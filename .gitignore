@@ -1,0 +1,40 @@
+# Python/cache files
+**/__pycache__/
+*.pyc
+
+# Virtual environments
+.venv/
+venv/
+
+# Manim / generated media (never commit renders)
+media/
+**/media/
+*.mp4
+*.mov
+*.wav
+*.mp3
+
+# DaVinci Resolve project backups (a .drp is never uploaded — deliverable is the .mov)
+*.drp
+
+# Manim snapshot cache (build artifact, 50+ MB pickles). Scoped to the
+# animations tree.
+animations/**/cache/
+
+# Machine-local solver working data: resume checkpoints / memo pickles
+# (regenerable, can be GBs). Committed results live in math/data/shared/.
+math/data/local/
+
+# OS / editor junk
+.DS_Store
+
+# Claude config: commands + settings.local.json are machine-local (recreated from
+# dotclaude by /sync-videos — commands is a symlink, settings.local.json a real copy
+# since symlinked settings files aren't honored). CLAUDE.shared.md / CLAUDE.private.md
+# are COMMITTED in-tree symlinks (→ bpkfigures/ + dotclaude/), imported by CLAUDE.md —
+# do NOT gitignore them.
+.claude/commands
+.claude/settings.local.json
+
+# Ignore notebook checkpoints
+**/.ipynb_checkpoints/
