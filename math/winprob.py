@@ -439,9 +439,12 @@ class WinProbSolver:
         S = np.arange(self.n_ans, dtype=np.int32)
         eps = self.eps
         hard = self.mode == "hard"
+        total = int(opener_rows.shape[0])
+        seed = self._verbose and total > 1               # serial seed pass (not a worker)
         best_l, best_c, best_g = init_l, init_c, -1
-        for gi in range(int(opener_rows.shape[0])):
+        for gi in range(total):
             g = int(opener_rows[gi])
+            self._op = (self.guesses[g], gi + 1, total)   # feeds the heartbeat's opener field
             pats = self.PAT[g, S]
             uniq, cnts = np.unique(pats, return_counts=True)
             if uniq.shape[0] <= 1:                       # doesn't split -> useless
@@ -468,6 +471,10 @@ class WinProbSolver:
             if not pruned and self._lex_less((acc_l, acc_c), (best_l, best_c), eps):
                 best_l, best_c, best_g = acc_l, acc_c, g
                 self._best_p = (self.n_ans - best_l) / self.n_ans
+            if seed:                                     # serial seed: report each opener done
+                print(f"    seed {gi + 1}/{total} done | best P<= "
+                      f"{(self.n_ans - best_l) / self.n_ans:.4f} "
+                      f"('{self.guesses[best_g] if best_g >= 0 else '-'}')", flush=True)
         return float(best_l), float(best_c), int(best_g)
 
     def solve_root_parallel(self, n, workers=None, seed_k=64, dispatch=1):
