@@ -544,6 +544,67 @@ class WinProbSolver:
         opener = self.guesses[best_g] if best_g >= 0 else "-"
         return p, e_turns, opener
 
+    def solve_all_openers(self, n, workers=None, dispatch=1):
+        """Evaluate EVERY opener fully (no cross-opener pruning) at budget n, and for
+        each save its full optimal tree to gitignored data/local/winprob/trees/, plus
+        a committed per-opener summary (opener, p_win, e_turns) to data/shared/. Much
+        heavier than the optimal solve (no pruning), but embarrassingly parallel. The
+        optimal opener falls out as the best row. Returns (p, e, opener) of the best."""
+        if n <= 2:                                       # trivial: one row, still emit outputs
+            self.solve_root(n)
+        root = np.arange(self.n_ans, dtype=np.int32)
+        rows = np.arange(self.PAT.shape[0])
+        _, distinct, order = self._order(rows, root)
+        openers = rows[order][distinct[order] > 1]
+        workers = workers or max(1, (os.cpu_count() or 2))
+        data = Path(__file__).resolve().parent / "data"
+        tree_dir = data / "local" / "winprob" / "trees" / f"{self.mode}_n{n:02d}"
+        shared_dir = data / "shared" / "winprob"
+        tree_dir.mkdir(parents=True, exist_ok=True)
+        shared_dir.mkdir(parents=True, exist_ok=True)
+
+        # Resume: openers already in the summary CSV are done (their trees exist).
+        summary_path = shared_dir / f"{self.mode}_n{n:02d}_openers.csv"
+        done_words = set()
+        if summary_path.exists():
+            for line in summary_path.read_text().splitlines()[1:]:
+                if line:
+                    done_words.add(line.split(",")[0])
+        todo = [int(g) for g in openers.tolist() if self.guesses[int(g)] not in done_words]
+        if self._verbose and done_words:
+            print(f"    resuming: {len(done_words):,} openers done, {len(todo):,} to go", flush=True)
+
+        tasks = [(g, n, str(tree_dir)) for g in todo]
+        total = len(tasks)
+        ctx = mp.get_context("spawn")
+        done = 0
+        t0 = last = time.perf_counter()
+        # Append each opener's summary row as its worker finishes (so a kill is resumable).
+        with open(summary_path, "a") as csv:
+            if not done_words:
+                csv.write("opener,p_win,e_turns_given_won\n")
+            with ctx.Pool(workers, initializer=_init_worker, initargs=(self.mode,)) as pool:
+                for (g, l, c) in pool.imap_unordered(_eval_opener_full, tasks, chunksize=dispatch):
+                    won = self.n_ans - l
+                    csv.write(f"{self.guesses[g]},{won / self.n_ans:.6f},"
+                              f"{c / won if won > self.eps else 0.0:.6f}\n")
+                    csv.flush()
+                    done += 1
+                    now = time.perf_counter()
+                    if self._verbose and (now - last >= 2.0 or done == total):
+                        last = now
+                        eta = (now - t0) / done * (total - done) if done else 0.0
+                        print(f"    {done:,}/{total:,} openers ({100 * done // max(total, 1)}%) | "
+                              f"{now - t0:.0f}s, ~{eta:.0f}s left", flush=True)
+
+        # Sort the (complete) CSV best-first: P desc, then E asc.
+        rows = summary_path.read_text().splitlines()
+        body = sorted((r for r in rows[1:] if r),
+                      key=lambda r: (-float(r.split(",")[1]), float(r.split(",")[2])))
+        summary_path.write_text(rows[0] + "\n" + "\n".join(body) + "\n")
+        best = body[0].split(",")
+        return float(best[1]), float(best[2]), best[0]
+
     # --- optimal decision tree (committed to shared/) ---------------------
 
     def build_tree(self, S, r, n0, L=None):
@@ -583,6 +644,24 @@ class WinProbSolver:
                 Lp = (L[pg == pv] if pg is not None else L) if self.mode == "hard" else None
                 branches[tmpl] = self.build_tree(grp, r - 1, n0, Lp)
         return {"guess": self.guesses[g], "turn": turn, "n": k, "branches": branches}
+
+    def build_tree_for_opener(self, g, n, L=None):
+        """Tree that FORCES opener g at the root, then plays optimally. Requires g's
+        subtree to already be solved (memoized) in this process. Same node format as
+        build_tree; turn 1 is the forced guess g."""
+        root = np.arange(self.n_ans, dtype=np.int32)
+        pats = self.PAT[g, root]
+        pg = pattern_row(self.guesses[g], self.guess_codes[L]) if self.mode == "hard" else None
+        branches = {}
+        for pv in np.unique(pats):
+            grp = root[pats == pv]
+            tmpl = _pattern_str(int(pv))
+            if int(pv) == ALL_GREEN:
+                branches[tmpl] = {"word": self.guesses[g], "turn": 1}
+            else:
+                Lp = (L[pg == pv] if pg is not None else L) if self.mode == "hard" else None
+                branches[tmpl] = self.build_tree(grp, n - 1, n, Lp)   # optimal continuation
+        return {"guess": self.guesses[g], "turn": 1, "n": int(self.n_ans), "branches": branches}
 
     def save_tree(self, n, path, *, p_win, e_turns, opener):
         """Write the optimal decision tree for budget n to a self-describing,
@@ -625,11 +704,35 @@ def _solve_one_opener(args):
     return _WORKER._sweep_openers(np.array([g], dtype=np.int32), n, init_l, init_c, L)
 
 
+def _eval_opener_full(args):
+    """Solve one opener FULLY (no pruning), write its tree JSON, return (g, lost, cost).
+    Clears the worker memo afterward so peak memory stays at one opener's subtree."""
+    g, n, tree_dir = args
+    wp = _WORKER
+    L = np.arange(wp.PAT.shape[0], dtype=np.int32) if wp.mode == "hard" else None
+    lost, cost, _ = wp._sweep_openers(np.array([g], dtype=np.int32), n, INF, INF, L)
+    won = wp.n_ans - lost
+    payload = {
+        "mode": wp.mode, "n": n, "opener": wp.guesses[g],
+        "p_win": won / wp.n_ans,
+        "e_turns_given_won": (cost / won if won > wp.eps else 0.0),
+        "tree": wp.build_tree_for_opener(g, n, L),
+    }
+    path = os.path.join(tree_dir, wp.guesses[g] + ".json")
+    tmp = path + ".tmp"
+    with open(tmp, "w") as fh:
+        json.dump(payload, fh)
+    os.replace(tmp, path)
+    wp.memo.clear(); wp.lb.clear(); wp.move.clear()      # bound memory to one opener
+    return (g, float(lost), float(cost))
+
+
 def _main():
     import sys
     args = sys.argv[1:]
     mode = "hard" if "--hard" in args else "regular"
     fresh = "--fresh" in args                            # ignore any saved memo, start cold
+    all_openers = "--all-openers" in args                # evaluate EVERY opener (summary + trees)
     pos = [a for a in args if not a.startswith("--")]
     N = int(pos[0]) if pos else 6
 
@@ -655,6 +758,20 @@ def _main():
         loaded = wp.load_memo(memo_path)
         if loaded:
             print(f"resumed from {memo_path.name}: {loaded:,} states reused")
+
+    if all_openers:
+        # EVERY opener: per-opener summary (committed) + full trees (gitignored local).
+        # No cross-opener pruning, so this is far heavier than the optimal solve.
+        print("--all-openers: evaluating EVERY opener (summary -> shared/, trees -> local/)")
+        print(f"{'n':>3}  {'best P(win<=n)':>14}  {'E[turns|won]':>13}  {'opener':>7}")
+        for n in range(1, N + 1):
+            t = time.perf_counter()
+            p, em, opener = wp.solve_all_openers(n)
+            print(f"{n:>3}  {p:>14.5f}  {em:>13.4f}  {opener:>7}   "
+                  f"[+{time.perf_counter() - t:.1f}s]", flush=True)
+            print(f"     wrote {mode}_n{n:02d}_openers.csv (summary) + "
+                  f"trees/{mode}_n{n:02d}/*.json", flush=True)
+        return
 
     print(f"{'n':>3}  {'P(win<=n)':>10}  {'E[turns|won]':>13}  {'opener':>7}")
     for n in range(1, N + 1):
