@@ -82,6 +82,7 @@ class WinProbSolver:
         self._ckpt_path = None                          # if set, _beat periodically saves the memo
         self._ckpt_interval = 3600.0
         self._last_ckpt = 0.0
+        self._r2_closed = True                          # closed-form r==2 (off = validate vs recursion)
 
     # --- helpers ----------------------------------------------------------
 
@@ -177,6 +178,29 @@ class WinProbSolver:
         order = np.lexsort((worst, -distinct))           # -distinct primary, worst secondary
         return sub, distinct, order
 
+    def _solve_r2(self, sub, distinct, order):
+        """Exact (lost, cost, best_pos) for r == 2 in closed form -- no recursion.
+        With two turns left, guess g wins `distinct(g)` answers: the all-green word
+        now (iff g is a candidate) plus one per other feedback bucket next turn. So
+        won(S,2) = D = max distinct-pattern count. Among max-D guesses, one that is
+        itself a candidate (has an all-green bucket) wins its own word a turn
+        earlier, so cost = 2D - 1 if such a guess exists, else 2D. This kills the
+        entire second-to-last recursion layer (the most numerous nodes)."""
+        n = sub.shape[1]
+        D = int(distinct.max())
+        has_ag = (sub == ALL_GREEN).any(axis=1)          # guess is itself a candidate
+        ag = bool((has_ag & (distinct == D)).any())      # a max-D guess in S exists?
+        lost = float(n - D)
+        cost = float(2 * D - 1) if ag else float(2 * D)
+        best_pos = -1                                    # first best-ordered guess at D
+        for oi in order:                                 # order is -distinct sorted
+            if distinct[oi] != D:
+                break
+            if (not ag) or has_ag[oi]:
+                best_pos = int(oi)
+                break
+        return lost, cost, best_pos
+
     def _solve(self, S, r, bl, bc):
         """Exact (lost, cost) for (S, r) if it beats the lexicographic bound
         (bl, bc); otherwise a valid lower bound >= (bl, bc). Alpha-beta threads
@@ -207,6 +231,13 @@ class WinProbSolver:
         rows = self._legal_rows(S)
         sub, distinct, order = self._order(rows, S)
 
+        if r == 2 and self._r2_closed:                   # exact closed form, no recursion
+            lost, cost, bp = self._solve_r2(sub, distinct, order)
+            self.memo[key] = (lost, cost)
+            if bp >= 0:
+                self.move[key] = int(rows[bp])
+            return lost, cost
+
         is_root = n == self.n_ans
         best_l, best_c, best_g = bl, bc, -1
         for rank, oi in enumerate(order):
@@ -236,8 +267,8 @@ class WinProbSolver:
                 best_l, best_c, best_g = acc_l, acc_c, g
                 if n == self.n_ans:
                     self._best_p = (self.n_ans - best_l) / self.n_ans
-                if best_l <= eps:
-                    break                                # everything winnable: primary maxed
+                if best_l <= eps and best_c <= eps:      # perfect on BOTH -> can't improve
+                    break                                # (never fires for Wordle: won => cost>=1)
 
         if self._lex_less((best_l, best_c), (bl, bc), eps):
             self.memo[key] = (best_l, best_c)
@@ -278,6 +309,13 @@ class WinProbSolver:
         self._beat()
 
         sub, distinct, order = self._order(L, S)         # legal guesses vs S
+        if r == 2 and self._r2_closed:                   # exact closed form, no recursion
+            lost, cost, bp = self._solve_r2(sub, distinct, order)
+            self.memo[key] = (lost, cost)
+            if bp >= 0:
+                self.move[key] = int(L[bp])
+            return lost, cost
+
         is_root = n == self.n_ans and L.shape[0] == self.PAT.shape[0]
         best_l, best_c, best_g = bl, bc, -1
         for rank, oi in enumerate(order):
@@ -311,8 +349,8 @@ class WinProbSolver:
                 best_l, best_c, best_g = acc_l, acc_c, g
                 if is_root:
                     self._best_p = (self.n_ans - best_l) / self.n_ans
-                if best_l <= eps:
-                    break
+                if best_l <= eps and best_c <= eps:      # perfect on BOTH -> can't improve
+                    break                                # (never fires for Wordle: won => cost>=1)
 
         if self._lex_less((best_l, best_c), (bl, bc), eps):
             self.memo[key] = (best_l, best_c)
