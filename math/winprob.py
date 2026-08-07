@@ -725,6 +725,9 @@ def _solve_one_opener(args):
     # Root legal set is deterministic (all guesses), so reconstruct it per worker.
     L = np.arange(_WORKER.PAT.shape[0], dtype=np.int32) if _WORKER.mode == "hard" else None
     l, c, bg = _WORKER._sweep_openers(np.array([g], dtype=np.int32), n, init_l, init_c, L)
+    # Clear the memo between openers so a worker's RAM stays at one opener's subtree
+    # instead of growing unbounded across the ~1600 openers it handles.
+    _WORKER.memo.clear(); _WORKER.lb.clear(); _WORKER.move.clear()
     # Always report g (so the master can mark it tried for resume); (l, c) are this
     # opener's exact value only when it beat the incumbent (bg == g), else the bound.
     return (g, l, c, bg == g)
@@ -759,6 +762,10 @@ def _main():
     mode = "hard" if "--hard" in args else "regular"
     fresh = "--fresh" in args                            # ignore any saved memo, start cold
     all_openers = "--all-openers" in args                # evaluate EVERY opener (summary + trees)
+    workers = None                                       # worker processes (default = all cores)
+    for a in args:
+        if a.startswith("--workers="):
+            workers = int(a.split("=", 1)[1])
     pos = [a for a in args if not a.startswith("--")]
     N = int(pos[0]) if pos else 6
 
@@ -792,7 +799,7 @@ def _main():
         print(f"{'n':>3}  {'best P(win<=n)':>14}  {'E[turns|won]':>13}  {'opener':>7}")
         for n in range(1, N + 1):
             t = time.perf_counter()
-            p, em, opener = wp.solve_all_openers(n)
+            p, em, opener = wp.solve_all_openers(n, workers=workers)
             print(f"{n:>3}  {p:>14.5f}  {em:>13.4f}  {opener:>7}   "
                   f"[+{time.perf_counter() - t:.1f}s]", flush=True)
             print(f"     wrote {mode}_n{n:02d}_openers.csv (summary) + "
@@ -802,7 +809,7 @@ def _main():
     print(f"{'n':>3}  {'P(win<=n)':>10}  {'E[turns|won]':>13}  {'opener':>7}")
     for n in range(1, N + 1):
         t = time.perf_counter()
-        p, em, opener = wp.solve_root_parallel(n)        # fans root openers over workers (both modes)
+        p, em, opener = wp.solve_root_parallel(n, workers=workers)   # fans openers over workers
         print(f"{n:>3}  {p:>10.5f}  {em:>13.4f}  {opener:>7}   "
               f"[{len(wp.memo) + len(wp.lb):,} states, +{time.perf_counter() - t:.1f}s]",
               flush=True)
