@@ -503,31 +503,50 @@ class WinProbSolver:
         self._op = ("", 0, 0)
         self._best_p = 0.0
 
-        k = int(min(seed_k, openers.shape[0]))
-        l0, c0, g0 = self._sweep_openers(openers[:k], n, float(self.n_ans) + 1.0, INF, L_root)
-        if self._verbose:
-            print(f"    seed: P<= {(self.n_ans - l0) / self.n_ans:.4f} "
-                  f"('{self.guesses[g0] if g0 >= 0 else '-'}') from top {k}; "
-                  f"fanning {openers.shape[0] - k:,} openers over {workers} workers "
-                  f"({self.mode})", flush=True)
+        # Opener-level resume: which openers we've tried + the best so far. (The memo
+        # checkpoint barely helps a mid-sweep here, so this is the real resume.)
+        sweep_path = (Path(__file__).resolve().parent / "data" / "local" / "winprob"
+                      / f"{self.mode}_n{n:02d}.sweep.pkl")
+        tried, best_l, best_c, best_g = set(), None, None, -1
+        if sweep_path.exists():
+            try:
+                with open(sweep_path, "rb") as fh:
+                    st = pickle.load(fh)
+                tried, best_l, best_c, best_g = set(st["tried"]), st["l"], st["c"], st["g"]
+            except Exception:
+                tried, best_l, best_c, best_g = set(), None, None, -1
+        if best_l is None:                               # fresh: seed incumbent from top openers
+            k = int(min(seed_k, openers.shape[0]))
+            best_l, best_c, best_g = self._sweep_openers(openers[:k], n, float(self.n_ans) + 1.0, INF, L_root)
+            tried.update(int(g) for g in openers[:k])
+            if self._verbose:
+                print(f"    seed: P<= {(self.n_ans - best_l) / self.n_ans:.4f} "
+                      f"('{self.guesses[best_g] if best_g >= 0 else '-'}') from top {k}; "
+                      f"fanning openers over {workers} workers ({self.mode})", flush=True)
+        elif self._verbose:
+            print(f"    resuming sweep: {len(tried):,} openers tried, best P<= "
+                  f"{(self.n_ans - best_l) / self.n_ans:.4f} "
+                  f"('{self.guesses[best_g] if best_g >= 0 else '-'}')", flush=True)
 
-        best_l, best_c, best_g = l0, c0, g0
-        rest = openers[k:]
-        if rest.shape[0]:
-            # Hand openers to the pool ONE AT A TIME (completion order), so progress
-            # is per-opener and load is balanced by natural work-stealing. Each
-            # worker keeps its solver+memo across every opener it draws.
-            tasks = [(g, n, l0, c0) for g in rest.tolist()]
+        todo = [int(g) for g in openers.tolist() if int(g) not in tried]
+        if todo:
+            tasks = [(g, n, best_l, best_c) for g in todo]   # prune against the incumbent
             total = len(tasks)
             ctx = mp.get_context("spawn")
             done = 0
-            t0 = last = time.perf_counter()
+            t0 = last = tsave = time.perf_counter()
             with ctx.Pool(workers, initializer=_init_worker, initargs=(self.mode,)) as pool:
-                for (l, c, g) in pool.imap_unordered(_solve_one_opener, tasks, chunksize=dispatch):
+                for (g, l, c, beat) in pool.imap_unordered(_solve_one_opener, tasks, chunksize=dispatch):
                     done += 1
-                    if g >= 0 and self._lex_less((l, c), (best_l, best_c), self.eps):
+                    tried.add(g)
+                    if beat and self._lex_less((l, c), (best_l, best_c), self.eps):
                         best_l, best_c, best_g = l, c, g
                     now = time.perf_counter()
+                    if now - tsave >= 10.0:               # periodic resume checkpoint
+                        tsave = now
+                        with open(str(sweep_path) + ".tmp", "wb") as fh:
+                            pickle.dump({"tried": tried, "l": best_l, "c": best_c, "g": best_g}, fh)
+                        os.replace(str(sweep_path) + ".tmp", sweep_path)
                     if self._verbose and (now - last >= 2.0 or done == total):
                         last = now
                         eta = (now - t0) / done * (total - done)
@@ -538,6 +557,10 @@ class WinProbSolver:
 
         self.memo[rkey] = (best_l, best_c)               # lets build_tree reuse the winner
         self.move[rkey] = best_g
+        try:
+            sweep_path.unlink()                          # budget done -> drop the resume file
+        except OSError:
+            pass
         won = self.n_ans - best_l
         p = won / self.n_ans
         e_turns = best_c / won if won > self.eps else 0.0
@@ -701,7 +724,10 @@ def _solve_one_opener(args):
     g, n, init_l, init_c = args
     # Root legal set is deterministic (all guesses), so reconstruct it per worker.
     L = np.arange(_WORKER.PAT.shape[0], dtype=np.int32) if _WORKER.mode == "hard" else None
-    return _WORKER._sweep_openers(np.array([g], dtype=np.int32), n, init_l, init_c, L)
+    l, c, bg = _WORKER._sweep_openers(np.array([g], dtype=np.int32), n, init_l, init_c, L)
+    # Always report g (so the master can mark it tried for resume); (l, c) are this
+    # opener's exact value only when it beat the incumbent (bg == g), else the bound.
+    return (g, l, c, bg == g)
 
 
 def _eval_opener_full(args):
