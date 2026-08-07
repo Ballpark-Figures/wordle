@@ -70,6 +70,7 @@ class WinProbSolver:
         self._heartbeat = 30.0
         self._n = 0
         self._best_p = 0.0
+        self._op = ("", 0, 0)                           # root opener being tried: (word, i, total)
 
     # --- helpers ----------------------------------------------------------
 
@@ -80,18 +81,22 @@ class WinProbSolver:
         return np.arange(self.PAT.shape[0])              # any allowed word
 
     def _beat(self, force=False):
+        # Gate on wall-clock, NOT a call-count mask: each node here runs a
+        # ~13k-guess ordering pass (tens of ms), so a coarse call mask would take
+        # minutes to trip. A perf_counter() per node is negligible vs. node cost.
         self._calls += 1
         if not self._verbose:
-            return
-        if not force and (self._calls & 0x3FFF):
             return
         now = time.perf_counter()
         if not force and now - self._last_beat < self._heartbeat:
             return
         self._last_beat = now
+        op, oi, ot = self._op
+        frac = f"opener '{op}' {oi:,}/{ot:,} | " if ot else ""
         nst = len(self.memo) + len(self.lb)
-        print(f"    [n={self._n}] {nst:,} states | P<= so far {self._best_p:.4f} "
-              f"| {now - self._t0:.0f}s", flush=True)
+        rate = self._calls / (now - self._t0) if now > self._t0 else 0.0
+        print(f"    [n={self._n}] {frac}{nst:,} states | P<= so far {self._best_p:.4f} "
+              f"| {rate:,.0f} calls/s | {now - self._t0:.0f}s", flush=True)
 
     @staticmethod
     def _lex_less(a, b, eps):
@@ -143,11 +148,15 @@ class WinProbSolver:
             worst[i] = int(c.max())
         order = np.lexsort((worst, -distinct))           # -distinct primary, worst secondary
 
+        is_root = n == self.n_ans
         best_l, best_c, best_g = bl, bc, -1
-        for oi in order:
+        for rank, oi in enumerate(order):
             g = int(rows[oi])
             if distinct[oi] <= 1:                        # guess doesn't split S -> useless
                 continue
+            if is_root:                                  # feeds the heartbeat's opener progress
+                self._op = (self.guesses[g], rank + 1, order.shape[0])
+                self._beat()
             pats = sub[oi]
             # all-green bucket is the guessed word itself, nonempty iff g is a candidate
             has_ag = np.any(pats == ALL_GREEN)
@@ -186,6 +195,7 @@ class WinProbSolver:
         root = np.arange(self.n_ans, dtype=np.int32)
         self._n = n
         self._best_p = 0.0
+        self._op = ("", 0, 0)
         lost, cost = self._solve(root, n, float(self.n_ans) + 1.0, INF)
         won = self.n_ans - lost
         p = won / self.n_ans
