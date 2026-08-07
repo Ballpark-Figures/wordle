@@ -482,12 +482,23 @@ class WinProbSolver:
         if n <= 2:
             return self.solve_root(n)
         root = np.arange(self.n_ans, dtype=np.int32)
+        # Hard mode: at the root every allowed word is a legal guess -> L = all.
+        L_root = np.arange(self.PAT.shape[0], dtype=np.int32) if self.mode == "hard" else None
+        rk = n if n < self.n_ans else self.n_ans
+        rkey = (root.tobytes(), L_root.tobytes(), rk) if self.mode == "hard" else (root.tobytes(), rk)
+        if rkey in self.memo and rkey in self.move:      # already solved (e.g. resumed) -> skip sweep
+            best_l, best_c = self.memo[rkey]
+            best_g = self.move[rkey]
+            won = self.n_ans - best_l
+            p = won / self.n_ans
+            e_turns = best_c / won if won > self.eps else 0.0
+            if self._verbose:
+                print(f"    budget {n} already solved (cached root) -> reused, sweep skipped", flush=True)
+            return p, e_turns, (self.guesses[best_g] if best_g >= 0 else "-")
         rows = np.arange(self.PAT.shape[0])
         _, distinct, order = self._order(rows, root)
         openers = rows[order][distinct[order] > 1]       # splitting openers, best first
         workers = workers or max(1, (os.cpu_count() or 2))
-        # Hard mode: at the root every allowed word is a legal guess -> L = all.
-        L_root = np.arange(self.PAT.shape[0], dtype=np.int32) if self.mode == "hard" else None
         self._n = n
         self._op = ("", 0, 0)
         self._best_p = 0.0
@@ -525,10 +536,8 @@ class WinProbSolver:
                               f"('{self.guesses[best_g] if best_g >= 0 else '-'}') | "
                               f"{now - t0:.0f}s, ~{eta:.0f}s left", flush=True)
 
-        rk = n if n < self.n_ans else self.n_ans
-        key = (root.tobytes(), L_root.tobytes(), rk) if self.mode == "hard" else (root.tobytes(), rk)
-        self.memo[key] = (best_l, best_c)                # lets build_tree reuse the winner
-        self.move[key] = best_g
+        self.memo[rkey] = (best_l, best_c)               # lets build_tree reuse the winner
+        self.move[rkey] = best_g
         won = self.n_ans - best_l
         p = won / self.n_ans
         e_turns = best_c / won if won > self.eps else 0.0
