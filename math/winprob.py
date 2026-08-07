@@ -30,6 +30,7 @@ usage:  python math/winprob.py N [--hard]
 """
 
 import hashlib
+import json
 import os
 import pickle
 import time
@@ -414,6 +415,68 @@ class WinProbSolver:
         opener = self.guesses[g] if g >= 0 else "-"
         return p, e_turns, opener
 
+    # --- optimal decision tree (committed to shared/) ---------------------
+
+    def build_tree(self, S, r, n0, L=None):
+        """Nested optimal decision tree for (S, r); a guess made here is turn
+        n0-r+1. Leaves: {"word","turn"} (a won answer) or {"lost":[...]} (can't be
+        won within the budget). Internal: {"guess","turn","n","branches": {pattern
+        -> subtree}}. Follows the solved optimal move at each node (memoized), so
+        it's fast once solve_root(n) has run; fully-separable/last-turn nodes are
+        expanded directly without re-solving."""
+        k = int(S.shape[0])
+        turn = int(n0 - r + 1)
+        if k == 0:
+            return {}
+        if r <= 0:                                       # no turn left to submit
+            return {"lost": [self.answers[int(i)] for i in S]}
+        if k == 1:                                       # submit it, won this turn
+            return {"word": self.answers[int(S[0])], "turn": turn}
+        if r == 1:                                       # uniform last turn: win any one
+            g = int(self.ans2grow[int(S[0])])
+        elif self.mode == "hard":
+            self._solve_hard(S, L, r, float(k) + 1.0, INF)   # ensure exact + move recorded
+            g = self.move.get((S.tobytes(), L.tobytes(), min(r, k)), -1)
+        else:
+            self._solve(S, r, float(k) + 1.0, INF)
+            g = self.move.get((S.tobytes(), min(r, k)), -1)
+        if g < 0:                                        # safety net (never on an optimal path)
+            return {"lost": [self.answers[int(i)] for i in S]}
+        pats = self.PAT[g, S]
+        pg = pattern_row(self.guesses[g], self.guess_codes[L]) if (self.mode == "hard" and r > 1) else None
+        branches = {}
+        for pv in np.unique(pats):
+            grp = S[pats == pv]
+            tmpl = _pattern_str(int(pv))
+            if int(pv) == ALL_GREEN:                     # guessed the answer -> won now
+                branches[tmpl] = {"word": self.guesses[g], "turn": turn}
+            else:
+                Lp = (L[pg == pv] if pg is not None else L) if self.mode == "hard" else None
+                branches[tmpl] = self.build_tree(grp, r - 1, n0, Lp)
+        return {"guess": self.guesses[g], "turn": turn, "n": k, "branches": branches}
+
+    def save_tree(self, n, path, *, p_win, e_turns, opener):
+        """Write the optimal decision tree for budget n to a self-describing,
+        committed JSON (data/shared/winprob/). Atomic (tmp + replace)."""
+        root = np.arange(self.n_ans, dtype=np.int32)
+        L = np.arange(self.PAT.shape[0], dtype=np.int32) if self.mode == "hard" else None
+        payload = {
+            "mode": self.mode,
+            "n": n,
+            "answers": self.n_ans,
+            "guesses": len(self.guesses),
+            "distribution": "uniform",
+            "objective": "max P(finish within n turns); tie-break min E[turns|won]",
+            "p_win": p_win,
+            "e_turns_given_won": e_turns,
+            "opener": opener,
+            "tree": self.build_tree(root, n, n, L),
+        }
+        tmp = str(path) + ".tmp"
+        with open(tmp, "w") as fh:
+            json.dump(payload, fh)
+        os.replace(tmp, path)
+
 
 def _main():
     import sys
@@ -426,9 +489,12 @@ def _main():
     wp = WinProbSolver(mode=mode)
     wp._t0 = wp._last_beat = wp._last_ckpt = time.perf_counter()
 
-    # Committed final data would go under data/shared/; the resume memo is a
-    # regenerable checkpoint, so it lives in gitignored data/local/winprob/.
-    local_dir = Path(__file__).resolve().parent / "data" / "local" / "winprob"
+    # Committed deliverable (optimal trees) -> data/shared/winprob/, synced via git.
+    # The resume memo is a regenerable checkpoint -> gitignored data/local/winprob/.
+    data = Path(__file__).resolve().parent / "data"
+    shared_dir = data / "shared" / "winprob"
+    local_dir = data / "local" / "winprob"
+    shared_dir.mkdir(parents=True, exist_ok=True)
     local_dir.mkdir(parents=True, exist_ok=True)
     memo_path = local_dir / f"{mode}.memo.pkl"
     wp._ckpt_path = memo_path                            # enables periodic mid-solve checkpoints
@@ -450,8 +516,12 @@ def _main():
         print(f"{n:>3}  {p:>10.5f}  {em:>13.4f}  {opener:>7}   "
               f"[{len(wp.memo) + len(wp.lb):,} states, +{time.perf_counter() - t:.1f}s]",
               flush=True)
-        wp.save_memo(memo_path)                          # checkpoint after each budget
-        print(f"     saved checkpoint (n={n})", flush=True)
+        # Save the TREE first (the committed deliverable), so it survives even if
+        # the memo checkpoint below is interrupted.
+        tree_path = shared_dir / f"{mode}_n{n:02d}.json"
+        wp.save_tree(n, tree_path, p_win=p, e_turns=em, opener=opener)
+        wp.save_memo(memo_path)                          # resume checkpoint after each budget
+        print(f"     saved tree -> {tree_path.name} + checkpoint (n={n})", flush=True)
         if p >= 1.0 - 1e-9:
             print(f"     (all answers winnable at n={n}; higher n is identical)")
             break
