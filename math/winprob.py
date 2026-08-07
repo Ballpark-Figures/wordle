@@ -35,7 +35,6 @@ import multiprocessing as mp
 import os
 import pickle
 import time
-from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 import numpy as np
@@ -471,13 +470,15 @@ class WinProbSolver:
                 self._best_p = (self.n_ans - best_l) / self.n_ans
         return float(best_l), float(best_c), int(best_g)
 
-    def solve_root_parallel(self, n, workers=None, seed_k=64, chunks_per_worker=32):
+    def solve_root_parallel(self, n, workers=None, seed_k=64, dispatch=1):
         """Same result as solve_root(n), but the ~12972 root openers are swept in
         parallel (both regular and hard mode). Seed a strong incumbent from the top
-        `seed_k` openers serially, then fan the rest over worker processes (each
-        with its OWN memo), all pruning against that incumbent, and take the global
-        best. Exact: every opener that could beat the incumbent is evaluated
-        exactly; ties keep the earliest. n<=2 falls back to serial (instant)."""
+        `seed_k` openers serially, then hand the rest to a worker pool ONE AT A TIME
+        (imap_unordered), each worker pruning against the incumbent with its OWN
+        (persistent) memo; take the global best. Exact: every opener that could beat
+        the incumbent is evaluated exactly; ties keep the earliest. n<=2 falls back
+        to serial (instant). `dispatch` is the IPC batch size (1 = truest per-opener
+        progress; raise it to trade a little tracking granularity for less overhead)."""
         if n <= 2:
             return self.solve_root(n)
         root = np.arange(self.n_ans, dtype=np.int32)
@@ -502,31 +503,27 @@ class WinProbSolver:
         best_l, best_c, best_g = l0, c0, g0
         rest = openers[k:]
         if rest.shape[0]:
-            # Many small chunks, round-robin over the quality-ordered openers so each
-            # has a mix of hard/easy work. More chunks = finer progress + better
-            # balance; per-chunk overhead is a tiny pickle. Report in COMPLETION
-            # order so a slow chunk doesn't stall the progress of finished ones.
-            nchunks = min(int(rest.shape[0]), workers * chunks_per_worker)
-            chunks = [rest[i::nchunks] for i in range(nchunks) if rest[i::nchunks].shape[0]]
-            tasks = [(chunk.tolist(), n, l0, c0) for chunk in chunks]
+            # Hand openers to the pool ONE AT A TIME (completion order), so progress
+            # is per-opener and load is balanced by natural work-stealing. Each
+            # worker keeps its solver+memo across every opener it draws.
+            tasks = [(g, n, l0, c0) for g in rest.tolist()]
+            total = len(tasks)
             ctx = mp.get_context("spawn")
-            done, total = 0, len(tasks)
-            t0 = time.perf_counter()
-            with ProcessPoolExecutor(max_workers=workers, mp_context=ctx,
-                                     initializer=_init_worker, initargs=(self.mode,)) as ex:
-                futs = [ex.submit(_sweep_chunk, task) for task in tasks]
-                for fut in as_completed(futs):
-                    l, c, g = fut.result()
+            done = 0
+            t0 = last = time.perf_counter()
+            with ctx.Pool(workers, initializer=_init_worker, initargs=(self.mode,)) as pool:
+                for (l, c, g) in pool.imap_unordered(_solve_one_opener, tasks, chunksize=dispatch):
                     done += 1
                     if g >= 0 and self._lex_less((l, c), (best_l, best_c), self.eps):
                         best_l, best_c, best_g = l, c, g
-                    if self._verbose:
-                        el = time.perf_counter() - t0
-                        eta = el / done * (total - done)
-                        print(f"    {done}/{total} chunks ({100 * done // total}%) | best P<= "
+                    now = time.perf_counter()
+                    if self._verbose and (now - last >= 2.0 or done == total):
+                        last = now
+                        eta = (now - t0) / done * (total - done)
+                        print(f"    {done:,}/{total:,} openers ({100 * done // total}%) | best P<= "
                               f"{(self.n_ans - best_l) / self.n_ans:.4f} "
                               f"('{self.guesses[best_g] if best_g >= 0 else '-'}') | "
-                              f"{el:.0f}s elapsed, ~{eta:.0f}s left", flush=True)
+                              f"{now - t0:.0f}s, ~{eta:.0f}s left", flush=True)
 
         rk = n if n < self.n_ans else self.n_ans
         key = (root.tobytes(), L_root.tobytes(), rk) if self.mode == "hard" else (root.tobytes(), rk)
@@ -612,11 +609,11 @@ def _init_worker(mode):
     _WORKER._verbose = False
 
 
-def _sweep_chunk(args):
-    openers, n, init_l, init_c = args
+def _solve_one_opener(args):
+    g, n, init_l, init_c = args
     # Root legal set is deterministic (all guesses), so reconstruct it per worker.
     L = np.arange(_WORKER.PAT.shape[0], dtype=np.int32) if _WORKER.mode == "hard" else None
-    return _WORKER._sweep_openers(np.asarray(openers, dtype=np.int32), n, init_l, init_c, L)
+    return _WORKER._sweep_openers(np.array([g], dtype=np.int32), n, init_l, init_c, L)
 
 
 def _main():
