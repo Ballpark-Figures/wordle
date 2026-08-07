@@ -426,27 +426,29 @@ class WinProbSolver:
         opener = self.guesses[g] if g >= 0 else "-"
         return p, e_turns, opener
 
-    # --- parallel root sweep (regular mode) -------------------------------
+    # --- parallel root sweep ---------------------------------------------
 
-    def _sweep_openers(self, opener_rows, n, init_l, init_c):
+    def _sweep_openers(self, opener_rows, n, init_l, init_c, L=None):
         """Evaluate a SUBSET of root openers at budget n against an initial
         incumbent (init_l, init_c); return the best (lost, cost, opener_row).
-        This is exactly the serial _solve root loop restricted to `opener_rows` --
-        the unit of parallelism. Recursion into each opener's buckets uses
-        self._solve, i.e. THIS process's own memo (workers don't share one). The
-        incumbent is a valid achievable bound, so pruning against it is exact: any
-        opener that can beat it is computed exactly; the rest are correctly cut."""
+        This is exactly the serial root loop restricted to `opener_rows` -- the
+        unit of parallelism. Recursion into each opener's buckets uses this
+        process's OWN memo (workers don't share one). The incumbent is a valid
+        achievable bound, so pruning against it is exact: any opener that can beat
+        it is computed exactly; the rest are correctly cut. Hard mode threads the
+        legal set L (all guesses at the root) and splits it per opener."""
         S = np.arange(self.n_ans, dtype=np.int32)
         eps = self.eps
+        hard = self.mode == "hard"
         best_l, best_c, best_g = init_l, init_c, -1
-        total = int(opener_rows.shape[0])
-        for gi in range(total):
+        for gi in range(int(opener_rows.shape[0])):
             g = int(opener_rows[gi])
             pats = self.PAT[g, S]
             uniq, cnts = np.unique(pats, return_counts=True)
             if uniq.shape[0] <= 1:                       # doesn't split -> useless
                 continue
             has_ag = bool(np.any(pats == ALL_GREEN))
+            pg = pattern_row(self.guesses[g], self.guess_codes[L]) if hard else None
             acc_l = 0.0
             acc_c = 1.0 if has_ag else 0.0
             pruned = False
@@ -455,7 +457,10 @@ class WinProbSolver:
                 if pv == ALL_GREEN:
                     continue
                 grp = S[pats == pv]
-                cl, cc = self._solve(grp, n - 1, best_l - acc_l, INF)
+                if hard:
+                    cl, cc = self._solve_hard(grp, L[pg == pv], n - 1, best_l - acc_l, INF)
+                else:
+                    cl, cc = self._solve(grp, n - 1, best_l - acc_l, INF)
                 acc_l += cl
                 acc_c += cc + (grp.shape[0] - cl)
                 if not self._lex_less((acc_l, acc_c), (best_l, best_c), eps):
@@ -467,13 +472,12 @@ class WinProbSolver:
         return float(best_l), float(best_c), int(best_g)
 
     def solve_root_parallel(self, n, workers=None, seed_k=64):
-        """Same result as solve_root(n) for regular mode, but the ~12972 root
-        openers are swept in parallel. Seed a strong incumbent from the top
+        """Same result as solve_root(n), but the ~12972 root openers are swept in
+        parallel (both regular and hard mode). Seed a strong incumbent from the top
         `seed_k` openers serially, then fan the rest over worker processes (each
         with its OWN memo), all pruning against that incumbent, and take the global
         best. Exact: every opener that could beat the incumbent is evaluated
         exactly; ties keep the earliest. n<=2 falls back to serial (instant)."""
-        assert self.mode == "regular", "parallel sweep is regular-mode only for now"
         if n <= 2:
             return self.solve_root(n)
         root = np.arange(self.n_ans, dtype=np.int32)
@@ -481,16 +485,19 @@ class WinProbSolver:
         _, distinct, order = self._order(rows, root)
         openers = rows[order][distinct[order] > 1]       # splitting openers, best first
         workers = workers or max(1, (os.cpu_count() or 2))
+        # Hard mode: at the root every allowed word is a legal guess -> L = all.
+        L_root = np.arange(self.PAT.shape[0], dtype=np.int32) if self.mode == "hard" else None
         self._n = n
         self._op = ("", 0, 0)
         self._best_p = 0.0
 
         k = int(min(seed_k, openers.shape[0]))
-        l0, c0, g0 = self._sweep_openers(openers[:k], n, float(self.n_ans) + 1.0, INF)
+        l0, c0, g0 = self._sweep_openers(openers[:k], n, float(self.n_ans) + 1.0, INF, L_root)
         if self._verbose:
             print(f"    seed: P<= {(self.n_ans - l0) / self.n_ans:.4f} "
                   f"('{self.guesses[g0] if g0 >= 0 else '-'}') from top {k}; "
-                  f"fanning {openers.shape[0] - k:,} openers over {workers} workers", flush=True)
+                  f"fanning {openers.shape[0] - k:,} openers over {workers} workers "
+                  f"({self.mode})", flush=True)
 
         best_l, best_c, best_g = l0, c0, g0
         rest = openers[k:]
@@ -512,8 +519,9 @@ class WinProbSolver:
                               f"('{self.guesses[best_g] if best_g >= 0 else '-'}')", flush=True)
 
         rk = n if n < self.n_ans else self.n_ans
-        self.memo[(root.tobytes(), rk)] = (best_l, best_c)   # lets build_tree reuse the winner
-        self.move[(root.tobytes(), rk)] = best_g
+        key = (root.tobytes(), L_root.tobytes(), rk) if self.mode == "hard" else (root.tobytes(), rk)
+        self.memo[key] = (best_l, best_c)                # lets build_tree reuse the winner
+        self.move[key] = best_g
         won = self.n_ans - best_l
         p = won / self.n_ans
         e_turns = best_c / won if won > self.eps else 0.0
@@ -596,7 +604,9 @@ def _init_worker(mode):
 
 def _sweep_chunk(args):
     openers, n, init_l, init_c = args
-    return _WORKER._sweep_openers(np.asarray(openers, dtype=np.int32), n, init_l, init_c)
+    # Root legal set is deterministic (all guesses), so reconstruct it per worker.
+    L = np.arange(_WORKER.PAT.shape[0], dtype=np.int32) if _WORKER.mode == "hard" else None
+    return _WORKER._sweep_openers(np.asarray(openers, dtype=np.int32), n, init_l, init_c, L)
 
 
 def _main():
@@ -633,9 +643,7 @@ def _main():
     print(f"{'n':>3}  {'P(win<=n)':>10}  {'E[turns|won]':>13}  {'opener':>7}")
     for n in range(1, N + 1):
         t = time.perf_counter()
-        # regular mode fans the root openers over worker processes; hard is serial.
-        p, em, opener = (wp.solve_root_parallel(n) if mode == "regular"
-                         else wp.solve_root(n))
+        p, em, opener = wp.solve_root_parallel(n)        # fans root openers over workers (both modes)
         print(f"{n:>3}  {p:>10.5f}  {em:>13.4f}  {opener:>7}   "
               f"[{len(wp.memo) + len(wp.lb):,} states, +{time.perf_counter() - t:.1f}s]",
               flush=True)
