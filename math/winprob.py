@@ -80,6 +80,8 @@ class WinProbSolver:
         self._n = 0
         self._best_p = 0.0
         self._op = ("", 0, 0)                           # root opener being tried: (word, i, total)
+        self._hits = 0                                  # memo exact hits (transposition reuse)
+        self._lbhits = 0                                # alpha-beta lower-bound prunes on revisit
         self._ckpt_path = None                          # if set, _beat periodically saves the memo
         self._ckpt_interval = 3600.0
         self._last_ckpt = 0.0
@@ -147,8 +149,11 @@ class WinProbSolver:
         frac = f"opener '{op}' {oi:,}/{ot:,} | " if ot else ""
         nst = len(self.memo) + len(self.lb)
         rate = self._calls / (now - self._t0) if now > self._t0 else 0.0
+        tot = self._calls + self._hits + self._lbhits
+        hpct = 100.0 * (self._hits + self._lbhits) / tot if tot else 0.0
         print(f"    [n={self._n}] {frac}{nst:,} states | P<= so far {self._best_p:.4f} "
-              f"| {rate:,.0f} calls/s | {now - self._t0:.0f}s", flush=True)
+              f"| {rate:,.0f} calls/s | hits {hpct:.0f}% ({self._hits:,} memo / {self._lbhits:,} lb) "
+              f"| {now - self._t0:.0f}s", flush=True)
         if self._ckpt_path and now - self._last_ckpt >= self._ckpt_interval:
             self.save_memo(self._ckpt_path)              # periodic mid-solve checkpoint
             print(f"    checkpointed memo -> {self._ckpt_path}", flush=True)
@@ -234,9 +239,11 @@ class WinProbSolver:
         key = (S.tobytes(), r)
         ex = self.memo.get(key)
         if ex is not None:
+            self._hits += 1
             return ex
         lbv = self.lb.get(key)
         if lbv is not None and not self._lex_less(lbv, (bl, bc), eps):
+            self._lbhits += 1
             return lbv
         self._beat()
 
@@ -330,9 +337,11 @@ class WinProbSolver:
         key = (S.tobytes(), L.tobytes(), r)
         ex = self.memo.get(key)
         if ex is not None:
+            self._hits += 1
             return ex
         lbv = self.lb.get(key)
         if lbv is not None and not self._lex_less(lbv, (bl, bc), eps):
+            self._lbhits += 1
             return lbv
         self._beat()
 
