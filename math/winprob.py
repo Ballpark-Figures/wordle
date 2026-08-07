@@ -264,7 +264,9 @@ class WinProbSolver:
             acc_l = 0.0
             acc_c = 1.0 if has_ag else 0.0               # the self-win word spends this turn
             pruned = False
-            for pv in np.unique(pats):
+            uniq, cnts = np.unique(pats, return_counts=True)
+            for bi in np.argsort(-cnts):                 # largest buckets first -> prune sooner
+                pv = uniq[bi]
                 if pv == ALL_GREEN:
                     continue                             # won now: 0 lost, its +1 in acc_c
                 grp = S[pats == pv]
@@ -345,7 +347,9 @@ class WinProbSolver:
             acc_l = 0.0
             acc_c = 1.0 if has_ag else 0.0
             pruned = False
-            for pv in np.unique(pats):
+            uniq, cnts = np.unique(pats, return_counts=True)
+            for bi in np.argsort(-cnts):                 # largest buckets first -> prune sooner
+                pv = uniq[bi]
                 if pv == ALL_GREEN:
                     continue
                 grp = S[pats == pv]
