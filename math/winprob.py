@@ -173,7 +173,13 @@ class WinProbSolver:
         ~2x SLOWER — the single bincount is one C pass, the sort adds 12972 per-row
         sorts + a cumsum + a second bincount. The 243-wide histogram is not the
         bottleneck.)"""
-        sub = self.PAT[rows][:, S]                       # (m, k) patterns, uint8
+        # Gather (m, |S|) directly. `PAT[rows][:, S]` with rows = all 12972 first
+        # copies the WHOLE 30 MB matrix (~4x slower); a plain column slice avoids
+        # that, and np.ix_ gathers a genuine row subset without the intermediate.
+        if rows.shape[0] == self.PAT.shape[0]:
+            sub = self.PAT[:, S]                         # regular: all guesses legal
+        else:
+            sub = self.PAT[np.ix_(rows, S)]              # hard: legal subset L
         m = sub.shape[0]
         offs = (np.arange(m, dtype=np.int32) * N_PATTERNS)[:, None]
         counts = np.bincount((sub + offs).ravel(),
