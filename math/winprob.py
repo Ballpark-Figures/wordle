@@ -168,8 +168,12 @@ class WinProbSolver:
         distinct-pattern count per guess, and an argsort that tries the best
         splitters first (more distinct patterns, then smaller worst-case bucket)
         so alpha-beta gets a tight incumbent early. Ordering only -- NOT the
-        objective. Vectorized via one offset-bincount (the per-node floor cost)."""
-        sub = self.PAT[rows][:, S]                       # (m, |S|) patterns, uint8
+        objective. Vectorized via one offset-bincount over all guesses at once.
+        (A sort-based path scaling with |S| was tried for small buckets but ran
+        ~2x SLOWER — the single bincount is one C pass, the sort adds 12972 per-row
+        sorts + a cumsum + a second bincount. The 243-wide histogram is not the
+        bottleneck.)"""
+        sub = self.PAT[rows][:, S]                       # (m, k) patterns, uint8
         m = sub.shape[0]
         offs = (np.arange(m, dtype=np.int32) * N_PATTERNS)[:, None]
         counts = np.bincount((sub + offs).ravel(),
@@ -232,7 +236,11 @@ class WinProbSolver:
         rows = self._legal_rows(S)
         sub, distinct, order = self._order(rows, S)
 
-        if r == 2 and self._r2_closed:                   # exact closed form, no recursion
+        # Closed form (no recursion) when it is provably optimal: always at r==2,
+        # and at any r once some guess FULLY separates S (max distinct == n) --
+        # then everything is won and cost = 2n-1 (separator in S) / 2n is minimal
+        # regardless of remaining turns, so deeper budget can't do better.
+        if (r == 2 or int(distinct.max()) == n) and self._r2_closed:
             lost, cost, bp = self._solve_r2(sub, distinct, order)
             self.memo[key] = (lost, cost)
             if bp >= 0:
@@ -322,7 +330,10 @@ class WinProbSolver:
         self._beat()
 
         sub, distinct, order = self._order(L, S)         # legal guesses vs S
-        if r == 2 and self._r2_closed:                   # exact closed form, no recursion
+        # r==2, or any r where a legal guess fully separates S (see _solve). The
+        # separator and each isolated answer are all consistent candidates, hence
+        # legal in hard mode too, so the same closed form and cost apply.
+        if (r == 2 or int(distinct.max()) == n) and self._r2_closed:
             lost, cost, bp = self._solve_r2(sub, distinct, order)
             self.memo[key] = (lost, cost)
             if bp >= 0:
