@@ -37,7 +37,7 @@ from pathlib import Path
 
 import numpy as np
 
-from wordle import load_words, ALL_GREEN, N_PATTERNS, decode
+from wordle import load_words, to_codes, pattern_row, ALL_GREEN, N_PATTERNS, decode
 from build_patterns import load_patterns
 
 INF = float("inf")
@@ -62,6 +62,9 @@ class WinProbSolver:
         # every answer is an allowed guess). Used to (a) map candidates to guess
         # rows in hard mode, and (b) detect the all-green self-guess.
         self.ans2grow = np.searchsorted(self.guesses, self.answers).astype(np.int32)
+        # (12972, 5) letter codes for the guess words -- lets hard mode split the
+        # legal-guess set by pattern(played_guess, legal_word) via pattern_row.
+        self.guess_codes = to_codes(self.guesses)
         # search state
         self.memo = {}                                  # exact (lost, cost) per (S, r)
         self.move = {}                                  # chosen guess row per exact (S, r)
@@ -157,6 +160,23 @@ class WinProbSolver:
 
     # --- core recurrence --------------------------------------------------
 
+    def _order(self, rows, S):
+        """Move ordering over `rows` (guess indices) against candidate set S.
+        Returns (sub, distinct, order): the (len(rows) x |S|) pattern block, the
+        distinct-pattern count per guess, and an argsort that tries the best
+        splitters first (more distinct patterns, then smaller worst-case bucket)
+        so alpha-beta gets a tight incumbent early. Ordering only -- NOT the
+        objective. Vectorized via one offset-bincount (the per-node floor cost)."""
+        sub = self.PAT[rows][:, S]                       # (m, |S|) patterns, uint8
+        m = sub.shape[0]
+        offs = (np.arange(m, dtype=np.int32) * N_PATTERNS)[:, None]
+        counts = np.bincount((sub + offs).ravel(),
+                             minlength=m * N_PATTERNS).reshape(m, N_PATTERNS)
+        distinct = (counts > 0).sum(1)
+        worst = counts.max(1)
+        order = np.lexsort((worst, -distinct))           # -distinct primary, worst secondary
+        return sub, distinct, order
+
     def _solve(self, S, r, bl, bc):
         """Exact (lost, cost) for (S, r) if it beats the lexicographic bound
         (bl, bc); otherwise a valid lower bound >= (bl, bc). Alpha-beta threads
@@ -185,20 +205,7 @@ class WinProbSolver:
         self._beat()
 
         rows = self._legal_rows(S)
-        # Move ordering: try the best-splitting guesses first so alpha-beta gets a
-        # tight incumbent early. Ordering only -- NOT the objective. Key per guess:
-        # more distinct feedback patterns first, then smaller worst-case bucket.
-        # Vectorized: one offset-bincount gives the (n_rows x 243) histogram of
-        # feedback patterns for every guess at once -- same keys as the old per-row
-        # Python loop, ~10-100x faster (the loop was the solver's floor cost).
-        sub = self.PAT[rows][:, S]                       # (m, n) patterns on S, uint8
-        m = sub.shape[0]
-        offs = (np.arange(m, dtype=np.int32) * N_PATTERNS)[:, None]
-        counts = np.bincount((sub + offs).ravel(),
-                             minlength=m * N_PATTERNS).reshape(m, N_PATTERNS)
-        distinct = (counts > 0).sum(1)
-        worst = counts.max(1)
-        order = np.lexsort((worst, -distinct))           # -distinct primary, worst secondary
+        sub, distinct, order = self._order(rows, S)
 
         is_root = n == self.n_ans
         best_l, best_c, best_g = bl, bc, -1
@@ -239,6 +246,81 @@ class WinProbSolver:
             self.lb[key] = (bl, bc)
         return best_l, best_c
 
+    def _solve_hard(self, S, L, r, bl, bc):
+        """True (NYT) hard-mode recurrence. Same objective as `_solve`, but the
+        legal guesses at this node are exactly `L` = the allowed words still
+        CONSISTENT with the clues (a superset of the candidate answers S, since a
+        consistent non-answer word is a legal guess too). L is not a function of S
+        -- two feedback paths can reach the same S with different L -- so it is
+        part of the memo key. Playing guess g and observing pattern p narrows BOTH
+        sets: answers to S[PAT[g]==p], legal guesses to L[pattern(g, L)==p]. The
+        latter split is computed on the fly with pattern_row over the guess words."""
+        n = S.shape[0]
+        if n == 0:
+            return 0.0, 0.0
+        if r <= 0:                          # no turn to submit -> all lost
+            return float(n), 0.0
+        if n == 1:                          # lone candidate (always legal) -> win, 1 turn
+            return 0.0, 1.0
+        if r == 1:                          # uniform last turn: any candidate is legal, win 1
+            return float(n - 1), 1.0
+        if r >= n:                          # slack budget: candidates are always legal to try
+            r = n
+
+        eps = self.eps
+        key = (S.tobytes(), L.tobytes(), r)
+        ex = self.memo.get(key)
+        if ex is not None:
+            return ex
+        lbv = self.lb.get(key)
+        if lbv is not None and not self._lex_less(lbv, (bl, bc), eps):
+            return lbv
+        self._beat()
+
+        sub, distinct, order = self._order(L, S)         # legal guesses vs S
+        is_root = n == self.n_ans and L.shape[0] == self.PAT.shape[0]
+        best_l, best_c, best_g = bl, bc, -1
+        for rank, oi in enumerate(order):
+            g = int(L[oi])
+            if distinct[oi] <= 1:                        # doesn't split S -> useless
+                continue
+            if is_root:
+                self._op = (self.guesses[g], rank + 1, order.shape[0])
+                self._beat()
+            pats = sub[oi]                               # PAT[g, S]
+            has_ag = np.any(pats == ALL_GREEN)
+            # The child legal-set split is only consulted when a child recurses on
+            # L (budget r-1 >= 2). At the r==2 frontier children resolve at r==1
+            # without touching L, so skip the pattern_row entirely.
+            pg = pattern_row(self.guesses[g], self.guess_codes[L]) if r >= 3 else None
+            acc_l = 0.0
+            acc_c = 1.0 if has_ag else 0.0
+            pruned = False
+            for pv in np.unique(pats):
+                if pv == ALL_GREEN:
+                    continue
+                grp = S[pats == pv]
+                Lp = L[pg == pv] if pg is not None else L   # unused when r-1 < 2
+                cl, cc = self._solve_hard(grp, Lp, r - 1, best_l - acc_l, INF)
+                acc_l += cl
+                acc_c += cc + (grp.shape[0] - cl)
+                if not self._lex_less((acc_l, acc_c), (best_l, best_c), eps):
+                    pruned = True
+                    break
+            if not pruned and self._lex_less((acc_l, acc_c), (best_l, best_c), eps):
+                best_l, best_c, best_g = acc_l, acc_c, g
+                if is_root:
+                    self._best_p = (self.n_ans - best_l) / self.n_ans
+                if best_l <= eps:
+                    break
+
+        if self._lex_less((best_l, best_c), (bl, bc), eps):
+            self.memo[key] = (best_l, best_c)
+            self.move[key] = best_g
+        elif lbv is None or self._lex_less(lbv, (bl, bc), eps):
+            self.lb[key] = (bl, bc)
+        return best_l, best_c
+
     # --- top-level API ----------------------------------------------------
 
     def solve_root(self, n):
@@ -248,11 +330,17 @@ class WinProbSolver:
         self._n = n
         self._best_p = 0.0
         self._op = ("", 0, 0)
-        lost, cost = self._solve(root, n, float(self.n_ans) + 1.0, INF)
+        rk = n if n < self.n_ans else self.n_ans         # r is capped at |S| inside
+        if self.mode == "hard":
+            L = np.arange(self.PAT.shape[0], dtype=np.int32)   # all guesses legal at root
+            lost, cost = self._solve_hard(root, L, n, float(self.n_ans) + 1.0, INF)
+            g = self.move.get((root.tobytes(), L.tobytes(), rk), -1)
+        else:
+            lost, cost = self._solve(root, n, float(self.n_ans) + 1.0, INF)
+            g = self.move.get((root.tobytes(), rk), -1)
         won = self.n_ans - lost
         p = won / self.n_ans
         e_turns = cost / won if won > self.eps else 0.0
-        g = self.move.get((root.tobytes(), n if n < self.n_ans else self.n_ans), -1)
         opener = self.guesses[g] if g >= 0 else "-"
         return p, e_turns, opener
 
