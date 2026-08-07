@@ -29,7 +29,11 @@ Recurrence (a won word "spends" this turn, +1):
 usage:  python math/winprob.py N [--hard]
 """
 
+import hashlib
+import os
+import pickle
 import time
+from pathlib import Path
 
 import numpy as np
 
@@ -37,6 +41,7 @@ from wordle import load_words, ALL_GREEN, N_PATTERNS, decode
 from build_patterns import load_patterns
 
 INF = float("inf")
+MEMO_FORMAT = 1                        # bump if stored (lost, cost) values change meaning
 
 
 def _pattern_str(code):
@@ -67,10 +72,13 @@ class WinProbSolver:
         self._calls = 0
         self._t0 = 0.0
         self._last_beat = 0.0
-        self._heartbeat = 30.0
+        self._heartbeat = 60.0                          # matches hangman/winprob.py
         self._n = 0
         self._best_p = 0.0
         self._op = ("", 0, 0)                           # root opener being tried: (word, i, total)
+        self._ckpt_path = None                          # if set, _beat periodically saves the memo
+        self._ckpt_interval = 3600.0
+        self._last_ckpt = 0.0
 
     # --- helpers ----------------------------------------------------------
 
@@ -79,6 +87,44 @@ class WinProbSolver:
         if self.mode == "hard":
             return self.ans2grow[S]                      # only words still possible
         return np.arange(self.PAT.shape[0])              # any allowed word
+
+    # --- checkpoint / resume (mirrors hangman/winprob.py) -----------------
+
+    def _signature(self):
+        """Identifies which run a memo file belongs to (mode + exact word lists +
+        solver format), so a stale/incompatible checkpoint is never reused."""
+        h = hashlib.sha256()
+        h.update(f"wordle-winprob-v{MEMO_FORMAT}-{self.mode}".encode())
+        h.update("\n".join(self.answers).encode())
+        h.update("\n".join(self.guesses).encode())
+        return h.hexdigest()
+
+    def save_memo(self, path):
+        """Persist the exact (lost, cost) memo + chosen moves so a later run can
+        resume. Only exact values are stored -- alpha-beta lower bounds are cheap
+        to re-derive and would bloat the file. Atomic (tmp + replace)."""
+        data = {"sig": self._signature(), "memo": self.memo, "move": self.move}
+        tmp = str(path) + ".tmp"
+        with open(tmp, "wb") as fh:
+            pickle.dump(data, fh, protocol=pickle.HIGHEST_PROTOCOL)
+        os.replace(tmp, path)
+        self._last_ckpt = time.perf_counter()
+
+    def load_memo(self, path):
+        """Restore the exact memo + moves from a compatible previous run, if any.
+        Returns the number of states loaded, or 0."""
+        if not os.path.exists(path):
+            return 0
+        try:
+            with open(path, "rb") as fh:
+                data = pickle.load(fh)
+        except Exception:
+            return 0
+        if data.get("sig") != self._signature() or "memo" not in data:
+            return 0
+        self.memo = data["memo"]
+        self.move = data.get("move", {})
+        return len(self.memo)
 
     def _beat(self, force=False):
         # Gate on wall-clock, NOT a call-count mask: each node here runs a
@@ -97,6 +143,9 @@ class WinProbSolver:
         rate = self._calls / (now - self._t0) if now > self._t0 else 0.0
         print(f"    [n={self._n}] {frac}{nst:,} states | P<= so far {self._best_p:.4f} "
               f"| {rate:,.0f} calls/s | {now - self._t0:.0f}s", flush=True)
+        if self._ckpt_path and now - self._last_ckpt >= self._ckpt_interval:
+            self.save_memo(self._ckpt_path)              # periodic mid-solve checkpoint
+            print(f"    checkpointed memo -> {self._ckpt_path}", flush=True)
 
     @staticmethod
     def _lex_less(a, b, eps):
@@ -139,13 +188,16 @@ class WinProbSolver:
         # Move ordering: try the best-splitting guesses first so alpha-beta gets a
         # tight incumbent early. Ordering only -- NOT the objective. Key per guess:
         # more distinct feedback patterns first, then smaller worst-case bucket.
-        sub = self.PAT[rows][:, S]                       # (n_rows, n) patterns on S
-        distinct = np.empty(rows.shape[0], dtype=np.int32)
-        worst = np.empty(rows.shape[0], dtype=np.int32)
-        for i in range(rows.shape[0]):
-            c = np.bincount(sub[i], minlength=N_PATTERNS)
-            distinct[i] = int((c > 0).sum())
-            worst[i] = int(c.max())
+        # Vectorized: one offset-bincount gives the (n_rows x 243) histogram of
+        # feedback patterns for every guess at once -- same keys as the old per-row
+        # Python loop, ~10-100x faster (the loop was the solver's floor cost).
+        sub = self.PAT[rows][:, S]                       # (m, n) patterns on S, uint8
+        m = sub.shape[0]
+        offs = (np.arange(m, dtype=np.int32) * N_PATTERNS)[:, None]
+        counts = np.bincount((sub + offs).ravel(),
+                             minlength=m * N_PATTERNS).reshape(m, N_PATTERNS)
+        distinct = (counts > 0).sum(1)
+        worst = counts.max(1)
         order = np.lexsort((worst, -distinct))           # -distinct primary, worst secondary
 
         is_root = n == self.n_ans
@@ -209,13 +261,30 @@ def _main():
     import sys
     args = sys.argv[1:]
     mode = "hard" if "--hard" in args else "regular"
+    fresh = "--fresh" in args                            # ignore any saved memo, start cold
     pos = [a for a in args if not a.startswith("--")]
     N = int(pos[0]) if pos else 6
 
     wp = WinProbSolver(mode=mode)
-    wp._t0 = wp._last_beat = time.perf_counter()
+    wp._t0 = wp._last_beat = wp._last_ckpt = time.perf_counter()
+
+    # Committed final data would go under data/shared/; the resume memo is a
+    # regenerable checkpoint, so it lives in gitignored data/local/winprob/.
+    local_dir = Path(__file__).resolve().parent / "data" / "local" / "winprob"
+    local_dir.mkdir(parents=True, exist_ok=True)
+    memo_path = local_dir / f"{mode}.memo.pkl"
+    wp._ckpt_path = memo_path                            # enables periodic mid-solve checkpoints
+
     print(f"Wordle win-prob ({mode} mode, uniform): {wp.n_ans} answers, "
           f"{len(wp.guesses)} guesses")
+    if fresh and memo_path.exists():
+        memo_path.unlink()
+        print(f"--fresh: cleared {memo_path.name}")
+    elif not fresh:
+        loaded = wp.load_memo(memo_path)
+        if loaded:
+            print(f"resumed from {memo_path.name}: {loaded:,} states reused")
+
     print(f"{'n':>3}  {'P(win<=n)':>10}  {'E[turns|won]':>13}  {'opener':>7}")
     for n in range(1, N + 1):
         t = time.perf_counter()
@@ -223,6 +292,8 @@ def _main():
         print(f"{n:>3}  {p:>10.5f}  {em:>13.4f}  {opener:>7}   "
               f"[{len(wp.memo) + len(wp.lb):,} states, +{time.perf_counter() - t:.1f}s]",
               flush=True)
+        wp.save_memo(memo_path)                          # checkpoint after each budget
+        print(f"     saved checkpoint (n={n})", flush=True)
         if p >= 1.0 - 1e-9:
             print(f"     (all answers winnable at n={n}; higher n is identical)")
             break
