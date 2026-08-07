@@ -83,6 +83,7 @@ class WinProbSolver:
         self._ckpt_interval = 3600.0
         self._last_ckpt = 0.0
         self._r2_closed = True                          # closed-form r==2 (off = validate vs recursion)
+        self._dedup = True                              # regular-mode partition dedup (off = validate)
 
     # --- helpers ----------------------------------------------------------
 
@@ -240,14 +241,24 @@ class WinProbSolver:
 
         is_root = n == self.n_ans
         best_l, best_c, best_g = bl, bc, -1
+        seen = set()                                     # partition dedup (regular mode)
         for rank, oi in enumerate(order):
-            g = int(rows[oi])
             if distinct[oi] <= 1:                        # guess doesn't split S -> useless
                 continue
+            pats = sub[oi]
+            if self._dedup:
+                # Two guesses with an identical PAT[g,S] vector induce identical
+                # buckets -> identical (lost, cost). Evaluate one per distinct
+                # vector. Exact in regular mode (value depends only on S's split);
+                # NOT applied in hard mode, where g also splits the legal set L.
+                sig = pats.tobytes()
+                if sig in seen:
+                    continue
+                seen.add(sig)
+            g = int(rows[oi])
             if is_root:                                  # feeds the heartbeat's opener progress
                 self._op = (self.guesses[g], rank + 1, order.shape[0])
                 self._beat()
-            pats = sub[oi]
             # all-green bucket is the guessed word itself, nonempty iff g is a candidate
             has_ag = np.any(pats == ALL_GREEN)
             acc_l = 0.0
