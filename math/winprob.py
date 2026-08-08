@@ -30,6 +30,7 @@ usage:  python math/winprob.py N [--hard]
 """
 
 import hashlib
+import itertools
 import json
 import multiprocessing as mp
 import os
@@ -44,6 +45,11 @@ from build_patterns import load_patterns
 
 INF = float("inf")
 MEMO_FORMAT = 1                        # bump if stored (lost, cost) values change meaning
+# Cap the in-RAM memo so it can't outgrow RAM (esp. hard mode, whose keys embed the
+# legal set L). Over the cap, the oldest quarter is evicted (a cache, not correctness
+# -- evicted states are simply recomputed). ~600k entries is a few GB; raise it on a
+# big-RAM machine (--memo-cap), lower it on a small one.
+DEFAULT_MEMO_CAP = 600_000
 
 
 def _pattern_str(code):
@@ -83,6 +89,7 @@ class WinProbSolver:
         self._op = ("", 0, 0)                           # root opener being tried: (word, i, total)
         self._hits = 0                                  # memo exact hits (transposition reuse)
         self._lbhits = 0                                # alpha-beta lower-bound prunes on revisit
+        self._memo_cap = DEFAULT_MEMO_CAP               # max in-RAM memo entries (0/None = unbounded)
         self._ckpt_path = None                          # if set, _beat periodically saves the memo
         self._ckpt_interval = 3600.0
         self._last_ckpt = 0.0
@@ -135,11 +142,25 @@ class WinProbSolver:
         self.move = data.get("move", {})
         return len(self.memo)
 
+    def _evict_over_cap(self):
+        """Bound RAM: when the memo exceeds the cap, drop its oldest ~quarter (dict
+        insertion order). Evicted states are just recomputed on next visit -- a
+        cache eviction, not a correctness change. lb is cheap to rederive, so clear
+        it too."""
+        if not self._memo_cap or len(self.memo) <= self._memo_cap:
+            return
+        drop = len(self.memo) - int(self._memo_cap * 0.75)
+        for k in list(itertools.islice(self.memo, drop)):
+            del self.memo[k]
+            self.move.pop(k, None)
+        self.lb.clear()
+
     def _beat(self, force=False):
         # Gate on wall-clock, NOT a call-count mask: each node here runs a
         # ~13k-guess ordering pass (tens of ms), so a coarse call mask would take
         # minutes to trip. A perf_counter() per node is negligible vs. node cost.
         self._calls += 1
+        self._evict_over_cap()                           # keep memo (hence RAM) bounded
         if not self._verbose:
             return
         now = time.perf_counter()
@@ -542,7 +563,7 @@ class WinProbSolver:
             ctx = mp.get_context("spawn")
             done = 0
             t0 = last = tsave = time.perf_counter()
-            with ctx.Pool(workers, initializer=_init_worker, initargs=(self.mode,)) as pool:
+            with ctx.Pool(workers, initializer=_init_worker, initargs=(self.mode, self._memo_cap)) as pool:
                 for (g, l, c, beat) in pool.imap_unordered(_solve_one_opener, tasks, chunksize=dispatch):
                     done += 1
                     tried.add(g)
@@ -613,7 +634,7 @@ class WinProbSolver:
         with open(summary_path, "a") as csv:
             if not done_words:
                 csv.write("opener,p_win,e_turns_given_won\n")
-            with ctx.Pool(workers, initializer=_init_worker, initargs=(self.mode,)) as pool:
+            with ctx.Pool(workers, initializer=_init_worker, initargs=(self.mode, self._memo_cap)) as pool:
                 for (g, l, c) in pool.imap_unordered(_eval_opener_full, tasks, chunksize=dispatch):
                     won = self.n_ans - l
                     csv.write(f"{self.guesses[g]},{won / self.n_ans:.6f},"
@@ -721,10 +742,11 @@ class WinProbSolver:
 _WORKER = None                              # one WinProbSolver per worker process
 
 
-def _init_worker(mode):
+def _init_worker(mode, memo_cap=DEFAULT_MEMO_CAP):
     global _WORKER
     _WORKER = WinProbSolver(mode)
     _WORKER._verbose = False
+    _WORKER._memo_cap = memo_cap
 
 
 def _solve_one_opener(args):
@@ -770,34 +792,30 @@ def _main():
     fresh = "--fresh" in args                            # ignore any saved memo, start cold
     all_openers = "--all-openers" in args                # evaluate EVERY opener (summary + trees)
     workers = None                                       # worker processes (default = all cores)
+    memo_cap = DEFAULT_MEMO_CAP                           # in-RAM memo entry cap (0 = unbounded)
     for a in args:
         if a.startswith("--workers="):
             workers = int(a.split("=", 1)[1])
+        elif a.startswith("--memo-cap="):
+            memo_cap = int(a.split("=", 1)[1]) or None
     pos = [a for a in args if not a.startswith("--")]
     N = int(pos[0]) if pos else 6
 
     wp = WinProbSolver(mode=mode)
-    wp._t0 = wp._last_beat = wp._last_ckpt = time.perf_counter()
+    wp._memo_cap = memo_cap
+    wp._t0 = wp._last_beat = time.perf_counter()
 
-    # Committed deliverable (optimal trees) -> data/shared/winprob/, synced via git.
-    # The resume memo is a regenerable checkpoint -> gitignored data/local/winprob/.
     data = Path(__file__).resolve().parent / "data"
-    shared_dir = data / "shared" / "winprob"
-    local_dir = data / "local" / "winprob"
+    shared_dir = data / "shared" / "winprob"             # committed trees + summaries
+    local_dir = data / "local" / "winprob"               # gitignored sweep-resume files
     shared_dir.mkdir(parents=True, exist_ok=True)
     local_dir.mkdir(parents=True, exist_ok=True)
-    memo_path = local_dir / f"{mode}.memo.pkl"
-    wp._ckpt_path = memo_path                            # enables periodic mid-solve checkpoints
+    if fresh:                                            # start cold: drop opener-resume files
+        for f in local_dir.glob(f"{mode}_n*.sweep.pkl"):
+            f.unlink()
 
     print(f"Wordle win-prob ({mode} mode, uniform): {wp.n_ans} answers, "
-          f"{len(wp.guesses)} guesses")
-    if fresh and memo_path.exists():
-        memo_path.unlink()
-        print(f"--fresh: cleared {memo_path.name}")
-    elif not fresh:
-        loaded = wp.load_memo(memo_path)
-        if loaded:
-            print(f"resumed from {memo_path.name}: {loaded:,} states reused")
+          f"{len(wp.guesses)} guesses | memo cap {memo_cap or 'off'}")
 
     if all_openers:
         # EVERY opener: per-opener summary (committed) + full trees (gitignored local).
@@ -813,19 +831,25 @@ def _main():
                   f"trees/{mode}_n{n:02d}/*.json", flush=True)
         return
 
+    # Resume is via committed artifacts, NOT a giant memo checkpoint: a completed
+    # budget's tree JSON is reused; an interrupted budget resumes its opener sweep
+    # from data/local/winprob/<mode>_nNN.sweep.pkl (inside solve_root_parallel).
     print(f"{'n':>3}  {'P(win<=n)':>10}  {'E[turns|won]':>13}  {'opener':>7}")
     for n in range(1, N + 1):
+        tree_path = shared_dir / f"{mode}_n{n:02d}.json"
+        if tree_path.exists() and not fresh:            # budget already done -> reuse it
+            d = json.loads(tree_path.read_text())
+            p, em, opener = d["p_win"], d["e_turns_given_won"], d["opener"]
+            print(f"{n:>3}  {p:>10.5f}  {em:>13.4f}  {opener:>7}   [cached tree, skipped]", flush=True)
+            if p >= 1.0 - 1e-9:
+                break
+            continue
         t = time.perf_counter()
         p, em, opener = wp.solve_root_parallel(n, workers=workers)   # fans openers over workers
         print(f"{n:>3}  {p:>10.5f}  {em:>13.4f}  {opener:>7}   "
-              f"[{len(wp.memo) + len(wp.lb):,} states, +{time.perf_counter() - t:.1f}s]",
-              flush=True)
-        # Save the TREE first (the committed deliverable), so it survives even if
-        # the memo checkpoint below is interrupted.
-        tree_path = shared_dir / f"{mode}_n{n:02d}.json"
+              f"[+{time.perf_counter() - t:.1f}s]", flush=True)
         wp.save_tree(n, tree_path, p_win=p, e_turns=em, opener=opener)
-        wp.save_memo(memo_path)                          # resume checkpoint after each budget
-        print(f"     saved tree -> {tree_path.name} + checkpoint (n={n})", flush=True)
+        print(f"     saved tree -> {tree_path.name}", flush=True)
         if p >= 1.0 - 1e-9:
             print(f"     (all answers winnable at n={n}; higher n is identical)")
             break
