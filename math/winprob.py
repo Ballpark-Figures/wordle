@@ -46,10 +46,12 @@ from build_patterns import load_patterns
 INF = float("inf")
 MEMO_FORMAT = 1                        # bump if stored (lost, cost) values change meaning
 # Cap the in-RAM memo so it can't outgrow RAM (esp. hard mode, whose keys embed the
-# legal set L). Over the cap, the oldest quarter is evicted (a cache, not correctness
-# -- evicted states are simply recomputed). ~600k entries is a few GB; raise it on a
-# big-RAM machine (--memo-cap), lower it on a small one.
-DEFAULT_MEMO_CAP = 600_000
+# legal set L -> entries can be several KB each). Over the cap, the oldest quarter is
+# evicted (a cache, not correctness -- evicted states are simply recomputed). This cap
+# is PER SOLVER, and every worker holds its own, so total RAM ~ cap x (workers+1).
+# 300k is ~1-2 GB per solver; on a small-RAM box lower --memo-cap AND --workers, on a
+# big-RAM box raise --memo-cap (0 = unbounded) for speed.
+DEFAULT_MEMO_CAP = 300_000
 
 
 def _pattern_str(code):
