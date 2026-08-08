@@ -88,6 +88,7 @@ class WinProbSolver:
         self._heartbeat = 60.0                          # matches hangman/winprob.py
         self._n = 0
         self._best_p = 0.0
+        self._best_e = 0.0                              # E[turns|won] of the current best (tiebreak)
         self._op = ("", 0, 0)                           # root opener being tried: (word, i, total)
         self._hits = 0                                  # memo exact hits (transposition reuse)
         self._lbhits = 0                                # alpha-beta lower-bound prunes on revisit
@@ -175,9 +176,9 @@ class WinProbSolver:
         rate = self._calls / (now - self._t0) if now > self._t0 else 0.0
         tot = self._calls + self._hits + self._lbhits
         hpct = 100.0 * (self._hits + self._lbhits) / tot if tot else 0.0
-        print(f"    [n={self._n}] {frac}{nst:,} states | P<= so far {self._best_p:.4f} "
-              f"| {rate:,.0f} calls/s | hits {hpct:.0f}% ({self._hits:,} memo / {self._lbhits:,} lb) "
-              f"| {now - self._t0:.0f}s", flush=True)
+        print(f"    [n={self._n}] {frac}{nst:,} states | best P<= {self._best_p:.4f} "
+              f"E {self._best_e:.4f} | {rate:,.0f} calls/s | hits {hpct:.0f}% "
+              f"({self._hits:,} memo / {self._lbhits:,} lb) | {now - self._t0:.0f}s", flush=True)
         if self._ckpt_path and now - self._last_ckpt >= self._ckpt_interval:
             self.save_memo(self._ckpt_path)              # periodic mid-solve checkpoint
             print(f"    checkpointed memo -> {self._ckpt_path}", flush=True)
@@ -493,10 +494,13 @@ class WinProbSolver:
                     break
             if not pruned and self._lex_less((acc_l, acc_c), (best_l, best_c), eps):
                 best_l, best_c, best_g = acc_l, acc_c, g
-                self._best_p = (self.n_ans - best_l) / self.n_ans
+                won = self.n_ans - best_l
+                self._best_p = won / self.n_ans
+                self._best_e = best_c / won if won > eps else 0.0
             if seed:                                     # serial seed: report each opener done
+                won = self.n_ans - best_l
                 print(f"    seed {gi + 1}/{total} done | best P<= "
-                      f"{(self.n_ans - best_l) / self.n_ans:.4f} "
+                      f"{won / self.n_ans:.4f} E {best_c / won if won > eps else 0.0:.4f} "
                       f"('{self.guesses[best_g] if best_g >= 0 else '-'}')", flush=True)
         return float(best_l), float(best_c), int(best_g)
 
@@ -550,12 +554,15 @@ class WinProbSolver:
             best_l, best_c, best_g = self._sweep_openers(openers[:k], n, float(self.n_ans) + 1.0, INF, L_root)
             tried.update(int(g) for g in openers[:k])
             if self._verbose:
-                print(f"    seed: P<= {(self.n_ans - best_l) / self.n_ans:.4f} "
+                bwon = self.n_ans - best_l
+                print(f"    seed: P<= {bwon / self.n_ans:.4f} "
+                      f"E {best_c / bwon if bwon > self.eps else 0.0:.4f} "
                       f"('{self.guesses[best_g] if best_g >= 0 else '-'}') from top {k}; "
                       f"fanning openers over {workers} workers ({self.mode})", flush=True)
         elif self._verbose:
+            bwon = self.n_ans - best_l
             print(f"    resuming sweep: {len(tried):,} openers tried, best P<= "
-                  f"{(self.n_ans - best_l) / self.n_ans:.4f} "
+                  f"{bwon / self.n_ans:.4f} E {best_c / bwon if bwon > self.eps else 0.0:.4f} "
                   f"('{self.guesses[best_g] if best_g >= 0 else '-'}')", flush=True)
 
         todo = [int(g) for g in openers.tolist() if int(g) not in tried]
@@ -580,8 +587,9 @@ class WinProbSolver:
                     if self._verbose and (now - last >= 2.0 or done == total):
                         last = now
                         eta = (now - t0) / done * (total - done)
+                        bwon = self.n_ans - best_l
                         print(f"    {done:,}/{total:,} openers ({100 * done // total}%) | best P<= "
-                              f"{(self.n_ans - best_l) / self.n_ans:.4f} "
+                              f"{bwon / self.n_ans:.4f} E {best_c / bwon if bwon > self.eps else 0.0:.4f} "
                               f"('{self.guesses[best_g] if best_g >= 0 else '-'}') | "
                               f"{now - t0:.0f}s, ~{eta:.0f}s left", flush=True)
 
