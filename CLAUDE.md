@@ -1,25 +1,32 @@
 # wordle video — specifics
 
 wordle-only conventions. The shared cross-video rules (`bpkfigures/CLAUDE.md`)
-and private operational notes (`dotclaude/CLAUDE.md`) load via the two in-tree
-symlink imports below — a within-project `@import` path pointing out via a symlink
-(an additional-dir CLAUDE.md won't auto-load, and a cross-dir `@../` import won't
-expand). Committed + portable. See `yahtzee/CLAUDE.md` "Config loading" for the
-full cross-machine history.
+and private operational notes (`dotclaude/CLAUDE.md`) load via the two imports
+below. Those two names are **real files inside this repo** — gitignored copies,
+refreshed at every session start by `dotclaude/hooks/refresh-claude-imports.py`.
+They cannot be symlinks: a CLAUDE.md `@import` will not resolve to a target
+outside the project directory, by any route. See `yahtzee/CLAUDE.md` "Config
+loading" for the measurements and the full cross-machine history.
 
 @CLAUDE.shared.md
 @CLAUDE.private.md
 
-> **Import canary — check this first.** The two `@import`s above pull in the
-> shared and private rules through committed symlinks. If you cannot see the
-> tokens `SHARED-RULES-LOADED` and `PRIVATE-RULES-LOADED` in your context, those
-> imports **silently failed** and you are missing every shared and private
-> convention. Usual cause: the workspace was opened Windows-side over
-> `\\wsl$\`, where the WSL symlinks are unreadable 23-byte stubs. Recover by
-> reading `bpkfigures/CLAUDE.md` and `dotclaude/CLAUDE.md` directly, and tell the
-> user to reopen the workspace from a WSL shell
-> (`cd ~/projects/ballpark-figures && code <video>.code-workspace`) so the
-> bottom-left of VS Code reads `WSL: Ubuntu-22.04`.
+> **Import canary — check this first.** If you cannot see the tokens
+> `SHARED-RULES-LOADED` and `PRIVATE-RULES-LOADED` in your context, the imports
+> above **silently failed** and you are missing every shared and private
+> convention. The copies are machine-local and gitignored, so the usual cause is
+> a repo where they were never created — a fresh clone that has not had
+> `/sync-videos` run in it, so `.claude/settings.local.json` (and therefore the
+> refreshing hook) does not exist yet. Recover by reading `bpkfigures/CLAUDE.md`
+> and `dotclaude/CLAUDE.md` directly for this session, then regenerate the copies
+> with `python3 ../../dotclaude/hooks/refresh-claude-imports.py .` and tell the
+> user to run `/sync-videos`.
+>
+> Do **not** trust a hook that claims to inject the rules as context: a
+> SessionStart hook emitting the full ~121KB gets capped by the harness, saved to
+> a file, and replaced with a ~2KB preview — which contains
+> `SHARED-RULES-LOADED` and so reads as success while almost everything is
+> missing. The tokens only mean anything when they come from the imports.
 
 ## Script
 - `animations/Script.md` is the video script. Scenes become

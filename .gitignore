@@ -32,13 +32,19 @@ math/data/local/
 # OS / editor junk
 .DS_Store
 
-# Claude config: commands + settings.local.json are machine-local (recreated from
-# dotclaude by /sync-videos — commands is a symlink, settings.local.json a real copy
-# since symlinked settings files aren't honored). CLAUDE.shared.md / CLAUDE.private.md
-# are COMMITTED in-tree symlinks (→ bpkfigures/ + dotclaude/), imported by CLAUDE.md —
-# do NOT gitignore them.
+# Claude config: all machine-local, recreated from dotclaude by /sync-videos.
+# commands is a symlink; settings.local.json a real copy (symlinked settings files
+# aren't honored). CLAUDE.shared.md / CLAUDE.private.md are REAL COPIES of
+# bpkfigures/CLAUDE.md + dotclaude/CLAUDE.md, refreshed every session by the
+# SessionStart hook (dotclaude/hooks/refresh-claude-imports.py) and imported by
+# CLAUDE.md. They must be real files INSIDE the repo because a CLAUDE.md @import
+# will not resolve to a target outside the project dir — see CLAUDE.md "Config
+# loading". CLAUDE.private.md is private-repo content: keep it ignored so it can
+# never be committed to a video repo (yahtzee and battleship are PUBLIC).
 .claude/commands
 .claude/settings.local.json
+/CLAUDE.shared.md
+/CLAUDE.private.md
 
 # Ignore notebook checkpoints
 **/.ipynb_checkpoints/
