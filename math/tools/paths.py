@@ -19,6 +19,9 @@ TREES = os.path.join(LOCAL, "trees")
 LOG = os.path.join(LOCAL, "sweep.log")
 TT_BIN = os.path.join(LOCAL, "tt.bin")
 
+GUESS_WORDS = os.path.join(MATH, "data", "shared", "words", "guess.txt")
+PATTERNS = os.path.join(MATH, "data", "local", "patterns", "patterns.npy")
+
 N_ANSWERS = 2315
 N_GUESSES = 12972
 
