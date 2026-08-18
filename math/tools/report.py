@@ -4,6 +4,8 @@
     python3 math/tools/report.py --brief    # progress + extremes, no histogram
 
 Replaces stitching extremes.py + histogram.py + a log tail together by hand.
+The IN FLIGHT section comes from inflight.py (which words the current run is
+chewing on); --brief collapses it to just the long-running stragglers.
 """
 import csv
 import math
@@ -12,6 +14,7 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import inflight
 from paths import CSV_PATH, LOG, N_ANSWERS, N_GUESSES, load_totals
 
 BIN = 0.01
@@ -73,6 +76,11 @@ if os.path.exists(CSV_PATH):
         for s, w, t in times[:TOP]:
             print("  %-6s %8.1fs (%5.1f h)  expected %.5f"
                   % (w, s, s / 3600, t / N_ANSWERS))
+
+st = inflight.status()
+if st:
+    rule("IN FLIGHT")
+    inflight.print_status(st, verbose=not BRIEF)
 
 if os.path.exists(LOG):
     last = None

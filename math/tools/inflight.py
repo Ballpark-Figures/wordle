@@ -12,27 +12,28 @@ the next one down the list as it frees. That makes both sets recoverable:
 
     python3 inflight.py              # 20 threads (the standing sweep)
     python3 inflight.py --threads 12
+
+`report.py` imports `status()` from here for its IN FLIGHT section -- keep the
+computation in this module rather than duplicating it there.
 """
 import csv
 import os
 import re
 import sys
 
-import numpy as np
-
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from paths import CSV_PATH, GUESS_WORDS, LOG, N_ANSWERS, PATTERNS
 
 NPAT = 243
-
-threads = 20
-if "--threads" in sys.argv:
-    threads = int(sys.argv[sys.argv.index("--threads") + 1])
+THREADS = 20
 
 
-def sweep_order(words):
+def sweep_order():
     """Mirror of `sweep_order()` in optturns.c: ascending sum-of-squares of the
     pattern-class sizes, ties broken by index in guess.txt."""
+    import numpy as np
+
+    words = [w.strip() for w in open(GUESS_WORDS) if w.strip()]
     pat = np.load(PATTERNS, allow_pickle=False)
     ss = np.empty(len(words), dtype=np.int64)
     for g in range(len(words)):
@@ -74,38 +75,75 @@ def run_header():
     return started, resumed, elapsed
 
 
+def status(threads=THREADS):
+    """None if the run can't be reconstructed (no log, or no patterns matrix --
+    it's gitignored, so a fresh clone has no sweep order to compute)."""
+    if not (os.path.exists(LOG) and os.path.exists(PATTERNS)
+            and os.path.exists(CSV_PATH)):
+        return None
+    started, resumed, elapsed = run_header()
+    if elapsed is None:
+        return None
+    order = sweep_order()
+    done_order, info = csv_rows_in_order()
+    done_now = set(done_order)
+    done_at_resume = set(done_order[:resumed])
+    return {
+        "started": started,
+        "resumed": resumed,
+        "elapsed": elapsed,
+        "completed": len(done_order) - resumed,
+        "threads": threads,
+        "info": info,
+        "initial": [w for w in order if w not in done_at_resume][:threads],
+        "current": [w for w in order if w not in done_now][:threads],
+    }
+
+
 def hrs(s):
     return "%.1f h" % (s / 3600.0)
 
 
-words = [w.strip() for w in open(GUESS_WORDS) if w.strip()]
-order = sweep_order(words)
-done_order, info = csv_rows_in_order()
-started, resumed, elapsed = run_header()
+def print_status(st, verbose=True):
+    """The IN FLIGHT block, shared by this tool and report.py."""
+    print("  run started %s  --threads %d" % (st["started"], st["threads"]))
+    print("  resumed with %d done; %d finished since, %s elapsed"
+          % (st["resumed"], st["completed"], hrs(st["elapsed"])))
 
-done_now = set(done_order)
-done_at_resume = set(done_order[:resumed])
-
-initial = [w for w in order if w not in done_at_resume][:threads]
-current = [w for w in order if w not in done_now][:threads]
-
-print("run started %s  --threads %d" % (started, threads))
-print("resumed with %d done; last log line at %ss (%s)\n"
-      % (resumed, elapsed, hrs(elapsed)))
-
-fin = [w for w in initial if w in done_now]
-print("THE %d OPENERS IN FLIGHT AT t=0 -- %d finished, %d still running"
-      % (threads, len(fin), threads - len(fin)))
-print("-" * 62)
-for w in initial:
-    if w in done_now:
-        total, secs = info[w]
-        print("  %-7s done   total=%5d  exp=%.5f  %8.0fs  (%s)"
-              % (w, total, total / N_ANSWERS, secs, hrs(secs)))
+    initial, current, info = st["initial"], st["current"], st["info"]
+    fin = [w for w in initial if w in info]
+    print("\n  of the %d openers in flight at t=0: %d finished, %d still running"
+          % (st["threads"], len(fin), len(initial) - len(fin)))
+    if verbose:
+        for w in initial:
+            if w in info:
+                total, secs = info[w]
+                print("    %-7s done     total=%5d  exp=%.5f  %8.0fs  (%s)"
+                      % (w, total, total / N_ANSWERS, secs, hrs(secs)))
+            else:
+                print("    %-7s RUNNING  %s so far" % (w, hrs(st["elapsed"])))
     else:
-        print("  %-7s RUNNING  %s so far" % (w, hrs(elapsed)))
+        stuck = [w for w in initial if w not in info]
+        if stuck:
+            print("    still running after %s: %s"
+                  % (hrs(st["elapsed"]), " ".join(stuck)))
 
-still = [w for w in current if w not in initial]
-print("\nIN FLIGHT NOW (%d): %s" % (len(current), " ".join(current)))
-print("  %d of them are t=0 holdovers; %d picked up later: %s"
-      % (len(current) - len(still), len(still), " ".join(still)))
+    later = [w for w in current if w not in initial]
+    print("\n  in flight now (%d): %s" % (len(current), " ".join(current)))
+    print("  %d t=0 holdovers, %d picked up later"
+          % (len(current) - len(later), len(later)))
+
+
+def main():
+    threads = THREADS
+    if "--threads" in sys.argv:
+        threads = int(sys.argv[sys.argv.index("--threads") + 1])
+    st = status(threads)
+    if st is None:
+        sys.exit("no reconstructable run (need %s, %s and %s)"
+                 % (LOG, PATTERNS, CSV_PATH))
+    print_status(st)
+
+
+if __name__ == "__main__":
+    main()

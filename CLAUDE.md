@@ -59,9 +59,13 @@ loading" for the measurements and the full cross-machine history.
   `sweep.log`, `archive/`).
 - `math/tools/` holds the analysis scripts, all importing `paths.py` for
   locations. **`python3 math/tools/report.py`** is the standing status report
-  (progress, best/worst, 0.01-bin histogram with percentiles, slowest solves);
-  also `lookup.py` (rank named openers), `vowels.py`, `depths.py` (tree depth +
-  tree-vs-CSV check), `ttdump.py`/`ttverify.py`/`ttscan.py` (table snapshots).
+  (progress, best/worst, 0.01-bin histogram with percentiles, slowest solves,
+  and the current run's in-flight openers); also `lookup.py` (rank named
+  openers — its default word list is a set of POPULAR real-world openers, not
+  anything the sweep tracks), `inflight.py` (which openers the running sweep
+  picked up at t=0 and which are still going — `report.py` imports it),
+  `vowels.py`, `depths.py` (tree depth + tree-vs-CSV check),
+  `ttdump.py`/`ttverify.py`/`ttscan.py` (table snapshots).
 
 ## Gameplay layout
 - (Describe this video's on-screen layout and the assets in `animations/assets/`.)
