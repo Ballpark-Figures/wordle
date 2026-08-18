@@ -49,10 +49,19 @@ loading" for the measurements and the full cross-machine history.
   are exact, not float-compared. Validate any solver change with
   `bash solver/validate.sh` from `math/`: SALET 7920, REAST 7923, TRACE/CRATE
   7926, SLATE 7928 (Bertsimas & Paskov Table 1, reproduced exactly).
-- Long sweep resumes with `bash ~/bin/resume-jobs.sh` (skips finished openers
-  via the CSV, warm-starts the transposition table from `tt.bin`). A Windows
-  Scheduled Task runs the same script at boot so a forced Windows Update
-  restart self-recovers.
+- **The DEFAULT way to start the sweep is ATTACHED, in a terminal:
+  `bash solver/run-sweep.sh` (from `math/`).** The user watches completions
+  scroll live; output is tee'd so `sweep.log` gets every line too. Do NOT
+  substitute a detached launch, and do NOT hand-roll the `optturns` command line
+  -- both wrappers already carry the right flags, and a bare run that misses
+  `sweep.log` makes `report.py`/`inflight.py` report the PREVIOUS run's numbers.
+- `bash ~/bin/resume-jobs.sh` is the UNATTENDED path only: same flags, detached
+  via `nohup`, wired to a Windows Scheduled Task so a forced Windows Update
+  restart self-recovers. Watch it with `tail -F` on `sweep.log`.
+- Both skip finished openers via the CSV and warm-start the table from `tt.bin`.
+  Before stopping the solver deliberately, snapshot the table while it is still
+  LIVE -- `ttdump.py`, then `ttverify.py` must print PASS, then swap it in; the
+  full sequence is in `math/solver/README.md`. Ctrl-C/kill does NOT save it.
 - Outputs follow the shared/local split: **`math/data/shared/optturns/opener_totals.csv`**
   is the committed result that syncs between machines;
   `math/data/local/optturns/` holds the regenerable bulk (`trees/`, `tt.bin`,

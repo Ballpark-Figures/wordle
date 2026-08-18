@@ -51,8 +51,26 @@ Outputs follow the repo's shared/local data split:
 | `data/local/optturns/sweep.log` | ignored | run log |
 | `data/local/optturns/archive/` | ignored | superseded runs |
 
-Or just `bash ~/bin/resume-jobs.sh`, which wraps the sweep with the right flags
-and is wired to a Windows Scheduled Task so a forced reboot self-recovers.
+Two wrappers set those flags for you. Both warm-start from `tt.bin` and append
+to `sweep.log`; they differ only in whether the sweep is attached to a terminal.
+
+```sh
+bash solver/run-sweep.sh        # DEFAULT when you are at the machine
+```
+
+Runs in the FOREGROUND, output tee'd so completions scroll in your terminal AND
+land in `sweep.log`. Ctrl-C stops it; the CSV is safe (flushed per word) but the
+table is lost, so snapshot first if you want to keep it (see below).
+
+`bash ~/bin/resume-jobs.sh` is the other path: same flags, but detached via
+`nohup` with output only to `sweep.log`. It is wired to a Windows Scheduled Task
+so a forced reboot self-recovers unattended. Watch it with
+`tail -F data/local/optturns/sweep.log`.
+
+Do NOT run the bare binary without a tee or redirect: `tools/report.py` and
+`tools/inflight.py` PARSE `sweep.log` for the run's start, resume count and
+elapsed time, so a run that never reaches the log makes the IN FLIGHT section
+silently report the PREVIOUS run's numbers.
 
 | flag | meaning |
 |---|---|
@@ -86,12 +104,24 @@ The table is a pure cache; losing it costs only speed. But a cold start is
 expensive — the first words after a restart can take hours each.
 
 ```sh
-# snapshot a RUNNING solver (needs sudo for ptrace)
+# from math/ -- these paths are cwd-sensitive, cd first or they will not resolve
+cd ~/projects/ballpark-figures/wordle/math
+
+# snapshot a RUNNING solver (needs sudo for ptrace; ~16 GiB, a few minutes)
 sudo env PYTHONPATH=$HOME/.local/lib/python3.10/site-packages \
-  python3 ../tools/ttdump.py 29 ../data/local/optturns/tt2.bin
-python3 ../tools/ttverify.py ../data/local/optturns/tt2.bin 29   # must print PASS
-sudo mv ../data/local/optturns/tt2.bin ../data/local/optturns/tt.bin
+  python3 tools/ttdump.py 29 data/local/optturns/tt2.bin
+
+# verify BEFORE replacing the known-good snapshot -- must print PASS
+python3 tools/ttverify.py data/local/optturns/tt2.bin 29
+
+# ONLY if that printed PASS
+sudo mv data/local/optturns/tt2.bin data/local/optturns/tt.bin
 ```
+
+Then stop the solver with a plain `kill <pid>` (never `-9`) and commit the CSV.
+If the verify does NOT print PASS, leave `tt.bin` alone and just kill: you lose
+the newer table but keep a known-good one. That is the whole point of dumping to
+`tt2.bin` first.
 
 Snapshotting a live process is safe: entries carry `h1x = h1 XOR payload`, so
 anything caught mid-write fails verification on lookup and is treated as a miss,
