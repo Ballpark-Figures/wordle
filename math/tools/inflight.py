@@ -75,6 +75,24 @@ def run_header():
     return started, resumed, elapsed
 
 
+def completion_times():
+    """Elapsed-seconds stamp of every completion in the CURRENT run, in order.
+
+    The stamp resets to 0 at each resume, so the list is cleared whenever a new
+    `resuming` header appears -- pace windows must not straddle a restart.
+    """
+    times = []
+    with open(LOG) as f:
+        for line in f:
+            if re.match(r"\[\d{4}-\d\d-\d\dT[\d:+-]+\] resuming", line):
+                times = []
+                continue
+            m = re.match(r"\[\s*(\d+)s\]", line)
+            if m:
+                times.append(int(m.group(1)))
+    return times
+
+
 def status(threads=THREADS):
     """None if the run can't be reconstructed (no log, or no patterns matrix --
     it's gitignored, so a fresh clone has no sweep order to compute)."""
@@ -99,6 +117,7 @@ def status(threads=THREADS):
         "initial": [w for w in order if w not in done_at_resume][:threads],
         "remaining": remaining,          # every unsolved opener, dispatch order
         "current": remaining[:threads],  # ...of which these hold the threads
+        "times": completion_times(),
     }
 
 
@@ -144,6 +163,29 @@ def print_remaining(st, per_row=10):
     for i in range(0, len(left), per_row):
         print("  %5d  %s%s" % (i + 1, " ".join(left[i:i + per_row]),
                                "   <-- in flight" if i < threads else ""))
+
+
+PACE_WINDOWS = (1000, 100, 50, 20, 10, 5)
+
+
+def print_pace(st, windows=PACE_WINDOWS):
+    """Remaining wall-clock implied by the pace over each trailing window.
+
+    Pure throughput extrapolation: rate = N / (span of the last N completions),
+    remaining / rate. It says nothing about how long any INDIVIDUAL word takes,
+    and the sweep ends when the last word lands, not when the queue drains.
+    """
+    times, left = st["times"], len(st["remaining"])
+    print("  %d openers remaining" % left)
+    print("  %8s %10s %10s %12s" % ("window", "span", "rate/h", "remaining"))
+    for n in windows:
+        if len(times) < n + 1:
+            continue
+        span = times[-1] - times[-(n + 1)]
+        if span <= 0:
+            continue
+        rate = n / (span / 3600.0)
+        print("  %8d %8.2f h %10.1f %10.2f h" % (n, span / 3600.0, rate, left / rate))
 
 
 def main():
