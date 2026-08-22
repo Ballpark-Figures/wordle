@@ -88,6 +88,7 @@ def status(threads=THREADS):
     done_order, info = csv_rows_in_order()
     done_now = set(done_order)
     done_at_resume = set(done_order[:resumed])
+    remaining = [w for w in order if w not in done_now]
     return {
         "started": started,
         "resumed": resumed,
@@ -96,7 +97,8 @@ def status(threads=THREADS):
         "threads": threads,
         "info": info,
         "initial": [w for w in order if w not in done_at_resume][:threads],
-        "current": [w for w in order if w not in done_now][:threads],
+        "remaining": remaining,          # every unsolved opener, dispatch order
+        "current": remaining[:threads],  # ...of which these hold the threads
     }
 
 
@@ -132,6 +134,16 @@ def print_status(st, verbose=True):
     print("\n  in flight now (%d): %s" % (len(current), " ".join(current)))
     print("  %d t=0 holdovers, %d picked up later"
           % (len(current) - len(later), len(later)))
+
+
+def print_remaining(st, per_row=10):
+    """Every unsolved opener in dispatch order. Dispatch follows this order
+    strictly; COMPLETION does not, so a word further down can land first."""
+    left, threads = st["remaining"], st["threads"]
+    print("  %d openers remaining, in sweep dispatch order" % len(left))
+    for i in range(0, len(left), per_row):
+        print("  %5d  %s%s" % (i + 1, " ".join(left[i:i + per_row]),
+                               "   <-- in flight" if i < threads else ""))
 
 
 def main():

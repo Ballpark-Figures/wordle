@@ -81,6 +81,9 @@ st = inflight.status()
 if st:
     rule("IN FLIGHT")
     inflight.print_status(st, verbose=not BRIEF)
+    if not BRIEF and st["remaining"]:
+        rule("REMAINING (dispatch order)")
+        inflight.print_remaining(st)
 
 if os.path.exists(LOG):
     last = None
