@@ -6,6 +6,10 @@
 Replaces stitching extremes.py + histogram.py + a log tail together by hand.
 The IN FLIGHT section comes from inflight.py (which words the current run is
 chewing on); --brief collapses it to just the long-running stragglers.
+
+Section ORDER is deliberate: the report closes with REMAINING, then WORST, then
+PACE, so the most-read numbers sit at the tail of the output and are visible
+without scrolling back.
 """
 import csv
 import math
@@ -43,10 +47,6 @@ rule("BEST")
 for i, (w, t) in enumerate(order[:TOP], 1):
     print("%3d  %-6s %5d  %.5f" % (i, w, t, t / N_ANSWERS))
 
-rule("WORST")
-for i, (w, t) in enumerate(order[-TOP:][::-1], 1):
-    print("%3d  %-6s %5d  %.5f" % (i, w, t, t / N_ANSWERS))
-
 if not BRIEF:
     rule("HISTOGRAM (%.2f-wide bins)" % BIN)
     bins = {}
@@ -81,13 +81,6 @@ st = inflight.status()
 if st:
     rule("IN FLIGHT")
     inflight.print_status(st, verbose=not BRIEF)
-    if st["remaining"]:
-        rule("PACE (trailing-window extrapolation)")
-        inflight.print_pace(st)
-    # once the queue fits in the threads, REMAINING just repeats IN FLIGHT
-    if not BRIEF and len(st["remaining"]) > st["threads"]:
-        rule("REMAINING (dispatch order)")
-        inflight.print_remaining(st)
 
 if os.path.exists(LOG):
     last = None
@@ -103,3 +96,19 @@ if os.path.exists(LOG):
             print("\n  NOTE: the occupancy figure under-reports while long words are")
             print("  in flight (thread-local fill counters fold in only on completion).")
             print("  Use tools/ttscan.py against the live process for the true value.")
+
+# The last three sections are the ones read most often, so they close the report
+# in the order REMAINING -> WORST -> PACE: the tail of the output is what shows
+# without scrolling. Do not reshuffle these without asking.
+if st and not BRIEF and len(st["remaining"]) > st["threads"]:
+    # once the queue fits in the threads, REMAINING just repeats IN FLIGHT
+    rule("REMAINING (dispatch order)")
+    inflight.print_remaining(st)
+
+rule("WORST")
+for i, (w, t) in enumerate(order[-TOP:][::-1], 1):
+    print("%3d  %-6s %5d  %.5f" % (i, w, t, t / N_ANSWERS))
+
+if st and st["remaining"]:
+    rule("PACE (trailing-window extrapolation)")
+    inflight.print_pace(st)
