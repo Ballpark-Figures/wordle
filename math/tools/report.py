@@ -84,7 +84,8 @@ if st:
     if st["remaining"]:
         rule("PACE (trailing-window extrapolation)")
         inflight.print_pace(st)
-    if not BRIEF and st["remaining"]:
+    # once the queue fits in the threads, REMAINING just repeats IN FLIGHT
+    if not BRIEF and len(st["remaining"]) > st["threads"]:
         rule("REMAINING (dispatch order)")
         inflight.print_remaining(st)
 
