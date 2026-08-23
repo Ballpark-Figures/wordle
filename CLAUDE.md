@@ -66,6 +66,41 @@ loading" for the measurements and the full cross-machine history.
   is the committed result that syncs between machines;
   `math/data/local/optturns/` holds the regenerable bulk (`trees/`, `tt.bin`,
   `sweep.log`, `archive/`).
+## Hard-mode solver (same sweep, hard-mode rules)
+- **`optturns.c` builds TWO binaries** — `optturns` (normal) and `hardturns`
+  (hard mode), via a compile-time `-DHARDMODE`. One source of truth, no runtime
+  branch in either hot loop, and `hardturns` can be built while an `optturns`
+  sweep is live (the kernel refuses to overwrite the running one). `sh build.sh`
+  makes both.
+- **Hard mode = the NYT rule**: greens must be repeated in place, a yellow
+  letter must appear somewhere in the guess (the same square is legal), greys
+  constrain nothing. The accumulated constraint is REAL EXTRA STATE — the
+  candidate set `S` bounds it but does not determine it, so it is hashed into
+  the TT key. **`INFEASIBLE` openers are expected here** (normal mode's "follow
+  SALET's tree afterwards" escape is illegal in hard mode), so a `word,,,secs`
+  CSV row is a result, not a bug.
+- Data mirrors the normal sweep under its own name:
+  **`math/data/shared/hardturns/opener_totals.csv`** committed,
+  `math/data/local/hardturns/` (trees, `tt.bin`, `sweep.log`) gitignored.
+- **Launch it with `bash solver/run-hard-sweep.sh phase1|phase2`** (from `math/`),
+  attached, same tee'd-log rules as `run-sweep.sh`. `phase1` shares the machine
+  with a running `optturns` (nice'd, 12 threads, no table); `phase2` takes the
+  whole machine (20 threads, `--tt-bits 29`, warm from `tt.bin`) and REFUSES to
+  start while `optturns` still holds its 17.2 GB. Resume is automatic across the
+  switch, so stopping phase 1 and starting phase 2 just continues.
+- **`--tt-bits 0` disables memoisation entirely** — orders of magnitude slower
+  than even a small table. `--tt-bits 24` is 0.5 GB; prefer the smallest table
+  that fits over none.
+- **Every tool takes `WORDLE_SOLVER=hardturns`** to read the hard sweep instead
+  of the normal one (`report.py`, `lookup.py`, `inflight.py`, and the `tt*`
+  tools, which also use it to pick which process to attach to). Default stays
+  `optturns`, so existing invocations are unchanged.
+- **`python3 math/tools/checktrees.py` verifies emitted trees independently** —
+  replays every line against `wordle.pattern`, re-derives the hard-mode
+  constraint from scratch, and checks answer coverage, guess counts, hint reuse
+  and tree-sum-vs-CSV. Exits nonzero, so it works as a gate. Run it after any
+  solver change, alongside `solver/validate.sh`.
+
 - `math/tools/` holds the analysis scripts, all importing `paths.py` for
   locations. **`python3 math/tools/report.py`** is the standing status report
   (progress, best/worst, 0.01-bin histogram with percentiles, slowest solves,
