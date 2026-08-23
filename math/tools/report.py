@@ -7,9 +7,10 @@ Replaces stitching extremes.py + histogram.py + a log tail together by hand.
 The IN FLIGHT section comes from inflight.py (which words the current run is
 chewing on); --brief collapses it to just the long-running stragglers.
 
-Section ORDER is deliberate: the report closes with REMAINING, then WORST, then
-PACE, so the most-read numbers sit at the tail of the output and are visible
-without scrolling back.
+Section ORDER is deliberate: the report closes with REMAINING, WORST, IN FLIGHT,
+then PACE, so the most-read numbers sit at the tail of the output and are visible
+without scrolling back. WORST prints worst-LAST for the same reason. Do not
+reshuffle these without asking.
 """
 import csv
 import math
@@ -78,9 +79,6 @@ if os.path.exists(CSV_PATH):
                   % (w, s, s / 3600, t / N_ANSWERS))
 
 st = inflight.status()
-if st:
-    rule("IN FLIGHT")
-    inflight.print_status(st, verbose=not BRIEF)
 
 if os.path.exists(LOG):
     last = None
@@ -97,17 +95,23 @@ if os.path.exists(LOG):
             print("  in flight (thread-local fill counters fold in only on completion).")
             print("  Use tools/ttscan.py against the live process for the true value.")
 
-# The last three sections are the ones read most often, so they close the report
-# in the order REMAINING -> WORST -> PACE: the tail of the output is what shows
-# without scrolling. Do not reshuffle these without asking.
+# The closing sections are the ones read most often -- see the module docstring
+# for the order and why.
 if st and not BRIEF and len(st["remaining"]) > st["threads"]:
     # once the queue fits in the threads, REMAINING just repeats IN FLIGHT
     rule("REMAINING (dispatch order)")
     inflight.print_remaining(st)
 
+# printed WORST-LAST: the final line of this block is the worst opener, so it
+# lands closest to the bottom of the report. Ranks still count 1 = worst.
 rule("WORST")
-for i, (w, t) in enumerate(order[-TOP:][::-1], 1):
-    print("%3d  %-6s %5d  %.5f" % (i, w, t, t / N_ANSWERS))
+ntop = min(TOP, len(order))
+for i, (w, t) in enumerate(order[-ntop:]):
+    print("%3d  %-6s %5d  %.5f" % (ntop - i, w, t, t / N_ANSWERS))
+
+if st:
+    rule("IN FLIGHT")
+    inflight.print_status(st, verbose=not BRIEF)
 
 if st and st["remaining"]:
     rule("PACE (trailing-window extrapolation)")
