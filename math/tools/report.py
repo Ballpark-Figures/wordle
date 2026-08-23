@@ -21,7 +21,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import inflight
 from paths import (CSV_PATH, LOG, N_ANSWERS, N_GUESSES, SOLVER,
-                   load_infeasible, load_totals)
+                   load_depths, load_infeasible, load_totals)
 
 BIN = 0.01
 BRIEF = "--brief" in sys.argv
@@ -50,6 +50,26 @@ if infeasible:
 lo, hi = order[0][1], order[-1][1]
 print("range %.5f .. %.5f   spread %.5f turns (%d guesses)"
       % (lo / N_ANSWERS, hi / N_ANSWERS, (hi - lo) / N_ANSWERS, hi - lo))
+
+# hardturns escalates the cap per opener; how far it had to go is a headline
+# number for that sweep, so it sits near the top rather than buried.
+depths = load_depths()
+if depths and len(set(depths.values())) > 1:
+    rule("GUESSES REQUIRED (escalated cap)")
+    hist = {}
+    for d in depths.values():
+        hist[d] = hist.get(d, 0) + 1
+    nd = len(depths)
+    peakd = max(hist.values())
+    for d in sorted(hist):
+        print("  %2d guesses %7d  %5.1f%%  %s"
+              % (d, hist[d], 100 * hist[d] / nd, "#" * int(round(40 * hist[d] / peakd))))
+    base = min(hist)
+    over = sum(v for k, v in hist.items() if k > base)
+    print("\n  %d of %d openers (%.1f%%) needed more than %d guesses"
+          % (over, nd, 100 * over / nd, base))
+    print("  NB these are minimum-DEPTH solutions; the paired total is optimal")
+    print("  SUBJECT TO that depth, not necessarily the minimum expected guesses.")
 
 rule("BEST")
 for i, (w, t) in enumerate(order[:TOP], 1):

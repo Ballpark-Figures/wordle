@@ -48,6 +48,20 @@
 # Resume is automatic in BOTH phases: finished openers are read from the CSV and
 # skipped, so stopping phase 1 and starting phase 2 simply continues the sweep.
 #
+# THE CAP ESCALATES.  Normal Wordle can use one fixed 6-guess cap because every
+# opener wins within 6 by following SALET's tree afterwards.  Hard mode has no
+# such escape, so a fixed cap returns NOTHING for the openers it cannot fit --
+# exactly the data we want.  hardturns therefore starts at --depth and raises the
+# cap one guess at a time, per opener, until that opener solves; the depth it
+# needed is recorded in the CSV and shown as `d=N` in the progress line, with a
+# `*` marking any opener that needed more than the starting 6.
+#
+# WHAT THAT NUMBER IS: the minimum total AT THE FIRST FEASIBLE CAP.  Since f is
+# non-increasing in depth, a deeper cap may admit a LOWER total, so this is the
+# minimum-DEPTH solution, not necessarily the minimum expected guesses.  The CSV
+# carries (total, depth) per opener precisely so a later stabilisation pass can
+# seed from it and check whether depth+1 improves anything.
+#
 # Output is tee'd, so sweep.log gets every line as well as your terminal -- the
 # tools PARSE that log for the run's start time, resume count and elapsed
 # seconds, so a run that never reaches the log makes the IN FLIGHT section
@@ -68,6 +82,9 @@ LOC=data/local/hardturns
 
 cd "$MATH" || exit 1
 
+DEPTH=6          # where the cap starts
+DEPTHMAX=19      # ceiling; MAXD-1 in optturns.c, raise both together
+
 PHASE=${1:-}
 shift 2>/dev/null
 case "$PHASE" in
@@ -81,8 +98,10 @@ esac
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        --threads) THREADS=$2; shift 2 ;;
-        --tt-bits) TTBITS=$2; shift 2 ;;
+        --threads)   THREADS=$2; shift 2 ;;
+        --tt-bits)   TTBITS=$2;  shift 2 ;;
+        --depth)     DEPTH=$2;   shift 2 ;;
+        --depth-max) DEPTHMAX=$2; shift 2 ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
     esac
 done
@@ -108,11 +127,12 @@ WARM=""
 [ "$TTBITS" -gt 0 ] && [ -f "$LOC/tt.bin" ] && WARM="--tt-load $LOC/tt.bin"
 
 # the timestamped header is what inflight.py uses to find the run boundary
-echo "[$(date -Is)] resuming wordle HARD sweep ($PHASE, threads=$THREADS, tt-bits=$TTBITS) $WARM" \
+echo "[$(date -Is)] resuming wordle HARD sweep ($PHASE, threads=$THREADS, tt-bits=$TTBITS, depth=$DEPTH..$DEPTHMAX) $WARM" \
     | tee -a "$LOC/sweep.log"
 
 "${NICE[@]}" ./solver/hardturns --sweep \
     --out "$OUT" \
     --trees "$LOC/trees" \
+    --depth "$DEPTH" --depth-max "$DEPTHMAX" \
     --tt-bits "$TTBITS" --threads "$THREADS" $WARM \
     2>&1 | tee -a "$LOC/sweep.log"

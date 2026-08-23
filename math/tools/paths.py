@@ -85,3 +85,28 @@ def load_infeasible(include_archive=True):
                 if r.get("word") and not r.get("total"):
                     out.add(r["word"])
     return out
+
+
+def load_depths(include_archive=True):
+    """word -> the guess cap that opener actually needed.
+
+    hardturns escalates the cap per opener until the opener solves, and records
+    the depth it landed on. Normal Wordle uses one fixed cap, so every row there
+    reads 6 (or the column is absent on pre-2026-08-23 files, which yield {}).
+
+    NB this is the minimum FEASIBLE depth, and the paired total is optimal only
+    SUBJECT TO it -- a deeper cap may admit a lower total. Seeding a stabilisation
+    pass from (total, depth) is what this is for; see the bound/cap rule in the
+    shared CLAUDE.md.
+    """
+    paths = sorted(glob.glob(os.path.join(ARCHIVE, "opener_totals*.csv"))) if include_archive else []
+    paths.append(CSV_PATH)
+    out = {}
+    for p in paths:
+        if not os.path.exists(p):
+            continue
+        with open(p) as f:
+            for r in csv.DictReader(f):
+                if r.get("word") and r.get("depth"):
+                    out[r["word"]] = int(r["depth"])
+    return out

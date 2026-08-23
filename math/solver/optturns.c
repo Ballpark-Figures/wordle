@@ -59,7 +59,11 @@
 #define ALL_GREEN  242
 #define MAXG       13000
 #define MAXA       2400
-#define MAXD       7
+/* MAXD bounds --depth, and hard mode ESCALATES the cap per opener until the
+ * opener solves (see solve_escalating), so it needs headroom well past 6.  Cost
+ * is ~194 KB of per-thread arena per level: 20 levels is ~3.9 MB per thread,
+ * ~78 MB across 20 threads.  Normal mode never escalates and is unaffected. */
+#define MAXD       20
 #define INF        1000000000
 
 /* HARD is a COMPILE-TIME constant, not a runtime flag: build.sh emits two
@@ -713,6 +717,32 @@ static int solve_opener(int g, int depth, Ctx *ctx) {
     return total;
 }
 
+/* Solve `g` at the SMALLEST cap that admits a solution, starting at `dmin` and
+ * raising it one guess at a time up to `dmax`.
+ *
+ * This is the hard-mode answer to a problem normal mode does not have: there,
+ * every opener wins within 6 by following SALET's tree afterwards, so one fixed
+ * cap suffices.  Hard mode has no such escape -- the follow-up must keep reusing
+ * the revealed hints -- so a fixed cap simply returns NOTHING for the openers it
+ * cannot fit, which is exactly the data we want.  Escalating instead yields both
+ * the total AND the number of guesses that opener actually requires.
+ *
+ * NOTE what this does and does not compute.  It returns the minimum total at the
+ * FIRST feasible cap.  Because f(S,d) is non-increasing in d, a still-deeper cap
+ * may admit a LOWER total -- letting one answer run long to save guesses
+ * elsewhere.  So `*used` is the minimum feasible DEPTH and the total is optimal
+ * SUBJECT TO that depth; it is not, in general, the unconstrained minimum
+ * expected guesses.  Establishing that needs a separate stabilisation pass, for
+ * which the per-opener (total, depth) recorded in the CSV is the seed. */
+static int solve_escalating(int g, int dmin, int dmax, Ctx *ctx, int *used) {
+    for (int d = dmin; d <= dmax; d++) {
+        int total = solve_opener(g, d, ctx);
+        if (total < INF) { *used = d; return total; }
+    }
+    *used = 0;
+    return INF;
+}
+
 static int write_tree(const char *dir, int g, int depth, Ctx *ctx) {
     char cmd[1200];
     snprintf(cmd, sizeof cmd, "gzip -1 > '%s/%s.txt.gz'", dir, GWORD[g]);
@@ -775,7 +805,7 @@ int main(int argc, char **argv) {
     int nopen = 0;
     const char *outpath = NULL, *treedir = NULL;
     const char *ttload = NULL, *ttsave = NULL;
-    int depth = 6, ttbits = 28, threads = 0, sweep = 0;
+    int depth = 6, ttbits = 28, threads = 0, sweep = 0, depthmax = -1;
 
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--opener") && i + 1 < argc) {
@@ -785,12 +815,23 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--out") && i + 1 < argc) outpath = argv[++i];
         else if (!strcmp(argv[i], "--trees") && i + 1 < argc) treedir = argv[++i];
         else if (!strcmp(argv[i], "--depth") && i + 1 < argc) depth = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--depth-max") && i + 1 < argc) depthmax = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--tt-bits") && i + 1 < argc) ttbits = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--tt-load") && i + 1 < argc) ttload = argv[++i];
         else if (!strcmp(argv[i], "--tt-save") && i + 1 < argc) ttsave = argv[++i];
         else if (!strcmp(argv[i], "--threads") && i + 1 < argc) threads = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--data") && i + 1 < argc) datadir = argv[++i];
         else { fprintf(stderr, "unknown arg: %s\n", argv[i]); return 1; }
+    }
+
+    /* Hard mode escalates by default; normal mode keeps ONE fixed cap, so its
+     * behaviour and its results are exactly what they have always been. */
+    if (depthmax < 0) depthmax = HARD ? MAXD - 1 : depth;
+    if (depthmax < depth) depthmax = depth;
+    if (depthmax > MAXD - 1) {
+        fprintf(stderr, "--depth-max %d exceeds MAXD-1 (%d); raise MAXD and rebuild\n",
+                depthmax, MAXD - 1);
+        return 1;
     }
 
     char path[1024];
@@ -836,14 +877,15 @@ int main(int argc, char **argv) {
             int g = find_word(GWORD, NG, openers[k]);
             if (g < 0) { fprintf(stderr, "no such guess word: %s\n", openers[k]); return 1; }
             double t0 = now_s();
-            int total = solve_opener(g, depth, ctx);
-            if (total < INF && treedir) write_tree(treedir, g, depth, ctx);
+            int used = 0;
+            int total = solve_escalating(g, depth, depthmax, ctx, &used);
+            if (total < INF && treedir) write_tree(treedir, g, used, ctx);
             double dt = now_s() - t0;
             if (total >= INF)
-                printf("%s  INFEASIBLE within %d guesses  (%.1fs)\n", openers[k], depth, dt);
+                printf("%s  INFEASIBLE within %d guesses  (%.1fs)\n", openers[k], depthmax, dt);
             else
-                printf("%s  total=%d  expected=%.5f  (%.1fs, %lld nodes, TT %.3f%% hit)\n",
-                       openers[k], total, (double)total / NA, dt, ctx->nodes,
+                printf("%s  total=%d  expected=%.5f  d=%d  (%.1fs, %lld nodes, TT %.3f%% hit)\n",
+                       openers[k], total, (double)total / NA, used, dt, ctx->nodes,
                        100.0 * ctx->hit / (ctx->probe ? ctx->probe : 1));
             fflush(stdout);
         }
@@ -870,7 +912,7 @@ int main(int argc, char **argv) {
     }
     FILE *out = fopen(outpath, "a");
     if (!out) { fprintf(stderr, "cannot append to %s\n", outpath); return 1; }
-    if (ndone == 0) fprintf(out, "word,total,expected,seconds\n");
+    if (ndone == 0) fprintf(out, "word,total,expected,depth,seconds\n");
 
     int64_t *ord = sweep_order();
     double t0 = now_s();
@@ -884,9 +926,10 @@ int main(int argc, char **argv) {
             int g = (int)(ord[i] & 0xFFFFF);
             if (done[g]) continue;
             double s0 = now_s();
-            int total = solve_opener(g, depth, ctx);
+            int used = 0;
+            int total = solve_escalating(g, depth, depthmax, ctx, &used);
             int tree_ok = 1;
-            if (total < INF && treedir) tree_ok = (write_tree(treedir, g, depth, ctx) == 0);
+            if (total < INF && treedir) tree_ok = (write_tree(treedir, g, used, ctx) == 0);
             double dt = now_s() - s0;
 #pragma omp critical
             {
@@ -894,9 +937,9 @@ int main(int argc, char **argv) {
                 g_probe += ctx->probe; g_hit += ctx->hit; g_fill += ctx->fill;
                 ctx->probe = ctx->hit = ctx->fill = 0;
 
-                if (total >= INF) fprintf(out, "%s,,,%.1f\n", GWORD[g], dt);
-                else              fprintf(out, "%s,%d,%.5f,%.1f\n", GWORD[g], total,
-                                          (double)total / NA, dt);
+                if (total >= INF) fprintf(out, "%s,,,,%.1f\n", GWORD[g], dt);
+                else              fprintf(out, "%s,%d,%.5f,%d,%.1f\n", GWORD[g], total,
+                                          (double)total / NA, used, dt);
                 fflush(out);
                 completed++;
                 double el = now_s() - t0;
@@ -904,12 +947,13 @@ int main(int argc, char **argv) {
                 double hit = 100.0 * g_hit / (g_probe ? g_probe : 1);
                 double occ = TT_SLOTS ? 100.0 * g_fill / (double)TT_SLOTS : 0.0;
                 if (total >= INF)
-                    printf("[%7.0fs] %5d/%d  %s  INFEASIBLE          %7.1fs  eta %5.1fh  tt %.2f%%/%.2f%%\n",
-                           el, ndone + completed, NG, GWORD[g], dt,
+                    printf("[%7.0fs] %5d/%d  %s  INFEASIBLE d>%-2d          %7.1fs  eta %5.1fh  tt %.2f%%/%.2f%%\n",
+                           el, ndone + completed, NG, GWORD[g], depthmax, dt,
                            el / completed * left / 3600.0, hit, occ);
                 else
-                    printf("[%7.0fs] %5d/%d  %s  total=%5d  exp=%.5f%s %7.1fs  eta %5.1fh  tt %.2f%%/%.2f%%\n",
+                    printf("[%7.0fs] %5d/%d  %s  total=%5d  exp=%.5f  d=%d%s%s %7.1fs  eta %5.1fh  tt %.2f%%/%.2f%%\n",
                            el, ndone + completed, NG, GWORD[g], total, (double)total / NA,
+                           used, used > depth ? " *" : "  ",
                            tree_ok ? "" : " TREE-FAIL", dt,
                            el / completed * left / 3600.0, hit, occ);
                 fflush(stdout);
