@@ -42,6 +42,30 @@ loading" for the measurements and the full cross-machine history.
   pickles — regenerable, can be GBs). `math/data/local/` is in `.gitignore`.
 
 ## Solver (exact optimal turns per opener)
+- **THE OBJECTIVE IS CONSTRAINED — say this precisely, never loosely.** The solver
+  minimises TOTAL guesses over the 2315 answers **subject to resolving every answer
+  within `--depth` (default 6)**. That is NOT the same as "minimum expected guesses":
+  a strategy that spent a 7th guess on one answer to save two elsewhere is outside the
+  search space entirely, and would never be found. So
+  `math/data/shared/optturns/opener_totals.csv` holds **CONSTRAINED optima**, and must
+  be described that way unless and until the cap is shown non-binding.
+  - The README's "every opener can win within 6 by following SALET's tree" proves
+    **FEASIBILITY only** — that the ≤6 strategy set is non-empty, hence no `INFEASIBLE`
+    rows. It does NOT prove the unconstrained optimum lies inside that set. Do not
+    repeat it as if it did (that error is why the § bound/cap rule exists in the shared
+    CLAUDE.md).
+  - **Whether the cap binds for the normal sweep is an OPEN QUESTION**, unresolved as of
+    2026-08-23. Settling it needs all 12972 openers re-checked at a relaxed depth, not a
+    spot check. Cheapest sound route discussed: a "certificate" run at `--depth 7` seeded
+    with each opener's known `T6` as the incumbent, asking only "does anything beat this?"
+    — a decision problem, so far cheaper than a cold re-solve. Unbuilt and unmeasured.
+  - **`#define MAXD 7`** (`optturns.c`) sizes the per-depth arrays, so `--depth` cannot
+    exceed 7 without raising it and rebuilding. Depth 7 may not be enough to be
+    non-binding; a truly unconstrained run is `depth = n`, which the sizing can't express.
+  - **In HARD mode the cap BINDS HARD** — `INFEASIBLE` rows are common (3 of the first 15
+    openers), so those openers yield no number at all. Carrying `--depth 6` into hard mode
+    was an unflagged modelling decision; if the goal is expected guesses, the cap needs
+    revisiting before the hard results mean anything.
 - `math/solver/` is the C solver computing the exact minimum expected turns for
   every one of the 12972 openers, plus each one's optimal tree. **Read
   `math/solver/README.md` first** — build, flags, output format, gotchas.
