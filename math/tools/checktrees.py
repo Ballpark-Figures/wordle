@@ -113,7 +113,6 @@ def check_tree(path, totals):
 
 def vs_normal():
     """Hard-mode totals must dominate normal-mode totals, opener for opener."""
-    os.environ["WORDLE_SOLVER"] = "optturns"
     normal = _totals_for("optturns")
     hard = _totals_for("hardturns")
     both = sorted(set(normal) & set(hard))
@@ -139,7 +138,6 @@ def vs_normal():
 
 def _totals_for(solver):
     """load_totals() for one solver, independent of the ambient WORDLE_SOLVER."""
-    import csv as _csv
     import importlib
     os.environ["WORDLE_SOLVER"] = solver
     import paths as _paths
