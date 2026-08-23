@@ -8,6 +8,11 @@
 #
 #     bash solver/run-sweep.sh        # from math/, or from anywhere
 #
+# solver/run-hard-sweep.sh is the HARD-MODE companion (solver/hardturns, its own
+# data/{shared,local}/hardturns/ directory).  It takes a phase argument, because
+# it is designed to start while THIS sweep still owns the machine and then take
+# over from it -- see "Hard mode" in README.md.
+#
 # Output is tee'd, so sweep.log gets every line as well as your terminal.  That
 # matters: tools/report.py and tools/inflight.py PARSE that log for the run's
 # start time, resume count and elapsed seconds.  Run the binary bare, with no
