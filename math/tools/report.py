@@ -20,7 +20,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import inflight
-from paths import CSV_PATH, LOG, N_ANSWERS, N_GUESSES, load_totals
+from paths import (CSV_PATH, LOG, N_ANSWERS, N_GUESSES, SOLVER,
+                   load_infeasible, load_totals)
 
 BIN = 0.01
 BRIEF = "--brief" in sys.argv
@@ -33,13 +34,19 @@ def rule(title):
 
 
 totals = load_totals()
+infeasible = load_infeasible()
 if not totals:
     sys.exit("no results yet at %s" % CSV_PATH)
 n = len(totals)
 order = sorted(totals.items(), key=lambda kv: kv[1])
 
-print("optturns sweep - %d of %d openers solved (%.1f%%)"
-      % (n, N_GUESSES, 100 * n / N_GUESSES))
+# An INFEASIBLE opener is DONE, just with no total -- it counts as progress but
+# not as a data point. Only hard mode ever produces one; see paths.load_totals.
+done = n + len(infeasible)
+print("%s sweep - %d of %d openers done (%.1f%%)"
+      % (SOLVER, done, N_GUESSES, 100 * done / N_GUESSES))
+if infeasible:
+    print("  %d solved, %d INFEASIBLE within the guess budget" % (n, len(infeasible)))
 lo, hi = order[0][1], order[-1][1]
 print("range %.5f .. %.5f   spread %.5f turns (%d guesses)"
       % (lo / N_ANSWERS, hi / N_ANSWERS, (hi - lo) / N_ANSWERS, hi - lo))

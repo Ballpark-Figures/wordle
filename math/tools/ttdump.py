@@ -6,18 +6,27 @@ costs a recompute at worst -- it can never return a wrong value.
 
     sudo env PYTHONPATH=/home/pliscio/.local/lib/python3.10/site-packages \
          python3 ttdump.py [tt_bits] [outfile]
+
+WORDLE_SOLVER picks which sweep to snapshot -- `optturns` (default) or
+`hardturns`. It names both the process to attach to and the default output
+directory, so the hard-mode form is just:
+
+    sudo env PYTHONPATH=... WORDLE_SOLVER=hardturns \
+         python3 ttdump.py 29 data/local/hardturns/tt2.bin
 """
 import os, subprocess, sys, time
 import numpy as np
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import LOCAL, SOLVER
+
 TT_BITS = int(sys.argv[1]) if len(sys.argv) > 1 else 29
-OUT = sys.argv[2] if len(sys.argv) > 2 else \
-    "/home/pliscio/projects/ballpark-figures/wordle/math/data/local/optturns/tt.bin"
+OUT = sys.argv[2] if len(sys.argv) > 2 else os.path.join(LOCAL, "tt.bin")
 TT_BYTES = (1 << TT_BITS) * 32
 ENTRY = np.dtype([("h0", "<u8"), ("h1x", "<u8"), ("val", "<i4"),
                   ("d", "<i4"), ("work", "<u4"), ("pad", "<u4")])
 
-pid = subprocess.check_output(["pgrep", "-x", "optturns"]).decode().split()[0]
+pid = subprocess.check_output(["pgrep", "-x", SOLVER]).decode().split()[0]
 base = None
 for line in open("/proc/%s/maps" % pid):
     p = line.split()

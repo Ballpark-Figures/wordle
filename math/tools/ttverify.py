@@ -9,8 +9,10 @@ and occupancy should match what the solver was reporting.
 import os, sys
 import numpy as np
 
-PATH = sys.argv[1] if len(sys.argv) > 1 else \
-    "/home/pliscio/projects/ballpark-figures/wordle/math/data/local/optturns/tt.bin"
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import LOCAL
+
+PATH = sys.argv[1] if len(sys.argv) > 1 else os.path.join(LOCAL, "tt.bin")
 BITS = int(sys.argv[2]) if len(sys.argv) > 2 else 29
 WANT = (1 << BITS) * 32
 ENTRY = np.dtype([("h0", "<u8"), ("h1x", "<u8"), ("val", "<i4"),
