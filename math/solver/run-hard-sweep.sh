@@ -9,17 +9,36 @@
 #     bash solver/run-hard-sweep.sh phase1    # share: spare cores, no big table
 #     bash solver/run-hard-sweep.sh phase2    # own it: all cores, full table
 #
-# PHASE1 -- coexist with a running optturns.  Runs at nice 19 so the normal
-#   sweep keeps every core it actually wants and hardturns only fills idle
-#   capacity, and takes NO transposition table by default (--tt-bits 0), since
-#   optturns is holding ~17 GB of the machine's RAM.  Both are overridable:
+# PHASE1 -- coexist with a running optturns.  14 threads at nice 19, with a
+#   deliberately small 0.54 GB table.  Both are overridable:
 #
-#     bash solver/run-hard-sweep.sh phase1 --threads 8 --tt-bits 24
+#     bash solver/run-hard-sweep.sh phase1 --threads 8 --tt-bits 26
+#
+#   WHY THOSE NUMBERS (measured 2026-08-23, with optturns on its last 6 openers):
+#
+#   threads 14 -- optturns was using 586% CPU, i.e. 5.9 cores for its 6 in-flight
+#     openers, leaving ~13.7 genuinely idle; its finished threads SLEEP at the
+#     OpenMP barrier rather than spinning.  6 + 14 = 20, so the two jobs do not
+#     actually contend.  Note ps %CPU is a LIFETIME AVERAGE and read 1859% here
+#     -- measure with `top -b -n 2 -d 3` instead, or you will size this wrong.
+#
+#   nice 19 -- CPU scheduling weight ONLY (-20 highest .. +19 lowest, 0 default).
+#     It decides who wins when two processes want the SAME core, and costs
+#     nothing when cores are idle.  It does NOT limit memory: RAM is governed
+#     entirely by --tt-bits.  So this is belt-and-braces for the moments the two
+#     jobs might overlap.
+#
+#   tt-bits 24 -- 0.54 GB of the 4.9 GiB available, leaving ~4.4 GiB.  The thing
+#     to protect is optturns' 16 GiB resident table: push THAT into swap and its
+#     throughput collapses.  --tt-bits 26 (2.15 GB) leaves ~2.8 GiB against
+#     optturns' ~1.4 GiB of still-unfaulted table -- too thin while the normal
+#     sweep is the priority.
 #
 #   NOTE --tt-bits 0 means literally no memoisation: every recurrence of a deep
-#   state is recomputed.  That is orders of magnitude slower than even a small
-#   table.  --tt-bits 24 costs 512 MB and buys back most of it; --tt-bits 26 is
-#   2.1 GB.  Prefer the smallest table that fits rather than none.
+#   state is recomputed.  Measured on SALET, the EASIEST opener: 119s with the
+#   0.54 GB table, still unfinished after 5.5 minutes with none.  The hard
+#   openers, where the table matters most, are far worse.  Prefer the smallest
+#   table that fits over no table at all.
 #
 # PHASE2 -- the normal sweep is done and the machine is yours.  All 20 threads,
 #   --tt-bits 29 (17.2 GB), warm-started from tt.bin if a snapshot exists.
@@ -52,7 +71,7 @@ cd "$MATH" || exit 1
 PHASE=${1:-}
 shift 2>/dev/null
 case "$PHASE" in
-    phase1) THREADS=12; TTBITS=0;  NICE=(nice -n 19) ;;
+    phase1) THREADS=14; TTBITS=24; NICE=(nice -n 19) ;;
     phase2) THREADS=20; TTBITS=29; NICE=() ;;
     *) echo "usage: bash solver/run-hard-sweep.sh {phase1|phase2} [--threads N] [--tt-bits N]" >&2
        echo "  phase1  share the machine with a running optturns sweep" >&2

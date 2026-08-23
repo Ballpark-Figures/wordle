@@ -155,21 +155,33 @@ still owns the machine, then take over from it:
 
 | | threads | table | niceness |
 |---|---|---|---|
-| `phase1` | 12 | none (`--tt-bits 0`) | `nice -n 19` |
-| `phase2` | 20 | `--tt-bits 29`, warm from `tt.bin` | normal |
+| `phase1` | 14 | `--tt-bits 24` (0.54 GB) | `nice -n 19` |
+| `phase2` | 20 | `--tt-bits 29` (17.2 GB), warm from `tt.bin` | normal |
 
-`phase1` runs nice'd so the normal sweep keeps every core it actually wants and
-hardturns only fills idle capacity, and takes no table by default because
-optturns is holding ~17 GB. Both are overridable:
+Both are overridable: `bash solver/run-hard-sweep.sh phase1 --threads 8 --tt-bits 26`.
 
-```sh
-bash solver/run-hard-sweep.sh phase1 --threads 8 --tt-bits 24
-```
+**Sizing phase 1** (measured 2026-08-23, optturns on its last 6 openers):
+
+- **14 threads.** optturns was using 586% CPU — 5.9 cores for its 6 in-flight
+  openers — leaving ~13.7 genuinely idle; its finished threads *sleep* at the
+  OpenMP barrier rather than spinning. 6 + 14 = 20, so the two do not actually
+  contend. **Measure with `top -b -n 2 -d 3`, not `ps`**: `ps` `%CPU` is a
+  lifetime average and read 1859% here, which would size this badly wrong.
+- **`nice -n 19`** is CPU scheduling weight *only* (−20 highest … +19 lowest, 0
+  default). It decides who wins when two processes want the **same core**, and
+  costs nothing when cores are idle. It does **not** limit memory — RAM is
+  governed entirely by `--tt-bits`.
+- **`--tt-bits 24`** takes 0.54 GB of the 4.9 GiB available, leaving ~4.4 GiB.
+  The thing to protect is optturns' **16 GiB resident table**: push that into
+  swap and its throughput collapses. `--tt-bits 26` (2.15 GB) leaves ~2.8 GiB
+  against optturns' ~1.4 GiB of still-unfaulted table — too thin while the
+  normal sweep is the priority.
 
 **`--tt-bits 0` means literally no memoisation** — every recurrence of a deep
-state is recomputed from scratch, which is orders of magnitude slower than even
-a small table. `--tt-bits 24` costs 0.5 GB and buys most of it back. Prefer the
-smallest table that fits over none at all.
+state is recomputed from scratch. Measured on SALET, the *easiest* opener: 119 s
+with the 0.54 GB table, still unfinished after 5.5 minutes with none. The hard
+openers, where the table matters most, are far worse. Prefer the smallest table
+that fits over no table at all.
 
 `phase2` refuses to start while `optturns` is still running, since the two
 17.2 GB tables do not fit at once. Resume is automatic across the switch:
