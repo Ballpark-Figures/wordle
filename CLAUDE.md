@@ -98,10 +98,13 @@ loading" for the measurements and the full cross-machine history.
   newly-finished openers. **Planned: reroute `--trees` at `shared/` once the regular
   sweep finishes and before hard mode switches to phase 2**, which collapses the two
   into one location and ends the duplication.
-- **`paths.TREES` still points at `local/`**, so the tree-reading tools
-  (`checktrees.py`, `depths.py`) only see the working copy — on a machine that has just
-  the committed trees they find nothing until that is rerouted too. Note this reroute is
-  INDEPENDENT of the solver one and does not have to wait for a sweep to finish.
+- **`paths.TREES` RESOLVES between the two locations** — it prefers
+  `local/<solver>/trees/` whenever that actually holds trees, and falls back to
+  `shared/<solver>/trees/`. So a sweep machine reads the LIVE set its solver is writing,
+  while a machine with only the committed copies reads those. The precedence matters in
+  that direction: preferring `shared/` would make this machine silently report on a stale
+  snapshot. `WORDLE_TREES=<path>` overrides explicitly. Both tree readers
+  (`checktrees.py`, `depths.py`) import the constant, so they follow it.
 ## Hard-mode solver (same sweep, hard-mode rules)
 - **`optturns.c` builds TWO binaries** — `optturns` (normal) and `hardturns`
   (hard mode), via a compile-time `-DHARDMODE`. One source of truth, no runtime
