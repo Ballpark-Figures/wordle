@@ -27,7 +27,7 @@ sys.path.insert(0, "/home/pliscio/projects/ballpark-figures/wordle/math")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from wordle import load_words
 from build_patterns import load_patterns
-from paths import CSV_PATH as CSV, LOG, SOLVER
+from paths import CSV_PATH as CSV, LOG, SOLVER, read_rows
 
 N_AT_REBOOT = 8271          # CSV rows already present when the current run started
 FRAC = float(sys.argv[1]) if len(sys.argv) > 1 else 0.10
@@ -121,7 +121,7 @@ def big_buckets(word):
     c[242] = 0
     return int((c >= 5).sum())
 
-rows = [r for r in csv.DictReader(open(CSV)) if r.get("word")]
+rows = list(read_rows(CSV))          # not DictReader; see paths.read_rows
 since = [r["word"] for r in rows[N_AT_REBOOT:]]
 done_at_reboot = {r["word"] for r in rows[:N_AT_REBOOT]}
 ss = np.array([np.bincount(r, minlength=243).astype(np.int64).__pow__(2).sum() for r in PAT])

@@ -22,7 +22,7 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from paths import CSV_PATH, GUESS_WORDS, LOG, N_ANSWERS, PATTERNS
+from paths import CSV_PATH, GUESS_WORDS, LOG, N_ANSWERS, PATTERNS, read_rows
 
 NPAT = 243
 THREADS = 20
@@ -43,16 +43,25 @@ def sweep_order():
 
 
 def csv_rows_in_order():
-    """The live CSV only (not the archive) -- append order is dispatch history."""
+    """The live CSV only (not the archive) -- append order is dispatch history.
+
+    Uses paths.read_rows, not a bare DictReader: the file can carry more than one
+    header line and DictReader would misalign every column after the schema
+    change. See the note on read_rows in paths.py.
+    """
     order, info = [], {}
-    with open(CSV_PATH) as f:
-        for r in csv.DictReader(f):
-            w = r.get("word")
-            if not w:
-                continue
-            order.append(w)
-            info[w] = (int(r["total"]) if r.get("total") else None,
-                       float(r["seconds"]) if r.get("seconds") else None)
+    for r in read_rows(CSV_PATH):
+        w = r["word"]
+        order.append(w)
+        try:
+            total = int(r["total"]) if r.get("total") else None
+        except ValueError:
+            total = None
+        try:
+            secs = float(r["seconds"]) if r.get("seconds") else None
+        except ValueError:
+            secs = None
+        info[w] = (total, secs)
     return order, info
 
 

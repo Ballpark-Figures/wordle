@@ -119,8 +119,10 @@ if [ "$PHASE" = phase2 ] && pgrep -x optturns >/dev/null; then
 fi
 [ -x ./solver/hardturns ] || { echo "no hardturns binary -- run 'sh build.sh' in solver/" >&2; exit 1; }
 
+# Only the DIRECTORIES -- the solver writes the CSV header itself, on the run
+# that finds no resumable rows.  Writing one here too produced a duplicate (and,
+# once the depth column was added, a stale 4-column one on line 1).
 mkdir -p "$(dirname "$OUT")" "$LOC/trees"
-[ -f "$OUT" ] || echo "word,total,expected,seconds" > "$OUT"
 
 # reuse a table snapshot if present, so we resume warm rather than cold
 WARM=""

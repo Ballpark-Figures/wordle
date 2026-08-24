@@ -11,19 +11,17 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from paths import CSV_PATH, TREES, load_totals
-
-import csv
+from paths import CSV_PATH, TREES, load_totals, read_rows
 
 blank = solved = 0
-for r in csv.DictReader(open(CSV_PATH)):
-    if not r.get("word"):
-        continue
+for r in read_rows(CSV_PATH):
     if r.get("total"):
         solved += 1
     else:
         blank += 1
-        print("INFEASIBLE within 6:", r["word"])
+        # hardturns escalates its cap, so a blank means it failed even at
+        # --depth-max; for optturns it means the fixed cap was not met.
+        print("INFEASIBLE within the cap:", r["word"])
 print("openers solved %d, infeasible %d" % (solved, blank))
 print("(infeasible should always be 0: play any opener, then follow SALET's tree,")
 print(" which resolves any answer in <=5 more -- so <=6 total, always.)\n")

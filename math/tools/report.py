@@ -21,7 +21,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import inflight
 from paths import (CSV_PATH, LOG, N_ANSWERS, N_GUESSES, SOLVER,
-                   load_depths, load_infeasible, load_totals)
+                   load_depths, load_infeasible, load_times, load_totals)
 
 BIN = 0.01
 BRIEF = "--brief" in sys.argv
@@ -91,13 +91,12 @@ if not BRIEF:
               % (b * BIN, (b + 1) * BIN, c, 100 * c / n, cum, 100 * cum / n,
                  "#" * int(round(40 * c / peak))))
 
-# slowest solves come only from the live CSV -- archived runs used older code
+# slowest solves come only from the live CSV -- archived runs used older code.
+# Read via paths.load_times, NOT a bare DictReader: the file can carry more than
+# one header line and DictReader would misalign every column after the schema
+# change. See the note on read_rows in paths.py.
 if os.path.exists(CSV_PATH):
-    times = []
-    with open(CSV_PATH) as f:
-        for r in csv.DictReader(f):
-            if r.get("word") and r.get("seconds") and r.get("total"):
-                times.append((float(r["seconds"]), r["word"], int(r["total"])))
+    times = [(secs, w, t) for w, (secs, t) in load_times().items()]
     if times:
         times.sort(reverse=True)
         rule("SLOWEST TO SOLVE")
