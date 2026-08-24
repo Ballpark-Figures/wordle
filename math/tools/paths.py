@@ -30,7 +30,32 @@ LOCAL = os.path.join(MATH, "data", "local", SOLVER)
 
 CSV_PATH = os.path.join(SHARED, "opener_totals.csv")
 ARCHIVE = os.path.join(LOCAL, "archive")
-TREES = os.path.join(LOCAL, "trees")
+SHARED_TREES = os.path.join(SHARED, "trees")
+LOCAL_TREES = os.path.join(LOCAL, "trees")
+
+
+def _resolve_trees():
+    """Pick the tree directory to READ from, preferring the live working copy.
+
+    The emitted trees exist in up to two places. `local/<solver>/trees/` is where
+    a RUNNING solver writes (its `--trees` flag), so on a sweep machine it is the
+    live, complete set. `shared/<solver>/trees/` is the COMMITTED copy that syncs
+    between machines -- the only one present on a machine that does no data
+    generation, and on a sweep machine a possibly-stale snapshot of local.
+
+    So prefer LOCAL whenever it actually holds trees, and fall back to SHARED.
+    Preferring shared would silently report on a stale snapshot on the very
+    machine that has the live one. `WORDLE_TREES` overrides with an explicit path.
+    """
+    override = os.environ.get("WORDLE_TREES")
+    if override:
+        return override
+    if glob.glob(os.path.join(LOCAL_TREES, "*.txt.gz")):
+        return LOCAL_TREES
+    return SHARED_TREES
+
+
+TREES = _resolve_trees()
 LOG = os.path.join(LOCAL, "sweep.log")
 TT_BIN = os.path.join(LOCAL, "tt.bin")
 
