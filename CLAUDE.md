@@ -88,8 +88,20 @@ loading" for the measurements and the full cross-machine history.
   full sequence is in `math/solver/README.md`. Ctrl-C/kill does NOT save it.
 - Outputs follow the shared/local split: **`math/data/shared/optturns/opener_totals.csv`**
   is the committed result that syncs between machines;
-  `math/data/local/optturns/` holds the regenerable bulk (`trees/`, `tt.bin`,
-  `sweep.log`, `archive/`).
+  `math/data/local/optturns/` holds the regenerable bulk (`tt.bin`, `sweep.log`,
+  `archive/`).
+- **The emitted TREES are COMMITTED, under `math/data/shared/<solver>/trees/`** — the
+  laptop runs no data generation, so it cannot regenerate them. As of 2026-08-24 these
+  are **COPIES**: the running solvers still write to `math/data/local/<solver>/trees/`
+  via their `--trees` flag (a live process's flag cannot be changed), so `local/` stays
+  the WORKING location and `shared/` is a snapshot that has to be re-copied to pick up
+  newly-finished openers. **Planned: reroute `--trees` at `shared/` once the regular
+  sweep finishes and before hard mode switches to phase 2**, which collapses the two
+  into one location and ends the duplication.
+- **`paths.TREES` still points at `local/`**, so the tree-reading tools
+  (`checktrees.py`, `depths.py`) only see the working copy — on a machine that has just
+  the committed trees they find nothing until that is rerouted too. Note this reroute is
+  INDEPENDENT of the solver one and does not have to wait for a sweep to finish.
 ## Hard-mode solver (same sweep, hard-mode rules)
 - **`optturns.c` builds TWO binaries** — `optturns` (normal) and `hardturns`
   (hard mode), via a compile-time `-DHARDMODE`. One source of truth, no runtime
@@ -104,8 +116,9 @@ loading" for the measurements and the full cross-machine history.
   SALET's tree afterwards" escape is illegal in hard mode), so a `word,,,secs`
   CSV row is a result, not a bug.
 - Data mirrors the normal sweep under its own name:
-  **`math/data/shared/hardturns/opener_totals.csv`** committed,
-  `math/data/local/hardturns/` (trees, `tt.bin`, `sweep.log`) gitignored.
+  **`math/data/shared/hardturns/opener_totals.csv`** committed, **`math/data/shared/hardturns/trees/`**
+  committed (see the trees bullet above — currently copies), `math/data/local/hardturns/`
+  (`tt.bin`, `sweep.log`) gitignored.
 - **Launch it with `bash solver/run-hard-sweep.sh phase1|phase2`** (from `math/`),
   attached, same tee'd-log rules as `run-sweep.sh`. `phase1` shares the machine
   with a running `optturns` (nice'd, 12 threads, no table); `phase2` takes the
