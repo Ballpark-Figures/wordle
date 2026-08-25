@@ -20,6 +20,7 @@ import csv
 import os
 import re
 import sys
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from paths import CSV_PATH, GUESS_WORDS, LOG, N_ANSWERS, PATTERNS, read_rows
@@ -107,7 +108,8 @@ def status(threads=THREADS):
     are not logged, but dispatch follows sweep order and `schedule(dynamic, 1)`
     hands a freed slot the next word, so the i-th dispatched word starts at the
     (i - threads)-th completion. Checked against all 2430 completed words of the
-    current run: median error 0.3 s, worst 1.0 s (log rounding).
+    current run: median error 0.3 s, worst 1.0 s (log rounding). Runtimes are
+    measured against the WALL CLOCK, not the last log stamp -- see status().
 
     None if the run can't be reconstructed (no log, or no patterns matrix --
     it's gitignored, so a fresh clone has no sweep order to compute)."""
@@ -125,11 +127,21 @@ def status(threads=THREADS):
     times = completion_times()
     dispatch = [w for w in order if w not in done_at_resume]
     pos = {w: i for i, w in enumerate(dispatch)}
+
+    # `elapsed` is the stamp of the LAST COMPLETION, not now. An in-flight word
+    # has been running since then too, so measure against the wall clock: the
+    # log is written only on completion, so its mtime IS that completion's wall
+    # time, and now - mtime is the extra. Both come from the current clock, so a
+    # past clock jump cannot skew it. Without this the runtimes freeze whenever
+    # completions stop -- harmless at 20 words in flight, badly wrong at 1.
+    since_last = max(0.0, time.time() - os.path.getmtime(LOG))
+    now_elapsed = elapsed + since_last
+
     runtimes = {}
     for w in remaining[:threads]:
         i = pos.get(w)
         if i is not None:
-            runtimes[w] = elapsed - (0 if i < threads else times[i - threads])
+            runtimes[w] = now_elapsed - (0 if i < threads else times[i - threads])
     return {
         "started": started,
         "resumed": resumed,
@@ -142,6 +154,8 @@ def status(threads=THREADS):
         "current": remaining[:threads],  # ...of which these hold the threads
         "times": times,
         "runtimes": runtimes,            # in-flight word -> seconds so far
+        "now_elapsed": now_elapsed,      # run elapsed NOW, not at last completion
+        "since_last": since_last,        # wall seconds since anything completed
     }
 
 
@@ -153,7 +167,10 @@ def print_status(st, verbose=True):
     """The IN FLIGHT block, shared by this tool and report.py."""
     print("  run started %s  --threads %d" % (st["started"], st["threads"]))
     print("  resumed with %d done; %d finished since, %s elapsed"
-          % (st["resumed"], st["completed"], hrs(st["elapsed"])))
+          % (st["resumed"], st["completed"], hrs(st.get("now_elapsed", st["elapsed"]))))
+    if st.get("since_last", 0) > 900:
+        print("  last completion was %s ago (log stamp %s)"
+              % (hrs(st["since_last"]), hrs(st["elapsed"])))
 
     initial, current, info = st["initial"], st["current"], st["info"]
     fin = [w for w in initial if w in info]
