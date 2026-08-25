@@ -198,6 +198,34 @@ in flight → pace.
 - Exact TIES are real (the objective is an integer): call them out rather than
   letting them look like a rounding artifact.
 
+### Auto-update on every completion
+When the user asks for an update each time a word lands, do NOT poll and do NOT
+set an interval — the sweep log is an event stream. Arm a persistent Monitor on
+it and write a full summary on each event:
+
+    Monitor(command="tail -f -n 0 <math>/data/local/<solver>/sweep.log",
+            description="<solver> sweep completions",
+            persistent=True, timeout_ms=3600000)
+
+Why this works and what to know:
+- **The line lands the instant a word finishes.** `optturns` calls `fflush(stdout)`
+  right after each completion's printf (inside the same critical section that
+  writes the CSV row), and `run-sweep.sh` tees stdout to the log — so there is no
+  buffering lag and nothing to poll.
+- **No grep filter.** The log contains ONLY completion lines and run headers, so
+  every line is an event worth seeing. That also covers the two non-completion
+  cases for free: the final `12972/12972` line, and a `resuming` header if the
+  machine reboots and the Scheduled Task restarts the sweep.
+- **`-n 0`** so it streams from the current end instead of replaying the file.
+- **Several completions inside 200 ms batch into ONE notification.** Run the
+  report on the event, not once per word — the report reflects all of them.
+- **Silence is ambiguous.** `tail -f` on a dead writer looks exactly like a quiet
+  stretch, so a long gap warrants checking `pgrep -x <solver>` rather than
+  assuming nothing happened. (Late in a sweep a genuine 12 h gap is normal — one
+  holdout can run for days.)
+- **Each event costs a full summary**, so only arm this when asked, and note that
+  N words remaining means up to N more reports. `TaskStop` ends the watch.
+
 ## Gameplay layout
 - (Describe this video's on-screen layout and the assets in `animations/assets/`.)
 
