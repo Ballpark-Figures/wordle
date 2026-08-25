@@ -5,6 +5,19 @@ minimum expected number of turns under optimal play — plus the full optimal
 decision tree for each. Reproduces and extends Bertsimas & Paskov, *An Exact
 and Interpretable Solution to Wordle*.
 
+`optturns.c` builds **two binaries**, one per ruleset:
+
+| binary | ruleset | data directory |
+|---|---|---|
+| `optturns` | normal Wordle | `data/{shared,local}/optturns/` |
+| `hardturns` | **hard mode** — revealed hints must be reused | `data/{shared,local}/hardturns/` |
+
+They are the same source with `HARD` as a compile-time constant (`-DHARDMODE`),
+so each keeps its hot loops free of the other's branches while both stay one
+source of truth. Two output names also mean `hardturns` can be built and run
+while an `optturns` sweep is in flight. Everything below applies to both;
+`## Hard mode` covers what differs.
+
 ## The key idea
 
 The objective is an **integer**: total guesses summed over all 2315 answers.
@@ -26,7 +39,15 @@ published result, not a rounding coincidence.
 ## Build
 
 ```sh
-cd math/solver && sh build.sh          # gcc -O3 -march=native -fopenmp
+cd math/solver && sh build.sh          # builds optturns AND hardturns
+```
+
+`build.sh` writes both binaries. It will fail on `optturns` with `Text file
+busy` if a sweep is running — that is the kernel refusing to overwrite a live
+executable, and it is a feature. To build just the other one:
+
+```sh
+gcc -O3 -march=native -funroll-loops -fopenmp -DHARDMODE -o hardturns optturns.c
 ```
 
 Requires `math/data/local/patterns/patterns.npy` (`python3 build_patterns.py`
@@ -51,15 +72,33 @@ Outputs follow the repo's shared/local data split:
 | `data/local/optturns/sweep.log` | ignored | run log |
 | `data/local/optturns/archive/` | ignored | superseded runs |
 
-Or just `bash ~/bin/resume-jobs.sh`, which wraps the sweep with the right flags
-and is wired to a Windows Scheduled Task so a forced reboot self-recovers.
+Two wrappers set those flags for you. Both warm-start from `tt.bin` and append
+to `sweep.log`; they differ only in whether the sweep is attached to a terminal.
+
+```sh
+bash solver/run-sweep.sh        # DEFAULT when you are at the machine
+```
+
+Runs in the FOREGROUND, output tee'd so completions scroll in your terminal AND
+land in `sweep.log`. Ctrl-C stops it; the CSV is safe (flushed per word) but the
+table is lost, so snapshot first if you want to keep it (see below).
+
+`bash ~/bin/resume-jobs.sh` is the other path: same flags, but detached via
+`nohup` with output only to `sweep.log`. It is wired to a Windows Scheduled Task
+so a forced reboot self-recovers unattended. Watch it with
+`tail -F data/local/optturns/sweep.log`.
+
+Do NOT run the bare binary without a tee or redirect: `tools/report.py` and
+`tools/inflight.py` PARSE `sweep.log` for the run's start, resume count and
+elapsed time, so a run that never reaches the log makes the IN FLIGHT section
+silently report the PREVIOUS run's numbers.
 
 | flag | meaning |
 |---|---|
 | `--sweep` | all openers, best-heuristic-first, resumable |
 | `--out FILE` | CSV: `word,total,expected,seconds`; flushed per word |
 | `--trees DIR` | one `<word>.txt.gz` per opener, written before the CSV row |
-| `--tt-bits N` | 2^N entries x 32 B. 29 = 17.2 GB, 28 = 8.6 GB |
+| `--tt-bits N` | 2^N entries x 32 B. 29 = 17.2 GB, 28 = 8.6 GB, 24 = 0.5 GB. **0 disables the table entirely** — see Hard mode |
 | `--tt-load F` | warm-start the table from a snapshot |
 | `--tt-save F` | dump the table on normal completion |
 | `--threads N` | OpenMP threads |
@@ -67,6 +106,118 @@ and is wired to a Windows Scheduled Task so a forced reboot self-recovers.
 **Resume is automatic**: rerunning reads the CSV and skips finished openers.
 Killing mid-word is safe — the CSV row is written only after that word's tree
 file is complete, so an interrupted word is simply redone.
+
+## Hard mode
+
+`hardturns` solves the same problem under hard mode: **any revealed hint must be
+used in subsequent guesses**. That is the NYT rule — a green must be repeated in
+its position, a yellow letter must appear *somewhere* in the guess (legally
+including the square it was yellow on), and greys constrain nothing, so an
+all-black pattern imposes no restriction at all.
+
+**The constraint is real extra state, not a function of the candidate set.**
+This is the one thing to understand before touching the code. The accumulated
+requirement is a pair — the letter each position is pinned to, and the minimum
+number of copies of each letter — and the candidate set `S` only bounds it from
+above: a green at position *i* means every word in `S` has that letter there,
+but the converse fails. The words in `S` can happen to share a letter that was
+never revealed, and hard mode does not pin an unrevealed letter. Two lines of
+play reaching the same `S` with different revealed hints genuinely have
+different legal-guess sets, so the constraint is hashed into the TT key
+alongside `S` and the depth.
+
+The legal set is a pure function of the constraint, materialised on demand by
+intersecting precomputed bitsets — and only on a TT **miss**, since a hit never
+needs it. Candidates are always legal (a word consistent with all feedback
+necessarily has the greens in place and at least the revealed counts), which is
+what keeps the `n == 1`, `n == 2` and depth-normalisation shortcuts valid.
+
+The TT key also carries a hard-mode salt, so a `tt.bin` loaded into the wrong
+binary fails verification and costs a recompute rather than returning a wrong
+value. The two tables still must not be *resident* at once — 17.2 GB each.
+
+**`INFEASIBLE` can actually fire here.** In normal mode no opener ever fails,
+because you can always follow SALET's tree afterwards; that argument does not
+survive hard mode, where the follow-up is restricted to guesses reusing the
+hints. A `word,,,seconds` row (no total) is therefore a real, expected result,
+not a bug. `tools/report.py` counts those separately.
+
+### Running the hard sweep
+
+```sh
+# from math/
+bash solver/run-hard-sweep.sh phase1     # share a machine with a live optturns
+bash solver/run-hard-sweep.sh phase2     # take the machine once optturns is done
+```
+
+Two phases because the hard sweep is designed to start *while* the normal sweep
+still owns the machine, then take over from it:
+
+| | threads | table | niceness |
+|---|---|---|---|
+| `phase1` | 14 | `--tt-bits 24` (0.54 GB) | `nice -n 19` |
+| `phase2` | 20 | `--tt-bits 29` (17.2 GB), warm from `tt.bin` | normal |
+
+Both are overridable: `bash solver/run-hard-sweep.sh phase1 --threads 8 --tt-bits 26`.
+
+**Sizing phase 1** (measured 2026-08-23, optturns on its last 6 openers):
+
+- **14 threads.** optturns was using 586% CPU — 5.9 cores for its 6 in-flight
+  openers — leaving ~13.7 genuinely idle; its finished threads *sleep* at the
+  OpenMP barrier rather than spinning. 6 + 14 = 20, so the two do not actually
+  contend. **Measure with `top -b -n 2 -d 3`, not `ps`**: `ps` `%CPU` is a
+  lifetime average and read 1859% here, which would size this badly wrong.
+- **`nice -n 19`** is CPU scheduling weight *only* (−20 highest … +19 lowest, 0
+  default). It decides who wins when two processes want the **same core**, and
+  costs nothing when cores are idle. It does **not** limit memory — RAM is
+  governed entirely by `--tt-bits`.
+- **`--tt-bits 24`** takes 0.54 GB of the 4.9 GiB available, leaving ~4.4 GiB.
+  The thing to protect is optturns' **16 GiB resident table**: push that into
+  swap and its throughput collapses. `--tt-bits 26` (2.15 GB) leaves ~2.8 GiB
+  against optturns' ~1.4 GiB of still-unfaulted table — too thin while the
+  normal sweep is the priority.
+
+**`--tt-bits 0` means literally no memoisation** — every recurrence of a deep
+state is recomputed from scratch. Measured on SALET, the *easiest* opener: 119 s
+with the 0.54 GB table, still unfinished after 5.5 minutes with none. The hard
+openers, where the table matters most, are far worse. Prefer the smallest table
+that fits over no table at all.
+
+`phase2` refuses to start while `optturns` is still running, since the two
+17.2 GB tables do not fit at once. Resume is automatic across the switch:
+finished openers come from the CSV, so stopping phase 1 and starting phase 2
+simply continues the sweep.
+
+### Reading hard-mode results
+
+Every tool takes `WORDLE_SOLVER` to choose which sweep it reads (default
+`optturns`). The name doubles as the binary name, so the tt* tools also use it
+to pick which process to attach to.
+
+```sh
+WORDLE_SOLVER=hardturns python3 tools/report.py
+WORDLE_SOLVER=hardturns python3 tools/lookup.py
+tail -F data/local/hardturns/sweep.log
+```
+
+### Verifying the trees
+
+`tools/checktrees.py` replays every line of an emitted tree against the repo's
+own `wordle.pattern` and re-derives the hard-mode constraint from scratch, so a
+bug in the solver's constraint handling surfaces as a legality failure rather
+than a plausible-looking wrong number. It checks answer coverage, guess counts,
+pattern consistency, hint reuse, and that the tree sums to the CSV total.
+
+```sh
+WORDLE_SOLVER=hardturns python3 tools/checktrees.py           # 20-tree sample
+WORDLE_SOLVER=hardturns python3 tools/checktrees.py salet     # named openers
+WORDLE_SOLVER=hardturns python3 tools/checktrees.py --all     # everything
+```
+
+It exits nonzero on any failure, so it works as a gate. Run it against a normal
+tree too (`python3 tools/checktrees.py salet`) — the hard-mode legality check is
+skipped there, and the same tree fails ~1450 of 2315 lines if you force it on,
+which is what confirms the check actually fires.
 
 ## Output format
 
@@ -86,12 +237,24 @@ The table is a pure cache; losing it costs only speed. But a cold start is
 expensive — the first words after a restart can take hours each.
 
 ```sh
-# snapshot a RUNNING solver (needs sudo for ptrace)
+# from math/ -- these paths are cwd-sensitive, cd first or they will not resolve
+cd ~/projects/ballpark-figures/wordle/math
+
+# snapshot a RUNNING solver (needs sudo for ptrace; ~16 GiB, a few minutes)
 sudo env PYTHONPATH=$HOME/.local/lib/python3.10/site-packages \
-  python3 ../tools/ttdump.py 29 ../data/local/optturns/tt2.bin
-python3 ../tools/ttverify.py ../data/local/optturns/tt2.bin 29   # must print PASS
-sudo mv ../data/local/optturns/tt2.bin ../data/local/optturns/tt.bin
+  python3 tools/ttdump.py 29 data/local/optturns/tt2.bin
+
+# verify BEFORE replacing the known-good snapshot -- must print PASS
+python3 tools/ttverify.py data/local/optturns/tt2.bin 29
+
+# ONLY if that printed PASS
+sudo mv data/local/optturns/tt2.bin data/local/optturns/tt.bin
 ```
+
+Then stop the solver with a plain `kill <pid>` (never `-9`) and commit the CSV.
+If the verify does NOT print PASS, leave `tt.bin` alone and just kill: you lose
+the newer table but keep a known-good one. That is the whole point of dumping to
+`tt2.bin` first.
 
 Snapshotting a live process is safe: entries carry `h1x = h1 XOR payload`, so
 anything caught mid-write fails verification on lookup and is treated as a miss,
@@ -102,7 +265,8 @@ known-good one.
 
 - **Every opener can win within 6 guesses**, provably: play your opener, then
   follow SALET's optimal tree, which resolves any answer in ≤5 more. So the
-  `INFEASIBLE` path exists but can never fire.
+  `INFEASIBLE` path exists but can never fire. **Normal mode only** — the
+  follow-up is illegal in hard mode, where INFEASIBLE openers are expected.
 - **Only SALET finishes within 5.** Even `crane` (6th best) needs a 6th guess
   on 3 answers. The paper's "never needs all six" is a property of the optimal
   opener, not of good play generally.

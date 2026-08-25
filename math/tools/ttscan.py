@@ -20,16 +20,15 @@ Run as root (needs ptrace):
     sudo env PYTHONPATH=/home/pliscio/.local/lib/python3.10/site-packages \
          python3 ttscan.py [fraction]
 """
-import csv, re, subprocess, sys
+import csv, os, re, subprocess, sys
 import numpy as np
 
 sys.path.insert(0, "/home/pliscio/projects/ballpark-figures/wordle/math")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from wordle import load_words
 from build_patterns import load_patterns
+from paths import CSV_PATH as CSV, LOG, SOLVER, read_rows
 
-LOCAL = "/home/pliscio/projects/ballpark-figures/wordle/math/data/local/optturns"
-CSV = LOCAL + "/opener_totals.csv"
-LOG = LOCAL + "/sweep.log"
 N_AT_REBOOT = 8271          # CSV rows already present when the current run started
 FRAC = float(sys.argv[1]) if len(sys.argv) > 1 else 0.10
 TT_BITS = int(sys.argv[2]) if len(sys.argv) > 2 else 29     # must match --tt-bits
@@ -38,7 +37,7 @@ ENTRY = np.dtype([("h0", "<u8"), ("h1x", "<u8"), ("val", "<i4"),
                   ("d", "<i4"), ("work", "<u4"), ("pad", "<u4")])
 assert ENTRY.itemsize == 32
 
-pid = subprocess.check_output(["pgrep", "-x", "optturns"]).decode().split()[0]
+pid = subprocess.check_output(["pgrep", "-x", SOLVER]).decode().split()[0]
 mapbase = mapsize = None
 for line in open("/proc/%s/maps" % pid):
     p = line.split()
@@ -122,7 +121,7 @@ def big_buckets(word):
     c[242] = 0
     return int((c >= 5).sum())
 
-rows = [r for r in csv.DictReader(open(CSV)) if r.get("word")]
+rows = list(read_rows(CSV))          # not DictReader; see paths.read_rows
 since = [r["word"] for r in rows[N_AT_REBOOT:]]
 done_at_reboot = {r["word"] for r in rows[:N_AT_REBOOT]}
 ss = np.array([np.bincount(r, minlength=243).astype(np.int64).__pow__(2).sum() for r in PAT])

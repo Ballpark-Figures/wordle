@@ -28,9 +28,10 @@ edit_clips/
 # animations tree.
 animations/**/cache/
 
-# Compiled solver binary — rebuild with math/solver/build.sh (-march=native, so
-# a committed binary would not be portable between machines anyway).
+# Compiled solver binaries — rebuild with math/solver/build.sh (-march=native,
+# so a committed binary would not be portable between machines anyway).
 math/solver/optturns
+math/solver/hardturns
 
 # Machine-local solver working data: resume checkpoints / memo pickles
 # (regenerable, can be GBs). Committed results live in math/data/shared/.
