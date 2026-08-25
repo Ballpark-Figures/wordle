@@ -151,6 +151,51 @@ loading" for the measurements and the full cross-machine history.
   `vowels.py`, `depths.py` (tree depth + tree-vs-CSV check),
   `ttdump.py`/`ttverify.py`/`ttscan.py` (table snapshots).
 
+### Sweep status summaries (the standing format)
+When the user asks for an update / report / status on a sweep, run
+`python3 math/tools/report.py` (prefix `WORDLE_SOLVER=hardturns` for hard mode)
+and write it up in THIS shape. The tool already emits the sections in order;
+the write-up mirrors it. Both sweeps use the same format.
+
+**Section order — the tail is what shows without scrolling, so the most-read
+things come last.** Progress → slowest → histogram → remaining → worst →
+in flight → pace.
+
+1. **Progress** — `N / 12972 solved (X%)`, completions since the last update and
+   over what span, how many remain, run elapsed, the solver's own ETA. Second
+   line: `range lo .. hi`, spread in turns AND in total guesses. (Hard mode also
+   has INFEASIBLE openers — count them via `load_infeasible()`; progress is
+   solved + infeasible, and say so, since normal Wordle has none by construction.)
+2. **Slowest to solve** — markdown table, 10 rows, `word | time | expected`.
+   Note the solve time of anything that just landed even when it misses the list.
+3. **Histogram** — the 0.01-bin table verbatim in a code block. Once it is long,
+   show only the TAIL (say from 3.90 up) plus a sentence on which bins moved.
+4. **Remaining** — the dispatch-order queue in a code block, 10 per row, with
+   `<-- in flight` on the rows that hold threads. DROP this section once the
+   queue fits inside the thread count (report.py suppresses it automatically).
+5. **Worst words** — code block, **worst LAST** (ranks still count 1 = worst, so
+   they read bottom-up). Mark new entries, say who dropped off, and report where
+   the 10th-place CUTOFF moved.
+6. **In flight** — every running opener with its current runtime, longest first.
+7. **Pace** — the trailing-window table verbatim in a code block.
+
+**Content rules, learned the hard way:**
+- **Report measured values and DELTAS only.** What changed since the last update,
+  by how much. No forecasts about what will move next, nothing about what is
+  "likely final" or "won't hold".
+- **Never extrapolate from the ETA or a pace window to bound an INDIVIDUAL word.**
+  Throughput says nothing about how long one opener takes, and the sweep ends when
+  the LAST word lands. (`uhuru` ran 64.4 h alone at the end of the normal sweep.)
+- **Short pace windows are noise** — they swing by 3-8x between updates. Don't
+  narrate a trend from them.
+- **No letter-pattern theories** ("doubled letters are bad", "z words cluster")
+  unless actually computed over the full result set. A top-ten list is ten points.
+- **Lead with a one-line headline ONLY when something genuinely moved** — a new
+  worst opener, a percentage milestone, a record solve. Otherwise open with
+  Progress and let the numbers carry it.
+- Exact TIES are real (the objective is an integer): call them out rather than
+  letting them look like a rounding artifact.
+
 ## Gameplay layout
 - (Describe this video's on-screen layout and the assets in `animations/assets/`.)
 
