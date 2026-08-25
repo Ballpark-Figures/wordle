@@ -67,13 +67,22 @@ def csv_rows_in_order():
 
 
 def run_header():
-    """Resume count, wall-clock start, and elapsed seconds of the current run."""
+    """Resume count, wall-clock start, elapsed seconds, and THREAD COUNT.
+
+    The thread count matters: it is how many openers can be in flight at once,
+    so a wrong value makes the IN FLIGHT section report slots that do not exist.
+    run-hard-sweep.sh stamps `threads=N` into its header; run-sweep.sh does not,
+    so an unstamped run falls back to THREADS and behaves exactly as before.
+    """
     started, resumed, elapsed = None, 0, None
+    threads = None
     with open(LOG) as f:
         for line in f:
             m = re.match(r"\[(\d{4}-\d\d-\d\dT[\d:+-]+)\] resuming", line)
             if m:
                 started, resumed, elapsed = m.group(1), 0, None
+                t = re.search(r"threads=(\d+)", line)
+                threads = int(t.group(1)) if t else None
                 continue
             m = re.match(r"resume: (\d+) openers already done", line)
             if m:
@@ -82,7 +91,7 @@ def run_header():
             m = re.match(r"\[\s*(\d+)s\]", line)
             if m:
                 elapsed = int(m.group(1))
-    return started, resumed, elapsed
+    return started, resumed, elapsed, threads
 
 
 def completion_times():
@@ -116,7 +125,9 @@ def status(threads=THREADS):
     if not (os.path.exists(LOG) and os.path.exists(PATTERNS)
             and os.path.exists(CSV_PATH)):
         return None
-    started, resumed, elapsed = run_header()
+    started, resumed, elapsed, logthreads = run_header()
+    if logthreads:
+        threads = logthreads
     if elapsed is None:
         return None
     order = sweep_order()
