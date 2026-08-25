@@ -14,8 +14,15 @@ media/
 *.wav
 *.mp3
 
-# DaVinci Resolve project backups (a .drp is never uploaded — deliverable is the .mov)
+# DaVinci Resolve local artifacts (per-project, machine-local — never commit).
+# .gallery / CacheClip are pointed here by the project's colorGalleryStillsLocation /
+# perfCacheClipsLocation settings; a .drp is an editable project backup, never uploaded.
+.gallery/
+CacheClip/
 *.drp
+Resolve Project Backups/
+# `render NN --stills` staging dir (anim copies + still PNGs + .swap versions).
+edit_clips/
 
 # Manim snapshot cache (build artifact, 50+ MB pickles). Scoped to the
 # animations tree.
