@@ -168,8 +168,10 @@ in flight → pace.
    solved + infeasible, and say so, since normal Wordle has none by construction.)
 2. **Slowest to solve** — markdown table, 10 rows, `word | time | expected`.
    Note the solve time of anything that just landed even when it misses the list.
-3. **Histogram** — the 0.01-bin table verbatim in a code block. Once it is long,
-   show only the TAIL (say from 3.90 up) plus a sentence on which bins moved.
+3. **Histogram** — the FULL 0.01-bin table verbatim in a code block, every bin
+   from the best to the worst, every update. Do not trim it to the tail: the
+   whole distribution is the point, and the user reads the shape. Follow it with
+   a sentence naming which bins moved and by how much.
 4. **Remaining** — the dispatch-order queue in a code block, 10 per row, with
    `<-- in flight` on the rows that hold threads. DROP this section once the
    queue fits inside the thread count (report.py suppresses it automatically).
