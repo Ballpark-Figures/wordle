@@ -1376,12 +1376,16 @@ int main(int argc, char **argv) {
 #pragma omp atomic read
 #endif
                 inc = incumbent;
-                /* A valid per-opener skip either way: an opener whose LB already
-                 * exceeds the incumbent cannot win.  With TOPK the list is in
-                 * sum-of-squares order, so this says nothing about the openers
-                 * AFTER it; only the exact path's ascending-LB order makes it a
-                 * proof about the whole tail. */
-                if (mylb > inc) {
+                /* The LB skip compares TOTALS, so under the lexicographic
+                 * objective it is only sound once no DEPTH improvement is still
+                 * possible -- i.e. the leader already solves at the floor.  Above
+                 * the floor an opener with a hopeless total could still win by
+                 * finishing shallower, and skipping it would lose the answer.
+                 *
+                 * Even when it applies, with TOPK the list is in sum-of-squares
+                 * order, so it says nothing about the openers AFTER it; only the
+                 * exact path's ascending-LB order makes it a proof about the tail. */
+                if (depth <= depth_floor && mylb > inc) {
 #ifdef _OPENMP
 #pragma omp atomic
 #endif
@@ -1408,7 +1412,12 @@ int main(int argc, char **argv) {
 #endif
                 cap = depth;
                 for (int dd = depth_floor; dd <= cap; dd++) {
-                    total = solve_opener_bounded(g, dd, ctx, inc);
+                    /* LEXICOGRAPHIC: depth first, total second.  An opener that
+                     * resolves SHALLOWER than the leader wins outright however
+                     * large its total, so no total-based cutoff may be applied to
+                     * it -- pass INF.  Only at the leader's own depth does the
+                     * total decide, and there the incumbent is a valid bound. */
+                    total = solve_opener_bounded(g, dd, ctx, dd < cap ? INF : inc);
                     dused = dd;
                     if (total < INF) break;      /* solved, or cut, at this depth */
                 }
@@ -1440,25 +1449,30 @@ int main(int argc, char **argv) {
                          * the bound comes down and every later opener is held to
                          * it.  Ratchets one way only, and never below the
                          * requested --depth. */
+                        /* LEXICOGRAPHIC COMPARISON: fewer guesses in the WORST
+                         * case beats a lower total.  A word that finishes at a
+                         * shallower depth wins outright even if its total is
+                         * worse, so depth is tested before total. */
                         if (dused < depth) {
-                            printf("[%7.0fs] depth bound %d -> %d (%s solves at %d)\n",
-                                   el, depth, dused, GWORD[g], dused);
-                            depth = dused;
+                            printf("[%7.0fs] %s  total=%5d  avg=%.5f  NEW BEST (depth %d, was %d)  %7.1fs\n",
+                                   el, GWORD[g], total, (double)total / NA, dused, depth, dt);
+                            depth = dused;            /* the bound IS the leader's depth */
+                            incumbent = total;
+                            nbest = 0; best[nbest++] = g;
                             for (int q = 0; q < nord; q++) {
                                 int gg = (int)(ord[q] & 0xFFFFF);
                                 lb[gg] = root_lb(gg, depth);
                                 ord[q] = ((int64_t)lb[gg] << 20) | (int64_t)gg;
                             }
-                        }
-                        if (total < incumbent) {
+                        } else if (total < incumbent) {
                             incumbent = total;
                             nbest = 0; best[nbest++] = g;
-                            printf("[%7.0fs] %s  total=%5d  avg=%.5f  NEW BEST  lb=%d  %7.1fs  tt %.2f%%/%.2f%%\n",
-                                   el, GWORD[g], total, (double)total / NA, mylb, dt, hit, occ);
+                            printf("[%7.0fs] %s  total=%5d  avg=%.5f  NEW BEST  d=%d  lb=%d  %7.1fs  tt %.2f%%/%.2f%%\n",
+                                   el, GWORD[g], total, (double)total / NA, dused, mylb, dt, hit, occ);
                         } else if (total == incumbent) {
                             best[nbest++] = g;
-                            printf("[%7.0fs] %s  total=%5d  avg=%.5f  TIED      lb=%d  %7.1fs  tt %.2f%%/%.2f%%\n",
-                                   el, GWORD[g], total, (double)total / NA, mylb, dt, hit, occ);
+                            printf("[%7.0fs] %s  total=%5d  avg=%.5f  TIED      d=%d  lb=%d  %7.1fs  tt %.2f%%/%.2f%%\n",
+                                   el, GWORD[g], total, (double)total / NA, dused, mylb, dt, hit, occ);
                         }
                     }
                     /* Heartbeat on WHICHEVER comes first, count or time.  A count
@@ -1487,8 +1501,8 @@ int main(int argc, char **argv) {
             printf("NO OPENER solves every answer within %d guesses.\n", depth);
             printf("%d rejected by lower bound, %d proved infeasible by search.\n", nolb, infeas);
         } else {
-            printf("total=%d  expected=%.5f  over %d answers\n",
-                   incumbent, (double)incumbent / NA, NA);
+            printf("depth=%d (worst case), total=%d  expected=%.5f  over %d answers\n",
+                   depth, incumbent, (double)incumbent / NA, NA);
             printf("%d opener%s attain it:", nbest, nbest == 1 ? "" : "s");
             for (int i = 0; i < nbest; i++) printf(" %s", GWORD[best[i]]);
             printf("\n");
