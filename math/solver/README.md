@@ -362,11 +362,34 @@ bash solver/run-allwords-sweep.sh -k 50
 ./solver/optturns --opener salet --depth 6 --topk 100
 ```
 
+**THE ROOT IS A BRANCHING POINT TOO.** `--topk` applies at EVERY branching point
+including the first, so the sweep examines **K openers, not all 12972** — `-k 1`
+checks exactly one starting word. The opener list is in sum-of-squares order and
+is NOT re-sorted by lower bound: the selection rule and the visit order are the
+same thing here. So the winner is the best of the **K openers examined**, not the
+best of all NG, which is a weaker claim than the exact sweep makes and is exactly
+what lets a small K finish.
+
+(The exact path, `K = 0`, still ranks all NG openers by ascending root LB, where
+that ordering is what makes the "everything after this is worse" exit sound.)
+
 **THE RESULT IS AN UPPER BOUND, NOT AN OPTIMUM.** The search space is a strict
 subset, so what comes back is a real, achievable strategy that may not be the
 best one. It is weakly monotone in `K` — larger `K` can only match or improve the
 total — and `K = 0` recovers exactness. Report as **"best found within top-K
 branching"**, never as "the optimum".
+
+Measured end-to-end on the 2315-answer problem (exact answer: SALET 7920):
+
+| K | winner | total | avg | time |
+|---|---|---|---|---|
+| 1 | roate | 8204 | 3.54384 | 0.2s |
+| 5 | soare | 8016 | 3.46263 | 1s |
+| 20 | snare | 7981 | 3.44752 | 2s |
+| 100 | **salet** | **7920** | **3.42117** | 18s |
+
+K=100 recovers the true optimum in 18 seconds, against 5540 CPU-hours for the
+exhaustive sweep. It FINDS it; it does not PROVE it.
 
 Measured on SALET (2315 answers, depth 6; exact = 7920 in 16672 nodes):
 

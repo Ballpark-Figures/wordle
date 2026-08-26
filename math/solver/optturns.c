@@ -1200,13 +1200,40 @@ int main(int argc, char **argv) {
 
         int64_t *ord = malloc(sizeof(int64_t) * NG);
         int nord = 0, nolb = 0;
-        for (int g = 0; g < NG; g++) {
-            if (lb[g] >= INF) { nolb++; continue; }   /* cannot fit the cap at all */
-            ord[nord++] = ((int64_t)lb[g] << 20) | (int64_t)g;
+
+        if (TOPK > 0) {
+            /* THE OPENER IS A BRANCHING POINT LIKE ANY OTHER.  --topk means the
+             * top K by sum of squared bin sizes at EVERY branching point, and the
+             * root is the first one -- so the sweep examines K openers, not all
+             * NG of them.  K=1 checks exactly one starting word.
+             *
+             * The order is the sum-of-squares order and is NOT re-sorted by lower
+             * bound: the selection rule and the visit order are the same thing
+             * here, by definition of what was asked for.
+             *
+             * Consequence to state plainly: the winner is the best of the K
+             * openers EXAMINED, not the best of all NG. That is a weaker claim
+             * than the exact sweep makes, and it is the point -- it is what lets
+             * a small K finish. */
+            int64_t *so = sweep_order();          /* ascending sum of squared bins */
+            int K = (TOPK < NG) ? TOPK : NG;
+            for (int i = 0; i < K; i++) {
+                int g = (int)(so[i] & 0xFFFFF);
+                if (lb[g] >= INF) { nolb++; continue; }
+                ord[nord++] = ((int64_t)lb[g] << 20) | (int64_t)g;
+            }
+            free(so);
+            fprintf(stderr, "topk root: %d openers of %d examined (top %d by sum of squares), %d rejected by LB\n",
+                    nord, NG, K, nolb);
+        } else {
+            for (int g = 0; g < NG; g++) {
+                if (lb[g] >= INF) { nolb++; continue; }   /* cannot fit the cap at all */
+                ord[nord++] = ((int64_t)lb[g] << 20) | (int64_t)g;
+            }
+            qsort(ord, nord, sizeof(int64_t), cmp_i64);
+            fprintf(stderr, "root LB screen: %d openers ranked, %d rejected outright\n",
+                    nord, nolb);
         }
-        qsort(ord, nord, sizeof(int64_t), cmp_i64);
-        fprintf(stderr, "root LB screen: %d openers ranked, %d rejected outright\n",
-                nord, nolb);
 
         /* Resume: an existing CSV both seeds the incumbent and marks work done.
          * Seeding matters more than skipping -- a good bound from the previous
@@ -1238,9 +1265,13 @@ int main(int argc, char **argv) {
         int nbest = 0, searched = 0, cut = 0, infeas = 0, seen = 0, lbskip = 0;
         double t0 = now_s(), last_report = t0;
 
-        printf("optimal-only: %d openers by ascending root LB (min %d = %.5f avg)\n",
-               nord, nord ? (int)(ord[0] >> 20) : 0,
-               nord ? (double)(int)(ord[0] >> 20) / NA : 0.0);
+        if (TOPK > 0)
+            printf("optimal-only: top %d openers by sum of squared bins (of %d); best of these K, not of all %d\n",
+                   nord, NG, NG);
+        else
+            printf("optimal-only: %d openers by ascending root LB (min %d = %.5f avg)\n",
+                   nord, nord ? (int)(ord[0] >> 20) : 0,
+                   nord ? (double)(int)(ord[0] >> 20) / NA : 0.0);
         fflush(stdout);
 
         /* ---- DEPTH IS MEASURED FROM THE FIRST OPENER, NOT ASSUMED -----------
@@ -1272,15 +1303,26 @@ int main(int argc, char **argv) {
                 printf("%s  needed depth %d (not %d); holding every opener to %d\n",
                        GWORD[g0], used, depth, used);
                 depth = used;
-                /* the LB ranking was computed at the OLD depth -- redo it, or the
-                 * search order and every cutoff bound refer to a different cap */
+                /* the LB values were computed at the OLD depth -- redo them, or
+                 * every cutoff bound refers to a different cap.  Under --topk the
+                 * SET and its ORDER are fixed by sum of squares, which does not
+                 * depend on depth, so only the bounds are refreshed. */
                 for (int g = 0; g < NG; g++) lb[g] = root_lb(g, depth);
-                nord = 0;
-                for (int g = 0; g < NG; g++)
-                    if (lb[g] < INF) ord[nord++] = ((int64_t)lb[g] << 20) | (int64_t)g;
-                qsort(ord, nord, sizeof(int64_t), cmp_i64);
-                printf("re-ranked at depth %d: %d openers, min LB %d (%.5f avg)\n",
-                       depth, nord, (int)(ord[0] >> 20), (double)(int)(ord[0] >> 20) / NA);
+                if (TOPK > 0) {
+                    for (int i = 0; i < nord; i++) {
+                        int g = (int)(ord[i] & 0xFFFFF);
+                        ord[i] = ((int64_t)lb[g] << 20) | (int64_t)g;
+                    }
+                    printf("re-bounded at depth %d: same %d openers, order unchanged\n",
+                           depth, nord);
+                } else {
+                    nord = 0;
+                    for (int g = 0; g < NG; g++)
+                        if (lb[g] < INF) ord[nord++] = ((int64_t)lb[g] << 20) | (int64_t)g;
+                    qsort(ord, nord, sizeof(int64_t), cmp_i64);
+                    printf("re-ranked at depth %d: %d openers, min LB %d (%.5f avg)\n",
+                           depth, nord, (int)(ord[0] >> 20), (double)(int)(ord[0] >> 20) / NA);
+                }
             } else {
                 printf("%s  solved at depth %d  total=%d  avg=%.5f  (%.1fs)\n",
                        GWORD[g0], used, t0v, (double)t0v / NA, dt0);
@@ -1317,7 +1359,11 @@ int main(int argc, char **argv) {
 #pragma omp atomic read
 #endif
                 inc = incumbent;
-                /* Ascending LB: once this fires it fires for the whole tail. */
+                /* A valid per-opener skip either way: an opener whose LB already
+                 * exceeds the incumbent cannot win.  With TOPK the list is in
+                 * sum-of-squares order, so this says nothing about the openers
+                 * AFTER it; only the exact path's ascending-LB order makes it a
+                 * proof about the whole tail. */
                 if (mylb > inc) {
 #ifdef _OPENMP
 #pragma omp atomic
