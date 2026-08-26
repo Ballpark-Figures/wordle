@@ -173,26 +173,6 @@ loading" for the measurements and the full cross-machine history.
   `vowels.py`, `depths.py` (tree depth + tree-vs-CSV check),
   `ttdump.py`/`ttverify.py`/`ttscan.py` (table snapshots).
 
-## macOS will SLEEP mid-sweep — a busy CPU does not stop it (2026-08-26)
-- **macOS measures idleness by USER INPUT, not load.** A solver pinning all 18 cores
-  contributes NOTHING toward keeping the machine awake. This is the opposite of the
-  intuition, and it silently suspends a long run.
-- **The newer Mac's settings make it sharp:** `displaysleep 10`, **`sleep 1`** — the
-  system sleeps ONE MINUTE after the display does. `pmset -g` shows the live values
-  and, crucially, who is holding sleep off.
-- **Do not rely on an app happening to hold an assertion.** On 2026-08-26 the only
-  things preventing sleep during a live sweep were `powerd` (only while the display
-  is ON) and **DaVinci Resolve** with a "Background Activity" assertion. Quit Resolve,
-  walk away, and the sweep dies ~11 minutes later.
-- **Fix, now built into `run-ans-sweep.sh` and `run-allwords-sweep.sh`:** prefix the
-  solver with **`caffeinate -i`**, which blocks idle SYSTEM sleep while still letting
-  the DISPLAY sleep. Guarded by `command -v caffeinate`, so it is a no-op on the WSL
-  desktop and the scripts stay portable.
-- **For a run ALREADY in flight**, attach one: `caffeinate -i -w <pid>` blocks sleep
-  until that pid exits.
-- This is the macOS half of the shared "Assume the machine reboots under you" rule —
-  Windows loses a job to a forced update, macOS loses it to idle sleep.
-
 ## Feedback patterns: 243 encodings, but only 238 are POSSIBLE
 - **`3^5 = 243` is the ENCODING space; only 238 patterns can ever occur.** The five
   impossible ones are **4 greens + 1 yellow** (one per position of the yellow): if four
