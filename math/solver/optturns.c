@@ -1282,8 +1282,8 @@ int main(int argc, char **argv) {
                 printf("re-ranked at depth %d: %d openers, min LB %d (%.5f avg)\n",
                        depth, nord, (int)(ord[0] >> 20), (double)(int)(ord[0] >> 20) / NA);
             } else {
-                printf("%s  solved at depth %d  total=%d  (%.1fs)\n",
-                       GWORD[g0], used, t0v, dt0);
+                printf("%s  solved at depth %d  total=%d  avg=%.5f  (%.1fs)\n",
+                       GWORD[g0], used, t0v, (double)t0v / NA, dt0);
             }
             incumbent = t0v;
             nbest = 0; best[nbest++] = g0;
@@ -1294,8 +1294,8 @@ int main(int argc, char **argv) {
                         GWORD[g0], t0v, (double)t0v / NA, depth, dt0);
                 fflush(out);
             }
-            printf("[%7.0fs] %s  total=%5d  FIRST (depth %d)  %7.1fs\n",
-                   now_s() - t0, GWORD[g0], t0v, depth, dt0);
+            printf("[%7.0fs] %s  total=%5d  avg=%.5f  FIRST (depth %d)  %7.1fs\n",
+                   now_s() - t0, GWORD[g0], t0v, (double)t0v / NA, depth, dt0);
             fflush(stdout);
             free(c0);
         }
@@ -1354,12 +1354,12 @@ int main(int argc, char **argv) {
                         if (total < incumbent) {
                             incumbent = total;
                             nbest = 0; best[nbest++] = g;
-                            printf("[%7.0fs] %s  total=%5d  NEW BEST  lb=%d  %7.1fs  tt %.2f%%/%.2f%%\n",
-                                   el, GWORD[g], total, mylb, dt, hit, occ);
+                            printf("[%7.0fs] %s  total=%5d  avg=%.5f  NEW BEST  lb=%d  %7.1fs  tt %.2f%%/%.2f%%\n",
+                                   el, GWORD[g], total, (double)total / NA, mylb, dt, hit, occ);
                         } else if (total == incumbent) {
                             best[nbest++] = g;
-                            printf("[%7.0fs] %s  total=%5d  TIED      lb=%d  %7.1fs  tt %.2f%%/%.2f%%\n",
-                                   el, GWORD[g], total, mylb, dt, hit, occ);
+                            printf("[%7.0fs] %s  total=%5d  avg=%.5f  TIED      lb=%d  %7.1fs  tt %.2f%%/%.2f%%\n",
+                                   el, GWORD[g], total, (double)total / NA, mylb, dt, hit, occ);
                         }
                     }
                     /* Heartbeat on WHICHEVER comes first, count or time.  A count
@@ -1369,8 +1369,9 @@ int main(int argc, char **argv) {
                     if (seen % 100 == 0 || now_s() - last_report >= 30.0) {
                         last_report = now_s();
                         int gone = seen + lbskip, left = nord - gone;
-                        printf("[%7.0fs] %5d/%d done (%d searched, %d cut, %d lb-skip, %d infeas)  best=%d  %.1f/min  eta %5.1fh  tt %.2f%%/%.2f%%\n",
+                        printf("[%7.0fs] %5d/%d done (%d searched, %d cut, %d lb-skip, %d infeas)  best=%d (avg %.5f)  %.1f/min  eta %5.1fh  tt %.2f%%/%.2f%%\n",
                                el, gone, nord, searched, cut, lbskip, infeas, incumbent,
+                               incumbent < INF ? (double)incumbent / NA : 0.0,
                                gone / (el / 60.0),
                                (left > 0 && gone > 0) ? el / (double)gone * left / 3600.0 : 0.0,
                                hit, occ);
