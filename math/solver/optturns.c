@@ -1192,11 +1192,19 @@ int main(int argc, char **argv) {
     if (optonly) {
         if (!sweep) { fprintf(stderr, "--optimal-only requires --sweep\n"); return 1; }
 
+        /* Screen at the CEILING, not the floor.  Openers escalate UPWARD from
+         * --depth, so an opener that cannot fit the floor may still be perfectly
+         * feasible deeper: rejecting it here on the floor's bound would discard
+         * it before escalation ever gets a chance, which is precisely the case
+         * this design exists to handle.  root_lb is monotone in depth, so the
+         * ceiling's bound rejects only what can NEVER work.  It is looser, so
+         * the initial cutoffs are weaker -- the re-bound after the first opener
+         * tightens everything to the depth actually in force. */
         int *lb = malloc(sizeof(int) * NG);
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static)
 #endif
-        for (int g = 0; g < NG; g++) lb[g] = root_lb(g, depth);
+        for (int g = 0; g < NG; g++) lb[g] = root_lb(g, MAXD - 1);
 
         int64_t *ord = malloc(sizeof(int64_t) * NG);
         int nord = 0, nolb = 0;
@@ -1286,6 +1294,7 @@ int main(int argc, char **argv) {
          * The floor is the requested --depth: if the first opener happens to
          * solve in fewer, we still allow the full budget, so no opener is held
          * to a tighter cap than asked for. */
+        const int depth_floor = depth;   /* never ratchet below what was asked for */
         if (nord > 0) {
             int g0 = (int)(ord[0] & 0xFFFFF);
             Ctx *c0 = calloc(1, sizeof(Ctx));
@@ -1327,6 +1336,14 @@ int main(int argc, char **argv) {
                 printf("%s  solved at depth %d  total=%d  avg=%.5f  (%.1fs)\n",
                        GWORD[g0], used, t0v, (double)t0v / NA, dt0);
             }
+            /* The screen ran at the CEILING; now that the working depth is known,
+             * tighten every bound to it. */
+            for (int q = 0; q < nord; q++) {
+                int gg = (int)(ord[q] & 0xFFFFF);
+                lb[gg] = root_lb(gg, depth);
+                ord[q] = ((int64_t)lb[gg] << 20) | (int64_t)gg;
+            }
+            if (TOPK == 0) qsort(ord, nord, sizeof(int64_t), cmp_i64);
             incumbent = t0v;
             nbest = 0; best[nbest++] = g0;
             done[g0] = 1;
@@ -1371,8 +1388,30 @@ int main(int argc, char **argv) {
                     lbskip++;
                     continue;
                 }
+                /* ---- TRY EVERY DEPTH FROM THE FLOOR UP TO THE CURRENT BOUND --
+                 * Each opener is attempted at 6 first, then 7, and so on up to
+                 * the bound in force.  Solving at a SHALLOWER cap is the goal in
+                 * its own right, and the first opener's requirement is not
+                 * evidence about the rest -- it only sets the ceiling.
+                 *
+                 * A depth that CUTS ends the escalation for this opener: it
+                 * cannot beat the incumbent at that cap, and going deeper to
+                 * chase it would work against lowering the bound. That is a
+                 * deliberate approximation -- f(S,d) is non-increasing in d, so
+                 * a deeper cap COULD have beaten the incumbent -- and it is the
+                 * price of driving the bound down. */
                 double s0 = now_s();
-                int total = solve_opener_bounded(g, depth, ctx, inc);
+                int total = INF, dused = 0;
+                int cap;
+#ifdef _OPENMP
+#pragma omp atomic read
+#endif
+                cap = depth;
+                for (int dd = depth_floor; dd <= cap; dd++) {
+                    total = solve_opener_bounded(g, dd, ctx, inc);
+                    dused = dd;
+                    if (total < INF) break;      /* solved, or cut, at this depth */
+                }
                 double dt = now_s() - s0;
 #ifdef _OPENMP
 #pragma omp critical
@@ -1394,8 +1433,22 @@ int main(int argc, char **argv) {
                         searched++;
                         if (out) {
                             fprintf(out, "%s,%d,%.5f,%d,%.1f\n",
-                                    GWORD[g], total, (double)total / NA, depth, dt);
+                                    GWORD[g], total, (double)total / NA, dused, dt);
                             fflush(out);
+                        }
+                        /* Solved at a shallower cap than the bound in force, so
+                         * the bound comes down and every later opener is held to
+                         * it.  Ratchets one way only, and never below the
+                         * requested --depth. */
+                        if (dused < depth) {
+                            printf("[%7.0fs] depth bound %d -> %d (%s solves at %d)\n",
+                                   el, depth, dused, GWORD[g], dused);
+                            depth = dused;
+                            for (int q = 0; q < nord; q++) {
+                                int gg = (int)(ord[q] & 0xFFFFF);
+                                lb[gg] = root_lb(gg, depth);
+                                ord[q] = ((int64_t)lb[gg] << 20) | (int64_t)gg;
+                            }
                         }
                         if (total < incumbent) {
                             incumbent = total;
