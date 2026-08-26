@@ -350,6 +350,59 @@ one. If no opener solves all 12972 words within 6, the run says so explicitly
 rather than returning a number. Report any result as optimal **subject to a
 6-guess guarantee**.
 
+## `--topk K`: trade exactness for tractability
+
+At every branching point, rank the legal guesses by **sum of squared bin sizes**
+(ascending — the evenest split first) and search only the best `K`. `K = 0` is
+unlimited and is the exact solver.
+
+```sh
+# from math/
+bash solver/run-allwords-sweep.sh -k 50
+./solver/optturns --opener salet --depth 6 --topk 100
+```
+
+**THE RESULT IS AN UPPER BOUND, NOT AN OPTIMUM.** The search space is a strict
+subset, so what comes back is a real, achievable strategy that may not be the
+best one. It is weakly monotone in `K` — larger `K` can only match or improve the
+total — and `K = 0` recovers exactness. Report as **"best found within top-K
+branching"**, never as "the optimum".
+
+Measured on SALET (2315 answers, depth 6; exact = 7920 in 16672 nodes):
+
+| K | total | nodes |
+|---|---|---|
+| 1 | 8124 | 303 |
+| 5 | 7962 | 480 |
+| 20 | 7927 | 850 |
+| 50 | 7927 | 1366 |
+| 100 | **7920** | 1945 |
+| 200 | 7920 | 4199 |
+
+K=100 FINDS the optimum at ~1/9 the nodes — but finding is not proving, and the
+value is still formally an upper bound.
+
+**`INFEASIBLE` is weaker here too**: it means "not solvable within the depth cap
+USING ONLY THESE K GUESSES PER NODE", which is not evidence about the problem.
+
+**Candidates are added when `n <= K`** — every word still in `S` joins the
+survivors, so the answer is always playable in a small state and a tight `K`
+degrades the total gracefully instead of manufacturing spurious infeasibility.
+
+**`K` is part of the TT salt.** Stored values under `--topk` are best-found-
+within-K, not exact optima, so a table from one `K` read by another (or by the
+exact solver) would return a confidently wrong value. Each `K` gets its own key
+space, and the wrapper gives each `K` its own CSV and `tt.bin`.
+
+### Depth is MEASURED, not assumed
+
+Under `--optimal-only` the first opener (lowest root LB) is solved at an
+ESCALATING cap starting from `--depth`; whatever cap it needed becomes the fixed
+depth for every remaining opener, with `--depth` as the floor. This replaces
+guessing whether 6 is satisfiable — under `--topk` an INFEASIBLE at a fixed 6
+would mostly be an artifact of the restricted branching — and keeps every opener
+under the SAME constraint, which a per-opener escalation would not.
+
 ## Output format
 
 Each tree line is a complete replay of one game:

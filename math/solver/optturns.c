@@ -91,6 +91,24 @@ static int      NG, NA;
  * under another: the same candidate set genuinely has a different optimum when
  * the legal guesses differ, and a shared key would return that wrong value. */
 static uint64_t GSALT = 0;
+
+/* --topk: at every branching point consider only the K guesses that split the
+ * candidate set most evenly (smallest sum of squared bin sizes), instead of all
+ * NG of them.  0 = unlimited = the exact solver.
+ *
+ * THIS MAKES THE RESULT AN UPPER BOUND, NOT AN OPTIMUM.  The search space is a
+ * strict subset, so what comes back is a real, achievable strategy that may not
+ * be the best one.  It is weakly monotone in K -- a larger K can only match or
+ * improve the total -- and K = 0 recovers exactness.  Report these numbers as
+ * "best found within top-K branching", NEVER as "the optimum".
+ *
+ * INFEASIBLE means something weaker here too: "not solvable within the depth cap
+ * USING ONLY THESE K GUESSES PER NODE", which is not evidence about the problem.
+ *
+ * Candidates (the words still in S) are added when n <= TOPK, so the answer is
+ * always playable in a small state and a tight K degrades the total gracefully
+ * rather than manufacturing spurious infeasibility. */
+static int TOPK = 0;
 static uint8_t *PAT;             /* NG * NA, row-major: PAT[g*NA + a] */
 static uint64_t ZOB0[MAXA], ZOB1[MAXA];
 static int      ANS2G[MAXA];
@@ -487,6 +505,8 @@ typedef struct {
     int      lbg[MAXD][MAXG];
     int64_t  ord[MAXD][MAXG];
     uint16_t leg[MAXD][MAXG];      /* hard mode: guesses this state may play */
+    int32_t  mark[MAXD][MAXG];     /* --topk: stamped membership, no clearing */
+    int32_t  tag[MAXD];            /* current stamp value per depth */
     long long nodes, probe, hit, fill;
 } Ctx;
 
@@ -616,9 +636,13 @@ static int solve(const uint16_t *S, int n, int d, const Cons *C, Ctx *ctx) {
         return best;
     }
 
-    /* pass 1: per-guess lower bound from its partition profile */
+    /* pass 1: per-guess lower bound from its partition profile.  When --topk is
+     * on this also records the SUM OF SQUARED BIN SIZES, the split-quality score
+     * the K survivors are chosen by -- computed from the same counts, so it is
+     * nearly free and costs the exact path nothing. */
     int *cnt = ctx->cnt[d], *lbg = ctx->lbg[d];
-    int bestlb = INF, bestlb_g = -1, bestlb_in = 0;
+    int64_t *ssq = ctx->ord[d];                  /* reused as (ss << 20 | g) */
+    int bestlb = INF, bestlb_g = -1, bestlb_in = 0, nss = 0;
     for (int t = 0; t < nleg; t++) {
         int g = HARD ? (int)leg[t] : t;
         const uint8_t *row = PAT + (size_t)g * NA;
@@ -628,8 +652,10 @@ static int solve(const uint16_t *S, int n, int d, const Cons *C, Ctx *ctx) {
             if (cnt[p]++ == 0) bp[nb++] = p;
         }
         int lv = n, dead = 0, ing = 0;
+        int64_t ss = 0;
         for (int k = 0; k < nb; k++) {
             int p = bp[k], c = cnt[p];
+            if (TOPK > 0) ss += (int64_t)c * c;
             if (p == ALL_GREEN) { ing = 1; continue; }
             if (c == n) { dead = 1; break; }             /* guess reveals nothing */
             int v = LBTAB[d - 1][c];
@@ -638,11 +664,58 @@ static int solve(const uint16_t *S, int n, int d, const Cons *C, Ctx *ctx) {
         }
         for (int k = 0; k < nb; k++) cnt[bp[k]] = 0;
         lbg[g] = dead ? INF : lv;
-        if (!dead && (lv < bestlb || (lv == bestlb && ing && !bestlb_in))) {
-            bestlb = lv; bestlb_g = g; bestlb_in = ing;
+        if (!dead) {
+            if (TOPK > 0) ssq[nss++] = (ss << 20) | (int64_t)g;
+            if (lv < bestlb || (lv == bestlb && ing && !bestlb_in)) {
+                bestlb = lv; bestlb_g = g; bestlb_in = ing;
+            }
         }
     }
     if (bestlb_g < 0) { tt_put(h0, h1, d, INF, -1, 1, &ctx->fill); return INF; }
+
+    /* ---- --topk: keep only the K most evenly-splitting guesses -------------
+     * Ordered by ASCENDING sum of squares, so the evenest split ranks first.
+     * The survivors are then re-keyed by lower bound, because that is the better
+     * order to SEARCH in even though split quality is what SELECTS them. */
+    if (TOPK > 0) {
+        qsort(ssq, nss, sizeof(int64_t), cmp_i64);
+        int K = (TOPK < nss) ? TOPK : nss;
+        int32_t *mark = ctx->mark[d], tag = ++ctx->tag[d];
+        for (int i = 0; i < K; i++) {
+            int g = (int)(ssq[i] & 0xFFFFF);
+            mark[g] = tag;
+            ssq[i] = ((int64_t)lbg[g] << 20) | (int64_t)g;
+        }
+        /* A tight K can leave every word in S unplayable, which would report
+         * INFEASIBLE for a state that is perfectly solvable.  Below the cutoff
+         * the candidates are cheap to add, so add them and let the total degrade
+         * gracefully instead. */
+        if (n <= TOPK)
+            for (int i = 0; i < n; i++) {
+                int g = ANS2G[S[i]];
+                if (mark[g] != tag && lbg[g] < INF) {
+                    mark[g] = tag;
+                    ssq[K++] = ((int64_t)lbg[g] << 20) | (int64_t)g;
+                }
+            }
+        qsort(ssq, K, sizeof(int64_t), cmp_i64);
+
+        int seed = (int)(ssq[0] & 0xFFFFF);
+        int v0 = eval_guess(S, n, d, seed, INF, C, ctx);
+        if (v0 < best) { best = v0; bestg = seed; }
+        if (best > lb0)
+            for (int i = 1; i < K; i++) {
+                if ((int)(ssq[i] >> 20) >= best) break;   /* sorted: none left can win */
+                int g = (int)(ssq[i] & 0xFFFFF);
+                int v = eval_guess(S, n, d, g, best, C, ctx);
+                if (v < best) { best = v; bestg = g; }
+                if (best <= lb0) break;                   /* provably optimal */
+            }
+        long long workk = ctx->nodes - nodes0;
+        tt_put(h0, h1, d, best, bestg,
+               workk > 0xFFFFFFFFLL ? 0xFFFFFFFFu : (uint32_t)workk, &ctx->fill);
+        return best;
+    }
 
     /* seed the incumbent with the most promising guess; only guesses whose
      * bound still undercuts it are worth sorting or exploring at all */
@@ -964,6 +1037,8 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--answer-list") && i + 1 < argc) answerlist = argv[++i];
         else if (!strcmp(argv[i], "--patterns") && i + 1 < argc) patpath = argv[++i];
         else if (!strcmp(argv[i], "--optimal-only")) optonly = 1;
+        else if ((!strcmp(argv[i], "--topk") || !strcmp(argv[i], "-k")) && i + 1 < argc)
+            TOPK = atoi(argv[++i]);
         else { fprintf(stderr, "unknown arg: %s\n", argv[i]); return 1; }
     }
 
@@ -1047,10 +1122,16 @@ int main(int argc, char **argv) {
      * Either way a foreign tt.bin would return confidently wrong values rather
      * than missing, so salt on both. Zero when both lists are the defaults, which
      * keeps the existing hashes bit-identical and existing snapshots valid. */
-    if (guesslist || answerlist) {
+    /* TOPK belongs in the salt for the same reason the word lists do, and more
+     * urgently: under --topk the stored values are the best found within the
+     * restricted branching, NOT exact optima. A table from one K read by another
+     * K -- or by the exact solver -- would return a confidently wrong value that
+     * is merely an upper bound. Each K gets its own key space. */
+    if (guesslist || answerlist || TOPK > 0) {
         GSALT = 0xCBF29CE484222325ULL
               ^ ((uint64_t)NG * 0xD6E8FEB86659FD93ULL)
-              ^ ((uint64_t)NA * 0x9E3779B97F4A7C15ULL);
+              ^ ((uint64_t)NA * 0x9E3779B97F4A7C15ULL)
+              ^ ((uint64_t)(unsigned)TOPK * 0xA24BAED4963EE407ULL);
         for (int i = 0; i < NG; i++)
             for (int j = 0; GWORD[i][j]; j++)
                 GSALT = (GSALT ^ (uint8_t)GWORD[i][j]) * 0x100000001B3ULL;
@@ -1161,6 +1242,63 @@ int main(int argc, char **argv) {
                nord, nord ? (int)(ord[0] >> 20) : 0,
                nord ? (double)(int)(ord[0] >> 20) / NA : 0.0);
         fflush(stdout);
+
+        /* ---- DEPTH IS MEASURED FROM THE FIRST OPENER, NOT ASSUMED -----------
+         * Solve the most promising opener at an ESCALATING cap starting at
+         * --depth, take the cap it actually needed, and hold every remaining
+         * opener to that same depth.  This replaces guessing whether 6 is
+         * satisfiable: under --topk an INFEASIBLE at a fixed 6 would mostly be
+         * an artifact of the restricted branching rather than a fact about the
+         * problem, and a per-opener escalation would compare openers under
+         * DIFFERENT constraints, which is not one objective.
+         *
+         * The floor is the requested --depth: if the first opener happens to
+         * solve in fewer, we still allow the full budget, so no opener is held
+         * to a tighter cap than asked for. */
+        if (nord > 0) {
+            int g0 = (int)(ord[0] & 0xFFFFF);
+            Ctx *c0 = calloc(1, sizeof(Ctx));
+            double s0 = now_s();
+            int used = 0;
+            int t0v = solve_escalating(g0, depth, MAXD - 1, c0, &used);
+            double dt0 = now_s() - s0;
+            if (t0v >= INF) {
+                printf("%s  INFEASIBLE at every depth up to %d  (%.1fs) -- nothing to do\n",
+                       GWORD[g0], MAXD - 1, dt0);
+                free(c0);
+                return 1;
+            }
+            if (used > depth) {
+                printf("%s  needed depth %d (not %d); holding every opener to %d\n",
+                       GWORD[g0], used, depth, used);
+                depth = used;
+                /* the LB ranking was computed at the OLD depth -- redo it, or the
+                 * search order and every cutoff bound refer to a different cap */
+                for (int g = 0; g < NG; g++) lb[g] = root_lb(g, depth);
+                nord = 0;
+                for (int g = 0; g < NG; g++)
+                    if (lb[g] < INF) ord[nord++] = ((int64_t)lb[g] << 20) | (int64_t)g;
+                qsort(ord, nord, sizeof(int64_t), cmp_i64);
+                printf("re-ranked at depth %d: %d openers, min LB %d (%.5f avg)\n",
+                       depth, nord, (int)(ord[0] >> 20), (double)(int)(ord[0] >> 20) / NA);
+            } else {
+                printf("%s  solved at depth %d  total=%d  (%.1fs)\n",
+                       GWORD[g0], used, t0v, dt0);
+            }
+            incumbent = t0v;
+            nbest = 0; best[nbest++] = g0;
+            done[g0] = 1;
+            searched++;
+            if (out) {
+                fprintf(out, "%s,%d,%.5f,%d,%.1f\n",
+                        GWORD[g0], t0v, (double)t0v / NA, depth, dt0);
+                fflush(out);
+            }
+            printf("[%7.0fs] %s  total=%5d  FIRST (depth %d)  %7.1fs\n",
+                   now_s() - t0, GWORD[g0], t0v, depth, dt0);
+            fflush(stdout);
+            free(c0);
+        }
 
 #ifdef _OPENMP
 #pragma omp parallel

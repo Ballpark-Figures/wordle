@@ -49,21 +49,33 @@
 set -u
 
 MATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-OUT=data/shared/allwords/opener_totals.csv
-LOC=data/local/allwords
 WORDS=data/shared/words/guess.txt
 PATS=data/local/patterns/patterns_full.npy
 
 THREADS=18
 TTBITS=28           # 8.6 GB of 24 GiB. 29 would be 16 GiB and would swap here.
+TOPK=0              # 0 = exact (and intractable here); pass -k N for the heuristic
 
 while [ $# -gt 0 ]; do
     case "$1" in
+        -k|--topk) TOPK="$2";    shift 2 ;;
         --threads) THREADS="$2"; shift 2 ;;
         --tt-bits) TTBITS="$2";  shift 2 ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
     esac
 done
+
+# EVERY K GETS ITS OWN FILES.  Different K values are different search spaces
+# producing different (upper-bound) totals, so sharing a CSV would interleave
+# incomparable results and let resume seed one run from another's numbers. The TT
+# is salted by K as well, so a shared tt.bin would fail verification anyway.
+if [ "$TOPK" -gt 0 ]; then
+    OUT=data/shared/allwords/opener_totals_k${TOPK}.csv
+    LOC=data/local/allwords/k${TOPK}
+else
+    OUT=data/shared/allwords/opener_totals.csv
+    LOC=data/local/allwords
+fi
 
 cd "$MATH" || exit 1
 
@@ -88,13 +100,18 @@ mkdir -p "$(dirname "$OUT")" "$LOC"
 WARM=""
 [ -f "$LOC/tt.bin" ] && WARM="--tt-load $LOC/tt.bin"
 
-echo "[$(date -Is)] resuming wordle ALL-WORDS sweep (optimal-only, depth 6) $WARM" \
+KFLAG=""
+[ "$TOPK" -gt 0 ] && KFLAG="--topk $TOPK"
+
+# BSD date has no -Is; this form works on both macOS and Linux. inflight.py parses
+# this timestamp to find the run boundary, so an empty one breaks its run detection.
+echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] resuming wordle ALL-WORDS sweep (optimal-only, depth 6, topk=$TOPK) $WARM" \
     | tee -a "$LOC/sweep.log"
 
 ./solver/optturns --sweep --optimal-only \
     --answer-list "$WORDS" \
     --patterns "$PATS" \
     --out "$OUT" \
-    --depth 6 \
+    --depth 6 $KFLAG \
     --tt-bits "$TTBITS" --threads "$THREADS" $WARM \
     2>&1 | tee -a "$LOC/sweep.log"
