@@ -181,14 +181,31 @@ loading" for the measurements and the full cross-machine history.
 - `NPAT 243` and `ALL_GREEN 242` are both CORRECT and should not be "fixed": they are
   the base-3 encoding (`ggggg` = 242) and its array size. The 5 unreachable codes are
   just slots that never fill.
-- **Where it actually matters is the LOWER BOUND.** `build_lb` uses `cap *= 242` and the
-  file header says "at most 242^(k-1) words can be resolved at [level k]". The true
-  branching is **237** (238 attainable minus the winning one). 242 OVER-states the
-  branching, which UNDER-states the total, so the bound stays VALID — it is merely
-  slacker than it needs to be. Using 237 is also valid and strictly tighter.
-- **The gain is real but small: root LB for n=2315, d=6 goes 6701 to 6706 (+5, 0.07%).**
-  Against a true optimum of 7920 the bound is ~14% loose either way, so this does NOT
-  fix the pruning weakness in `--optimal-only` — do not expect it to.
+- **Where it matters is the LOWER BOUND, and 237 is not the right number either.**
+  `build_lb` used `cap *= 242`. 237 (238 attainable minus the win) is the theoretical
+  ceiling, but **no real guess comes close**: MEASURED, the widest splitter manages
+  **149** non-winning bins against the 2315 mystery answers and **211** against all
+  12972 words (means 86 and 133). Over-stating branching under-states the bound, so 242
+  was VALID, merely slack; the measured max is the tightest sound value.
+- **`BRANCH` is now MEASURED at startup** (`measure_branching()`), not hardcoded — the
+  right constant depends on the ANSWER SET, so any literal is wrong for one of them.
+  Sound for sub-states too: for `S` within `A`, a guess's patterns on `S` are a subset
+  of its patterns on `A`, so `bins(g,S) <= bins(g,A) <= BRANCH`.
+- **MEASURED EFFECT, so nobody re-litigates it (2026-08-26):**
+  - root LB (n=2315, d=6): 6701 to **6794**. True optimum 7920, so still ~14% loose.
+  - ordinary solving: **NO effect at all** — validate.sh node counts bit-identical
+    (salet 16672 before and after). Reason: `LBTAB[d][n] = 2n-1` for every `n <= BRANCH+1`,
+    so the table only changes above n=150, and the search lives in deep states far
+    smaller than that. Every hot-path lookup returns what it always did.
+  - `--optimal-only`: **~17% faster** (1.8 to 2.1 openers/min; ETA 122.9h to 100.8h at
+    6 threads). Real, because the root cutoff sums LBTAB over ROOT partition sizes,
+    which are exactly the large bins that changed.
+  - **It does NOT make the all-words sweep tractable.** For n=12972 the gain is
+    38672 to 38703 (+31, 0.08%), because 211 is close to 242.
+- **Why the ceiling is low:** the counting bound collapses to `LB = 1 + 2B + 3(n-1-B)`
+  = `6943 - B` at n=2315, d=6 — `B^2` already exceeds `n` by level 3, so the branching
+  constant only ever moves the DEPTH-2 term. Tightening `B` cannot attack the
+  `3(n-1-B)` term that dominates; only a bound that constrains depth-3 capacity can.
 
 ## Answers-only + all-words sweeps (same solver, different word sets)
 Two more variants of the SAME objective, both driven by flags on `optturns`

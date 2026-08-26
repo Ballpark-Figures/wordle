@@ -285,6 +285,40 @@ static uint8_t *load_npy(const char *path, int *rows, int *cols) {
 
 /* ------------------------------------------------------------ lower bound */
 
+/* Branching factor for the counting bound, MEASURED rather than assumed.
+ *
+ * 3^5 = 243 is the ENCODING space; only 238 of those are attainable (four greens
+ * plus a yellow cannot occur -- the fifth letter is green or grey, never yellow).
+ * But what any REAL guess achieves is lower still: 149 non-winning bins against
+ * the 2315 mystery answers, 211 against all 12972 words.
+ *
+ * Over-stating the branching UNDER-states the bound, so the old literal 242 was
+ * VALID, merely slack. This is the largest value that is still sound, and it is
+ * sound for every sub-state too: for S contained in A, a guess's patterns on S
+ * are a subset of its patterns on A, so bins(g,S) <= bins(g,A) <= BRANCH.
+ *
+ * Measured, not hardcoded, because the right constant depends on the ANSWER SET
+ * -- a literal would be wrong for one of the two. O(NG*NA), well under a second.
+ *
+ * This tightens LBTAB everywhere it is read, which matters most INSIDE solve():
+ * pass 1 bounds every candidate guess with it, so a tighter table prunes guesses
+ * at every node rather than only screening openers at the root. */
+static int BRANCH = 242;
+
+static int measure_branching(void) {
+    int seen[NPAT], best = 1;
+    for (int g = 0; g < NG; g++) {
+        memset(seen, 0, sizeof seen);
+        int k = 0;
+        const uint8_t *row = PAT + (size_t)g * NA;
+        for (int a = 0; a < NA; a++)
+            if (!seen[row[a]]) { seen[row[a]] = 1; k++; }
+        if (seen[ALL_GREEN]) k--;          /* the win RESOLVES, it does not branch */
+        if (k > best) best = k;
+    }
+    return best;
+}
+
 static void build_lb(void) {
     for (int d = 0; d < MAXD; d++)
         for (int n = 0; n <= NA; n++) LBTAB[d][n] = INF;
@@ -298,7 +332,7 @@ static void build_lb(void) {
                 total += take * k;
                 rem -= take;
                 if (rem == 0) { ok = 1; break; }
-                if (cap < MAXA) cap *= 242;
+                if (cap < MAXA) cap *= BRANCH;
             }
             LBTAB[d][n] = ok ? (int)total : INF;
         }
@@ -1037,6 +1071,9 @@ int main(int argc, char **argv) {
     if (HARD) { build_bitsets(); fprintf(stderr, "mode: HARD\n"); }
     else      fprintf(stderr, "mode: normal\n");
 
+    BRANCH = measure_branching();
+    fprintf(stderr, "branching: %d non-winning bins (max over %d guesses; 238 attainable of 243)\n",
+            BRANCH, NG);
     build_lb();
     fprintf(stderr, "root LB(d=%d, n=%d) = %d  (%.5f avg)\n",
             depth, NA, LBTAB[depth][NA], (double)LBTAB[depth][NA] / NA);
