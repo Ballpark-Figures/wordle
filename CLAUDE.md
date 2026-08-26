@@ -173,6 +173,23 @@ loading" for the measurements and the full cross-machine history.
   `vowels.py`, `depths.py` (tree depth + tree-vs-CSV check),
   `ttdump.py`/`ttverify.py`/`ttscan.py` (table snapshots).
 
+## Feedback patterns: 243 encodings, but only 238 are POSSIBLE
+- **`3^5 = 243` is the ENCODING space; only 238 patterns can ever occur.** The five
+  impossible ones are **4 greens + 1 yellow** (one per position of the yellow): if four
+  positions are green, the fifth letter is either in that position — green — or not in
+  the word at all — grey. Yellow cannot happen there. `243 - 5 = 238`.
+- `NPAT 243` and `ALL_GREEN 242` are both CORRECT and should not be "fixed": they are
+  the base-3 encoding (`ggggg` = 242) and its array size. The 5 unreachable codes are
+  just slots that never fill.
+- **Where it actually matters is the LOWER BOUND.** `build_lb` uses `cap *= 242` and the
+  file header says "at most 242^(k-1) words can be resolved at [level k]". The true
+  branching is **237** (238 attainable minus the winning one). 242 OVER-states the
+  branching, which UNDER-states the total, so the bound stays VALID — it is merely
+  slacker than it needs to be. Using 237 is also valid and strictly tighter.
+- **The gain is real but small: root LB for n=2315, d=6 goes 6701 to 6706 (+5, 0.07%).**
+  Against a true optimum of 7920 the bound is ~14% loose either way, so this does NOT
+  fix the pruning weakness in `--optimal-only` — do not expect it to.
+
 ## Answers-only + all-words sweeps (same solver, different word sets)
 Two more variants of the SAME objective, both driven by flags on `optturns`
 rather than new binaries. **`math/solver/README.md` has the full detail.**

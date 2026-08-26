@@ -1114,8 +1114,11 @@ int main(int argc, char **argv) {
         if (out && ndone == 0) fprintf(out, "word,total,expected,depth,seconds\n");
 
         int *best = malloc(sizeof(int) * nord);
-        int nbest = 0, searched = 0, cut = 0, infeas = 0, seen = 0;
-        double t0 = now_s();
+        /* seen  = reached the critical section (searched + cut + infeasible)
+         * lbskip = discarded by the root LB without any search, never reaches it
+         * so processed = seen + lbskip, and the two must not be conflated. */
+        int nbest = 0, searched = 0, cut = 0, infeas = 0, seen = 0, lbskip = 0;
+        double t0 = now_s(), last_report = t0;
 
         printf("optimal-only: %d openers by ascending root LB (min %d = %.5f avg)\n",
                nord, nord ? (int)(ord[0] >> 20) : 0,
@@ -1144,7 +1147,7 @@ int main(int argc, char **argv) {
 #ifdef _OPENMP
 #pragma omp atomic
 #endif
-                    cut++;
+                    lbskip++;
                     continue;
                 }
                 double s0 = now_s();
@@ -1184,9 +1187,19 @@ int main(int argc, char **argv) {
                                    el, GWORD[g], total, mylb, dt, hit, occ);
                         }
                     }
-                    if (seen % 500 == 0)
-                        printf("[%7.0fs] ... %d/%d screened  %d searched  %d cut  %d infeasible  best=%d  tt %.2f%%/%.2f%%\n",
-                               el, seen, nord, searched, cut, infeas, incumbent, hit, occ);
+                    /* Heartbeat on WHICHEVER comes first, count or time.  A count
+                     * alone goes silent for many minutes when openers are slow --
+                     * which is exactly when you most need to see it moving, and is
+                     * indistinguishable from a hang. */
+                    if (seen % 100 == 0 || now_s() - last_report >= 30.0) {
+                        last_report = now_s();
+                        int gone = seen + lbskip, left = nord - gone;
+                        printf("[%7.0fs] %5d/%d done (%d searched, %d cut, %d lb-skip, %d infeas)  best=%d  %.1f/min  eta %5.1fh  tt %.2f%%/%.2f%%\n",
+                               el, gone, nord, searched, cut, lbskip, infeas, incumbent,
+                               gone / (el / 60.0),
+                               (left > 0 && gone > 0) ? el / (double)gone * left / 3600.0 : 0.0,
+                               hit, occ);
+                    }
                     fflush(stdout);
                 }
             }
@@ -1205,8 +1218,8 @@ int main(int argc, char **argv) {
             for (int i = 0; i < nbest; i++) printf(" %s", GWORD[best[i]]);
             printf("\n");
         }
-        printf("searched %d, cut %d, infeasible %d, lb-rejected %d, of %d openers in %.0fs\n",
-               searched, cut, infeas, nolb, NG, el);
+        printf("searched %d, cut %d, lb-skipped %d, infeasible %d, lb-rejected %d, of %d openers in %.0fs\n",
+               searched, cut, lbskip, infeas, nolb, NG, el);
         if (out) fclose(out);
         if (ttsave) tt_save(ttsave);
         return 0;
