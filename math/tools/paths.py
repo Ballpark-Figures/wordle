@@ -15,14 +15,22 @@ unchanged:
 
 The name doubles as the BINARY name (`solver/optturns`, `solver/hardturns`), so
 the same variable also tells the tt* tools which process to snapshot.
+
+`ansturns` is the ANSWERS-ONLY sweep -- the same objective, but every guess must
+itself be one of the 2315 answers (`optturns --guess-list mystery.txt`). It is
+the ONE name here that is NOT a binary: the process is still called `optturns`,
+so the tt* tools cannot find it by process name. Reading its results works
+normally; snapshotting its table does not.
+
+    WORDLE_SOLVER=ansturns python3 tools/report.py   # the answers-only sweep
 """
 import csv
 import glob
 import os
 
 SOLVER = os.environ.get("WORDLE_SOLVER", "optturns")
-if SOLVER not in ("optturns", "hardturns"):
-    raise SystemExit("WORDLE_SOLVER must be optturns or hardturns, not %r" % SOLVER)
+if SOLVER not in ("optturns", "hardturns", "ansturns"):
+    raise SystemExit("WORDLE_SOLVER must be optturns, hardturns or ansturns, not %r" % SOLVER)
 
 MATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHARED = os.path.join(MATH, "data", "shared", SOLVER)
@@ -59,11 +67,24 @@ TREES = _resolve_trees()
 LOG = os.path.join(LOCAL, "sweep.log")
 TT_BIN = os.path.join(LOCAL, "tt.bin")
 
-GUESS_WORDS = os.path.join(MATH, "data", "shared", "words", "guess.txt")
+# FULL_GUESS_WORDS is the 12972-word list the pattern matrix ROWS are indexed by
+# -- always this file, whatever the sweep. GUESS_WORDS is the OPENER SET of the
+# sweep being read, which for ansturns is the answers. A reader that wants a
+# pattern row for a word from a restricted set must map it through
+# FULL_GUESS_WORDS first; the two differ exactly when a --guess-list is in play.
+FULL_GUESS_WORDS = os.path.join(MATH, "data", "shared", "words", "guess.txt")
+ANSWER_WORDS = os.path.join(MATH, "data", "shared", "words", "mystery.txt")
+GUESS_WORDS = ANSWER_WORDS if SOLVER == "ansturns" else FULL_GUESS_WORDS
 PATTERNS = os.path.join(MATH, "data", "local", "patterns", "patterns.npy")
 
 N_ANSWERS = 2315
-N_GUESSES = 12972
+
+# How many openers a sweep covers -- the DENOMINATOR for every progress figure.
+# It is the size of the sweep's GUESS SET, because --sweep enumerates exactly the
+# legal guesses. The answers-only sweep restricts that set to the answers, so it
+# has 2315 openers to get through, not 12972; using the wrong one here understates
+# its progress by 5.6x.
+N_GUESSES = N_ANSWERS if SOLVER == "ansturns" else 12972
 
 
 # The results CSV is APPENDED TO by a live solver, and its schema gained a

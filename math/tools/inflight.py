@@ -22,10 +22,32 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from paths import CSV_PATH, GUESS_WORDS, LOG, N_ANSWERS, PATTERNS, read_rows
+from paths import (CSV_PATH, FULL_GUESS_WORDS, GUESS_WORDS, LOG, N_ANSWERS,
+                   PATTERNS, read_rows)
 
 NPAT = 243
-THREADS = 20
+THREADS = 20          # fallback only; log_threads() below reads the real value
+
+
+def log_threads(default=THREADS):
+    """The thread count the RUNNING sweep actually used.
+
+    This is the width of the in-flight window, so a wrong value invents openers
+    that are not running (or hides ones that are). The solver prints `threads: N`
+    at startup and that is tee'd into sweep.log, so read it rather than assume a
+    machine: the desktop runs 20, this Mac runs 18. Last occurrence wins -- the
+    log accumulates across runs.
+    """
+    n = default
+    try:
+        with open(LOG) as f:
+            for line in f:
+                if line.startswith("threads:"):
+                    try: n = int(line.split(":", 1)[1])
+                    except ValueError: pass
+    except OSError:
+        pass
+    return n
 
 
 def sweep_order():
@@ -35,6 +57,14 @@ def sweep_order():
 
     words = [w.strip() for w in open(GUESS_WORDS) if w.strip()]
     pat = np.load(PATTERNS, allow_pickle=False)
+    if len(words) != pat.shape[0]:
+        # A RESTRICTED sweep (--guess-list): patterns.npy rows are indexed by the
+        # FULL guess list, so row g is not this word's row. Select the real rows,
+        # mirroring the row compaction --guess-list does in the C. Ties then break
+        # by index in the RESTRICTED list, which is what the solver sorts on too.
+        full = [w.strip() for w in open(FULL_GUESS_WORDS) if w.strip()]
+        idx = {w: i for i, w in enumerate(full)}
+        pat = pat[[idx[w] for w in words]]
     ss = np.empty(len(words), dtype=np.int64)
     for g in range(len(words)):
         cnt = np.bincount(pat[g], minlength=NPAT).astype(np.int64)
@@ -102,7 +132,7 @@ def completion_times():
     return times
 
 
-def status(threads=THREADS):
+def status(threads=None):
     """Also recovers how long each IN-FLIGHT word has been running. Start times
     are not logged, but dispatch follows sweep order and `schedule(dynamic, 1)`
     hands a freed slot the next word, so the i-th dispatched word starts at the
@@ -117,6 +147,8 @@ def status(threads=THREADS):
     started, resumed, elapsed = run_header()
     if elapsed is None:
         return None
+    if threads is None:
+        threads = log_threads()
     order = sweep_order()
     done_order, info = csv_rows_in_order()
     done_now = set(done_order)
@@ -215,7 +247,7 @@ def print_pace(st, windows=PACE_WINDOWS):
 
 
 def main():
-    threads = THREADS
+    threads = log_threads()
     if "--threads" in sys.argv:
         threads = int(sys.argv[sys.argv.index("--threads") + 1])
     st = status(threads)
