@@ -88,10 +88,20 @@ mkdir -p "$(dirname "$OUT")" "$LOC"
 WARM=""
 [ -f "$LOC/tt.bin" ] && WARM="--tt-load $LOC/tt.bin"
 
+# KEEP THE MACHINE AWAKE.  macOS measures idleness by USER INPUT, not load, so a
+# solver pinning every core does NOTHING to prevent sleep.  This Mac sleeps 1
+# minute after the display sleeps (10 min on AC), which would suspend the sweep
+# mid-run; the only reason that has not bitten yet is an unrelated app happening
+# to hold a power assertion.  `-i` blocks idle SYSTEM sleep while still letting
+# the DISPLAY sleep, which is what we want.  No-op where caffeinate does not
+# exist (the WSL desktop), so the script stays portable.
+CAFF=""
+command -v caffeinate >/dev/null 2>&1 && CAFF="caffeinate -i"
+
 echo "[$(date -Is)] resuming wordle ALL-WORDS sweep (optimal-only, depth 6) $WARM" \
     | tee -a "$LOC/sweep.log"
 
-./solver/optturns --sweep --optimal-only \
+$CAFF ./solver/optturns --sweep --optimal-only \
     --answer-list "$WORDS" \
     --patterns "$PATS" \
     --out "$OUT" \

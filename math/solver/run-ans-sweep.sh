@@ -73,9 +73,17 @@ WARM=""
 [ -f "$LOC/tt.bin" ] && WARM="--tt-load $LOC/tt.bin"
 
 # the timestamped header is what inflight.py uses to find the run boundary
+# KEEP THE MACHINE AWAKE.  macOS measures idleness by USER INPUT, not load, so a
+# solver pinning every core does NOTHING to prevent sleep.  This Mac sleeps 1
+# minute after the display sleeps (10 min on AC), which would suspend the sweep
+# mid-run.  `-i` blocks idle SYSTEM sleep while still letting the DISPLAY sleep.
+# No-op where caffeinate does not exist (the WSL desktop).
+CAFF=""
+command -v caffeinate >/dev/null 2>&1 && CAFF="caffeinate -i"
+
 echo "[$(date -Is)] resuming wordle ANSWERS-ONLY sweep (depth 6) $WARM" | tee -a "$LOC/sweep.log"
 
-./solver/optturns --sweep \
+$CAFF ./solver/optturns --sweep \
     --guess-list "$LIST" \
     --out "$OUT" \
     --trees "$LOC/trees" \
