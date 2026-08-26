@@ -155,22 +155,28 @@ def main():
         check()
         return
     rows = passes()
-    width = max(len(r[0]) for r in rows)
+    finished = [r for r in rows if r[2] >= r[1]]
+    live = [r for r in rows if r[2] < r[1]]
+    width = max(len(r[0]) for r in (live or rows))
     print("PASS PROGRESS (dispatch bisection: ends, median, quartiles, ...)")
     print("-" * 64)
+    if finished:
+        # A finished pass never changes again, so it is dropped from the table
+        # rather than parked at 100%.  Named here so it does not just vanish.
+        print("  complete (%d): %s" % (len(finished),
+                                       " ".join(r[0] for r in finished)))
+    if not live:
+        print("  every pass complete -- sweep finished")
+        return
     print("  %-*s %7s %7s %7s %7s" % (width, "pass", "words", "done", "pct", "run"))
-    front = None
-    for label, total, done, run in rows:
+    for label, total, done, run in live:
         pct = 100.0 * done / total
-        if front is None and done < total:
-            front = label
         bar = "#" * int(pct / 5 + 0.5)
         print("  %-*s %7d %7d %6.1f%% %7d  %s"
               % (width, label, total, done, pct, run, bar))
-    deep = [r for r in rows if r[3] == 0]
-    print("\n  first incomplete pass: %s" % (front or "none -- sweep finished"))
+    deep = [r for r in live if r[3] == 0]
     if deep:
-        print("  passes untouched by this run start at the overall %.1f%% -- those"
+        print("\n  passes untouched by this run start at the overall %.1f%% -- those"
               % (100.0 * sum(r[2] for r in rows) / sum(r[1] for r in rows)))
         print("  are earlier runs' sorted-order prefix, spread evenly over them.")
 
