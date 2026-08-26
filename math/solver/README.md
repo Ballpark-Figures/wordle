@@ -276,6 +276,80 @@ still named `optturns`, so the `tt*` tools — which attach by process name —
 cannot find it under that name, and `run-sweep.sh`'s `pgrep -x optturns` guard
 will also fire on a running answers-only sweep.
 
+## All-words (`--answer-list` + `--optimal-only`)
+
+`--answer-list FILE` replaces the ANSWER set — the thing the total is summed
+over. Pointed at `guess.txt` it makes every legal word both a possible answer
+and a legal guess:
+
+> Minimise the **total guesses summed over all 12972 legal words**, every one of
+> which is **both a possible answer and a legal guess**, subject to resolving
+> every answer within `--depth` guesses.
+
+```sh
+# from math/
+python3 build_patterns.py --full          # PREREQUISITE, ~18s, 168 MB
+bash solver/run-allwords-sweep.sh
+```
+
+**It needs the SQUARE pattern matrix.** `--answer-list guess.txt` makes the
+matrix 12972 x 12972, not 12972 x 2315, so `--patterns` must point at
+`patterns_full.npy`. That is a separate file — the default the normal, hard and
+answers-only sweeps read is left untouched. The shape check catches a mismatch.
+
+`MAXA` is 13000 rather than 2315 to allow this. Sizing it up cannot change an
+existing result: `LBTAB` is only read at `n <= NA` and the Zobrist values are
+drawn for `a < NA`, so the first `NA` of them are identical whatever `MAXA` is —
+which `validate.sh` reproducing all five totals confirms.
+
+### `--optimal-only`: prove the winner, bound everyone else
+
+Reports **the optimal opener only**, not a total per opener. A full sweep spends
+nearly all its time proving exact totals for openers that were never going to
+win; this proves the winner and merely bounds the rest.
+
+Each opener has a **root lower bound** — `NA` plus `LBTAB[d-1][|P|]` for every
+surviving partition `P` — computable in O(NA) with no search. The run screens all
+openers by it, sorts ASCENDING, and walks them against a running incumbent:
+
+1. **LB skip.** If an opener's LB exceeds the incumbent, skip it — and because
+   the order is ascending, that proves every opener after it is worse too.
+2. **Partition cutoff.** Within an opener, partitions are solved largest-first
+   and abandoned as soon as `(solved so far + LB of the rest)` exceeds the
+   incumbent.
+
+**TIES SURVIVE.** Both tests are `> incumbent`, never `>=`. An opener whose true
+total equals the incumbent always satisfies `partial + lbrest <= true total <=
+bound`, so it is never cut, and every opener attaining the optimum is reported.
+
+**The bound never enters `solve()`.** It applies only between the root's
+partitions. Subproblem values are memoised and must stay exact — see the
+exactness note at the top of `optturns.c` — so a beta inherited from a parent
+would store a bound where an exact value belongs and poison every later query.
+Cutting between root partitions changes nothing that is stored.
+
+Resume re-seeds the incumbent from the CSV's best total, so a restarted run
+prunes at full strength immediately instead of rediscovering the bound.
+
+### The TT salt covers BOTH lists
+
+`GSALT` is derived from the guess set AND the answer set, and is **zero only when
+both are the defaults** — which keeps existing hashes bit-identical and existing
+`tt.bin` snapshots valid. Both halves are load-bearing: a different guess set
+gives the same candidate set a different optimum, and a different ANSWER set is
+worse still, because the Zobrist values are indexed by ANSWER INDEX — index 7 is
+simply a different word, so every key silently means something else. Without the
+salt a foreign `tt.bin` returns confidently wrong values rather than missing.
+
+### The cap is part of the objective here too
+
+`--depth 6` over 12972 answers is a far stronger demand than over 2315, and
+normal mode's "any opener can follow SALET's tree" argument establishes
+feasibility for the **2315-answer** problem only — it says nothing about this
+one. If no opener solves all 12972 words within 6, the run says so explicitly
+rather than returning a number. Report any result as optimal **subject to a
+6-guess guarantee**.
+
 ## Output format
 
 Each tree line is a complete replay of one game:

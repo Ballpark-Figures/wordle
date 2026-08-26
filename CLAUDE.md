@@ -59,9 +59,17 @@ loading" for the measurements and the full cross-machine history.
     spot check. Cheapest sound route discussed: a "certificate" run at `--depth 7` seeded
     with each opener's known `T6` as the incumbent, asking only "does anything beat this?"
     — a decision problem, so far cheaper than a cold re-solve. Unbuilt and unmeasured.
-  - **`#define MAXD 7`** (`optturns.c`) sizes the per-depth arrays, so `--depth` cannot
-    exceed 7 without raising it and rebuilding. Depth 7 may not be enough to be
-    non-binding; a truly unconstrained run is `depth = n`, which the sizing can't express.
+  - **`#define MAXD`** (`optturns.c`) sizes the per-depth arrays and bounds `--depth`.
+    **It is 20, not 7** — raised when hard mode began escalating its cap per opener
+    (this bullet said 7 until 2026-08-25; do not re-derive the old limit from memory).
+    So depth is NOT the binding constraint it once was: 7, 8 or more needs no rebuild.
+    A truly unconstrained run is still `depth = n`, which the sizing can't express, so
+    a cap remains part of the objective — but choosing a higher one is now free.
+  - **`#define MAXA` is 13000, not 2315** — the ANSWER set is no longer always the
+    2315 mystery words (`--answer-list` can make every legal guess an answer). Sizing
+    it up cannot change an existing result: `LBTAB` is read only at `n <= NA` and the
+    Zobrist values are drawn for `a < NA`, so the first `NA` are identical whatever
+    `MAXA` is — confirmed by `validate.sh` still reproducing all five totals.
   - **In HARD mode the cap BINDS HARD** — `INFEASIBLE` rows are common (3 of the first 15
     openers), so those openers yield no number at all. Carrying `--depth 6` into hard mode
     was an unflagged modelling decision; if the goal is expected guesses, the cap needs
@@ -164,6 +172,43 @@ loading" for the measurements and the full cross-machine history.
   picked up at t=0 and which are still going — `report.py` imports it),
   `vowels.py`, `depths.py` (tree depth + tree-vs-CSV check),
   `ttdump.py`/`ttverify.py`/`ttscan.py` (table snapshots).
+
+## Answers-only + all-words sweeps (same solver, different word sets)
+Two more variants of the SAME objective, both driven by flags on `optturns`
+rather than new binaries. **`math/solver/README.md` has the full detail.**
+- **Answers-only** — every guess (opener and follow-ups) must itself be one of the
+  2315 answers: `bash solver/run-ans-sweep.sh`. `--guess-list mystery.txt` shrinks
+  `NG`, and since every guess loop AND `--sweep` enumerate `0..NG-1`, that restricts
+  the follow-ups and the swept openers in one move — no hot-loop change. Data in
+  `math/data/{shared,local}/ansturns/`.
+- **All-words** — every one of the 12972 legal words is BOTH answer and guess:
+  `bash solver/run-allwords-sweep.sh`. Needs `python3 build_patterns.py --full`
+  first (the SQUARE 12972x12972 matrix, ~18s/168 MB, a SEPARATE file — the default
+  12972x2315 one is what the other three sweeps read). Data in
+  `math/data/{shared,local}/allwords/`.
+- **`--optimal-only` reports THE optimal opener, not a total per opener** (that is
+  what makes all-words tractable). Openers are screened by a root lower bound —
+  O(NA), no search — sorted ASCENDING, then walked against a running incumbent;
+  an opener whose LB exceeds the incumbent is skipped, and because the order is
+  ascending that proves the whole tail is worse. **Ties are kept** (every cut tests
+  `> incumbent`, never `>=`). The bound NEVER enters `solve()` — those values are
+  memoised and must stay exact.
+- **THE CAP BINDS IN BOTH, AND IS PART OF THE OBJECTIVE.** Normal mode's
+  "any opener can follow SALET's tree" argument is unavailable in answers-only
+  (**SALET and REAST are not answer words**) and says nothing about the 12972-answer
+  problem. `INFEASIBLE` is an expected result in both; report their numbers as
+  optima **subject to a 6-guess guarantee**, never as minimum expected guesses.
+- **The TT salt covers the guess set AND the answer set**, and is zero only when both
+  are the defaults (so existing `tt.bin` stays valid). The answer half matters most:
+  Zobrist values are indexed by ANSWER INDEX, so a different answer list makes every
+  key silently mean something else — a foreign snapshot would return confidently
+  wrong values rather than missing.
+- **`WORDLE_SOLVER=ansturns`** reads the answers-only results. It is the one name
+  that is NOT a binary (the process is still `optturns`), so the `tt*` tools, which
+  attach by process name, cannot find it.
+- **On macOS `sh build.sh` does NOT fail with `Text file busy` while a sweep runs**
+  (the README describes Linux behaviour). The linker unlinks and recreates, so the
+  live process keeps its old inode and is unaffected — but the safety net is absent.
 
 ## Gameplay layout
 - (Describe this video's on-screen layout and the assets in `animations/assets/`.)

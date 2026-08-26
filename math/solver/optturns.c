@@ -58,7 +58,13 @@
 #define NPAT       243
 #define ALL_GREEN  242
 #define MAXG       13000
-#define MAXA       2400
+/* MAXA bounds the ANSWER set.  It is 13000, not 2315, because --answer-list can
+ * make every legal guess a possible answer (the all-words sweep).  Sizing it up
+ * cannot change any existing result: LBTAB is only read at n <= NA, and the
+ * Zobrist keys are drawn for a < NA, so the first NA values are identical
+ * whatever MAXA is.  It costs ~0.9 MB more per-thread arena (buf + tbuf), which
+ * validate.sh reproducing all five totals confirms is all it costs. */
+#define MAXA       13000
 /* MAXD bounds --depth, and hard mode ESCALATES the cap per opener until the
  * opener solves (see solve_escalating), so it needs headroom well past 6.  Cost
  * is ~194 KB of per-thread arena per level: 20 levels is ~3.9 MB per thread,
@@ -751,6 +757,95 @@ static int solve_escalating(int g, int dmin, int dmax, Ctx *ctx, int *used) {
     return INF;
 }
 
+/* --------------------------------------------- root branch-and-bound (--optimal-only)
+ *
+ * For finding THE optimal opener and nothing else.  A full sweep spends nearly
+ * all its time proving exact totals for openers that were never going to win;
+ * this proves the winner instead, and merely bounds everyone else.
+ *
+ * CUTOFF is "provably worse than the bound" -- a real answer to the only
+ * question being asked, distinct from INF ("cannot solve within the cap"). */
+#define CUTOFF (INF - 1)
+
+/* The opener's root lower bound: no search at all, O(NA).
+ *
+ * Every answer costs the opener itself (NA), plus at least LBTAB[d-1][|P|] for
+ * each surviving partition P.  Since the sweep visits openers in ASCENDING LB,
+ * the first opener whose LB exceeds the incumbent proves every opener after it
+ * is worse too -- so the tail is discarded wholesale, without being solved. */
+static int root_lb(int g, int depth) {
+    int cnt[NPAT];
+    const uint8_t *row = PAT + (size_t)g * NA;
+    memset(cnt, 0, sizeof cnt);
+    for (int a = 0; a < NA; a++) cnt[row[a]]++;
+    int lb = NA;
+    for (int p = 0; p < NPAT; p++) {
+        if (p == ALL_GREEN || cnt[p] == 0) continue;
+        int v = LBTAB[depth - 1][cnt[p]];
+        if (v >= INF) return INF;
+        lb += v;
+    }
+    return lb;
+}
+
+/* Exact total if it is <= `bound`, CUTOFF if provably above it, INF if the
+ * opener cannot solve within `depth`.
+ *
+ * The bound lives ONLY at this level, between the root's partitions.  It is
+ * deliberately NOT passed into solve(): those values are memoised, and the
+ * exactness note at the top of this file is explicit that a beta inherited from
+ * a parent would store a bound where an exact value belongs and poison every
+ * later query.  Cutting between root partitions changes nothing that is stored.
+ *
+ * Partitions are solved LARGEST FIRST so the costliest subproblem gets the first
+ * chance to blow the budget, before the cheap ones have been paid for.
+ *
+ * TIES SURVIVE.  The test is `> bound`, never `>=`: an opener whose true total
+ * equals the incumbent always satisfies partial + lbrest <= true total <= bound,
+ * so it is never cut and is still reported. */
+static int solve_opener_bounded(int g, int depth, Ctx *ctx, int bound) {
+    uint16_t root[MAXA];
+    int cnt[NPAT], start[NPAT + 1], fill[NPAT];
+    const uint8_t *row = PAT + (size_t)g * NA;
+    memset(cnt, 0, sizeof cnt);
+    for (int a = 0; a < NA; a++) cnt[row[a]]++;
+    int acc = 0;
+    for (int p = 0; p < NPAT; p++) { start[p] = acc; acc += cnt[p]; }
+    start[NPAT] = acc;
+    memcpy(fill, start, sizeof fill);
+    for (int a = 0; a < NA; a++) root[fill[row[a]]++] = (uint16_t)a;
+
+    int ps[NPAT], np = 0;
+    for (int p = 0; p < NPAT; p++)
+        if (p != ALL_GREEN && cnt[p] > 0) ps[np++] = p;
+    for (int i = 1; i < np; i++) {                  /* insertion sort, np <= 242 */
+        int key = ps[i], j = i - 1;
+        while (j >= 0 && cnt[ps[j]] < cnt[key]) { ps[j + 1] = ps[j]; j--; }
+        ps[j + 1] = key;
+    }
+
+    int lbrest = 0;
+    for (int i = 0; i < np; i++) {
+        int v = LBTAB[depth - 1][cnt[ps[i]]];
+        if (v >= INF) return INF;
+        lbrest += v;
+    }
+
+    int total = NA;
+    if (total + lbrest > bound) return CUTOFF;
+    for (int i = 0; i < np; i++) {
+        int p = ps[i];
+        lbrest -= LBTAB[depth - 1][cnt[p]];
+        Cons kid;
+        if (HARD) cons_apply(&kid, &CONS_NONE, g, p);
+        int v = solve(root + start[p], cnt[p], depth - 1, HARD ? &kid : &CONS_NONE, ctx);
+        if (v >= INF) return INF;
+        total += v;
+        if (total + lbrest > bound) return CUTOFF;
+    }
+    return total;
+}
+
 static int write_tree(const char *dir, int g, int depth, Ctx *ctx) {
     char cmd[1200];
     snprintf(cmd, sizeof cmd, "gzip -1 > '%s/%s.txt.gz'", dir, GWORD[g]);
@@ -813,6 +908,8 @@ int main(int argc, char **argv) {
     int nopen = 0;
     const char *outpath = NULL, *treedir = NULL;
     const char *ttload = NULL, *ttsave = NULL, *guesslist = NULL;
+    const char *answerlist = NULL, *patpath = NULL;
+    int optonly = 0;
     int depth = 6, ttbits = 28, threads = 0, sweep = 0, depthmax = -1;
 
     for (int i = 1; i < argc; i++) {
@@ -830,6 +927,9 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--threads") && i + 1 < argc) threads = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--data") && i + 1 < argc) datadir = argv[++i];
         else if (!strcmp(argv[i], "--guess-list") && i + 1 < argc) guesslist = argv[++i];
+        else if (!strcmp(argv[i], "--answer-list") && i + 1 < argc) answerlist = argv[++i];
+        else if (!strcmp(argv[i], "--patterns") && i + 1 < argc) patpath = argv[++i];
+        else if (!strcmp(argv[i], "--optimal-only")) optonly = 1;
         else { fprintf(stderr, "unknown arg: %s\n", argv[i]); return 1; }
     }
 
@@ -848,9 +948,15 @@ int main(int argc, char **argv) {
     AWORD = malloc(sizeof(char[8]) * MAXA);
     snprintf(path, sizeof path, "%s/shared/words/guess.txt", datadir);
     NG = load_words(path, GWORD);
-    snprintf(path, sizeof path, "%s/shared/words/mystery.txt", datadir);
+    /* --answer-list replaces the ANSWER set (the thing the total is summed over).
+     * Pointed at guess.txt it makes every legal guess a possible answer, which
+     * needs the SQUARE pattern matrix -- hence --patterns alongside it. */
+    if (answerlist) snprintf(path, sizeof path, "%s", answerlist);
+    else            snprintf(path, sizeof path, "%s/shared/words/mystery.txt", datadir);
     NA = load_words(path, AWORD);
-    snprintf(path, sizeof path, "%s/local/patterns/patterns.npy", datadir);
+    if (NA > MAXA) { fprintf(stderr, "answer list has %d words, MAXA is %d\n", NA, MAXA); return 1; }
+    if (patpath) snprintf(path, sizeof path, "%s", patpath);
+    else         snprintf(path, sizeof path, "%s/local/patterns/patterns.npy", datadir);
     int r, c;
     PAT = load_npy(path, &r, &c);
     if (r != NG || c != NA) {
@@ -895,13 +1001,30 @@ int main(int argc, char **argv) {
         free(map); free(rw); free(PAT);
         PAT = np;
         NG = nr;
-        /* FNV over the restricted list: distinct guess sets get distinct TT keys */
-        GSALT = 0xCBF29CE484222325ULL ^ ((uint64_t)nr * 0xD6E8FEB86659FD93ULL);
-        for (int i = 0; i < nr; i++)
+        fprintf(stderr, "guess list: restricted to %d words from %s\n", nr, guesslist);
+    }
+
+    /* TT keys are comparable ONLY within one (guess set, answer set) pair, and
+     * BOTH halves matter:
+     *   - a different GUESS set gives the same candidate set a different optimum;
+     *   - a different ANSWER set is worse still, because the Zobrist values are
+     *     indexed by ANSWER INDEX, so index 7 is simply a different word and every
+     *     key silently means something else.
+     * Either way a foreign tt.bin would return confidently wrong values rather
+     * than missing, so salt on both. Zero when both lists are the defaults, which
+     * keeps the existing hashes bit-identical and existing snapshots valid. */
+    if (guesslist || answerlist) {
+        GSALT = 0xCBF29CE484222325ULL
+              ^ ((uint64_t)NG * 0xD6E8FEB86659FD93ULL)
+              ^ ((uint64_t)NA * 0x9E3779B97F4A7C15ULL);
+        for (int i = 0; i < NG; i++)
             for (int j = 0; GWORD[i][j]; j++)
                 GSALT = (GSALT ^ (uint8_t)GWORD[i][j]) * 0x100000001B3ULL;
-        fprintf(stderr, "guess list: restricted to %d words from %s (TT salt %016llx)\n",
-                nr, guesslist, (unsigned long long)GSALT);
+        for (int i = 0; i < NA; i++)
+            for (int j = 0; AWORD[i][j]; j++)
+                GSALT = (GSALT ^ (uint8_t)AWORD[i][j]) * 0x100000001B3ULL;
+        fprintf(stderr, "TT salt %016llx (%d guesses, %d answers)\n",
+                (unsigned long long)GSALT, NG, NA);
     }
 
     for (int a = 0; a < NA; a++) {
@@ -943,6 +1066,148 @@ int main(int argc, char **argv) {
                        100.0 * ctx->hit / (ctx->probe ? ctx->probe : 1));
             fflush(stdout);
         }
+        if (ttsave) tt_save(ttsave);
+        return 0;
+    }
+
+    /* ------------------------------------------------- --optimal-only sweep */
+    if (optonly) {
+        if (!sweep) { fprintf(stderr, "--optimal-only requires --sweep\n"); return 1; }
+
+        int *lb = malloc(sizeof(int) * NG);
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static)
+#endif
+        for (int g = 0; g < NG; g++) lb[g] = root_lb(g, depth);
+
+        int64_t *ord = malloc(sizeof(int64_t) * NG);
+        int nord = 0, nolb = 0;
+        for (int g = 0; g < NG; g++) {
+            if (lb[g] >= INF) { nolb++; continue; }   /* cannot fit the cap at all */
+            ord[nord++] = ((int64_t)lb[g] << 20) | (int64_t)g;
+        }
+        qsort(ord, nord, sizeof(int64_t), cmp_i64);
+        fprintf(stderr, "root LB screen: %d openers ranked, %d rejected outright\n",
+                nord, nolb);
+
+        /* Resume: an existing CSV both seeds the incumbent and marks work done.
+         * Seeding matters more than skipping -- a good bound from the previous
+         * run prunes immediately instead of rediscovering it. */
+        int incumbent = INF;
+        char *done = calloc(NG, 1);
+        int ndone = 0;
+        FILE *rf = outpath ? fopen(outpath, "r") : NULL;
+        if (rf) {
+            char line[256];
+            while (fgets(line, sizeof line, rf)) {
+                char w[64]; int t;
+                if (sscanf(line, "%63[^,],%d", w, &t) != 2) continue;
+                int g = find_word(GWORD, NG, w);
+                if (g >= 0 && !done[g]) { done[g] = 1; ndone++; }
+                if (t > 0 && t < incumbent) incumbent = t;
+            }
+            fclose(rf);
+            if (ndone) fprintf(stderr, "resume: %d searched, incumbent %d\n", ndone, incumbent);
+        }
+        FILE *out = outpath ? fopen(outpath, "a") : NULL;
+        if (outpath && !out) { fprintf(stderr, "cannot append to %s\n", outpath); return 1; }
+        if (out && ndone == 0) fprintf(out, "word,total,expected,depth,seconds\n");
+
+        int *best = malloc(sizeof(int) * nord);
+        int nbest = 0, searched = 0, cut = 0, infeas = 0, seen = 0;
+        double t0 = now_s();
+
+        printf("optimal-only: %d openers by ascending root LB (min %d = %.5f avg)\n",
+               nord, nord ? (int)(ord[0] >> 20) : 0,
+               nord ? (double)(int)(ord[0] >> 20) / NA : 0.0);
+        fflush(stdout);
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+        {
+            Ctx *ctx = calloc(1, sizeof(Ctx));
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic, 1)
+#endif
+            for (int i = 0; i < nord; i++) {
+                int g = (int)(ord[i] & 0xFFFFF);
+                int mylb = (int)(ord[i] >> 20);
+                if (done[g]) continue;
+                int inc;
+#ifdef _OPENMP
+#pragma omp atomic read
+#endif
+                inc = incumbent;
+                /* Ascending LB: once this fires it fires for the whole tail. */
+                if (mylb > inc) {
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
+                    cut++;
+                    continue;
+                }
+                double s0 = now_s();
+                int total = solve_opener_bounded(g, depth, ctx, inc);
+                double dt = now_s() - s0;
+#ifdef _OPENMP
+#pragma omp critical
+#endif
+                {
+                    g_probe += ctx->probe; g_hit += ctx->hit; g_fill += ctx->fill;
+                    ctx->probe = ctx->hit = ctx->fill = 0;
+                    seen++;
+                    double el = now_s() - t0;
+                    double hit = 100.0 * g_hit / (g_probe ? g_probe : 1);
+                    double occ = TT_SLOTS ? 100.0 * g_fill / (double)TT_SLOTS : 0.0;
+                    if (total >= INF) {
+                        infeas++;
+                        printf("[%7.0fs] %s  INFEASIBLE within %d   lb=%d  %7.1fs\n",
+                               el, GWORD[g], depth, mylb, dt);
+                    } else if (total == CUTOFF) {
+                        cut++;
+                    } else {
+                        searched++;
+                        if (out) {
+                            fprintf(out, "%s,%d,%.5f,%d,%.1f\n",
+                                    GWORD[g], total, (double)total / NA, depth, dt);
+                            fflush(out);
+                        }
+                        if (total < incumbent) {
+                            incumbent = total;
+                            nbest = 0; best[nbest++] = g;
+                            printf("[%7.0fs] %s  total=%5d  NEW BEST  lb=%d  %7.1fs  tt %.2f%%/%.2f%%\n",
+                                   el, GWORD[g], total, mylb, dt, hit, occ);
+                        } else if (total == incumbent) {
+                            best[nbest++] = g;
+                            printf("[%7.0fs] %s  total=%5d  TIED      lb=%d  %7.1fs  tt %.2f%%/%.2f%%\n",
+                                   el, GWORD[g], total, mylb, dt, hit, occ);
+                        }
+                    }
+                    if (seen % 500 == 0)
+                        printf("[%7.0fs] ... %d/%d screened  %d searched  %d cut  %d infeasible  best=%d  tt %.2f%%/%.2f%%\n",
+                               el, seen, nord, searched, cut, infeas, incumbent, hit, occ);
+                    fflush(stdout);
+                }
+            }
+            free(ctx);
+        }
+
+        double el = now_s() - t0;
+        printf("\n=== OPTIMAL (guesses %d, answers %d, depth %d) ===\n", NG, NA, depth);
+        if (incumbent >= INF) {
+            printf("NO OPENER solves every answer within %d guesses.\n", depth);
+            printf("%d rejected by lower bound, %d proved infeasible by search.\n", nolb, infeas);
+        } else {
+            printf("total=%d  expected=%.5f  over %d answers\n",
+                   incumbent, (double)incumbent / NA, NA);
+            printf("%d opener%s attain it:", nbest, nbest == 1 ? "" : "s");
+            for (int i = 0; i < nbest; i++) printf(" %s", GWORD[best[i]]);
+            printf("\n");
+        }
+        printf("searched %d, cut %d, infeasible %d, lb-rejected %d, of %d openers in %.0fs\n",
+               searched, cut, infeas, nolb, NG, el);
+        if (out) fclose(out);
         if (ttsave) tt_save(ttsave);
         return 0;
     }
