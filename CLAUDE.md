@@ -69,6 +69,20 @@ loading" for the measurements and the full cross-machine history.
 - `math/solver/` is the C solver computing the exact minimum expected turns for
   every one of the 12972 openers, plus each one's optimal tree. **Read
   `math/solver/README.md` first** — build, flags, output format, gotchas.
+- **On a FRESH CLONE the solver needs TWO bootstrap steps before it runs at all, and
+  BOTH fail confusingly (2026-08-25).** Neither is done by `/sync-videos`, and a clone
+  looks complete without them because the committed results are all in `shared/`:
+  1. **`python3 build_patterns.py` (from `math/`)** — regenerates
+     `math/data/local/patterns/patterns.npy` (30 MB, ~2s). It lives under `local/`, so
+     it is gitignored BY DESIGN and never arrives with a clone. Without it every solver
+     invocation dies instantly with `cannot open data/local/patterns/patterns.npy` — and
+     because `validate.sh` sends stderr to `/dev/null`, that surfaces as five silent
+     `FAIL <word> = <none>` lines in under a second. **A validate.sh run that finishes
+     in well under a second did not solve anything** — check for the missing patterns
+     file before suspecting the solver.
+  2. **`brew install libomp` on a Mac** — see the Brewfile / private notes. `build.sh`
+     probes for OpenMP support and wires libomp's keg-only paths itself, so once it is
+     installed the same script works unchanged on both machines.
 - The objective is an INTEGER (total guesses over all 2315 answers), so results
   are exact, not float-compared. Validate any solver change with
   `bash solver/validate.sh` from `math/`: SALET 7920, REAST 7923, TRACE/CRATE
