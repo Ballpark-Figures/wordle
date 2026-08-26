@@ -28,9 +28,50 @@ NPAT = 243
 THREADS = 20
 
 
+def bisect(seq):
+    """Ends, median, quartiles, odd eighths, ... -- mirror of bisect_emit() plus
+    the level loop in optturns.c.
+
+    The rounding and the already-emitted skip must match the C EXACTLY: this is
+    what reconstructs which opener each thread is on, so a divergence names the
+    wrong words rather than failing loudly. Python's // is floor division and
+    every term here is positive, so it agrees with C's truncating division.
+    """
+    n = len(seq)
+    out, seen = [], bytearray(n)
+
+    def emit(idx):
+        idx = 0 if idx < 0 else (n - 1 if idx >= n else idx)
+        if not seen[idx]:
+            seen[idx] = 1
+            out.append(seq[idx])
+
+    emit(0)
+    emit(n - 1)
+    for k in range(1, 21):
+        if len(out) >= n:
+            break
+        den = 1 << k
+        for i in range(den // 2):
+            if len(out) >= n:
+                break
+            emit((n * (2 * i + 1) + den // 2) // den)
+    for i in range(n):
+        if len(out) >= n:
+            break
+        emit(i)
+    return out
+
+
 def sweep_order():
-    """Mirror of `sweep_order()` in optturns.c: ascending sum-of-squares of the
-    pattern-class sizes, ties broken by index in guess.txt."""
+    """Mirror of `sweep_order()` in optturns.c: the opener list sorted by fewest
+    expected survivors (sum of squared pattern-class sizes, ties by index in
+    guess.txt), then DISPATCHED by bisection over that sorted list.
+
+    Already-solved openers keep their slot in this order -- the bisection is over
+    the whole list, so the sequence does not shift as the CSV fills; the solver
+    skips them at dispatch via done[].
+    """
     import numpy as np
 
     words = [w.strip() for w in open(GUESS_WORDS) if w.strip()]
@@ -39,7 +80,7 @@ def sweep_order():
     for g in range(len(words)):
         cnt = np.bincount(pat[g], minlength=NPAT).astype(np.int64)
         ss[g] = (cnt * cnt).sum()
-    return [words[g] for g in np.lexsort((np.arange(len(words)), ss))]
+    return bisect([words[g] for g in np.lexsort((np.arange(len(words)), ss))])
 
 
 def csv_rows_in_order():
