@@ -219,6 +219,63 @@ tree too (`python3 tools/checktrees.py salet`) — the hard-mode legality check 
 skipped there, and the same tree fails ~1450 of 2315 lines if you force it on,
 which is what confirms the check actually fires.
 
+## Answers-only (`--guess-list`)
+
+`--guess-list FILE` restricts the **legal guesses** to the words in `FILE`. The
+answers are untouched — the objective is still the total over all 2315 answers,
+only what may be *played* changes. Pointing it at `mystery.txt` gives the
+answers-only variant:
+
+> Minimise the **total guesses summed over all 2315 answers**, where **every
+> guess — the opener and every follow-up — must itself be one of the 2315 answer
+> words**, subject to resolving every answer within `--depth` guesses.
+
+```sh
+# from math/
+bash solver/run-ans-sweep.sh                        # the sweep, attached
+bash solver/run-ans-sweep.sh --threads 12 --tt-bits 26
+./solver/optturns --guess-list data/shared/words/mystery.txt \
+    --opener crate --depth 6 --tt-bits 26           # one opener
+```
+
+**No hot loop changed.** Every guess enumeration in `solve()` walks `0..NG-1`,
+and `--sweep` walks the same range, so compacting `GWORD` and the pattern matrix
+down to the listed words restricts the follow-up guesses AND the set of openers
+swept, in one move. The sweep therefore covers **2315 openers, not 12972**.
+
+**The TT key is salted with the guess set** (`GSALT`). The same candidate set has
+a genuinely different optimum when the legal guesses differ, so a shared key
+would return a wrong value. The salt is **0 for the full list**, leaving those
+hashes bit-identical to what they have always been — verified by `validate.sh`
+reproducing all five totals *and* their TT hit rates unchanged, so existing
+`tt.bin` snapshots stay valid.
+
+**THE DEPTH CAP BINDS HERE — that is the whole point, not an oversight.** Normal
+mode justifies `--depth 6` with "any opener can follow SALET's tree afterwards".
+**SALET is not an answer word, and neither is REAST** (`grep -cx salet
+mystery.txt` → 0). That escape is illegal under these rules, so the feasibility
+argument does not transfer, exactly as it fails to transfer into hard mode.
+`INFEASIBLE` rows are an **expected result** here: a `word,,,,secs` CSV row is
+data, not a bug. Report these as optima **subject to a 6-guess guarantee** —
+never as "minimum expected guesses".
+
+**Proving INFEASIBLE is the expensive case.** Restricting to answer words removes
+the pure probe guesses (SALET, REAST — words played to split the field, never to
+win), so partitions are coarser and `LBTAB` is weaker. Under a strict cap that
+means much more search, and an opener with no ≤6 solution must exhaust the space
+before it can say so. Expect this variant to be *slower per opener* than the full
+sweep, not faster, despite the smaller guess set.
+
+The per-word terminal line drops `exp=` (it is just `total/2315`); the CSV still
+carries it so `tools/report.py` is unaffected. The trailing `tt <hit>%/<occ>%` is
+load-bearing — `report.py` and `ttscan.py` parse it.
+
+**Tooling caveat:** the data lives in `data/{shared,local}/ansturns/`, so
+`WORDLE_SOLVER=ansturns python3 tools/report.py` reads it. But the *process* is
+still named `optturns`, so the `tt*` tools — which attach by process name —
+cannot find it under that name, and `run-sweep.sh`'s `pgrep -x optturns` guard
+will also fire on a running answers-only sweep.
+
 ## Output format
 
 Each tree line is a complete replay of one game:

@@ -78,6 +78,13 @@
 #endif
 
 static int      NG, NA;
+/* Salts the TT key with the identity of the GUESS SET (see --guess-list).  It is
+ * 0 for the full 12972-word list, which leaves every hash bit-identical to what
+ * it has always been -- so an existing tt.bin stays valid.  A restricted list
+ * sets it, so a snapshot taken under one guess set cannot be silently reused
+ * under another: the same candidate set genuinely has a different optimum when
+ * the legal guesses differ, and a shared key would return that wrong value. */
+static uint64_t GSALT = 0;
 static uint8_t *PAT;             /* NG * NA, row-major: PAT[g*NA + a] */
 static uint64_t ZOB0[MAXA], ZOB1[MAXA];
 static int      ANS2G[MAXA];
@@ -388,7 +395,8 @@ static inline void hash_state(const uint16_t *S, int n, int d, uint64_t ch,
     uint64_t a = (uint64_t)d * 0x9E3779B97F4A7C15ULL;
     uint64_t b = (uint64_t)d * 0xC2B2AE3D27D4EB4FULL;
     for (int i = 0; i < n; i++) { a ^= ZOB0[S[i]]; b ^= ZOB1[S[i]]; }
-    *h0 = a ^ ch; *h1 = b ^ (ch * 0xD6E8FEB86659FD93ULL);
+    *h0 = a ^ ch ^ GSALT;
+    *h1 = b ^ (ch * 0xD6E8FEB86659FD93ULL) ^ (GSALT * 0x9E3779B97F4A7C15ULL);
 }
 
 /* h1 is stored XORed with the payload, so a write torn by a concurrent writer
@@ -804,7 +812,7 @@ int main(int argc, char **argv) {
     const char *openers[64];
     int nopen = 0;
     const char *outpath = NULL, *treedir = NULL;
-    const char *ttload = NULL, *ttsave = NULL;
+    const char *ttload = NULL, *ttsave = NULL, *guesslist = NULL;
     int depth = 6, ttbits = 28, threads = 0, sweep = 0, depthmax = -1;
 
     for (int i = 1; i < argc; i++) {
@@ -821,6 +829,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--tt-save") && i + 1 < argc) ttsave = argv[++i];
         else if (!strcmp(argv[i], "--threads") && i + 1 < argc) threads = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--data") && i + 1 < argc) datadir = argv[++i];
+        else if (!strcmp(argv[i], "--guess-list") && i + 1 < argc) guesslist = argv[++i];
         else { fprintf(stderr, "unknown arg: %s\n", argv[i]); return 1; }
     }
 
@@ -849,6 +858,51 @@ int main(int argc, char **argv) {
         return 1;
     }
     fprintf(stderr, "loaded %d guesses x %d answers\n", NG, NA);
+
+    /* --guess-list restricts the LEGAL GUESSES to the words in FILE, compacting
+     * GWORD and the pattern matrix down to just those rows.  Every guess loop in
+     * the solver enumerates 0..NG-1, and --sweep iterates the same range, so
+     * shrinking NG here restricts BOTH the follow-up guesses and the set of
+     * openers swept -- with no change to any hot loop.
+     *
+     * The answers are untouched: the objective is still the total over all NA
+     * answers, we are only changing what may be PLAYED.  Pointing this at
+     * mystery.txt gives the answers-only variant.
+     *
+     * Resolve every source row against the ORIGINAL list BEFORE overwriting any
+     * of it -- compacting in place while still looking words up would let a
+     * lookup miss a word whose slot had already been reused. */
+    if (guesslist) {
+        char (*rw)[8] = malloc(sizeof(char[8]) * MAXG);
+        int nr = load_words(guesslist, rw);
+        if (nr < 1 || nr > MAXG) {
+            fprintf(stderr, "--guess-list %s: %d words\n", guesslist, nr); return 1;
+        }
+        int *map = malloc(sizeof(int) * nr);
+        for (int i = 0; i < nr; i++) {
+            map[i] = find_word(GWORD, NG, rw[i]);
+            if (map[i] < 0) {
+                fprintf(stderr, "--guess-list word %s is not a legal guess\n", rw[i]);
+                return 1;
+            }
+        }
+        uint8_t *np = malloc((size_t)nr * NA);
+        if (!np) { fprintf(stderr, "out of memory compacting pattern matrix\n"); return 1; }
+        for (int i = 0; i < nr; i++) {
+            memcpy(np + (size_t)i * NA, PAT + (size_t)map[i] * NA, NA);
+            memcpy(GWORD[i], rw[i], 8);
+        }
+        free(map); free(rw); free(PAT);
+        PAT = np;
+        NG = nr;
+        /* FNV over the restricted list: distinct guess sets get distinct TT keys */
+        GSALT = 0xCBF29CE484222325ULL ^ ((uint64_t)nr * 0xD6E8FEB86659FD93ULL);
+        for (int i = 0; i < nr; i++)
+            for (int j = 0; GWORD[i][j]; j++)
+                GSALT = (GSALT ^ (uint8_t)GWORD[i][j]) * 0x100000001B3ULL;
+        fprintf(stderr, "guess list: restricted to %d words from %s (TT salt %016llx)\n",
+                nr, guesslist, (unsigned long long)GSALT);
+    }
 
     for (int a = 0; a < NA; a++) {
         ANS2G[a] = find_word(GWORD, NG, AWORD[a]);
@@ -949,6 +1003,16 @@ int main(int argc, char **argv) {
                 if (total >= INF)
                     printf("[%7.0fs] %5d/%d  %s  INFEASIBLE d>%-2d          %7.1fs  eta %5.1fh  tt %.2f%%/%.2f%%\n",
                            el, ndone + completed, NG, GWORD[g], depthmax, dt,
+                           el / completed * left / 3600.0, hit, occ);
+                else if (guesslist)
+                    /* exp= is dropped for a restricted guess set: it is just
+                     * total/2315, and the run is read for the OVERALL best
+                     * rather than per-word averages.  The trailing tt %/%% is
+                     * load-bearing -- report.py and ttscan.py parse it. */
+                    printf("[%7.0fs] %5d/%d  %s  total=%5d  d=%d%s%s %7.1fs  eta %5.1fh  tt %.2f%%/%.2f%%\n",
+                           el, ndone + completed, NG, GWORD[g], total,
+                           used, used > depth ? " *" : "  ",
+                           tree_ok ? "" : " TREE-FAIL", dt,
                            el / completed * left / 3600.0, hit, occ);
                 else
                     printf("[%7.0fs] %5d/%d  %s  total=%5d  exp=%.5f  d=%d%s%s %7.1fs  eta %5.1fh  tt %.2f%%/%.2f%%\n",
