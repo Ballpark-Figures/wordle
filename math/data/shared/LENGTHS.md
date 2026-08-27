@@ -38,8 +38,8 @@ COMPLETE = every opener examined; the run's own accounting balances
 | 9 | 29150 | 5056 | 3 | 12882 | 2.54786 | `saprolite` | COMPLETE (4 s) |
 | 10 | 22326 | 4030 | 3 | 9631 | 2.38983 | `mercantile` | COMPLETE (5 s) |
 | 11 | 16165 | 3022 | 3 | 6823 | 2.25778 | `meteoritics` | COMPLETE (9 s) |
-| 6 | 15787 | 4561 | 5 | 14482 | 3.17518 | `carnet` | **PROVISIONAL** |
-| 6 | 15787 | 4561 | 4 | 14961 | 3.28020 | `distal` | **PROVISIONAL** |
+| 6 | 15787 | 4561 | 5 | 14482 | 3.17518 | `carnet` | **PROVISIONAL** (819/15787) |
+| 6 | 15787 | 4561 | 4 | 14961 | 3.28020 | `distal` | **PROVISIONAL** (2821/15787) |
 | 4 | 4030 | 2347 | — | — | — | — | not run |
 
 For 7–11 the depth shown is also the MINIMUM achievable depth: those runs
@@ -60,8 +60,17 @@ the head of BOTH heuristics, not just the one being sorted on.
 
 What does not: the orderings are heuristics, and 5% of a field is 5% of a field.
 
-`distal` at depth 4 is provisional in the same way and from an abandoned run —
-it was the first opener found that could solve within 4 at all.
+`distal` at depth 4 is provisional in the same way, from a pinned depth-4 pass
+stopped at 2821 of 15787. Its evidence is a different shape and arguably stronger:
+of those 2821 openers, **2820 were proven INFEASIBLE at depth 4** and `distal` is
+the only one that solved at all. Depth 4 is a severe constraint at this length —
+nearly no opener can resolve all 4561 answers within four guesses — so the
+question there is less "is 14961 the lowest total" than "how many openers can do
+it at all", and so far the answer is one in 2821.
+
+Note the two length-6 rows are NOT comparable as totals: 14961 at depth 4 is worse
+than 14482 at depth 5 only because the cap is tighter, which is exactly what the
+cap being part of the objective means.
 
 ## Reproducing
 
