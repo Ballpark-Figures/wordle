@@ -55,21 +55,66 @@
 #include <omp.h>
 #endif
 
-#define NPAT       243
-#define ALL_GREEN  242
+/* WORD LENGTH is a COMPILE-TIME constant, exactly like HARD below: build.sh
+ * emits one binary per length (optturns = 5, optturns7 = 7, ...), so every array
+ * bound here folds to a literal and the hot loops keep the shape they had when
+ * 5 was hardcoded.  -DWORDLEN=N is the only thing that varies. */
+#ifndef WORDLEN
+#define WORDLEN 5
+#endif
+/* 3**WORDLEN, as an integer constant expression -- array sizes need one and the
+ * preprocessor cannot compute a power, so it is a lookup by token paste. */
+#define P3_4 81
+#define P3_5 243
+#define P3_6 729
+#define P3_7 2187
+#define P3_8 6561
+#define P3_9 19683
+#define P3_10 59049
+#define P3_11 177147
+#define _P3CAT(a, b) a##b
+#define _P3(n) _P3CAT(P3_, n)
+#define NPAT       _P3(WORDLEN)
+#define ALL_GREEN  (NPAT - 1)
+/* One pattern code.  0..242 fits uint8 at WORDLEN 5 -- which is what keeps the
+ * existing 12972x2315 patterns.npy, every Zobrist key and every tt.bin
+ * bit-identical -- while 6..10 need uint16 and 11 needs uint32.
+ * build_patterns.py applies the SAME rule and load_npy checks the two agree. */
+#if NPAT <= 256
+typedef uint8_t pat_t;
+#define PAT_NPY "u1"
+#elif NPAT <= 65536
+typedef uint16_t pat_t;
+#define PAT_NPY "u2"
+#else
+typedef uint32_t pat_t;
+#define PAT_NPY "u4"
+#endif
+/* Longest word plus its NUL. */
+#define WBUF       ((WORDLEN < 7) ? 8 : 16)
+/* MAXG bounds the GUESS list.  12972 at 5 letters, but hello wordl's 8-letter
+ * dictionary is 29765, so build.sh passes -DMAXG sized from the actual list.
+ * It costs per-thread arena (lbg + ord + leg + mark), so it is not simply set
+ * to the maximum across all lengths. */
+#ifndef MAXG
 #define MAXG       13000
+#endif
 /* MAXA bounds the ANSWER set.  It is 13000, not 2315, because --answer-list can
  * make every legal guess a possible answer (the all-words sweep).  Sizing it up
  * cannot change any existing result: LBTAB is only read at n <= NA, and the
  * Zobrist keys are drawn for a < NA, so the first NA values are identical
  * whatever MAXA is.  It costs ~0.9 MB more per-thread arena (buf + tbuf), which
  * validate.sh reproducing all five totals confirms is all it costs. */
+#ifndef MAXA
 #define MAXA       13000
+#endif
 /* MAXD bounds --depth, and hard mode ESCALATES the cap per opener until the
  * opener solves (see solve_escalating), so it needs headroom well past 6.  Cost
  * is ~194 KB of per-thread arena per level: 20 levels is ~3.9 MB per thread,
  * ~78 MB across 20 threads.  Normal mode never escalates and is unaffected. */
+#ifndef MAXD
 #define MAXD       20
+#endif
 #define INF        1000000000
 
 /* HARD is a COMPILE-TIME constant, not a runtime flag: build.sh emits two
@@ -109,11 +154,11 @@ static uint64_t GSALT = 0;
  * always playable in a small state and a tight K degrades the total gracefully
  * rather than manufacturing spurious infeasibility. */
 static int TOPK = 0;
-static uint8_t *PAT;             /* NG * NA, row-major: PAT[g*NA + a] */
+static pat_t   *PAT;             /* NG * NA, row-major: PAT[g*NA + a] */
 static uint64_t ZOB0[MAXA], ZOB1[MAXA];
 static int      ANS2G[MAXA];
-static char   (*GWORD)[8];
-static char   (*AWORD)[8];
+static char   (*GWORD)[WBUF];
+static char   (*AWORD)[WBUF];
 static int      LBTAB[MAXD][MAXA + 1];
 
 /* --------------------------------------------------------------- hard mode
@@ -149,21 +194,28 @@ static int      LBTAB[MAXD][MAXA + 1];
 #define BSW  ((MAXG + 63) / 64)          /* bitset words spanning all guesses */
 
 typedef struct {
-    int8_t  green[5];                    /* pinned letter 0..25, or -1 */
+    int8_t  green[WORDLEN];              /* pinned letter 0..25, or -1 */
     uint8_t minc[26];                    /* required occurrences of each letter */
 } Cons;
 
-static uint64_t BS_POS[5][26][BSW];      /* guesses with letter c at position i */
-static uint64_t BS_CNT[26][6][BSW];      /* guesses containing >= k copies of c */
+static uint64_t BS_POS[WORDLEN][26][BSW];      /* guesses with letter c at position i */
+static uint64_t BS_CNT[26][WORDLEN + 1][BSW];  /* guesses containing >= k copies of c */
 static uint64_t BS_ALL[BSW];             /* every legal guess; NG..MAXG-1 clear */
 
-static const Cons CONS_NONE = { { -1, -1, -1, -1, -1 }, { 0 } };
+/* "nothing known yet": no greens, no required letters.  Built at startup rather
+ * than brace-initialized, because the green[] array is WORDLEN long. */
+static Cons CONS_NONE;
+
+static void cons_none_init(void) {
+    memset(&CONS_NONE, 0, sizeof CONS_NONE);
+    for (int i = 0; i < WORDLEN; i++) CONS_NONE.green[i] = -1;
+}
 
 static void build_bitsets(void) {
     for (int g = 0; g < NG; g++) {
         BS_ALL[g >> 6] |= 1ULL << (g & 63);
         int cnt[26] = { 0 };
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < WORDLEN; i++) {
             int c = GWORD[g][i] - 'a';
             BS_POS[i][c][g >> 6] |= 1ULL << (g & 63);
             cnt[c]++;
@@ -176,11 +228,11 @@ static void build_bitsets(void) {
 
 /* Fold the feedback (g, p) into a parent constraint. */
 static void cons_apply(Cons *out, const Cons *in, int g, int p) {
-    static const int POW3[5] = { 81, 27, 9, 3, 1 };   /* position 0 is the MSB */
     int req[26] = { 0 };
     *out = *in;
-    for (int i = 0; i < 5; i++) {
-        int t = (p / POW3[i]) % 3;                    /* 0 = b, 1 = y, 2 = g */
+    /* position 0 is the MSB, so the divisor starts at 3^(WORDLEN-1) */
+    for (int i = 0, div = NPAT / 3; i < WORDLEN; i++, div /= 3) {
+        int t = (p / div) % 3;                        /* 0 = b, 1 = y, 2 = g */
         int c = GWORD[g][i] - 'a';
         if (t == 2) { out->green[i] = (int8_t)c; req[c]++; }
         else if (t == 1) req[c]++;
@@ -218,7 +270,7 @@ static int cons_legal(const Cons *C, uint16_t *out) {
  * binary, which then simply fails verification and costs a recompute. */
 static inline uint64_t cons_hash(const Cons *C) {
     uint64_t h = 0x243F6A8885A308D3ULL;               /* hard-mode salt */
-    for (int i = 0; i < 5; i++)
+    for (int i = 0; i < WORDLEN; i++)
         h = (h ^ (uint64_t)(uint8_t)(C->green[i] + 1)) * 0x100000001B3ULL;
     for (int c = 0; c < 26; c++)
         h = (h ^ (uint64_t)C->minc[c]) * 0x100000001B3ULL;
@@ -241,13 +293,31 @@ static double now_s(void) {
 }
 
 static void pat_str(int code, char *out) {   /* base-3, position 0 = MSB */
-    for (int i = 4; i >= 0; i--) { out[i] = "byg"[code % 3]; code /= 3; }
-    out[5] = 0;
+    for (int i = WORDLEN - 1; i >= 0; i--) { out[i] = "byg"[code % 3]; code /= 3; }
+    out[WORDLEN] = 0;
 }
+
+/* Pattern-INDEXED scratch (NPAT ints per slot, plus one for the start[] sentinel).
+ *
+ * At 5 letters an int[243] on the stack is 972 B and nobody noticed.  At 11 it is
+ * 692 KB, and emit_tree -- which holds three of them -- is RECURSIVE, so the
+ * stack is simply not an option any more.  Allocating per call instead leaves
+ * every dense `for (p = 0; p < NPAT; p++)` loop below exactly as it was, which
+ * matters because that loop order is what fixes the ORDER OF LINES in an emitted
+ * tree file: sparsifying it would rewrite committed 5-letter trees.  The cost is
+ * one calloc against work that is O(NA) or a whole subtree, so it is noise.
+ *
+ * calloc zeroes, which is what the callers' opening memset did. */
+static int *pat_scratch(int nslots) {
+    int *p = calloc((size_t)nslots * (size_t)(NPAT + 1), sizeof(int));
+    if (!p) { fprintf(stderr, "out of memory: %d-slot pattern scratch\n", nslots); exit(1); }
+    return p;
+}
+#define PSLOT(base, i) ((base) + (size_t)(i) * (size_t)(NPAT + 1))
 
 /* --------------------------------------------------------------- loading */
 
-static int load_words(const char *path, char (*out)[8]) {
+static int load_words(const char *path, char (*out)[WBUF]) {
     FILE *f = fopen(path, "r");
     if (!f) { fprintf(stderr, "cannot open %s\n", path); exit(1); }
     char line[64];
@@ -256,7 +326,7 @@ static int load_words(const char *path, char (*out)[8]) {
         int len = 0;
         while (line[len] && !isspace((unsigned char)line[len])) len++;
         if (len == 0) continue;
-        if (len > 6) len = 6;
+        if (len > WORDLEN) len = WORDLEN;
         memcpy(out[n], line, len);
         out[n][len] = 0;
         n++;
@@ -265,7 +335,7 @@ static int load_words(const char *path, char (*out)[8]) {
     return n;
 }
 
-static uint8_t *load_npy(const char *path, int *rows, int *cols) {
+static pat_t *load_npy(const char *path, int *rows, int *cols) {
     FILE *f = fopen(path, "rb");
     if (!f) { fprintf(stderr, "cannot open %s\n", path); exit(1); }
     char magic[6];
@@ -287,14 +357,20 @@ static uint8_t *load_npy(const char *path, int *rows, int *cols) {
     char *hdr = malloc(hlen + 1);
     if (fread(hdr, 1, hlen, f) != hlen) exit(1);
     hdr[hlen] = 0;
-    if (!strstr(hdr, "u1")) { fprintf(stderr, "patterns.npy not uint8: %s\n", hdr); exit(1); }
+    /* The dtype must match pat_t exactly -- a uint16 matrix read as uint8 would
+     * not fail, it would return confidently wrong patterns. */
+    if (!strstr(hdr, PAT_NPY)) {
+        fprintf(stderr, "pattern matrix dtype is not %s (WORDLEN %d): %s\n",
+                PAT_NPY, WORDLEN, hdr);
+        exit(1);
+    }
     char *p = strchr(hdr, '(');
     if (!p || sscanf(p, "(%d, %d)", rows, cols) != 2) {
         fprintf(stderr, "cannot parse shape from: %s\n", hdr); exit(1);
     }
     free(hdr);
-    size_t nbytes = (size_t)(*rows) * (size_t)(*cols);
-    uint8_t *data = malloc(nbytes);
+    size_t nbytes = (size_t)(*rows) * (size_t)(*cols) * sizeof(pat_t);
+    pat_t *data = malloc(nbytes);
     if (!data) { fprintf(stderr, "out of memory for pattern matrix\n"); exit(1); }
     if (fread(data, 1, nbytes, f) != nbytes) { fprintf(stderr, "short read\n"); exit(1); }
     fclose(f);
@@ -321,19 +397,33 @@ static uint8_t *load_npy(const char *path, int *rows, int *cols) {
  * This tightens LBTAB everywhere it is read, which matters most INSIDE solve():
  * pass 1 bounds every candidate guess with it, so a tighter table prunes guesses
  * at every node rather than only screening openers at the root. */
-static int BRANCH = 242;
+/* Visit order for --optimal-only's exact path.  0 = ascending root lower bound
+ * (the default, and the only order under which an LB skip also proves the TAIL
+ * is worse); 1 = ascending sum of squared bin sizes, the same split-quality
+ * heuristic --sweep and --topk use.
+ *
+ * WHY OFFER THE SECOND.  The tail proof is worth having only when the bound is
+ * tight enough to fire.  It is a counting bound and runs ~11-14% under the true
+ * optimum, so on a wide problem almost every opener bounds below the incumbent,
+ * nothing is skipped, and the ordering's only remaining job is to find a good
+ * incumbent EARLY -- which is exactly what sum of squares is for.  That matters
+ * most when the run will be stopped before it finishes. */
+static int ORDER_SSQ = 0;
+
+static int BRANCH = NPAT - 1;
 
 static int measure_branching(void) {
-    int seen[NPAT], best = 1;
+    int *seen = pat_scratch(1), best = 1;
     for (int g = 0; g < NG; g++) {
-        memset(seen, 0, sizeof seen);
+        memset(seen, 0, (size_t)(NPAT + 1) * sizeof(int));
         int k = 0;
-        const uint8_t *row = PAT + (size_t)g * NA;
+        const pat_t *row = PAT + (size_t)g * NA;
         for (int a = 0; a < NA; a++)
             if (!seen[row[a]]) { seen[row[a]] = 1; k++; }
         if (seen[ALL_GREEN]) k--;          /* the win RESOLVES, it does not branch */
         if (k > best) best = k;
     }
+    free(seen);
     return best;
 }
 
@@ -530,8 +620,9 @@ static int eval_guess(const uint16_t *S, int n, int d, int g, int best,
                       const Cons *C, Ctx *ctx) {
     int *cnt = ctx->cnt[d], *kof = ctx->kof[d];
     uint16_t *buf = ctx->buf[d];
-    const uint8_t *row = PAT + (size_t)g * NA;
-    int bp[NPAT], bcnt[NPAT], bstart[NPAT], bfill[NPAT], nb = 0;
+    const pat_t *row = PAT + (size_t)g * NA;
+    /* indexed by BUCKET ORDINAL, not by pattern: nb <= n <= NA <= MAXA */
+    int bp[MAXA], bcnt[MAXA], bstart[MAXA], bfill[MAXA], nb = 0;
 
     for (int i = 0; i < n; i++) {
         int p = row[S[i]];
@@ -614,11 +705,11 @@ static int solve(const uint16_t *S, int n, int d, const Cons *C, Ctx *ctx) {
             int lim = (pass == 0) ? n : nleg;
             for (int t = 0; t < lim; t++) {
                 int g = (pass == 0) ? ANS2G[S[t]] : (HARD ? (int)leg[t] : t);
-                const uint8_t *row = PAT + (size_t)g * NA;
+                const pat_t *row = PAT + (size_t)g * NA;
                 /* Count every element -- never break early.  bp[] must end up
                  * holding EVERY touched pattern or the clear loop below leaks
                  * counters into the next call and corrupts the arena. */
-                int bp[NPAT], nb = 0, dup = 0;
+                int bp[MAXA], nb = 0, dup = 0;   /* bucket ordinal, nb <= n */
                 for (int i = 0; i < n; i++) {
                     int p = row[S[i]];
                     if (cnt[p]++ == 0) bp[nb++] = p;
@@ -645,8 +736,8 @@ static int solve(const uint16_t *S, int n, int d, const Cons *C, Ctx *ctx) {
     int bestlb = INF, bestlb_g = -1, bestlb_in = 0, nss = 0;
     for (int t = 0; t < nleg; t++) {
         int g = HARD ? (int)leg[t] : t;
-        const uint8_t *row = PAT + (size_t)g * NA;
-        int bp[NPAT], nb = 0;
+        const pat_t *row = PAT + (size_t)g * NA;
+        int bp[MAXA], nb = 0;                    /* bucket ordinal, nb <= n */
         for (int i = 0; i < n; i++) {
             int p = row[S[i]];
             if (cnt[p]++ == 0) bp[nb++] = p;
@@ -783,15 +874,15 @@ static int emit_tree(FILE *out, const uint16_t *S, int n, int d,
     if (g < 0) return -1;
     const char *gw = GWORD[g];
 
-    int cnt[NPAT], start[NPAT + 1], fill[NPAT];
+    int *sc = pat_scratch(3);
+    int *cnt = PSLOT(sc, 0), *start = PSLOT(sc, 1), *fill = PSLOT(sc, 2);
     uint16_t *buf = ctx->tbuf[d];
-    const uint8_t *row = PAT + (size_t)g * NA;
-    memset(cnt, 0, sizeof cnt);
+    const pat_t *row = PAT + (size_t)g * NA;
     for (int i = 0; i < n; i++) cnt[row[S[i]]]++;
     int acc = 0;
     for (int p = 0; p < NPAT; p++) { start[p] = acc; acc += cnt[p]; }
     start[NPAT] = acc;
-    memcpy(fill, start, sizeof fill);
+    memcpy(fill, start, (size_t)NPAT * sizeof(int));
     for (int i = 0; i < n; i++) buf[fill[row[S[i]]]++] = S[i];
 
     if (cnt[ALL_GREEN] > 0) {                    /* guess is itself the answer */
@@ -800,15 +891,18 @@ static int emit_tree(FILE *out, const uint16_t *S, int n, int d,
     }
     for (int p = 0; p < NPAT; p++) {
         if (p == ALL_GREEN || cnt[p] == 0) continue;
-        char ps[6];
+        char ps[WORDLEN + 1];
         pat_str(p, ps);
         int add = snprintf(path + plen, 4096 - plen, "%s %s ", gw, ps);
         Cons kid;
         if (HARD) cons_apply(&kid, C, g, p);
         if (emit_tree(out, buf + start[p], cnt[p], d - 1, path, plen + add, ply + 1,
-                      HARD ? &kid : C, ctx) < 0)
+                      HARD ? &kid : C, ctx) < 0) {
+            free(sc);
             return -1;
+        }
     }
+    free(sc);
     return 0;
 }
 
@@ -816,14 +910,14 @@ static int emit_tree(FILE *out, const uint16_t *S, int n, int d,
 
 static int solve_opener(int g, int depth, Ctx *ctx) {
     uint16_t root[MAXA];
-    int cnt[NPAT], start[NPAT + 1], fill[NPAT];
-    const uint8_t *row = PAT + (size_t)g * NA;
-    memset(cnt, 0, sizeof cnt);
+    int *sc = pat_scratch(3);
+    int *cnt = PSLOT(sc, 0), *start = PSLOT(sc, 1), *fill = PSLOT(sc, 2);
+    const pat_t *row = PAT + (size_t)g * NA;
     for (int a = 0; a < NA; a++) cnt[row[a]]++;
     int acc = 0;
     for (int p = 0; p < NPAT; p++) { start[p] = acc; acc += cnt[p]; }
     start[NPAT] = acc;
-    memcpy(fill, start, sizeof fill);
+    memcpy(fill, start, (size_t)NPAT * sizeof(int));
     for (int a = 0; a < NA; a++) root[fill[row[a]]++] = (uint16_t)a;
 
     int total = NA;
@@ -832,9 +926,10 @@ static int solve_opener(int g, int depth, Ctx *ctx) {
         Cons kid;                                /* the opener itself is unconstrained */
         if (HARD) cons_apply(&kid, &CONS_NONE, g, p);
         int v = solve(root + start[p], cnt[p], depth - 1, HARD ? &kid : &CONS_NONE, ctx);
-        if (v >= INF) return INF;
+        if (v >= INF) { free(sc); return INF; }
         total += v;
     }
+    free(sc);
     return total;
 }
 
@@ -881,17 +976,17 @@ static int solve_escalating(int g, int dmin, int dmax, Ctx *ctx, int *used) {
  * the first opener whose LB exceeds the incumbent proves every opener after it
  * is worse too -- so the tail is discarded wholesale, without being solved. */
 static int root_lb(int g, int depth) {
-    int cnt[NPAT];
-    const uint8_t *row = PAT + (size_t)g * NA;
-    memset(cnt, 0, sizeof cnt);
+    int *cnt = pat_scratch(1);
+    const pat_t *row = PAT + (size_t)g * NA;
     for (int a = 0; a < NA; a++) cnt[row[a]]++;
     int lb = NA;
     for (int p = 0; p < NPAT; p++) {
         if (p == ALL_GREEN || cnt[p] == 0) continue;
         int v = LBTAB[depth - 1][cnt[p]];
-        if (v >= INF) return INF;
+        if (v >= INF) { free(cnt); return INF; }
         lb += v;
     }
+    free(cnt);
     return lb;
 }
 
@@ -912,17 +1007,17 @@ static int root_lb(int g, int depth) {
  * so it is never cut and is still reported. */
 static int solve_opener_bounded(int g, int depth, Ctx *ctx, int bound) {
     uint16_t root[MAXA];
-    int cnt[NPAT], start[NPAT + 1], fill[NPAT];
-    const uint8_t *row = PAT + (size_t)g * NA;
-    memset(cnt, 0, sizeof cnt);
+    int *sc = pat_scratch(3);
+    int *cnt = PSLOT(sc, 0), *start = PSLOT(sc, 1), *fill = PSLOT(sc, 2);
+    const pat_t *row = PAT + (size_t)g * NA;
     for (int a = 0; a < NA; a++) cnt[row[a]]++;
     int acc = 0;
     for (int p = 0; p < NPAT; p++) { start[p] = acc; acc += cnt[p]; }
     start[NPAT] = acc;
-    memcpy(fill, start, sizeof fill);
+    memcpy(fill, start, (size_t)NPAT * sizeof(int));
     for (int a = 0; a < NA; a++) root[fill[row[a]]++] = (uint16_t)a;
 
-    int ps[NPAT], np = 0;
+    int ps[MAXA], np = 0;                        /* bucket ordinal, np <= NA */
     for (int p = 0; p < NPAT; p++)
         if (p != ALL_GREEN && cnt[p] > 0) ps[np++] = p;
     for (int i = 1; i < np; i++) {                  /* insertion sort, np <= 242 */
@@ -959,15 +1054,15 @@ static int write_tree(const char *dir, int g, int depth, Ctx *ctx) {
     FILE *out = popen(cmd, "w");
     if (!out) return -1;
 
-    int cnt[NPAT], start[NPAT + 1], fill[NPAT];
+    int *sc = pat_scratch(3);
+    int *cnt = PSLOT(sc, 0), *start = PSLOT(sc, 1), *fill = PSLOT(sc, 2);
     uint16_t *buf = ctx->tbuf[depth];
-    const uint8_t *row = PAT + (size_t)g * NA;
-    memset(cnt, 0, sizeof cnt);
+    const pat_t *row = PAT + (size_t)g * NA;
     for (int a = 0; a < NA; a++) cnt[row[a]]++;
     int acc = 0;
     for (int p = 0; p < NPAT; p++) { start[p] = acc; acc += cnt[p]; }
     start[NPAT] = acc;
-    memcpy(fill, start, sizeof fill);
+    memcpy(fill, start, (size_t)NPAT * sizeof(int));
     for (int a = 0; a < NA; a++) buf[fill[row[a]]++] = (uint16_t)a;
 
     char path[4096];
@@ -975,7 +1070,7 @@ static int write_tree(const char *dir, int g, int depth, Ctx *ctx) {
     if (cnt[ALL_GREEN] > 0) fprintf(out, "%s 1 %s\n", GWORD[g], GWORD[g]);
     for (int p = 0; p < NPAT && rc == 0; p++) {
         if (p == ALL_GREEN || cnt[p] == 0) continue;
-        char ps[6];
+        char ps[WORDLEN + 1];
         pat_str(p, ps);
         int plen = snprintf(path, sizeof path, "%s %s ", GWORD[g], ps);
         Cons kid;
@@ -984,10 +1079,11 @@ static int write_tree(const char *dir, int g, int depth, Ctx *ctx) {
                        HARD ? &kid : &CONS_NONE, ctx);
     }
     pclose(out);
+    free(sc);
     return rc;
 }
 
-static int find_word(char (*list)[8], int n, const char *w) {
+static int find_word(char (*list)[WBUF], int n, const char *w) {
     for (int i = 0; i < n; i++) if (!strcmp(list[i], w)) return i;
     return -1;
 }
@@ -997,12 +1093,12 @@ static int find_word(char (*list)[8], int n, const char *w) {
 static int64_t *sweep_order(void) {
     int64_t *ord = malloc(sizeof(int64_t) * NG);
     for (int g = 0; g < NG; g++) {
-        const uint8_t *row = PAT + (size_t)g * NA;
-        int cnt[NPAT];
-        memset(cnt, 0, sizeof cnt);
+        const pat_t *row = PAT + (size_t)g * NA;
+        int *cnt = pat_scratch(1);
         for (int a = 0; a < NA; a++) cnt[row[a]]++;
         int64_t ss = 0;
         for (int p = 0; p < NPAT; p++) ss += (int64_t)cnt[p] * cnt[p];
+        free(cnt);
         ord[g] = (ss << 20) | (int64_t)g;
     }
     qsort(ord, NG, sizeof(int64_t), cmp_i64);
@@ -1016,7 +1112,7 @@ int main(int argc, char **argv) {
     const char *outpath = NULL, *treedir = NULL;
     const char *ttload = NULL, *ttsave = NULL, *guesslist = NULL;
     const char *answerlist = NULL, *patpath = NULL;
-    int optonly = 0;
+    int optonly = 0, uselength = 0;
     int depth = 6, ttbits = 28, threads = 0, sweep = 0, depthmax = -1;
 
     for (int i = 1; i < argc; i++) {
@@ -1037,6 +1133,27 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--answer-list") && i + 1 < argc) answerlist = argv[++i];
         else if (!strcmp(argv[i], "--patterns") && i + 1 < argc) patpath = argv[++i];
         else if (!strcmp(argv[i], "--optimal-only")) optonly = 1;
+        else if (!strcmp(argv[i], "--order") && i + 1 < argc) {
+            const char *o = argv[++i];
+            if (!strcmp(o, "ssq")) ORDER_SSQ = 1;
+            else if (!strcmp(o, "lb")) ORDER_SSQ = 0;
+            else { fprintf(stderr, "--order must be lb or ssq\n"); return 1; }
+        }
+        /* --length L selects the hello wordl lists and the matching pattern
+         * matrix for that length.  It does NOT change WORDLEN -- that is fixed
+         * when the binary is compiled -- it only asserts the two agree, so
+         * `optturns7 --length 6` fails loudly instead of reading a 6-letter list
+         * into a 7-letter solver. */
+        else if (!strcmp(argv[i], "--length") && i + 1 < argc) {
+            int want = atoi(argv[++i]);
+            if (want != WORDLEN) {
+                fprintf(stderr, "--length %d but this binary is WORDLEN %d "
+                        "-- use ./optturns%d (sh build.sh %d)\n",
+                        want, WORDLEN, want, want);
+                return 1;
+            }
+            uselength = 1;
+        }
         else if ((!strcmp(argv[i], "--topk") || !strcmp(argv[i], "-k")) && i + 1 < argc)
             TOPK = atoi(argv[++i]);
         else { fprintf(stderr, "unknown arg: %s\n", argv[i]); return 1; }
@@ -1053,26 +1170,56 @@ int main(int argc, char **argv) {
     }
 
     char path[1024];
-    GWORD = malloc(sizeof(char[8]) * MAXG);
-    AWORD = malloc(sizeof(char[8]) * MAXA);
-    snprintf(path, sizeof path, "%s/shared/words/guess.txt", datadir);
+    GWORD = malloc(sizeof(char[WBUF]) * MAXG);
+    AWORD = malloc(sizeof(char[WBUF]) * MAXA);
+    if (uselength) snprintf(path, sizeof path, "%s/shared/words/hello/len%d/guess.txt",
+                            datadir, WORDLEN);
+    else           snprintf(path, sizeof path, "%s/shared/words/guess.txt", datadir);
     NG = load_words(path, GWORD);
     /* --answer-list replaces the ANSWER set (the thing the total is summed over).
      * Pointed at guess.txt it makes every legal guess a possible answer, which
      * needs the SQUARE pattern matrix -- hence --patterns alongside it. */
-    if (answerlist) snprintf(path, sizeof path, "%s", answerlist);
-    else            snprintf(path, sizeof path, "%s/shared/words/mystery.txt", datadir);
+    if (answerlist)     snprintf(path, sizeof path, "%s", answerlist);
+    else if (uselength) snprintf(path, sizeof path, "%s/shared/words/hello/len%d/mystery.txt",
+                                 datadir, WORDLEN);
+    else                snprintf(path, sizeof path, "%s/shared/words/mystery.txt", datadir);
     NA = load_words(path, AWORD);
     if (NA > MAXA) { fprintf(stderr, "answer list has %d words, MAXA is %d\n", NA, MAXA); return 1; }
-    if (patpath) snprintf(path, sizeof path, "%s", patpath);
-    else         snprintf(path, sizeof path, "%s/local/patterns/patterns.npy", datadir);
+    if (patpath)        snprintf(path, sizeof path, "%s", patpath);
+    else if (uselength) snprintf(path, sizeof path, "%s/local/patterns/patterns_len%d.npy",
+                                 datadir, WORDLEN);
+    else                snprintf(path, sizeof path, "%s/local/patterns/patterns.npy", datadir);
     int r, c;
     PAT = load_npy(path, &r, &c);
     if (r != NG || c != NA) {
         fprintf(stderr, "pattern matrix %dx%d != words %dx%d\n", r, c, NG, NA);
         return 1;
     }
-    fprintf(stderr, "loaded %d guesses x %d answers\n", NG, NA);
+    cons_none_init();
+
+    /* A list of the wrong length is the likeliest mistake when the binary is
+     * length-specific: load_words TRUNCATES to WORDLEN, so 6-letter words read
+     * into the 5-letter binary would silently become their first 5 letters and
+     * every result would be quietly wrong.  Check rather than truncate. */
+    for (int i = 0; i < NG; i++) {
+        if ((int)strlen(GWORD[i]) != WORDLEN) {
+            fprintf(stderr, "guess list holds a %d-letter word (%s) but this binary "
+                    "is WORDLEN %d -- wrong list, or wrong binary\n",
+                    (int)strlen(GWORD[i]), GWORD[i], WORDLEN);
+            return 1;
+        }
+    }
+    for (int i = 0; i < NA; i++) {
+        if ((int)strlen(AWORD[i]) != WORDLEN) {
+            fprintf(stderr, "answer list holds a %d-letter word (%s) but this binary "
+                    "is WORDLEN %d -- wrong list, or wrong binary\n",
+                    (int)strlen(AWORD[i]), AWORD[i], WORDLEN);
+            return 1;
+        }
+    }
+    if (NG > MAXG) { fprintf(stderr, "guess list has %d words, MAXG is %d\n", NG, MAXG); return 1; }
+
+    fprintf(stderr, "loaded %d guesses x %d answers (%d letters)\n", NG, NA, WORDLEN);
 
     /* --guess-list restricts the LEGAL GUESSES to the words in FILE, compacting
      * GWORD and the pattern matrix down to just those rows.  Every guess loop in
@@ -1088,7 +1235,7 @@ int main(int argc, char **argv) {
      * of it -- compacting in place while still looking words up would let a
      * lookup miss a word whose slot had already been reused. */
     if (guesslist) {
-        char (*rw)[8] = malloc(sizeof(char[8]) * MAXG);
+        char (*rw)[WBUF] = malloc(sizeof(char[WBUF]) * MAXG);
         int nr = load_words(guesslist, rw);
         if (nr < 1 || nr > MAXG) {
             fprintf(stderr, "--guess-list %s: %d words\n", guesslist, nr); return 1;
@@ -1101,11 +1248,11 @@ int main(int argc, char **argv) {
                 return 1;
             }
         }
-        uint8_t *np = malloc((size_t)nr * NA);
+        pat_t *np = malloc((size_t)nr * NA * sizeof(pat_t));
         if (!np) { fprintf(stderr, "out of memory compacting pattern matrix\n"); return 1; }
         for (int i = 0; i < nr; i++) {
-            memcpy(np + (size_t)i * NA, PAT + (size_t)map[i] * NA, NA);
-            memcpy(GWORD[i], rw[i], 8);
+            memcpy(np + (size_t)i * NA, PAT + (size_t)map[i] * NA, (size_t)NA * sizeof(pat_t));
+            memcpy(GWORD[i], rw[i], WBUF);
         }
         free(map); free(rw); free(PAT);
         PAT = np;
@@ -1153,8 +1300,12 @@ int main(int argc, char **argv) {
     else      fprintf(stderr, "mode: normal\n");
 
     BRANCH = measure_branching();
-    fprintf(stderr, "branching: %d non-winning bins (max over %d guesses; 238 attainable of 243)\n",
-            BRANCH, NG);
+    /* 3**L is the ENCODING space; exactly L of those codes are unreachable --
+     * the "L-1 greens plus a yellow" ones, since if every other position is
+     * green the remaining letter is either green or absent, never yellow.
+     * So 238 of 243 at 5 letters, 77 of 81 at 4, 2180 of 2187 at 7. */
+    fprintf(stderr, "branching: %d non-winning bins (max over %d guesses; %d attainable of %d)\n",
+            BRANCH, NG, NPAT - WORDLEN, NPAT);
     build_lb();
     fprintf(stderr, "root LB(d=%d, n=%d) = %d  (%.5f avg)\n",
             depth, NA, LBTAB[depth][NA], (double)LBTAB[depth][NA] / NA);
@@ -1209,7 +1360,7 @@ int main(int argc, char **argv) {
         int64_t *ord = malloc(sizeof(int64_t) * NG);
         int nord = 0, nolb = 0;
 
-        if (TOPK > 0) {
+        if (TOPK > 0 || ORDER_SSQ) {
             /* THE OPENER IS A BRANCHING POINT LIKE ANY OTHER.  --topk means the
              * top K by sum of squared bin sizes at EVERY branching point, and the
              * root is the first one -- so the sweep examines K openers, not all
@@ -1224,15 +1375,24 @@ int main(int argc, char **argv) {
              * than the exact sweep makes, and it is the point -- it is what lets
              * a small K finish. */
             int64_t *so = sweep_order();          /* ascending sum of squared bins */
-            int K = (TOPK < NG) ? TOPK : NG;
+            /* --order ssq is the SAME ordering with no truncation: every opener
+             * is still examined, so the result is exact -- only the visit order
+             * changes.  --topk is what makes the claim weaker, not this. */
+            int K = (TOPK > 0 && TOPK < NG) ? TOPK : NG;
             for (int i = 0; i < K; i++) {
                 int g = (int)(so[i] & 0xFFFFF);
                 if (lb[g] >= INF) { nolb++; continue; }
+                /* the LB still rides in the high bits -- the per-opener skip
+                 * reads it -- but the ARRAY stays in sum-of-squares order. */
                 ord[nord++] = ((int64_t)lb[g] << 20) | (int64_t)g;
             }
             free(so);
-            fprintf(stderr, "topk root: %d openers of %d examined (top %d by sum of squares), %d rejected by LB\n",
-                    nord, NG, K, nolb);
+            if (TOPK > 0)
+                fprintf(stderr, "topk root: %d openers of %d examined (top %d by sum of squares), %d rejected by LB\n",
+                        nord, NG, K, nolb);
+            else
+                fprintf(stderr, "ssq root: %d openers in sum-of-squares order, %d rejected outright by LB\n",
+                        nord, nolb);
         } else {
             for (int g = 0; g < NG; g++) {
                 if (lb[g] >= INF) { nolb++; continue; }   /* cannot fit the cap at all */
@@ -1276,6 +1436,9 @@ int main(int argc, char **argv) {
         if (TOPK > 0)
             printf("optimal-only: top %d openers by sum of squared bins (of %d); best of these K, not of all %d\n",
                    nord, NG, NG);
+        else if (ORDER_SSQ)
+            printf("optimal-only: %d openers in ascending sum-of-squares order (all %d examined; exact)\n",
+                   nord, NG);
         else
             printf("optimal-only: %d openers by ascending root LB (min %d = %.5f avg)\n",
                    nord, nord ? (int)(ord[0] >> 20) : 0,
@@ -1295,16 +1458,25 @@ int main(int argc, char **argv) {
          * solve in fewer, we still allow the full budget, so no opener is held
          * to a tighter cap than asked for. */
         const int depth_floor = depth;   /* never ratchet below what was asked for */
-        if (nord > 0) {
+        /* PINNED CAP.  When --depth-max equals --depth (its default in normal
+         * mode) the caller has asked for ONE cap, not a search for the shallowest
+         * one -- so the probe below is skipped entirely.  Two reasons it must be:
+         * it would abort the whole run if the first opener happened to be
+         * infeasible at that cap, and its whole purpose is to RAISE the cap,
+         * which is precisely what a pinned run does not want.  Skipping it also
+         * keeps depth == depth_floor, which is what keeps the LB skip live. */
+        if (nord > 0 && depthmax > depth) {
             int g0 = (int)(ord[0] & 0xFFFFF);
             Ctx *c0 = calloc(1, sizeof(Ctx));
             double s0 = now_s();
             int used = 0;
-            int t0v = solve_escalating(g0, depth, MAXD - 1, c0, &used);
+            /* bounded by depthmax, not MAXD-1: --depth-max is the caller's
+             * ceiling and this must not escalate past it. */
+            int t0v = solve_escalating(g0, depth, depthmax, c0, &used);
             double dt0 = now_s() - s0;
             if (t0v >= INF) {
                 printf("%s  INFEASIBLE at every depth up to %d  (%.1fs) -- nothing to do\n",
-                       GWORD[g0], MAXD - 1, dt0);
+                       GWORD[g0], depthmax, dt0);
                 free(c0);
                 return 1;
             }
@@ -1317,7 +1489,7 @@ int main(int argc, char **argv) {
                  * SET and its ORDER are fixed by sum of squares, which does not
                  * depend on depth, so only the bounds are refreshed. */
                 for (int g = 0; g < NG; g++) lb[g] = root_lb(g, depth);
-                if (TOPK > 0) {
+                if (TOPK > 0 || ORDER_SSQ) {
                     for (int i = 0; i < nord; i++) {
                         int g = (int)(ord[i] & 0xFFFFF);
                         ord[i] = ((int64_t)lb[g] << 20) | (int64_t)g;
@@ -1382,9 +1554,13 @@ int main(int argc, char **argv) {
                  * the floor an opener with a hopeless total could still win by
                  * finishing shallower, and skipping it would lose the answer.
                  *
-                 * Even when it applies, with TOPK the list is in sum-of-squares
-                 * order, so it says nothing about the openers AFTER it; only the
-                 * exact path's ascending-LB order makes it a proof about the tail. */
+                 * Even when it applies, the list is in sum-of-squares order under
+                 * TOPK or --order ssq, so it says nothing about the openers AFTER
+                 * it; only ascending-LB order makes it a proof about the tail.
+                 * The skip itself stays SOUND in every order -- an opener whose
+                 * own LB exceeds the incumbent cannot win -- it is only the
+                 * "and therefore so is everything after" reading that needs the
+                 * sort, and nothing here breaks early on it. */
                 if (depth <= depth_floor && mylb > inc) {
 #ifdef _OPENMP
 #pragma omp atomic

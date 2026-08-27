@@ -1,12 +1,19 @@
 #!/bin/sh
-# Build both solvers from the single optturns.c.  Run from math/solver/.
+# Build the solvers from the single optturns.c.  Run from math/solver/.
 #
-#   optturns   -- normal Wordle (HARD 0)
-#   hardturns  -- hard mode, "any revealed hints must be used" (HARD 1)
+#   sh build.sh           -- optturns (normal Wordle) + hardturns (hard mode)
+#   sh build.sh 7         -- optturns7, the 7-letter solver
+#   sh build.sh 4 6 7 8   -- several lengths at once
 #
-# HARD is a compile-time constant, so each binary keeps its hot loops free of
-# the other mode's branches while both stay one source of truth.  Two output
-# names also mean hardturns can be built while an optturns sweep is running.
+# HARD and WORDLEN are both COMPILE-TIME constants, so each binary keeps its hot
+# loops free of the other configurations' branches while all of them stay one
+# source of truth.  Separate output names also mean a 7-letter binary can be
+# built while a 5-letter sweep is running.
+#
+# WHY ONE BINARY PER LENGTH.  Every array bound in the solver derives from
+# NPAT = 3**WORDLEN (243 at 5 letters, 177147 at 11).  As a compile-time literal
+# those fold into the addressing; as a runtime variable they would cost an
+# indirection in the innermost partition loop, which is the whole program.
 set -e
 
 # OpenMP wiring differs by toolchain, so probe rather than assume.  On WSL /
@@ -28,6 +35,42 @@ if ! gcc -fopenmp -E -x c /dev/null >/dev/null 2>&1; then
 fi
 
 # $OMP is deliberately unquoted -- it is a multi-word flag list on macOS.
-gcc -O3 -march=native -funroll-loops $OMP -o optturns  optturns.c
-gcc -O3 -march=native -funroll-loops $OMP -DHARDMODE -o hardturns optturns.c
-echo "built ./optturns and ./hardturns"
+BASE="-O3 -march=native -funroll-loops"
+
+if [ $# -eq 0 ]; then
+  gcc $BASE $OMP -o optturns  optturns.c
+  gcc $BASE $OMP -DHARDMODE -o hardturns optturns.c
+  echo "built ./optturns and ./hardturns  (5 letters, Wordle lists)"
+  exit 0
+fi
+
+WORDS_DIR="../data/shared/words/hello"
+
+for L in "$@"; do
+  case "$L" in
+    4|5|6|7|8|9|10|11) ;;
+    *) echo "build.sh: unsupported length '$L' (4..11; NPAT table in optturns.c)" >&2
+       exit 1 ;;
+  esac
+
+  g="$WORDS_DIR/len$L/guess.txt"
+  a="$WORDS_DIR/len$L/mystery.txt"
+  if [ ! -f "$g" ] || [ ! -f "$a" ]; then
+    echo "build.sh: missing $g or $a -- run \`python3 build_wordlists.py\` from math/" >&2
+    exit 1
+  fi
+
+  # MAXG/MAXA are sized from the ACTUAL lists rather than set to the maximum
+  # across all lengths: they bound the per-thread arena (lbg + ord + leg + mark
+  # scale with MAXG, buf + tbuf with MAXA), so an 8-letter figure carried into
+  # the 4-letter binary would cost memory for nothing.  The slack absorbs a
+  # --guess-list/--answer-list that is a subset, never a superset.
+  ng=$(grep -c . "$g")
+  na=$(grep -c . "$a")
+  maxg=$((ng + 16))
+  maxa=$((na + 16))
+
+  gcc $BASE $OMP -DWORDLEN="$L" -DMAXG="$maxg" -DMAXA="$maxa" \
+      -o "optturns$L" optturns.c
+  echo "built ./optturns$L  ($L letters, MAXG=$maxg, MAXA=$maxa, NPAT=$(awk "BEGIN{print 3^$L}"))"
+done
