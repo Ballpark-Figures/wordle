@@ -173,6 +173,52 @@ loading" for the measurements and the full cross-machine history.
   `vowels.py`, `depths.py` (tree depth + tree-vs-CSV check),
   `ttdump.py`/`ttverify.py`/`ttscan.py` (table snapshots).
 
+## Other word lengths (4-11) — a DIFFERENT problem, not an extension
+- **The word lists are `hello wordl`'s, not the NYT's, and the two are NOT
+  comparable.** `math/data/shared/words/hello/len<L>/{guess,mystery}.txt`, built by
+  `math/build_wordlists.py` from [lynn/hello](https://github.com/lynn/hello) (MIT,
+  pinned SHA). The top-level `words/{guess,mystery}.txt` (12972/2315) are untouched.
+  hello's ANSWER list is a much looser curation — at 5 letters it is 3238 words, of
+  which only 2077 are among the NYT 2315 — so **`load_words("mystery", 5)` is NOT the
+  2315**. Inherited quirk worth knowing: hello's dictionary is North-American Scrabble
+  (TWL/NWL) at every length EXCEPT 5, where it is Wordle's Collins-derived 12972.
+- **Results live in `math/data/shared/LENGTHS.md`** with a PROVISIONAL/COMPLETE column.
+  7-11 are complete and exact; 6 is provisional; 4 is unrun. **Never quote a PROVISIONAL
+  row as an optimum** — it is "best of the first N openers examined, in a heuristic
+  order". Say "probably the result".
+- **One binary per length: `sh build.sh 7` emits `optturns7`.** `WORDLEN` is
+  compile-time (like `HARD`) because every array bound derives from `NPAT = 3**WORDLEN`
+  — 243 at 5 letters, 177147 at 11. `--length L` does not set the length; it asserts the
+  binary matches and selects that length's lists + matrix. `sh build.sh` with no args
+  still builds the 5-letter `optturns`/`hardturns` exactly as before.
+- Per length you need THREE things, and each is a separate file: the word lists
+  (`build_wordlists.py`), the matrix (`build_patterns.py --length L` -> `patterns_len<L>.npy`),
+  and the binary. **The matrix dtype is NOT always uint8** — `3**L` outgrows it at L=6
+  and uint16 at L=11 — and the solver rejects a mismatch rather than misreading it.
+- **Run it with `bash solver/run-length-sweep.sh --length L --depth D` (from `math/`),
+  attached, same tee'd-log rules as the other sweeps.** `--depth` is REQUIRED: the cap
+  is pinned and IS the objective, so a depth-4 pass and a depth-5 pass are different
+  quantities and get separate CSVs. Seeding one from the other's incumbent would cut
+  every candidate and report nothing found.
+- **`--order ssq` (the wrapper default) vs `--order lb`.** Both exact; only the visit
+  order differs. `lb` alone makes an LB skip prove the whole TAIL is worse — but the
+  bound never fires here (0 skips in 3596 openers at length 6), because in the regime
+  that matters it collapses to `3*NA - 2*(opener is an answer) - (number of bins)` and
+  is therefore blind to bin SIZES. `ssq` sorts by the evenness the bound discards, which
+  is what matters when the run will be stopped early. Measured, not assumed.
+- **`--optimal-only` emits NO TREES.** `write_tree` is only called from the
+  single-opener and plain `--sweep` paths, so `--trees` here silently creates an empty
+  directory. The winner's tree needs a follow-up `--opener <winner> --trees <dir>` run
+  at the same depth. (Open gap as of 2026-08-27.)
+- **`tt.bin` is 8.6 GB per length at `--tt-bits 28`, and is saved only on NORMAL
+  completion** — a Ctrl-C loses it. The CSV is flushed per improvement and always
+  survives.
+- **`python3 tools/checkpatterns.py`** verifies the length-general pattern primitives,
+  including a bit-identical regression of L=5 against the committed `patterns.npy`. Run
+  it alongside `solver/validate.sh` after any change to `wordle.py`/`build_patterns.py`.
+  `tools/orderdiag.py` compares the two visit orderings and asks what a part-finished
+  run has not reached yet.
+
 ## Feedback patterns: 243 encodings, but only 238 are POSSIBLE
 - **`3^5 = 243` is the ENCODING space; only 238 patterns can ever occur.** The five
   impossible ones are **4 greens + 1 yellow** (one per position of the yellow): if four

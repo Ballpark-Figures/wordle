@@ -426,6 +426,95 @@ guessing whether 6 is satisfiable — under `--topk` an INFEASIBLE at a fixed 6
 would mostly be an artifact of the restricted branching — and keeps every opener
 under the SAME constraint, which a per-opener escalation would not.
 
+## Other word lengths (`--length`, `optturns<L>`)
+
+Wordle is 5 letters, but the same solver runs any length from 4 to 11 against the
+**hello wordl** lists (`build_wordlists.py`; provenance and results in
+`math/data/shared/LENGTHS.md`). These do NOT touch the Wordle problem: the
+top-level `words/{guess,mystery}.txt` and `patterns.npy` are untouched, and
+`validate.sh` still reproduces all five published totals.
+
+```sh
+# from math/
+python3 build_wordlists.py                    # once, all lengths
+python3 build_patterns.py --length 6          # per length -- SEPARATE matrix file
+cd solver && sh build.sh 6                    # per length -- SEPARATE binary
+bash solver/run-length-sweep.sh --length 6 --depth 5
+```
+
+**WORDLEN is compile-time, like HARD.** Every array bound derives from
+`NPAT = 3**WORDLEN` (243 at 5 letters, 177147 at 11); as a literal those fold into
+the addressing, as a runtime variable they would cost an indirection in the
+innermost partition loop. So `sh build.sh 7` emits `optturns7`, and `--length 7`
+merely asserts the binary matches and picks the right lists. `MAXG`/`MAXA` are
+sized from the actual lists by `build.sh`.
+
+Three things change with length beyond the array sizes:
+
+| | 5 letters | 11 letters |
+|---|---|---|
+| `pat_t` (one pattern code) | `uint8_t` | `uint32_t` — uint16 from 6 |
+| word buffer | `char[8]` | `char[16]` — from 8 |
+| pattern-indexed scratch | 972 B, on the stack | 692 KB, so on the HEAP |
+
+That last one is why `emit_tree`/`root_lb`/`solve_opener_bounded` call
+`pat_scratch()` instead of declaring arrays: three `int[NPAT]` inside a RECURSIVE
+function is fine at 243 and fatal at 177147. The dense `for (p = 0; p < NPAT; p++)`
+loops were deliberately left alone — that loop order fixes the ORDER OF LINES in an
+emitted tree, so sparsifying it would rewrite committed 5-letter trees.
+
+### The cap is PINNED, and it is the objective
+
+`run-length-sweep.sh` requires `--depth` and runs exactly that cap. A depth-4 pass
+and a depth-5 pass are two different quantities, not two attempts at one — a
+tighter cap can only raise the total. Each gets its own CSV for that reason:
+seeding a depth-4 run's incumbent from a depth-5 total would cut every candidate
+and report nothing found.
+
+Pinning is what keeps `depth == depth_floor`, which is what keeps the per-opener
+LB skip live. In normal mode `--depth-max` defaults to `--depth`, and the
+escalation probe is skipped entirely when they are equal — without that skip, an
+infeasible FIRST opener would abort the whole run at a pinned cap.
+
+### `--order ssq` vs `--order lb`
+
+Both examine every opener, so both are exact; only the visit order differs, and
+with it what a STOPPED run is worth.
+
+- `lb` — ascending root lower bound. Buys one extra thing: when an opener's bound
+  exceeds the incumbent, every opener AFTER it is worse too, so the tail is free.
+- `ssq` — ascending sum of squared bin sizes, the evenest splitters first. No tail
+  proof, but it front-loads the openers that can actually win.
+
+**Why `ssq` is the wrapper's default.** The tail proof is only worth having if the
+bound fires, and it does not: it is a counting bound running 8–14% under the true
+optimum, so nearly every opener bounds below the incumbent. Measured at length 6:
+**0 skips in 3596 openers.**
+
+Worse, in the regime that matters the bound is not even a proxy for split quality.
+With `d-1` guesses left and every bucket at or under `1 + BRANCH`, each bucket
+costs `2n - 1`, the `Σ n` term is a constant, and the whole bound collapses to
+
+    root LB  ==  3*NA  -  2*(opener is itself an answer)  -  (number of bins)
+
+— exact for every opener in that regime, and all of the LB top-200 are in it. So
+ascending-LB order is **descending BIN COUNT**, blind to how the mass is spread.
+At length 6 `satire` (405 bins, biggest bucket 210) outranks `salter` (395 bins,
+biggest bucket 151) despite splitting far less evenly. Sum of squares measures
+exactly what the bound discards.
+
+### Stopping early
+
+Ctrl-C is safe and expected: the CSV is flushed per improvement, so every opener
+that ever held the lead is on disk, and re-running resumes from it. What a stopped
+run does NOT give you is a proof — the leader is "best of those examined, in a
+heuristic order". Record it that way; `LENGTHS.md` marks such rows PROVISIONAL.
+
+**`--optimal-only` does not emit trees.** `write_tree` is called only from the
+single-opener and plain `--sweep` paths, so `--trees` under `--optimal-only`
+creates an empty directory. Getting the winner's tree currently means a follow-up
+`--opener <winner> --trees <dir>` run at the same depth.
+
 ## Output format
 
 Each tree line is a complete replay of one game:
