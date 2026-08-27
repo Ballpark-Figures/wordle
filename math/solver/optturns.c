@@ -952,8 +952,22 @@ static int solve_opener(int g, int depth, Ctx *ctx) {
  * which the per-opener (total, depth) recorded in the CSV is the seed. */
 static int solve_escalating(int g, int dmin, int dmax, Ctx *ctx, int *used) {
     for (int d = dmin; d <= dmax; d++) {
+        double t0 = now_s();
         int total = solve_opener(g, d, ctx);
         if (total < INF) { *used = d; return total; }
+        /* Report each rejected cap as it falls.  Proving infeasibility at a
+         * too-tight cap can take a long time, and without this the escalation is
+         * silent for as long as it takes -- which reads as a hang rather than as
+         * progress.  Every caller is sequential (the single-opener loop, and the
+         * optimal-only probe, which runs before the parallel region opens), so
+         * this cannot interleave with another thread's output. */
+        if (d < dmax)
+            printf("%s  INFEASIBLE at depth %d  (%.1fs) -- escalating to %d\n",
+                   GWORD[g], d, now_s() - t0, d + 1);
+        else
+            printf("%s  INFEASIBLE at depth %d  (%.1fs) -- that was --depth-max\n",
+                   GWORD[g], d, now_s() - t0);
+        fflush(stdout);
     }
     *used = 0;
     return INF;

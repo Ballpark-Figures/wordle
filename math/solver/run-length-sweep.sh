@@ -55,6 +55,7 @@ MATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 LENGTH=""
 DEPTH=""
+DEPTHMAX=""      # empty = pin --depth; set = escalate the first opener up to this
 ORDER=ssq
 THREADS=18
 TTBITS=28
@@ -62,7 +63,8 @@ TTBITS=28
 while [ $# -gt 0 ]; do
     case "$1" in
         --length)  LENGTH="$2";  shift 2 ;;
-        --depth)   DEPTH="$2";   shift 2 ;;
+        --depth)     DEPTH="$2";    shift 2 ;;
+        --depth-max) DEPTHMAX="$2"; shift 2 ;;
         --order)   ORDER="$2";   shift 2 ;;
         --threads) THREADS="$2"; shift 2 ;;
         --tt-bits) TTBITS="$2";  shift 2 ;;
@@ -109,7 +111,29 @@ mkdir -p "$OUTDIR" "$LOC"
 # One CSV per (depth, order).  Depth because the cap is the objective; order
 # because a stopped run's partial results are only meaningful alongside the order
 # that produced them, and resume would otherwise mix them.
-OUT=$OUTDIR/opener_totals_d${DEPTH}_${ORDER}.csv
+# DISCOVER-THE-DEPTH mode.  With --depth-max the solver solves the FIRST opener
+# at an escalating cap, takes the depth it actually needed, and holds every other
+# opener to that -- so you do not have to know the right cap in advance.  An
+# opener that later solves SHALLOWER still wins and drags the cap down with it,
+# so the objective stays lexicographic (fewest worst-case guesses, then total).
+#
+# The cost is that the working depth then sits above --depth, which switches off
+# the LB skip for the rest of the run.  Worth knowing, and worth ignoring wherever
+# the bound does not fire anyway -- at length 4 it saturates at depth 3 and cannot
+# tell any cap from any other, so there is nothing to lose.
+#
+# The file is named for the MODE, not a depth: the achieved depth is not known
+# when the run starts, and naming it after --depth would label the results with a
+# floor they did not run at.  The depth each row achieved is its 4th column.
+if [ -n "$DEPTHMAX" ] && [ "$DEPTHMAX" -gt "$DEPTH" ]; then
+    OUT=$OUTDIR/opener_totals_escalating_${ORDER}.csv
+    DFLAG="--depth $DEPTH --depth-max $DEPTHMAX"
+    MODE="depth $DEPTH escalating to $DEPTHMAX"
+else
+    OUT=$OUTDIR/opener_totals_d${DEPTH}_${ORDER}.csv
+    DFLAG="--depth $DEPTH"
+    MODE="depth $DEPTH PINNED"
+fi
 
 # The TT is salted by (guess set, answer set) but NOT by depth -- depth is part of
 # each entry's own key -- so one table serves every depth at this length, and a
@@ -117,13 +141,13 @@ OUT=$OUTDIR/opener_totals_d${DEPTH}_${ORDER}.csv
 WARM=""
 [ -f "$LOC/tt.bin" ] && WARM="--tt-load $LOC/tt.bin"
 
-echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] length $LENGTH, depth $DEPTH PINNED, order $ORDER $WARM" \
+echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] length $LENGTH, $MODE, order $ORDER $WARM" \
     | tee -a "$LOC/sweep.log"
 
 "$BIN" --length "$LENGTH" --sweep --optimal-only \
     --order "$ORDER" \
     --out "$OUT" \
-    --depth "$DEPTH" \
+    $DFLAG \
     --tt-bits "$TTBITS" --threads "$THREADS" $WARM \
     --tt-save "$LOC/tt.bin" \
     2>&1 | tee -a "$LOC/sweep.log"
