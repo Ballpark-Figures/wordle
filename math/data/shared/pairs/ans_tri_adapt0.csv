@@ -1,0 +1,7 @@
+word1,word2,word3,total,expected,seconds
+bland,copse,right,9631,4.16026,0.0
+bland,right,copse,9631,4.16026,0.0
+copse,bland,right,9631,4.16026,0.0
+copse,right,bland,9631,4.16026,0.0
+right,bland,copse,9631,4.16026,0.0
+right,copse,bland,9631,4.16026,0.0
