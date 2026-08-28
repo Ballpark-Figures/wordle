@@ -57,6 +57,7 @@ LENGTH=""
 DEPTH=""
 DEPTHMAX=""      # empty = pin --depth; set = escalate the first opener up to this
 ORDER=ssq
+TOPK=0           # 0 = exact. K > 0 restricts branching to the K evenest splits
 THREADS=18
 TTBITS=28
 
@@ -65,7 +66,8 @@ while [ $# -gt 0 ]; do
         --length)  LENGTH="$2";  shift 2 ;;
         --depth)     DEPTH="$2";    shift 2 ;;
         --depth-max) DEPTHMAX="$2"; shift 2 ;;
-        --order)   ORDER="$2";   shift 2 ;;
+        --order)     ORDER="$2";    shift 2 ;;
+        -k|--topk)   TOPK="$2";     shift 2 ;;
         --threads) THREADS="$2"; shift 2 ;;
         --tt-bits) TTBITS="$2";  shift 2 ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
@@ -106,6 +108,15 @@ if pgrep -x "optturns$LENGTH" >/dev/null; then
     exit 1
 fi
 
+# EVERY K GETS ITS OWN FILES.  Different K values are different search spaces
+# producing different (upper-bound) totals, so sharing a CSV would interleave
+# incomparable results and let resume seed one run from another's numbers.  The
+# TT is salted by K as well, so a shared tt.bin would fail verification anyway.
+if [ "$TOPK" -gt 0 ]; then
+    OUTDIR=$OUTDIR/k$TOPK
+    LOC=$LOC/k$TOPK
+fi
+
 mkdir -p "$OUTDIR" "$LOC"
 
 # One CSV per (depth, order).  Depth because the cap is the objective; order
@@ -141,11 +152,20 @@ fi
 WARM=""
 [ -f "$LOC/tt.bin" ] && WARM="--tt-load $LOC/tt.bin"
 
-echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] length $LENGTH, $MODE, order $ORDER $WARM" \
+KFLAG=""
+if [ "$TOPK" -gt 0 ]; then
+    KFLAG="--topk $TOPK"
+    echo "*** --topk $TOPK: results are the best found within the RESTRICTED" >&2
+    echo "*** branching, NOT optima.  Report them as upper bounds.  An INFEASIBLE" >&2
+    echo "*** at a given depth may be an artifact of the restriction rather than a" >&2
+    echo "*** fact about the problem, so a discovered depth can come out TOO DEEP." >&2
+fi
+
+echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] length $LENGTH, $MODE, order $ORDER, topk $TOPK $WARM" \
     | tee -a "$LOC/sweep.log"
 
 "$BIN" --length "$LENGTH" --sweep --optimal-only \
-    --order "$ORDER" \
+    --order "$ORDER" $KFLAG \
     --out "$OUT" \
     $DFLAG \
     --tt-bits "$TTBITS" --threads "$THREADS" $WARM \

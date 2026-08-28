@@ -1062,6 +1062,156 @@ static int solve_opener_bounded(int g, int depth, Ctx *ctx, int bound) {
     return total;
 }
 
+/* ------------------------------------------------------- PAIR OPENERS ----
+ *
+ * Cost of committing to the pair (g1, g2) played BLIND: both words fixed in
+ * advance, g2 NOT chosen in response to g1's feedback.
+ *
+ * ORDER MATTERS, so (a,b) and (b,a) are DIFFERENT candidates and both must be
+ * evaluated.  The joint partition itself is order-independent -- which is why
+ * the sum-of-squares screen emits each pair once -- but the COST is not:
+ *
+ *   - the answer equal to g1 wins at guess 1 and never plays g2, so it costs 1
+ *     rather than 2.  Playing the answer-word first is worth exactly 1, which
+ *     is measurable: parse+clint is 8325 against clint+parse's 8326.
+ *   - under --pair-early-finish the asymmetry is much larger, because the rule
+ *     keys on singleton buckets of the FIRST word's partition.
+ *
+ * --pair-early-finish: when g1 alone has already narrowed the field to ONE
+ * answer, say that answer at guess 2 instead of playing g2 blindly.  Those
+ * answers cost 2 rather than 3.  Nothing else changes -- the joint buckets of
+ * every other answer are untouched -- so the two models differ by exactly the
+ * number of non-winning singleton g1-buckets whose answer is not g2 itself.
+ *
+ * THE ACCOUNTING, in the two-level form the early-finish rule requires:
+ *
+ *     total = NA                        guess 1, paid by every answer
+ *           + for each non-winning g1-bucket B:
+ *               1              if |B| == 1 and early-finish  (say it)
+ *               |B|            otherwise                     (play g2)
+ *           + for each g2 sub-bucket that is not an outright win:
+ *               solve(sub-bucket, depth - 2)
+ *
+ * Returns CUTOFF if provably worse than `bound`, INF if it cannot finish within
+ * the cap.  The bound NEVER enters solve(): those values are memoised and must
+ * stay exact, so cutting happens only between root sub-buckets.  TIES SURVIVE --
+ * every test is `> bound`, never `>=`. */
+/* --pair-adaptive N: when g1 ALONE has already cut the field to N or fewer
+ * answers, abandon the blind second word and play optimally from there.
+ *
+ *   N = 0  pure blind -- g2 is always played (the default)
+ *   N = 1  if one answer remains, say it at guess 2                 (cost 2)
+ *   N = 2  if two remain, guess them in order                       (cost 2 + 3)
+ *
+ * Both special cases are the SAME rule, which is why this is one knob and not
+ * two: solve() on a 1-answer set returns 1, and on a 2-answer set returns 3
+ * (name one, and if wrong name the other) -- exactly "guess both in order", and
+ * provably the best either set admits.  So the adaptive branch is just the
+ * ordinary optimal continuation with depth-1 guesses left, in place of the blind
+ * expansion with depth-2 left.
+ *
+ * This is a STRICT improvement per bucket, never a trade: blind play of g2 on a
+ * tiny bucket can only match the optimum, and usually loses to it -- on a 2-set
+ * it costs 6 when g2 separates them and 7 when it does not, against 5. */
+static int PAIR_ADAPT = 0;
+
+typedef struct { int start, len, d; } SubJob;
+
+static int cmp_subjob(const void *a, const void *b) {
+    const SubJob *x = a, *y = b;                 /* largest first */
+    return (y->len > x->len) - (y->len < x->len);
+}
+
+static int solve_pair_bounded(int g1, int g2, int depth, Ctx *ctx, int bound) {
+    const pat_t *r1 = PAT + (size_t)g1 * NA;
+    const pat_t *r2 = PAT + (size_t)g2 * NA;
+
+    int *cnt1 = calloc(NPAT, sizeof(int));
+    int *kof1 = calloc(NPAT, sizeof(int));
+    int *cnt2 = calloc(NPAT, sizeof(int));
+    int *kof2 = calloc(NPAT, sizeof(int));
+    int *k1   = malloc(sizeof(int) * NPAT);
+    int *k2   = malloc(sizeof(int) * NPAT);
+    int *st1  = malloc(sizeof(int) * (NPAT + 1));
+    int *fl1  = malloc(sizeof(int) * (NPAT + 1));
+    int *fl2  = malloc(sizeof(int) * (NPAT + 1));
+    uint16_t *ord = malloc(sizeof(uint16_t) * NA);
+    uint16_t *buf = malloc(sizeof(uint16_t) * NA);
+    SubJob   *job = malloc(sizeof(SubJob) * (NA + 1));
+    if (!cnt1 || !buf || !job) { fprintf(stderr, "out of memory in solve_pair_bounded\n"); exit(1); }
+
+    /* ---- level 1: partition the answers by g1 */
+    int nk1 = 0;
+    for (int a = 0; a < NA; a++)
+        if (cnt1[r1[a]]++ == 0) k1[nk1++] = r1[a];
+    int acc = 0;
+    for (int i = 0; i < nk1; i++) {
+        st1[i] = acc; fl1[i] = acc; acc += cnt1[k1[i]]; kof1[k1[i]] = i;
+    }
+    for (int a = 0; a < NA; a++) ord[fl1[kof1[r1[a]]]++] = (uint16_t)a;
+
+    int total = NA;                  /* guess 1, everyone */
+    int njob = 0, bufn = 0, rc;
+
+    for (int i = 0; i < nk1; i++) {
+        int p1 = k1[i], s = st1[i], n1 = cnt1[p1];
+        if (p1 == ALL_GREEN) continue;                  /* won at guess 1, costs 1 */
+
+        if (PAIR_ADAPT > 0 && n1 <= PAIR_ADAPT) {
+            /* drop the blind word: solve this bucket outright, depth-1 left.
+             * Copied into buf so every job indexes one array. */
+            memcpy(buf + bufn, ord + s, sizeof(uint16_t) * n1);
+            job[njob].start = bufn; job[njob].len = n1; job[njob].d = depth - 1;
+            njob++; bufn += n1;
+            continue;
+        }
+
+        total += n1;                                    /* guess 2, this bucket */
+        int nk2 = 0;
+        for (int t = s; t < s + n1; t++)
+            if (cnt2[r2[ord[t]]]++ == 0) k2[nk2++] = r2[ord[t]];
+        int off = bufn;
+        for (int j = 0; j < nk2; j++) { kof2[k2[j]] = j; fl2[j] = off; off += cnt2[k2[j]]; }
+        for (int t = s; t < s + n1; t++) buf[fl2[kof2[r2[ord[t]]]]++] = ord[t];
+
+        int base = bufn;
+        for (int j = 0; j < nk2; j++) {
+            int n2 = cnt2[k2[j]];
+            if (k2[j] != ALL_GREEN) {                   /* else won at guess 2 */
+                job[njob].start = base; job[njob].len = n2; job[njob].d = depth - 2;
+                njob++;
+            }
+            base += n2;
+            cnt2[k2[j]] = 0;
+        }
+        bufn = off;
+    }
+
+    qsort(job, njob, sizeof(SubJob), cmp_subjob);
+
+    int lbrest = 0;
+    for (int i = 0; i < njob; i++) {
+        int v = LBTAB[job[i].d][job[i].len];
+        if (v >= INF) { rc = INF; goto done; }
+        lbrest += v;
+    }
+    if (total + lbrest > bound) { rc = CUTOFF; goto done; }
+
+    for (int i = 0; i < njob; i++) {
+        lbrest -= LBTAB[job[i].d][job[i].len];
+        int v = solve(buf + job[i].start, job[i].len, job[i].d, &CONS_NONE, ctx);
+        if (v >= INF) { rc = INF; goto done; }
+        total += v;
+        if (total + lbrest > bound) { rc = CUTOFF; goto done; }
+    }
+    rc = total;
+
+done:
+    free(cnt1); free(kof1); free(cnt2); free(kof2); free(k1); free(k2);
+    free(st1); free(fl1); free(fl2); free(ord); free(buf); free(job);
+    return rc;
+}
+
 static int write_tree(const char *dir, int g, int depth, Ctx *ctx) {
     char cmd[1200];
     snprintf(cmd, sizeof cmd, "gzip -1 > '%s/%s.txt.gz'", dir, GWORD[g]);
@@ -1127,6 +1277,7 @@ int main(int argc, char **argv) {
     const char *ttload = NULL, *ttsave = NULL, *guesslist = NULL;
     const char *answerlist = NULL, *patpath = NULL;
     int optonly = 0, uselength = 0;
+    const char *pairlist = NULL;
     int depth = 6, ttbits = 28, threads = 0, sweep = 0, depthmax = -1;
 
     for (int i = 1; i < argc; i++) {
@@ -1146,6 +1297,10 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--guess-list") && i + 1 < argc) guesslist = argv[++i];
         else if (!strcmp(argv[i], "--answer-list") && i + 1 < argc) answerlist = argv[++i];
         else if (!strcmp(argv[i], "--patterns") && i + 1 < argc) patpath = argv[++i];
+        else if (!strcmp(argv[i], "--pair-list") && i + 1 < argc) pairlist = argv[++i];
+        else if (!strcmp(argv[i], "--pair-adaptive") && i + 1 < argc) PAIR_ADAPT = atoi(argv[++i]);
+        /* kept as the N=1 alias so runs already launched with it keep working */
+        else if (!strcmp(argv[i], "--pair-early-finish")) PAIR_ADAPT = 1;
         else if (!strcmp(argv[i], "--optimal-only")) optonly = 1;
         else if (!strcmp(argv[i], "--order") && i + 1 < argc) {
             const char *o = argv[++i];
@@ -1354,6 +1509,187 @@ int main(int argc, char **argv) {
     }
 
     /* ------------------------------------------------- --optimal-only sweep */
+    /* ---------------------------------------------- PAIR-OPENER EVALUATION
+     *
+     * Walk a list of candidate PAIRS -- produced by ./pairsplit, in ascending
+     * joint sum-of-squares order -- against a running incumbent, and report the
+     * pair with the lowest exact total.
+     *
+     * The claim this supports is narrower than the single-opener sweep's, and
+     * the difference must survive into how the result is reported: the pair list
+     * is a HEURISTIC screen, so the winner is the best of the pairs SCREENED,
+     * not the optimal pair over all C(NG,2). Sum of squares proves nothing.
+     *
+     * Within that list, though, the evaluation is exact: every pair is either
+     * solved exactly or proven worse than the incumbent, and ties are kept. */
+    if (pairlist) {
+        if (HARD) {
+            fprintf(stderr, "--pair-list is normal-mode only: in hard mode the second "
+                    "word's legality depends on the first one's feedback, so a BLIND "
+                    "pair is not a well-defined opening\n");
+            return 1;
+        }
+        if (depth < 3) {
+            fprintf(stderr, "--pair-list needs --depth 3 or more (two openers plus at "
+                    "least one guess)\n");
+            return 1;
+        }
+        FILE *pf = fopen(pairlist, "r");
+        if (!pf) { fprintf(stderr, "cannot open %s\n", pairlist); return 1; }
+        int cap = 1024, np = 0;
+        int *p1 = malloc(sizeof(int) * cap), *p2 = malloc(sizeof(int) * cap);
+        char line[256];
+        while (fgets(line, sizeof line, pf)) {
+            char w1[64], w2[64];
+            if (sscanf(line, "%63[^,],%63[^,],", w1, w2) != 2) continue;
+            int a = find_word(GWORD, NG, w1), b = find_word(GWORD, NG, w2);
+            if (a < 0 || b < 0) continue;          /* the header lands here */
+            if (np == cap) {
+                cap *= 2;
+                p1 = realloc(p1, sizeof(int) * cap);
+                p2 = realloc(p2, sizeof(int) * cap);
+            }
+            p1[np] = a; p2[np] = b; np++;
+        }
+        fclose(pf);
+        if (!np) { fprintf(stderr, "no usable pairs in %s\n", pairlist); return 1; }
+        /* BOTH ORDERS.  The screen scores unordered pairs -- correctly, since the
+         * joint partition cannot depend on order -- but the COST can, so each
+         * listed pair becomes two candidates.  Ignoring this silently reports the
+         * worse order whenever exactly one of the words is an answer. */
+        int ncand = 2 * np;
+        int *cA = malloc(sizeof(int) * ncand), *cB = malloc(sizeof(int) * ncand);
+        for (int i = 0; i < np; i++) {
+            cA[2*i] = p1[i];     cB[2*i] = p2[i];
+            cA[2*i+1] = p2[i];   cB[2*i+1] = p1[i];
+        }
+        if (PAIR_ADAPT > 0)
+            fprintf(stderr, "pair list: %d pairs from %s -> %d ordered candidates "
+                    "(adaptive when g1 leaves %d or fewer)\n",
+                    np, pairlist, ncand, PAIR_ADAPT);
+        else
+            fprintf(stderr, "pair list: %d pairs from %s -> %d ordered candidates (pure blind)\n",
+                    np, pairlist, ncand);
+
+        int incumbent = INF, nbest = 0;
+        int *bestA = malloc(sizeof(int) * ncand), *bestB = malloc(sizeof(int) * ncand);
+        char *done = calloc(ncand, 1);
+        int ndone = 0;
+
+        /* Resume, and seed the incumbent -- a good bound from a previous run
+         * prunes immediately instead of being rediscovered. */
+        FILE *rf = outpath ? fopen(outpath, "r") : NULL;
+        if (rf) {
+            while (fgets(line, sizeof line, rf)) {
+                char w1[64], w2[64]; int t;
+                if (sscanf(line, "%63[^,],%63[^,],%d", w1, w2, &t) != 3) continue;
+                int a = find_word(GWORD, NG, w1), b = find_word(GWORD, NG, w2);
+                if (a < 0 || b < 0) continue;
+                for (int i = 0; i < ncand; i++)
+                    if (!done[i] && cA[i] == a && cB[i] == b) { done[i] = 1; ndone++; break; }
+                if (t > 0 && t < incumbent) incumbent = t;
+            }
+            fclose(rf);
+            if (ndone) fprintf(stderr, "resume: %d evaluated, incumbent %d\n", ndone, incumbent);
+        }
+        FILE *out = outpath ? fopen(outpath, "a") : NULL;
+        if (outpath && !out) { fprintf(stderr, "cannot append to %s\n", outpath); return 1; }
+        if (out && ndone == 0) fprintf(out, "word1,word2,total,expected,seconds\n");
+
+        int searched = 0, cut = 0, infeas = 0;
+        double t0 = now_s(), last_report = t0;
+        printf("pair-list: %d ordered candidates from %d pairs, depth %d, "
+               "exact within the list, adaptive %d\n", ncand, np, depth, PAIR_ADAPT);
+        fflush(stdout);
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+        {
+            Ctx *ctx = calloc(1, sizeof(Ctx));
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic, 1)
+#endif
+            for (int i = 0; i < ncand; i++) {
+                if (done[i]) continue;
+                int inc;
+#ifdef _OPENMP
+#pragma omp atomic read
+#endif
+                inc = incumbent;
+                double s0 = now_s();
+                int total = solve_pair_bounded(cA[i], cB[i], depth, ctx, inc);
+                double dt = now_s() - s0;
+
+#ifdef _OPENMP
+#pragma omp critical
+#endif
+                {
+                    if (total >= INF)      infeas++;
+                    else if (total == CUTOFF) cut++;
+                    else {
+                        searched++;
+                        if (total < incumbent) {
+                            incumbent = total;
+                            nbest = 0; bestA[nbest] = cA[i]; bestB[nbest] = cB[i]; nbest++;
+                            printf("[%7.0fs] %s %s  total=%5d  avg=%.5f  NEW BEST  %7.1fs\n",
+                                   now_s() - t0, GWORD[cA[i]], GWORD[cB[i]], total,
+                                   (double)total / NA, dt);
+                            if (out) {
+                                fprintf(out, "%s,%s,%d,%.5f,%.1f\n", GWORD[cA[i]],
+                                        GWORD[cB[i]], total, (double)total / NA, dt);
+                                fflush(out);
+                            }
+                        } else if (total == incumbent) {
+                            bestA[nbest] = cA[i]; bestB[nbest] = cB[i]; nbest++;
+                            printf("[%7.0fs] %s %s  total=%5d  avg=%.5f  TIED      %7.1fs\n",
+                                   now_s() - t0, GWORD[cA[i]], GWORD[cB[i]], total,
+                                   (double)total / NA, dt);
+                            if (out) {
+                                fprintf(out, "%s,%s,%d,%.5f,%.1f\n", GWORD[cA[i]],
+                                        GWORD[cB[i]], total, (double)total / NA, dt);
+                                fflush(out);
+                            }
+                        }
+                    }
+                    int seen = searched + cut + infeas;
+                    if (now_s() - last_report > 30.0) {
+                        last_report = now_s();
+                        double el = now_s() - t0;
+                        printf("[%7.0fs] %5d/%d done (%d searched, %d cut, %d infeas)  "
+                               "best=%d (avg %.5f)  %.1f/min  eta %5.1fh\n",
+                               el, seen, ncand, searched, cut, infeas, incumbent,
+                               incumbent < INF ? (double)incumbent / NA : 0.0,
+                               60.0 * seen / (el > 0 ? el : 1),
+                               (el / (seen > 0 ? seen : 1)) * (ncand - seen) / 3600.0);
+                    }
+                    fflush(stdout);
+                }
+            }
+            free(ctx);
+        }
+
+        double el = now_s() - t0;
+        printf("\n=== BEST PAIR (of %d pairs screened, both orders, depth %d, adaptive %d) ===\n",
+               np, depth, PAIR_ADAPT);
+        if (incumbent >= INF) {
+            printf("NO PAIR in the list solves every answer within %d guesses.\n", depth);
+        } else {
+            printf("total=%d  expected=%.5f  over %d answers\n",
+                   incumbent, (double)incumbent / NA, NA);
+            printf("%d pair%s attain it:", nbest, nbest == 1 ? "" : "s");
+            for (int i = 0; i < nbest; i++) printf(" %s+%s", GWORD[bestA[i]], GWORD[bestB[i]]);
+            printf("\n");
+        }
+        printf("searched %d, cut %d, infeasible %d, of %d ordered candidates in %.0fs\n",
+               searched, cut, infeas, ncand, el);
+        printf("NOTE: best of the %d pairs SCREENED by joint sum of squares, "
+               "which is a heuristic -- not the optimal pair over all C(%d,2).\n", np, NG);
+        if (out) fclose(out);
+        if (ttsave) tt_save(ttsave);
+        return 0;
+    }
+
     if (optonly) {
         if (!sweep) { fprintf(stderr, "--optimal-only requires --sweep\n"); return 1; }
 
@@ -1488,13 +1824,26 @@ int main(int argc, char **argv) {
              * ceiling and this must not escalate past it. */
             int t0v = solve_escalating(g0, depth, depthmax, c0, &used);
             double dt0 = now_s() - s0;
-            if (t0v >= INF) {
-                printf("%s  INFEASIBLE at every depth up to %d  (%.1fs) -- nothing to do\n",
-                       GWORD[g0], depthmax, dt0);
-                free(c0);
-                return 1;
+            /* THE FIRST OPENER FAILING IS NOT A REASON TO ABORT THE RUN.  It
+             * used to return 1 here, which threw away the whole sweep because one
+             * word could not fit the ceiling -- while other openers reach it
+             * perfectly well.  Under --topk that is worse still: an INFEASIBLE
+             * there is frequently an artifact of the restricted branching rather
+             * than a fact about the problem.
+             *
+             * So fall through with the cap set to the CEILING and let the walk
+             * decide.  If genuinely nothing solves, the final report says exactly
+             * that -- a real answer, and a far more useful one than an early exit.
+             * The probe's only job is to pick the working cap; failing to solve
+             * still answers that, with the ceiling. */
+            int probe_ok = (t0v < INF);
+            if (!probe_ok) {
+                printf("%s  INFEASIBLE at every depth up to %d  (%.1fs) -- holding every "
+                       "opener to %d and continuing with the rest\n",
+                       GWORD[g0], depthmax, dt0, depthmax);
+                depth = depthmax;
             }
-            if (used > depth) {
+            else if (used > depth) {
                 printf("%s  needed depth %d (not %d); holding every opener to %d\n",
                        GWORD[g0], used, depth, used);
                 depth = used;
@@ -1530,17 +1879,24 @@ int main(int argc, char **argv) {
                 ord[q] = ((int64_t)lb[gg] << 20) | (int64_t)gg;
             }
             if (TOPK == 0) qsort(ord, nord, sizeof(int64_t), cmp_i64);
-            incumbent = t0v;
-            nbest = 0; best[nbest++] = g0;
-            done[g0] = 1;
-            searched++;
-            if (out) {
-                fprintf(out, "%s,%d,%.5f,%d,%.1f\n",
-                        GWORD[g0], t0v, (double)t0v / NA, depth, dt0);
-                fflush(out);
+            if (probe_ok) {
+                incumbent = t0v;
+                nbest = 0; best[nbest++] = g0;
+                done[g0] = 1;
+                searched++;
+                if (out) {
+                    fprintf(out, "%s,%d,%.5f,%d,%.1f\n",
+                            GWORD[g0], t0v, (double)t0v / NA, depth, dt0);
+                    fflush(out);
+                }
+                printf("[%7.0fs] %s  total=%5d  avg=%.5f  FIRST (depth %d)  %7.1fs\n",
+                       now_s() - t0, GWORD[g0], t0v, (double)t0v / NA, depth, dt0);
+            } else {
+                /* no incumbent to seed -- the walk starts unbounded, exactly as it
+                 * would have if this opener had come up later in the order */
+                done[g0] = 1;
+                infeas++;
             }
-            printf("[%7.0fs] %s  total=%5d  avg=%.5f  FIRST (depth %d)  %7.1fs\n",
-                   now_s() - t0, GWORD[g0], t0v, (double)t0v / NA, depth, dt0);
             fflush(stdout);
             free(c0);
         }

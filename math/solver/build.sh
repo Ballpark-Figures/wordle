@@ -40,7 +40,11 @@ BASE="-O3 -march=native -funroll-loops"
 if [ $# -eq 0 ]; then
   gcc $BASE $OMP -o optturns  optturns.c
   gcc $BASE $OMP -DHARDMODE -o hardturns optturns.c
-  echo "built ./optturns and ./hardturns  (5 letters, Wordle lists)"
+  # pairsplit is the PAIR-OPENER screen: no search, no TT, just the joint-split
+  # score for every unordered pair of guesses. Separate program because it shares
+  # nothing with the solver but the .npy loader.
+  gcc $BASE $OMP -o pairsplit pairsplit.c
+  echo "built ./optturns, ./hardturns and ./pairsplit  (5 letters, Wordle lists)"
   exit 0
 fi
 

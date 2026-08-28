@@ -35,6 +35,7 @@ math/solver/hardturns
 # one binary per word length (sh build.sh 7 -> optturns7); same reasoning
 math/solver/optturns[0-9]
 math/solver/optturns[0-9][0-9]
+math/solver/pairsplit
 
 # Machine-local solver working data: resume checkpoints / memo pickles
 # (regenerable, can be GBs). Committed results live in math/data/shared/.
