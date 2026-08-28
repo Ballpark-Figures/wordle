@@ -219,6 +219,302 @@ tree too (`python3 tools/checktrees.py salet`) — the hard-mode legality check 
 skipped there, and the same tree fails ~1450 of 2315 lines if you force it on,
 which is what confirms the check actually fires.
 
+## Answers-only (`--guess-list`)
+
+`--guess-list FILE` restricts the **legal guesses** to the words in `FILE`. The
+answers are untouched — the objective is still the total over all 2315 answers,
+only what may be *played* changes. Pointing it at `mystery.txt` gives the
+answers-only variant:
+
+> Minimise the **total guesses summed over all 2315 answers**, where **every
+> guess — the opener and every follow-up — must itself be one of the 2315 answer
+> words**, subject to resolving every answer within `--depth` guesses.
+
+```sh
+# from math/
+bash solver/run-ans-sweep.sh                        # the sweep, attached
+bash solver/run-ans-sweep.sh --threads 12 --tt-bits 26
+./solver/optturns --guess-list data/shared/words/mystery.txt \
+    --opener crate --depth 6 --tt-bits 26           # one opener
+```
+
+**No hot loop changed.** Every guess enumeration in `solve()` walks `0..NG-1`,
+and `--sweep` walks the same range, so compacting `GWORD` and the pattern matrix
+down to the listed words restricts the follow-up guesses AND the set of openers
+swept, in one move. The sweep therefore covers **2315 openers, not 12972**.
+
+**The TT key is salted with the guess set** (`GSALT`). The same candidate set has
+a genuinely different optimum when the legal guesses differ, so a shared key
+would return a wrong value. The salt is **0 for the full list**, leaving those
+hashes bit-identical to what they have always been — verified by `validate.sh`
+reproducing all five totals *and* their TT hit rates unchanged, so existing
+`tt.bin` snapshots stay valid.
+
+**THE DEPTH CAP BINDS HERE — that is the whole point, not an oversight.** Normal
+mode justifies `--depth 6` with "any opener can follow SALET's tree afterwards".
+**SALET is not an answer word, and neither is REAST** (`grep -cx salet
+mystery.txt` → 0). That escape is illegal under these rules, so the feasibility
+argument does not transfer, exactly as it fails to transfer into hard mode.
+`INFEASIBLE` rows are an **expected result** here: a `word,,,,secs` CSV row is
+data, not a bug. Report these as optima **subject to a 6-guess guarantee** —
+never as "minimum expected guesses".
+
+**Proving INFEASIBLE is the expensive case.** Restricting to answer words removes
+the pure probe guesses (SALET, REAST — words played to split the field, never to
+win), so partitions are coarser and `LBTAB` is weaker. Under a strict cap that
+means much more search, and an opener with no ≤6 solution must exhaust the space
+before it can say so. Expect this variant to be *slower per opener* than the full
+sweep, not faster, despite the smaller guess set.
+
+The per-word terminal line drops `exp=` (it is just `total/2315`); the CSV still
+carries it so `tools/report.py` is unaffected. The trailing `tt <hit>%/<occ>%` is
+load-bearing — `report.py` and `ttscan.py` parse it.
+
+**Tooling caveat:** the data lives in `data/{shared,local}/ansturns/`, so
+`WORDLE_SOLVER=ansturns python3 tools/report.py` reads it. But the *process* is
+still named `optturns`, so the `tt*` tools — which attach by process name —
+cannot find it under that name, and `run-sweep.sh`'s `pgrep -x optturns` guard
+will also fire on a running answers-only sweep.
+
+## All-words (`--answer-list` + `--optimal-only`)
+
+`--answer-list FILE` replaces the ANSWER set — the thing the total is summed
+over. Pointed at `guess.txt` it makes every legal word both a possible answer
+and a legal guess:
+
+> Minimise the **total guesses summed over all 12972 legal words**, every one of
+> which is **both a possible answer and a legal guess**, subject to resolving
+> every answer within `--depth` guesses.
+
+```sh
+# from math/
+python3 build_patterns.py --full          # PREREQUISITE, ~18s, 168 MB
+bash solver/run-allwords-sweep.sh
+```
+
+**It needs the SQUARE pattern matrix.** `--answer-list guess.txt` makes the
+matrix 12972 x 12972, not 12972 x 2315, so `--patterns` must point at
+`patterns_full.npy`. That is a separate file — the default the normal, hard and
+answers-only sweeps read is left untouched. The shape check catches a mismatch.
+
+`MAXA` is 13000 rather than 2315 to allow this. Sizing it up cannot change an
+existing result: `LBTAB` is only read at `n <= NA` and the Zobrist values are
+drawn for `a < NA`, so the first `NA` of them are identical whatever `MAXA` is —
+which `validate.sh` reproducing all five totals confirms.
+
+### `--optimal-only`: prove the winner, bound everyone else
+
+Reports **the optimal opener only**, not a total per opener. A full sweep spends
+nearly all its time proving exact totals for openers that were never going to
+win; this proves the winner and merely bounds the rest.
+
+Each opener has a **root lower bound** — `NA` plus `LBTAB[d-1][|P|]` for every
+surviving partition `P` — computable in O(NA) with no search. The run screens all
+openers by it, sorts ASCENDING, and walks them against a running incumbent:
+
+1. **LB skip.** If an opener's LB exceeds the incumbent, skip it — and because
+   the order is ascending, that proves every opener after it is worse too.
+2. **Partition cutoff.** Within an opener, partitions are solved largest-first
+   and abandoned as soon as `(solved so far + LB of the rest)` exceeds the
+   incumbent.
+
+**TIES SURVIVE.** Both tests are `> incumbent`, never `>=`. An opener whose true
+total equals the incumbent always satisfies `partial + lbrest <= true total <=
+bound`, so it is never cut, and every opener attaining the optimum is reported.
+
+**The bound never enters `solve()`.** It applies only between the root's
+partitions. Subproblem values are memoised and must stay exact — see the
+exactness note at the top of `optturns.c` — so a beta inherited from a parent
+would store a bound where an exact value belongs and poison every later query.
+Cutting between root partitions changes nothing that is stored.
+
+Resume re-seeds the incumbent from the CSV's best total, so a restarted run
+prunes at full strength immediately instead of rediscovering the bound.
+
+### The TT salt covers BOTH lists
+
+`GSALT` is derived from the guess set AND the answer set, and is **zero only when
+both are the defaults** — which keeps existing hashes bit-identical and existing
+`tt.bin` snapshots valid. Both halves are load-bearing: a different guess set
+gives the same candidate set a different optimum, and a different ANSWER set is
+worse still, because the Zobrist values are indexed by ANSWER INDEX — index 7 is
+simply a different word, so every key silently means something else. Without the
+salt a foreign `tt.bin` returns confidently wrong values rather than missing.
+
+### The cap is part of the objective here too
+
+`--depth 6` over 12972 answers is a far stronger demand than over 2315, and
+normal mode's "any opener can follow SALET's tree" argument establishes
+feasibility for the **2315-answer** problem only — it says nothing about this
+one. If no opener solves all 12972 words within 6, the run says so explicitly
+rather than returning a number. Report any result as optimal **subject to a
+6-guess guarantee**.
+
+## `--topk K`: trade exactness for tractability
+
+At every branching point, rank the legal guesses by **sum of squared bin sizes**
+(ascending — the evenest split first) and search only the best `K`. `K = 0` is
+unlimited and is the exact solver.
+
+```sh
+# from math/
+bash solver/run-allwords-sweep.sh -k 50
+./solver/optturns --opener salet --depth 6 --topk 100
+```
+
+**THE ROOT IS A BRANCHING POINT TOO.** `--topk` applies at EVERY branching point
+including the first, so the sweep examines **K openers, not all 12972** — `-k 1`
+checks exactly one starting word. The opener list is in sum-of-squares order and
+is NOT re-sorted by lower bound: the selection rule and the visit order are the
+same thing here. So the winner is the best of the **K openers examined**, not the
+best of all NG, which is a weaker claim than the exact sweep makes and is exactly
+what lets a small K finish.
+
+(The exact path, `K = 0`, still ranks all NG openers by ascending root LB, where
+that ordering is what makes the "everything after this is worse" exit sound.)
+
+**THE RESULT IS AN UPPER BOUND, NOT AN OPTIMUM.** The search space is a strict
+subset, so what comes back is a real, achievable strategy that may not be the
+best one. It is weakly monotone in `K` — larger `K` can only match or improve the
+total — and `K = 0` recovers exactness. Report as **"best found within top-K
+branching"**, never as "the optimum".
+
+Measured end-to-end on the 2315-answer problem (exact answer: SALET 7920):
+
+| K | winner | total | avg | time |
+|---|---|---|---|---|
+| 1 | roate | 8204 | 3.54384 | 0.2s |
+| 5 | soare | 8016 | 3.46263 | 1s |
+| 20 | snare | 7981 | 3.44752 | 2s |
+| 100 | **salet** | **7920** | **3.42117** | 18s |
+
+K=100 recovers the true optimum in 18 seconds, against 5540 CPU-hours for the
+exhaustive sweep. It FINDS it; it does not PROVE it.
+
+Measured on SALET (2315 answers, depth 6; exact = 7920 in 16672 nodes):
+
+| K | total | nodes |
+|---|---|---|
+| 1 | 8124 | 303 |
+| 5 | 7962 | 480 |
+| 20 | 7927 | 850 |
+| 50 | 7927 | 1366 |
+| 100 | **7920** | 1945 |
+| 200 | 7920 | 4199 |
+
+K=100 FINDS the optimum at ~1/9 the nodes — but finding is not proving, and the
+value is still formally an upper bound.
+
+**`INFEASIBLE` is weaker here too**: it means "not solvable within the depth cap
+USING ONLY THESE K GUESSES PER NODE", which is not evidence about the problem.
+
+**Candidates are added when `n <= K`** — every word still in `S` joins the
+survivors, so the answer is always playable in a small state and a tight `K`
+degrades the total gracefully instead of manufacturing spurious infeasibility.
+
+**`K` is part of the TT salt.** Stored values under `--topk` are best-found-
+within-K, not exact optima, so a table from one `K` read by another (or by the
+exact solver) would return a confidently wrong value. Each `K` gets its own key
+space, and the wrapper gives each `K` its own CSV and `tt.bin`.
+
+### Depth is MEASURED, not assumed
+
+Under `--optimal-only` the first opener (lowest root LB) is solved at an
+ESCALATING cap starting from `--depth`; whatever cap it needed becomes the fixed
+depth for every remaining opener, with `--depth` as the floor. This replaces
+guessing whether 6 is satisfiable — under `--topk` an INFEASIBLE at a fixed 6
+would mostly be an artifact of the restricted branching — and keeps every opener
+under the SAME constraint, which a per-opener escalation would not.
+
+## Other word lengths (`--length`, `optturns<L>`)
+
+Wordle is 5 letters, but the same solver runs any length from 4 to 11 against the
+**hello wordl** lists (`build_wordlists.py`; provenance and results in
+`math/data/shared/LENGTHS.md`). These do NOT touch the Wordle problem: the
+top-level `words/{guess,mystery}.txt` and `patterns.npy` are untouched, and
+`validate.sh` still reproduces all five published totals.
+
+```sh
+# from math/
+python3 build_wordlists.py                    # once, all lengths
+python3 build_patterns.py --length 6          # per length -- SEPARATE matrix file
+cd solver && sh build.sh 6                    # per length -- SEPARATE binary
+bash solver/run-length-sweep.sh --length 6 --depth 5
+```
+
+**WORDLEN is compile-time, like HARD.** Every array bound derives from
+`NPAT = 3**WORDLEN` (243 at 5 letters, 177147 at 11); as a literal those fold into
+the addressing, as a runtime variable they would cost an indirection in the
+innermost partition loop. So `sh build.sh 7` emits `optturns7`, and `--length 7`
+merely asserts the binary matches and picks the right lists. `MAXG`/`MAXA` are
+sized from the actual lists by `build.sh`.
+
+Three things change with length beyond the array sizes:
+
+| | 5 letters | 11 letters |
+|---|---|---|
+| `pat_t` (one pattern code) | `uint8_t` | `uint32_t` — uint16 from 6 |
+| word buffer | `char[8]` | `char[16]` — from 8 |
+| pattern-indexed scratch | 972 B, on the stack | 692 KB, so on the HEAP |
+
+That last one is why `emit_tree`/`root_lb`/`solve_opener_bounded` call
+`pat_scratch()` instead of declaring arrays: three `int[NPAT]` inside a RECURSIVE
+function is fine at 243 and fatal at 177147. The dense `for (p = 0; p < NPAT; p++)`
+loops were deliberately left alone — that loop order fixes the ORDER OF LINES in an
+emitted tree, so sparsifying it would rewrite committed 5-letter trees.
+
+### The cap is PINNED, and it is the objective
+
+`run-length-sweep.sh` requires `--depth` and runs exactly that cap. A depth-4 pass
+and a depth-5 pass are two different quantities, not two attempts at one — a
+tighter cap can only raise the total. Each gets its own CSV for that reason:
+seeding a depth-4 run's incumbent from a depth-5 total would cut every candidate
+and report nothing found.
+
+Pinning is what keeps `depth == depth_floor`, which is what keeps the per-opener
+LB skip live. In normal mode `--depth-max` defaults to `--depth`, and the
+escalation probe is skipped entirely when they are equal — without that skip, an
+infeasible FIRST opener would abort the whole run at a pinned cap.
+
+### `--order ssq` vs `--order lb`
+
+Both examine every opener, so both are exact; only the visit order differs, and
+with it what a STOPPED run is worth.
+
+- `lb` — ascending root lower bound. Buys one extra thing: when an opener's bound
+  exceeds the incumbent, every opener AFTER it is worse too, so the tail is free.
+- `ssq` — ascending sum of squared bin sizes, the evenest splitters first. No tail
+  proof, but it front-loads the openers that can actually win.
+
+**Why `ssq` is the wrapper's default.** The tail proof is only worth having if the
+bound fires, and it does not: it is a counting bound running 8–14% under the true
+optimum, so nearly every opener bounds below the incumbent. Measured at length 6:
+**0 skips in 3596 openers.**
+
+Worse, in the regime that matters the bound is not even a proxy for split quality.
+With `d-1` guesses left and every bucket at or under `1 + BRANCH`, each bucket
+costs `2n - 1`, the `Σ n` term is a constant, and the whole bound collapses to
+
+    root LB  ==  3*NA  -  2*(opener is itself an answer)  -  (number of bins)
+
+— exact for every opener in that regime, and all of the LB top-200 are in it. So
+ascending-LB order is **descending BIN COUNT**, blind to how the mass is spread.
+At length 6 `satire` (405 bins, biggest bucket 210) outranks `salter` (395 bins,
+biggest bucket 151) despite splitting far less evenly. Sum of squares measures
+exactly what the bound discards.
+
+### Stopping early
+
+Ctrl-C is safe and expected: the CSV is flushed per improvement, so every opener
+that ever held the lead is on disk, and re-running resumes from it. What a stopped
+run does NOT give you is a proof — the leader is "best of those examined, in a
+heuristic order". Record it that way; `LENGTHS.md` marks such rows PROVISIONAL.
+
+**`--optimal-only` does not emit trees.** `write_tree` is called only from the
+single-opener and plain `--sweep` paths, so `--trees` under `--optimal-only`
+creates an empty directory. Getting the winner's tree currently means a follow-up
+`--opener <winner> --trees <dir>` run at the same depth.
+
 ## Output format
 
 Each tree line is a complete replay of one game:

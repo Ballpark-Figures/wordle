@@ -14,8 +14,15 @@ media/
 *.wav
 *.mp3
 
-# DaVinci Resolve project backups (a .drp is never uploaded — deliverable is the .mov)
+# DaVinci Resolve local artifacts (per-project, machine-local — never commit).
+# .gallery / CacheClip are pointed here by the project's colorGalleryStillsLocation /
+# perfCacheClipsLocation settings; a .drp is an editable project backup, never uploaded.
+.gallery/
+CacheClip/
 *.drp
+Resolve Project Backups/
+# `render NN --stills` staging dir (anim copies + still PNGs + .swap versions).
+edit_clips/
 
 # Manim snapshot cache (build artifact, 50+ MB pickles). Scoped to the
 # animations tree.
@@ -25,6 +32,10 @@ animations/**/cache/
 # so a committed binary would not be portable between machines anyway).
 math/solver/optturns
 math/solver/hardturns
+# one binary per word length (sh build.sh 7 -> optturns7); same reasoning
+math/solver/optturns[0-9]
+math/solver/optturns[0-9][0-9]
+math/solver/pairsplit
 
 # Machine-local solver working data: resume checkpoints / memo pickles
 # (regenerable, can be GBs). Committed results live in math/data/shared/.

@@ -1,0 +1,10 @@
+word1,word2,word3,total,expected,seconds
+bland,copse,right,9177,3.96415,0.0
+copse,bland,right,9176,3.96371,0.0
+copse,right,bland,9149,3.95205,0.0
+dance,short,blimp,9058,3.91274,0.0
+short,dance,blimp,9053,3.91058,0.0
+spire,match,blond,9051,3.90972,0.0
+chant,spire,godly,9050,3.90929,0.0
+crane,spilt,dough,9038,3.90410,0.0
+spilt,crane,dough,9028,3.89978,0.0

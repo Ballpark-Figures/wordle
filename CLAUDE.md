@@ -59,9 +59,17 @@ loading" for the measurements and the full cross-machine history.
     spot check. Cheapest sound route discussed: a "certificate" run at `--depth 7` seeded
     with each opener's known `T6` as the incumbent, asking only "does anything beat this?"
     — a decision problem, so far cheaper than a cold re-solve. Unbuilt and unmeasured.
-  - **`#define MAXD 7`** (`optturns.c`) sizes the per-depth arrays, so `--depth` cannot
-    exceed 7 without raising it and rebuilding. Depth 7 may not be enough to be
-    non-binding; a truly unconstrained run is `depth = n`, which the sizing can't express.
+  - **`#define MAXD`** (`optturns.c`) sizes the per-depth arrays and bounds `--depth`.
+    **It is 20, not 7** — raised when hard mode began escalating its cap per opener
+    (this bullet said 7 until 2026-08-25; do not re-derive the old limit from memory).
+    So depth is NOT the binding constraint it once was: 7, 8 or more needs no rebuild.
+    A truly unconstrained run is still `depth = n`, which the sizing can't express, so
+    a cap remains part of the objective — but choosing a higher one is now free.
+  - **`#define MAXA` is 13000, not 2315** — the ANSWER set is no longer always the
+    2315 mystery words (`--answer-list` can make every legal guess an answer). Sizing
+    it up cannot change an existing result: `LBTAB` is read only at `n <= NA` and the
+    Zobrist values are drawn for `a < NA`, so the first `NA` are identical whatever
+    `MAXA` is — confirmed by `validate.sh` still reproducing all five totals.
   - **In HARD mode the cap BINDS HARD** — `INFEASIBLE` rows are common (3 of the first 15
     openers), so those openers yield no number at all. Carrying `--depth 6` into hard mode
     was an unflagged modelling decision; if the goal is expected guesses, the cap needs
@@ -69,6 +77,20 @@ loading" for the measurements and the full cross-machine history.
 - `math/solver/` is the C solver computing the exact minimum expected turns for
   every one of the 12972 openers, plus each one's optimal tree. **Read
   `math/solver/README.md` first** — build, flags, output format, gotchas.
+- **On a FRESH CLONE the solver needs TWO bootstrap steps before it runs at all, and
+  BOTH fail confusingly (2026-08-25).** Neither is done by `/sync-videos`, and a clone
+  looks complete without them because the committed results are all in `shared/`:
+  1. **`python3 build_patterns.py` (from `math/`)** — regenerates
+     `math/data/local/patterns/patterns.npy` (30 MB, ~2s). It lives under `local/`, so
+     it is gitignored BY DESIGN and never arrives with a clone. Without it every solver
+     invocation dies instantly with `cannot open data/local/patterns/patterns.npy` — and
+     because `validate.sh` sends stderr to `/dev/null`, that surfaces as five silent
+     `FAIL <word> = <none>` lines in under a second. **A validate.sh run that finishes
+     in well under a second did not solve anything** — check for the missing patterns
+     file before suspecting the solver.
+  2. **`brew install libomp` on a Mac** — see the Brewfile / private notes. `build.sh`
+     probes for OpenMP support and wires libomp's keg-only paths itself, so once it is
+     installed the same script works unchanged on both machines.
 - The objective is an INTEGER (total guesses over all 2315 answers), so results
   are exact, not float-compared. Validate any solver change with
   `bash solver/validate.sh` from `math/`: SALET 7920, REAST 7923, TRACE/CRATE
@@ -225,6 +247,123 @@ Why this works and what to know:
   holdout can run for days.)
 - **Each event costs a full summary**, so only arm this when asked, and note that
   N words remaining means up to N more reports. `TaskStop` ends the watch.
+
+## Other word lengths (4-11) — a DIFFERENT problem, not an extension
+- **The word lists are `hello wordl`'s, not the NYT's, and the two are NOT
+  comparable.** `math/data/shared/words/hello/len<L>/{guess,mystery}.txt`, built by
+  `math/build_wordlists.py` from [lynn/hello](https://github.com/lynn/hello) (MIT,
+  pinned SHA). The top-level `words/{guess,mystery}.txt` (12972/2315) are untouched.
+  hello's ANSWER list is a much looser curation — at 5 letters it is 3238 words, of
+  which only 2077 are among the NYT 2315 — so **`load_words("mystery", 5)` is NOT the
+  2315**. Inherited quirk worth knowing: hello's dictionary is North-American Scrabble
+  (TWL/NWL) at every length EXCEPT 5, where it is Wordle's Collins-derived 12972.
+- **Results live in `math/data/shared/LENGTHS.md`** with a PROVISIONAL/COMPLETE column.
+  7-11 are complete and exact; 6 is provisional; 4 is unrun. **Never quote a PROVISIONAL
+  row as an optimum** — it is "best of the first N openers examined, in a heuristic
+  order". Say "probably the result".
+- **One binary per length: `sh build.sh 7` emits `optturns7`.** `WORDLEN` is
+  compile-time (like `HARD`) because every array bound derives from `NPAT = 3**WORDLEN`
+  — 243 at 5 letters, 177147 at 11. `--length L` does not set the length; it asserts the
+  binary matches and selects that length's lists + matrix. `sh build.sh` with no args
+  still builds the 5-letter `optturns`/`hardturns` exactly as before.
+- Per length you need THREE things, and each is a separate file: the word lists
+  (`build_wordlists.py`), the matrix (`build_patterns.py --length L` -> `patterns_len<L>.npy`),
+  and the binary. **The matrix dtype is NOT always uint8** — `3**L` outgrows it at L=6
+  and uint16 at L=11 — and the solver rejects a mismatch rather than misreading it.
+- **Run it with `bash solver/run-length-sweep.sh --length L --depth D` (from `math/`),
+  attached, same tee'd-log rules as the other sweeps.** `--depth` is REQUIRED: the cap
+  is pinned and IS the objective, so a depth-4 pass and a depth-5 pass are different
+  quantities and get separate CSVs. Seeding one from the other's incumbent would cut
+  every candidate and report nothing found.
+- **`--order ssq` (the wrapper default) vs `--order lb`.** Both exact; only the visit
+  order differs. `lb` alone makes an LB skip prove the whole TAIL is worse — but the
+  bound never fires here (0 skips in 3596 openers at length 6), because in the regime
+  that matters it collapses to `3*NA - 2*(opener is an answer) - (number of bins)` and
+  is therefore blind to bin SIZES. `ssq` sorts by the evenness the bound discards, which
+  is what matters when the run will be stopped early. Measured, not assumed.
+- **`--optimal-only` emits NO TREES.** `write_tree` is only called from the
+  single-opener and plain `--sweep` paths, so `--trees` here silently creates an empty
+  directory. The winner's tree needs a follow-up `--opener <winner> --trees <dir>` run
+  at the same depth. (Open gap as of 2026-08-27.)
+- **`tt.bin` is 8.6 GB per length at `--tt-bits 28`, and is saved only on NORMAL
+  completion** — a Ctrl-C loses it. The CSV is flushed per improvement and always
+  survives.
+- **`python3 tools/checkpatterns.py`** verifies the length-general pattern primitives,
+  including a bit-identical regression of L=5 against the committed `patterns.npy`. Run
+  it alongside `solver/validate.sh` after any change to `wordle.py`/`build_patterns.py`.
+  `tools/orderdiag.py` compares the two visit orderings and asks what a part-finished
+  run has not reached yet.
+
+## Feedback patterns: 243 encodings, but only 238 are POSSIBLE
+- **`3^5 = 243` is the ENCODING space; only 238 patterns can ever occur.** The five
+  impossible ones are **4 greens + 1 yellow** (one per position of the yellow): if four
+  positions are green, the fifth letter is either in that position — green — or not in
+  the word at all — grey. Yellow cannot happen there. `243 - 5 = 238`.
+- `NPAT 243` and `ALL_GREEN 242` are both CORRECT and should not be "fixed": they are
+  the base-3 encoding (`ggggg` = 242) and its array size. The 5 unreachable codes are
+  just slots that never fill.
+- **Where it matters is the LOWER BOUND, and 237 is not the right number either.**
+  `build_lb` used `cap *= 242`. 237 (238 attainable minus the win) is the theoretical
+  ceiling, but **no real guess comes close**: MEASURED, the widest splitter manages
+  **149** non-winning bins against the 2315 mystery answers and **211** against all
+  12972 words (means 86 and 133). Over-stating branching under-states the bound, so 242
+  was VALID, merely slack; the measured max is the tightest sound value.
+- **`BRANCH` is now MEASURED at startup** (`measure_branching()`), not hardcoded — the
+  right constant depends on the ANSWER SET, so any literal is wrong for one of them.
+  Sound for sub-states too: for `S` within `A`, a guess's patterns on `S` are a subset
+  of its patterns on `A`, so `bins(g,S) <= bins(g,A) <= BRANCH`.
+- **MEASURED EFFECT, so nobody re-litigates it (2026-08-26):**
+  - root LB (n=2315, d=6): 6701 to **6794**. True optimum 7920, so still ~14% loose.
+  - ordinary solving: **NO effect at all** — validate.sh node counts bit-identical
+    (salet 16672 before and after). Reason: `LBTAB[d][n] = 2n-1` for every `n <= BRANCH+1`,
+    so the table only changes above n=150, and the search lives in deep states far
+    smaller than that. Every hot-path lookup returns what it always did.
+  - `--optimal-only`: **~17% faster** (1.8 to 2.1 openers/min; ETA 122.9h to 100.8h at
+    6 threads). Real, because the root cutoff sums LBTAB over ROOT partition sizes,
+    which are exactly the large bins that changed.
+  - **It does NOT make the all-words sweep tractable.** For n=12972 the gain is
+    38672 to 38703 (+31, 0.08%), because 211 is close to 242.
+- **Why the ceiling is low:** the counting bound collapses to `LB = 1 + 2B + 3(n-1-B)`
+  = `6943 - B` at n=2315, d=6 — `B^2` already exceeds `n` by level 3, so the branching
+  constant only ever moves the DEPTH-2 term. Tightening `B` cannot attack the
+  `3(n-1-B)` term that dominates; only a bound that constrains depth-3 capacity can.
+
+## Answers-only + all-words sweeps (same solver, different word sets)
+Two more variants of the SAME objective, both driven by flags on `optturns`
+rather than new binaries. **`math/solver/README.md` has the full detail.**
+- **Answers-only** — every guess (opener and follow-ups) must itself be one of the
+  2315 answers: `bash solver/run-ans-sweep.sh`. `--guess-list mystery.txt` shrinks
+  `NG`, and since every guess loop AND `--sweep` enumerate `0..NG-1`, that restricts
+  the follow-ups and the swept openers in one move — no hot-loop change. Data in
+  `math/data/{shared,local}/ansturns/`.
+- **All-words** — every one of the 12972 legal words is BOTH answer and guess:
+  `bash solver/run-allwords-sweep.sh`. Needs `python3 build_patterns.py --full`
+  first (the SQUARE 12972x12972 matrix, ~18s/168 MB, a SEPARATE file — the default
+  12972x2315 one is what the other three sweeps read). Data in
+  `math/data/{shared,local}/allwords/`.
+- **`--optimal-only` reports THE optimal opener, not a total per opener** (that is
+  what makes all-words tractable). Openers are screened by a root lower bound —
+  O(NA), no search — sorted ASCENDING, then walked against a running incumbent;
+  an opener whose LB exceeds the incumbent is skipped, and because the order is
+  ascending that proves the whole tail is worse. **Ties are kept** (every cut tests
+  `> incumbent`, never `>=`). The bound NEVER enters `solve()` — those values are
+  memoised and must stay exact.
+- **THE CAP BINDS IN BOTH, AND IS PART OF THE OBJECTIVE.** Normal mode's
+  "any opener can follow SALET's tree" argument is unavailable in answers-only
+  (**SALET and REAST are not answer words**) and says nothing about the 12972-answer
+  problem. `INFEASIBLE` is an expected result in both; report their numbers as
+  optima **subject to a 6-guess guarantee**, never as minimum expected guesses.
+- **The TT salt covers the guess set AND the answer set**, and is zero only when both
+  are the defaults (so existing `tt.bin` stays valid). The answer half matters most:
+  Zobrist values are indexed by ANSWER INDEX, so a different answer list makes every
+  key silently mean something else — a foreign snapshot would return confidently
+  wrong values rather than missing.
+- **`WORDLE_SOLVER=ansturns`** reads the answers-only results. It is the one name
+  that is NOT a binary (the process is still `optturns`), so the `tt*` tools, which
+  attach by process name, cannot find it.
+- **On macOS `sh build.sh` does NOT fail with `Text file busy` while a sweep runs**
+  (the README describes Linux behaviour). The linker unlinks and recreates, so the
+  live process keeps its old inode and is unaffected — but the safety net is absent.
 
 ## Gameplay layout
 - (Describe this video's on-screen layout and the assets in `animations/assets/`.)
