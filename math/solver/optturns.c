@@ -1212,6 +1212,132 @@ done:
     return rc;
 }
 
+/* Cost of committing to the BLIND triple (g1, g2, g3), the direct generalisation
+ * of solve_pair_bounded.  Each word is fixed in advance; none is chosen from the
+ * previous one's feedback.
+ *
+ * The accounting has one more early-win term than the pair case, and the same
+ * trap: an answer that wins at guess 1 never plays g2 OR g3, and one that wins at
+ * guess 2 never plays g3, so charging every answer 3 for the opening overstates
+ * the total by up to 3.
+ *
+ *   total = NA                            guess 1, everyone
+ *         + (NA - won1)                   guess 2, everyone still playing
+ *         + (NA - won1 - won2)            guess 3, everyone still playing
+ *         + sum solve(bucket, depth - 3)  over buckets still unresolved
+ *
+ * --pair-adaptive N applies at BOTH branch points, which is what makes it the
+ * same rule rather than a new one: if g1 alone leaves N or fewer answers, drop
+ * g2 AND g3 and solve with depth-1 left; else if g1+g2 leave N or fewer, drop g3
+ * and solve with depth-2 left; else play all three. */
+static int solve_triple_bounded(int g1, int g2, int g3, int depth, Ctx *ctx, int bound) {
+    const pat_t *r1 = PAT + (size_t)g1 * NA;
+    const pat_t *r2 = PAT + (size_t)g2 * NA;
+    const pat_t *r3 = PAT + (size_t)g3 * NA;
+
+    int *c1 = calloc(NPAT, sizeof(int)), *k1 = malloc(sizeof(int) * NPAT);
+    int *o1 = calloc(NPAT, sizeof(int)), *s1 = malloc(sizeof(int) * (NPAT + 1));
+    int *f1 = malloc(sizeof(int) * (NPAT + 1));
+    int *c2 = calloc(NPAT, sizeof(int)), *k2 = malloc(sizeof(int) * NPAT);
+    int *o2 = calloc(NPAT, sizeof(int)), *f2 = malloc(sizeof(int) * (NPAT + 1));
+    int *c3 = calloc(NPAT, sizeof(int)), *k3 = malloc(sizeof(int) * NPAT);
+    int *o3 = calloc(NPAT, sizeof(int)), *f3 = malloc(sizeof(int) * (NPAT + 1));
+    uint16_t *ord = malloc(sizeof(uint16_t) * NA);
+    uint16_t *mid = malloc(sizeof(uint16_t) * NA);
+    uint16_t *buf = malloc(sizeof(uint16_t) * NA);
+    SubJob   *job = malloc(sizeof(SubJob) * (NA + 1));
+    if (!c1 || !buf || !job) { fprintf(stderr, "out of memory in solve_triple_bounded\n"); exit(1); }
+
+    int n1k = 0;
+    for (int a = 0; a < NA; a++) if (c1[r1[a]]++ == 0) k1[n1k++] = r1[a];
+    int acc = 0;
+    for (int i = 0; i < n1k; i++) { s1[i] = acc; f1[i] = acc; acc += c1[k1[i]]; o1[k1[i]] = i; }
+    for (int a = 0; a < NA; a++) ord[f1[o1[r1[a]]]++] = (uint16_t)a;
+
+    int total = NA;                       /* guess 1, everyone */
+    int njob = 0, bufn = 0, midn = 0, rc;
+
+    for (int i = 0; i < n1k; i++) {
+        int p1 = k1[i], st = s1[i], n1 = c1[p1];
+        if (p1 == ALL_GREEN) continue;                       /* won at guess 1 */
+        if (PAIR_ADAPT > 0 && n1 <= PAIR_ADAPT) {            /* drop g2 and g3 */
+            memcpy(buf + bufn, ord + st, sizeof(uint16_t) * n1);
+            job[njob].start = bufn; job[njob].len = n1; job[njob].d = depth - 1;
+            njob++; bufn += n1;
+            continue;
+        }
+        total += n1;                                         /* guess 2 here */
+
+        /* split this g1-bucket by g2, into mid[] */
+        int n2k = 0;
+        for (int t = st; t < st + n1; t++)
+            if (c2[r2[ord[t]]]++ == 0) k2[n2k++] = r2[ord[t]];
+        int off = midn;
+        for (int j = 0; j < n2k; j++) { o2[k2[j]] = j; f2[j] = off; off += c2[k2[j]]; }
+        for (int t = st; t < st + n1; t++) mid[f2[o2[r2[ord[t]]]]++] = ord[t];
+
+        int base = midn;
+        for (int j = 0; j < n2k; j++) {
+            int p2 = k2[j], n2 = c2[p2], mst = base;
+            base += n2;
+            c2[p2] = 0;
+            if (p2 == ALL_GREEN) continue;                   /* won at guess 2 */
+            if (PAIR_ADAPT > 0 && n2 <= PAIR_ADAPT) {        /* drop g3 */
+                memcpy(buf + bufn, mid + mst, sizeof(uint16_t) * n2);
+                job[njob].start = bufn; job[njob].len = n2; job[njob].d = depth - 2;
+                njob++; bufn += n2;
+                continue;
+            }
+            total += n2;                                     /* guess 3 here */
+
+            int n3k = 0;
+            for (int t = mst; t < mst + n2; t++)
+                if (c3[r3[mid[t]]]++ == 0) k3[n3k++] = r3[mid[t]];
+            int off3 = bufn;
+            for (int j3 = 0; j3 < n3k; j3++) { o3[k3[j3]] = j3; f3[j3] = off3; off3 += c3[k3[j3]]; }
+            for (int t = mst; t < mst + n2; t++) buf[f3[o3[r3[mid[t]]]]++] = mid[t];
+
+            int b3 = bufn;
+            for (int j3 = 0; j3 < n3k; j3++) {
+                int n3 = c3[k3[j3]];
+                if (k3[j3] != ALL_GREEN) {                   /* else won at guess 3 */
+                    job[njob].start = b3; job[njob].len = n3; job[njob].d = depth - 3;
+                    njob++;
+                }
+                b3 += n3;
+                c3[k3[j3]] = 0;
+            }
+            bufn = off3;
+        }
+        midn = off;
+    }
+
+    qsort(job, njob, sizeof(SubJob), cmp_subjob);
+
+    int lbrest = 0;
+    for (int i = 0; i < njob; i++) {
+        int v = LBTAB[job[i].d][job[i].len];
+        if (v >= INF) { rc = INF; goto done; }
+        lbrest += v;
+    }
+    if (total + lbrest > bound) { rc = CUTOFF; goto done; }
+    for (int i = 0; i < njob; i++) {
+        lbrest -= LBTAB[job[i].d][job[i].len];
+        int v = solve(buf + job[i].start, job[i].len, job[i].d, &CONS_NONE, ctx);
+        if (v >= INF) { rc = INF; goto done; }
+        total += v;
+        if (total + lbrest > bound) { rc = CUTOFF; goto done; }
+    }
+    rc = total;
+
+done:
+    free(c1); free(k1); free(o1); free(s1); free(f1);
+    free(c2); free(k2); free(o2); free(f2);
+    free(c3); free(k3); free(o3); free(f3);
+    free(ord); free(mid); free(buf); free(job);
+    return rc;
+}
+
 static int write_tree(const char *dir, int g, int depth, Ctx *ctx) {
     char cmd[1200];
     snprintf(cmd, sizeof cmd, "gzip -1 > '%s/%s.txt.gz'", dir, GWORD[g]);
@@ -1277,7 +1403,7 @@ int main(int argc, char **argv) {
     const char *ttload = NULL, *ttsave = NULL, *guesslist = NULL;
     const char *answerlist = NULL, *patpath = NULL;
     int optonly = 0, uselength = 0;
-    const char *pairlist = NULL;
+    const char *pairlist = NULL, *triplelist = NULL;
     int depth = 6, ttbits = 28, threads = 0, sweep = 0, depthmax = -1;
 
     for (int i = 1; i < argc; i++) {
@@ -1298,6 +1424,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--answer-list") && i + 1 < argc) answerlist = argv[++i];
         else if (!strcmp(argv[i], "--patterns") && i + 1 < argc) patpath = argv[++i];
         else if (!strcmp(argv[i], "--pair-list") && i + 1 < argc) pairlist = argv[++i];
+        else if (!strcmp(argv[i], "--triple-list") && i + 1 < argc) triplelist = argv[++i];
         else if (!strcmp(argv[i], "--pair-adaptive") && i + 1 < argc) PAIR_ADAPT = atoi(argv[++i]);
         /* kept as the N=1 alias so runs already launched with it keep working */
         else if (!strcmp(argv[i], "--pair-early-finish")) PAIR_ADAPT = 1;
@@ -1509,6 +1636,173 @@ int main(int argc, char **argv) {
     }
 
     /* ------------------------------------------------- --optimal-only sweep */
+    /* -------------------------------------------- TRIPLE-OPENER EVALUATION
+     *
+     * Same shape as the pair walk, with one difference that matters: each listed
+     * triple expands to SIX ordered candidates, not two.  The screen scores
+     * unordered sets -- a triple's joint partition cannot depend on play order --
+     * but the COST can, so every permutation is a distinct candidate and all six
+     * are evaluated.  Evaluating one ordering per triple would leave five of six
+     * untried, a far bigger error than the pair case's one of two. */
+    if (triplelist) {
+        if (HARD) {
+            fprintf(stderr, "--triple-list is normal-mode only\n");
+            return 1;
+        }
+        if (depth < 4) {
+            fprintf(stderr, "--triple-list needs --depth 4 or more (three openers "
+                    "plus at least one guess)\n");
+            return 1;
+        }
+        FILE *tf = fopen(triplelist, "r");
+        if (!tf) { fprintf(stderr, "cannot open %s\n", triplelist); return 1; }
+        int cap = 1024, nt = 0;
+        int *t1 = malloc(sizeof(int) * cap), *t2 = malloc(sizeof(int) * cap),
+            *t3 = malloc(sizeof(int) * cap);
+        char line[512];
+        while (fgets(line, sizeof line, tf)) {
+            char w1[64], w2[64], w3[64];
+            if (sscanf(line, "%63[^,],%63[^,],%63[^,],", w1, w2, w3) != 3) continue;
+            int a = find_word(GWORD, NG, w1), b = find_word(GWORD, NG, w2),
+                c = find_word(GWORD, NG, w3);
+            if (a < 0 || b < 0 || c < 0) continue;      /* header, or restricted out */
+            if (nt == cap) {
+                cap *= 2;
+                t1 = realloc(t1, sizeof(int) * cap);
+                t2 = realloc(t2, sizeof(int) * cap);
+                t3 = realloc(t3, sizeof(int) * cap);
+            }
+            t1[nt] = a; t2[nt] = b; t3[nt] = c; nt++;
+        }
+        fclose(tf);
+        if (!nt) { fprintf(stderr, "no usable triples in %s\n", triplelist); return 1; }
+
+        static const int PERM[6][3] = {{0,1,2},{0,2,1},{1,0,2},{1,2,0},{2,0,1},{2,1,0}};
+        int ncand = 6 * nt;
+        int *cA = malloc(sizeof(int) * ncand), *cB = malloc(sizeof(int) * ncand),
+            *cC = malloc(sizeof(int) * ncand);
+        for (int i = 0; i < nt; i++) {
+            int w[3] = { t1[i], t2[i], t3[i] };
+            for (int q = 0; q < 6; q++) {
+                cA[6*i+q] = w[PERM[q][0]];
+                cB[6*i+q] = w[PERM[q][1]];
+                cC[6*i+q] = w[PERM[q][2]];
+            }
+        }
+        fprintf(stderr, "triple list: %d triples from %s -> %d ordered candidates "
+                "(adaptive %d)\n", nt, triplelist, ncand, PAIR_ADAPT);
+
+        int incumbent = INF, nbest = 0;
+        int *bA = malloc(sizeof(int) * ncand), *bB = malloc(sizeof(int) * ncand),
+            *bC = malloc(sizeof(int) * ncand);
+        char *done = calloc(ncand, 1);
+        int ndone = 0;
+        FILE *rf = outpath ? fopen(outpath, "r") : NULL;
+        if (rf) {
+            while (fgets(line, sizeof line, rf)) {
+                char w1[64], w2[64], w3[64]; int tv;
+                if (sscanf(line, "%63[^,],%63[^,],%63[^,],%d", w1, w2, w3, &tv) != 4) continue;
+                int a = find_word(GWORD, NG, w1), b = find_word(GWORD, NG, w2),
+                    c = find_word(GWORD, NG, w3);
+                if (a < 0 || b < 0 || c < 0) continue;
+                for (int i = 0; i < ncand; i++)
+                    if (!done[i] && cA[i] == a && cB[i] == b && cC[i] == c)
+                        { done[i] = 1; ndone++; break; }
+                if (tv > 0 && tv < incumbent) incumbent = tv;
+            }
+            fclose(rf);
+            if (ndone) fprintf(stderr, "resume: %d evaluated, incumbent %d\n", ndone, incumbent);
+        }
+        FILE *out = outpath ? fopen(outpath, "a") : NULL;
+        if (outpath && !out) { fprintf(stderr, "cannot append to %s\n", outpath); return 1; }
+        if (out && ndone == 0) fprintf(out, "word1,word2,word3,total,expected,seconds\n");
+
+        int searched = 0, cut = 0, infeas = 0;
+        double t0 = now_s(), last_report = t0;
+        printf("triple-list: %d ordered candidates from %d triples, depth %d, "
+               "adaptive %d\n", ncand, nt, depth, PAIR_ADAPT);
+        fflush(stdout);
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+        {
+            Ctx *ctx = calloc(1, sizeof(Ctx));
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic, 1)
+#endif
+            for (int i = 0; i < ncand; i++) {
+                if (done[i]) continue;
+                int inc;
+#ifdef _OPENMP
+#pragma omp atomic read
+#endif
+                inc = incumbent;
+                double s0 = now_s();
+                int total = solve_triple_bounded(cA[i], cB[i], cC[i], depth, ctx, inc);
+                double dt = now_s() - s0;
+#ifdef _OPENMP
+#pragma omp critical
+#endif
+                {
+                    if (total >= INF)         infeas++;
+                    else if (total == CUTOFF) cut++;
+                    else {
+                        searched++;
+                        int better = total < incumbent, tied = total == incumbent;
+                        if (better) { incumbent = total; nbest = 0; }
+                        if (better || tied) {
+                            bA[nbest] = cA[i]; bB[nbest] = cB[i]; bC[nbest] = cC[i];
+                            nbest++;
+                            printf("[%7.0fs] %s %s %s  total=%5d  avg=%.5f  %s  %7.1fs\n",
+                                   now_s() - t0, GWORD[cA[i]], GWORD[cB[i]], GWORD[cC[i]],
+                                   total, (double)total / NA, better ? "NEW BEST" : "TIED    ", dt);
+                            if (out) {
+                                fprintf(out, "%s,%s,%s,%d,%.5f,%.1f\n", GWORD[cA[i]],
+                                        GWORD[cB[i]], GWORD[cC[i]], total,
+                                        (double)total / NA, dt);
+                                fflush(out);
+                            }
+                        }
+                    }
+                    int seen = searched + cut + infeas;
+                    if (now_s() - last_report > 30.0) {
+                        last_report = now_s();
+                        double el = now_s() - t0;
+                        printf("[%7.0fs] %6d/%d done (%d searched, %d cut, %d infeas)  "
+                               "best=%d (avg %.5f)  eta %5.1fh\n",
+                               el, seen, ncand, searched, cut, infeas, incumbent,
+                               incumbent < INF ? (double)incumbent / NA : 0.0,
+                               (el / (seen > 0 ? seen : 1)) * (ncand - seen) / 3600.0);
+                    }
+                    fflush(stdout);
+                }
+            }
+            free(ctx);
+        }
+
+        double el = now_s() - t0;
+        printf("\n=== BEST TRIPLE (of %d screened, all 6 orders, depth %d, adaptive %d) ===\n",
+               nt, depth, PAIR_ADAPT);
+        if (incumbent >= INF) {
+            printf("NO TRIPLE in the list solves every answer within %d guesses.\n", depth);
+        } else {
+            printf("total=%d  expected=%.5f  over %d answers\n",
+                   incumbent, (double)incumbent / NA, NA);
+            printf("%d ordering%s attain it:", nbest, nbest == 1 ? "" : "s");
+            for (int i = 0; i < nbest; i++)
+                printf(" %s+%s+%s", GWORD[bA[i]], GWORD[bB[i]], GWORD[bC[i]]);
+            printf("\n");
+        }
+        printf("searched %d, cut %d, infeasible %d, of %d ordered candidates in %.0fs\n",
+               searched, cut, infeas, ncand, el);
+        printf("NOTE: best of the %d triples SCREENED, by a GREEDY screen that can only "
+               "reach a triple one of whose word PAIRS ranked highly. Not the optimal triple.\n", nt);
+        if (out) fclose(out);
+        if (ttsave) tt_save(ttsave);
+        return 0;
+    }
+
     /* ---------------------------------------------- PAIR-OPENER EVALUATION
      *
      * Walk a list of candidate PAIRS -- produced by ./pairsplit, in ascending
