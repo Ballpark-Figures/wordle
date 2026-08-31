@@ -6,7 +6,8 @@
 #     bash solver/run-singles.sh words            # just the single-word ranking
 #     bash solver/run-singles.sh pairs            # just the pair ranking
 #     bash solver/run-singles.sh triples          # extend the top pairs to triples
-#     bash solver/run-singles.sh quads            # extend the top triples by a 4th word
+#     bash solver/run-singles.sh quads --disjoint-triples   # disjoint parents, ANY 4th word
+#     bash solver/run-singles.sh quads --disjoint            # 20 distinct letters, all four
 #     bash solver/run-singles.sh all              # all three stages
 #     bash solver/run-singles.sh pairs --top 250000
 #     bash solver/run-singles.sh triples --pairs-top 20000
@@ -60,8 +61,17 @@
 # every count is still over the same 2315 words.  There are only
 # C(2315, 2) = 2,678,455 answer pairs, 31x fewer than the unrestricted 84M.
 #
-# --disjoint KEEPS ONLY OPENERS WHOSE WORDS SHARE NO LETTER and repeat none: 10
-# distinct letters for a pair, 15 for a triple.  Of the 12972 guesses, 8322 have
+# --disjoint MEANS THE SAME THING AT EVERY SIZE: no word of the opener shares a
+# letter with another, and none repeats one.  That is 10 distinct letters for a
+# pair, 15 for a triple, 20 for a quad.
+#
+# --disjoint-triples is the quads-only variant: take the DISJOINT triple ranking
+# as parents but leave the 4th word unrestricted.  It exists because the two are
+# very different searches -- see the note on quads below -- and because a single
+# flag meaning "disjoint parents" in one stage and "disjoint everything" in
+# another is the kind of overload that gets misread later.
+#
+# The original --disjoint description, still accurate for pairs and triples:  Of the 12972 guesses, 8322 have
 # 5 distinct letters, and they form 5,020,842 disjoint pairs -- 6% of the 84M --
 # and roughly 139 million disjoint triples against 3.6e11 unrestricted.  THAT
 # 2600x cut is what makes an exhaustive triple sweep possible over the full guess
@@ -116,7 +126,8 @@ TRIPSTOP=100000     # triples fed to the quad stage
 TRIPFROM=""         # which triple ranking to extend; default is the widest on disk
 THREADS=0           # 0 = let OpenMP pick, which is right on both machines
 ANSWERS=0           # --answers: only the 2315 answer words may open
-DISJOINT=0          # --disjoint: 10 distinct letters per pair, 15 per triple
+DISJOINT=0          # --disjoint: every word of the opener shares no letter
+DISJTRI=0           # --disjoint-triples: disjoint PARENTS only, 4th word free
 EXHAUSTIVE=0        # --exhaustive: feed EVERY pair to the triple stage
 
 while [ $# -gt 0 ]; do
@@ -129,6 +140,7 @@ while [ $# -gt 0 ]; do
         --threads)    THREADS="$2";  shift 2 ;;
         --answers)    ANSWERS=1;     shift ;;
         --disjoint)   DISJOINT=1;    shift ;;
+        --disjoint-triples) DISJTRI=1; shift ;;
         --exhaustive) EXHAUSTIVE=1;  shift ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
     esac
@@ -171,6 +183,12 @@ if [ "$EXHAUSTIVE" = 1 ]; then
     PAIRKEEP="$BIGTOP"
     PAIRSTOP="$BIGTOP"
     PAIROUT="$LOC/pair_singletons${SUF}_all.csv"
+fi
+
+if [ "$DISJTRI" = 1 ] && [ "$STAGE" != quads ] && [ "$STAGE" != all ]; then
+    echo "--disjoint-triples only applies to the quads stage; use --disjoint" >&2
+    echo "to restrict the pair or triple stages themselves." >&2
+    exit 1
 fi
 
 cd "$MATH" || exit 1
@@ -289,18 +307,24 @@ if [ "$STAGE" = quads ] || [ "$STAGE" = all ]; then
     # WHICH triple ranking to build on is a real choice, not a default to bury:
     # an exhaustive parent gives a quad screen with a proven base, a narrow one
     # does not.  Absent --triples-from, prefer the exhaustive file and say so.
+    QSUF="$SUF"
+    QDFLAG="$DFLAG"
+    if [ "$DISJTRI" = 1 ]; then
+        QSUF="${SUF}_disjoint"      # parents come from the disjoint ranking ...
+        QDFLAG=""                   # ... but the 4th word is not restricted
+    fi
     if [ -n "$TRIPFROM" ]; then
         TSRC="$TRIPFROM"
-    elif [ -f "$SHARED/triple_singletons${SUF}_exhaustive.csv" ]; then
-        TSRC="$SHARED/triple_singletons${SUF}_exhaustive.csv"
+    elif [ -f "$SHARED/triple_singletons${QSUF}_exhaustive.csv" ]; then
+        TSRC="$SHARED/triple_singletons${QSUF}_exhaustive.csv"
     else
         # An EMPTY $SUF makes triple_singletons_* match the _answers_ and
         # _disjoint_ files too, so an unrestricted run could silently build on a
         # restricted parent -- a different search wearing the same prefix. Keep
         # only names whose restriction is exactly this run's.
-        TSRC=$(ls -1S "$SHARED"/triple_singletons${SUF}_*.csv 2>/dev/null \
+        TSRC=$(ls -1S "$SHARED"/triple_singletons${QSUF}_*.csv 2>/dev/null \
                | grep -vE "_(answers|disjoint)" | head -1)
-        [ -n "$SUF" ] && TSRC=$(ls -1S "$SHARED"/triple_singletons${SUF}_*.csv 2>/dev/null | head -1)
+        [ -n "$QSUF" ] && TSRC=$(ls -1S "$SHARED"/triple_singletons${QSUF}_*.csv 2>/dev/null | head -1)
     fi
     [ -n "$TSRC" ] && [ -f "$TSRC" ] || {
         echo "no triple ranking found for this restriction" >&2
@@ -308,17 +332,30 @@ if [ "$STAGE" = quads ] || [ "$STAGE" = all ]; then
         exit 1
     }
     echo "parent triples: $TSRC" | tee -a "$LOC/singles.log"
-    TCUT="$LOC/triples${SUF}_top$TRIPSTOP.csv"
+    if [ "$DISJOINT" = 1 ]; then
+        echo "4th word: DISJOINT -- 20 distinct letters across all four." \
+            | tee -a "$LOC/singles.log"
+        echo "NOTE only about 5% of disjoint triples admit ANY disjoint 4th word" \
+            | tee -a "$LOC/singles.log"
+        echo "(0.06 on average, sampled), so most parents contribute nothing." \
+            | tee -a "$LOC/singles.log"
+    else
+        echo "4th word: unrestricted -- any of the 12972 legal words." \
+            | tee -a "$LOC/singles.log"
+    fi
+    TCUT="$LOC/triples${QSUF}_top$TRIPSTOP.csv"
     head -n $((TRIPSTOP + 1)) "$TSRC" > "$TCUT"
     NTRI=$(( $(grep -c . "$TCUT") - 1 ))
-    QUADOUT="$SHARED/quad_singletons${SUF}_t$NTRI.csv"
+    # The name records BOTH halves of the search: which parents, and whether the
+    # 4th word was restricted. They are different questions with different
+    # answers, so they must not share a filename.
+    QNAME="$SUF"
+    [ "$DISJTRI" = 1 ] && QNAME="${SUF}_disjointtriples"
+    QUADOUT="$SHARED/quad_singletons${QNAME}_t$NTRI.csv"
     TFLAG=""
     [ "$THREADS" -gt 0 ] && TFLAG="--threads $THREADS"
-    # NO --disjoint here even under --disjoint: four disjoint words need 20 of
-    # the 26 letters, a far harsher cut than the triple stage's 15, and the ask
-    # was any 4th word.  Pass --disjoint explicitly to pairsplit if you want it.
     ./solver/pairsplit --metric singles --extend "$TCUT" --top "$TOP" \
-        --out "$QUADOUT" $GLIST $TFLAG \
+        --out "$QUADOUT" $GLIST $QDFLAG $TFLAG \
         2>&1 | tee -a "$LOC/singles.log"
 fi
 
