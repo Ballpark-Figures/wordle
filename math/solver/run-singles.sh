@@ -184,21 +184,37 @@ if [ "$STAGE" = triples ] || [ "$STAGE" = all ]; then
         echo "no pairsplit binary -- run 'sh build.sh' in solver/" >&2
         exit 1
     }
-    [ -f "$PAIROUT" ] || {
+    # WHICH PARENT FILE TO CUT FROM.  The exhaustive list is the same ranking as
+    # the shared one, just longer -- same metric, same restriction, same
+    # comparator -- so its first K rows ARE the shared file's first K rows, and a
+    # narrow run can read it directly.  Preferring it means one exhaustive pair
+    # run serves every width, instead of demanding a second, narrower run that
+    # would recompute a prefix already on disk.
+    ALLPAIRS="$LOC/pair_singletons${SUF}_all.csv"
+    if [ "$EXHAUSTIVE" = 1 ]; then
+        PAIRSRC="$ALLPAIRS"
+    elif [ -f "$PAIROUT" ]; then
+        PAIRSRC="$PAIROUT"
+    else
+        PAIRSRC="$ALLPAIRS"
+    fi
+    [ -f "$PAIRSRC" ] || {
         echo "no pair ranking at $PAIROUT" >&2
+        [ "$EXHAUSTIVE" = 1 ] && echo "(nor the exhaustive list at $ALLPAIRS)" >&2
         echo "run the pair stage first, with the SAME flags:" >&2
         echo "  bash solver/run-singles.sh pairs$([ "$ANSWERS" = 1 ] && echo ' --answers')$([ "$EXHAUSTIVE" = 1 ] && echo ' --exhaustive')" >&2
         exit 1
     }
+    echo "parents: $PAIRSRC" | tee -a "$LOC/singles.log"
     # The cut is taken here rather than inside pairsplit so that one wide pair
     # run serves every width: --extend reads whatever file it is handed, and its
     # line order IS the rank the minparent column is reported against.
     CUT="$LOC/pairs${SUF}_top$PAIRSTOP.csv"
-    head -n $((PAIRSTOP + 1)) "$PAIROUT" > "$CUT"
+    head -n $((PAIRSTOP + 1)) "$PAIRSRC" > "$CUT"
     NCUT=$(( $(grep -c . "$CUT") - 1 ))
     if [ "$EXHAUSTIVE" = 1 ] && [ "$NCUT" -lt "$NANSPAIRS" ]; then
         echo "--exhaustive needs all $NANSPAIRS pairs as parents, found $NCUT in" >&2
-        echo "$PAIROUT -- rerun the pair stage with --answers --exhaustive first." >&2
+        echo "$PAIRSRC -- rerun the pair stage with --answers --exhaustive first." >&2
         exit 1
     fi
     TFLAG=""
@@ -211,6 +227,6 @@ if [ "$STAGE" = triples ] || [ "$STAGE" = all ]; then
 fi
 
 echo "wrote:" | tee -a "$LOC/singles.log"
-for f in "$SHARED/guess_singletons$SUF.csv" "$PAIROUT" "$SHARED/triple_singletons$SUF.csv"; do
+for f in "$SHARED/guess_singletons$SUF.csv" "$PAIROUT" "$LOC/pair_singletons${SUF}_all.csv" "$SHARED/triple_singletons$SUF.csv"; do
     [ -f "$f" ] && echo "  $f" | tee -a "$LOC/singles.log"
 done
