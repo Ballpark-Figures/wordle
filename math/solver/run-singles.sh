@@ -127,9 +127,13 @@ LOC=data/local/singletons
 PATS=data/local/patterns/patterns.npy
 
 STAGE=both
-TOP=100000          # rows kept; the full ranking is far too large to store
-PAIRSTOP=100000     # pairs fed to the triple stage; about 11 min at this width
-TRIPSTOP=100000     # triples fed to the quad stage
+# EVERYTHING BY DEFAULT.  These were cuts -- 100000 rows kept, 100000 parents
+# fed on -- from when the tool was a screen feeding a later exact stage. They are
+# now "all": every candidate scored is written, and every parent on disk is
+# extended. A cut is a deliberate choice, so it has to be typed.
+TOP=all             # rows written; "all" keeps every scored candidate
+PAIRSTOP=all        # pairs fed to the triple stage
+TRIPSTOP=all        # triples fed to the quad stage
 TRIPFROM=""         # which triple ranking to extend; default is the widest on disk
 THREADS=0           # 0 = let OpenMP pick, which is right on both machines
 ANSWERS=0           # --answers: only the 2315 answer words may open
@@ -137,7 +141,7 @@ DISJOINT=0          # --disjoint: every word of the opener shares no letter
 MINLET=0            # --min-letters N: at least N distinct letters in the opener
 DISJTRI=0           # --disjoint-triples: disjoint PARENTS only, 4th word free
 DISJQUAD=0          # --disjoint-quads: disjoint PARENTS only, 5th word free
-QUADSTOP=100000     # quads fed to the quint stage; "all" for every one
+QUADSTOP=all        # quads fed to the quint stage
 QUADFROM=""         # which quad ranking to extend
 EXHAUSTIVE=0        # --exhaustive: feed EVERY pair to the triple stage
 
@@ -208,7 +212,7 @@ fi
 PAIROUT="$SHARED/pair_singletons$SUF.csv"
 PAIRKEEP="$TOP"
 if [ "$EXHAUSTIVE" = 1 ]; then
-    PAIRKEEP="$BIGTOP"
+    PAIRKEEP=all
     PAIRSTOP="$BIGTOP"
     PAIROUT="$LOC/pair_singletons${SUF}_all.csv"
 fi
@@ -326,6 +330,7 @@ if [ "$STAGE" = triples ] || [ "$STAGE" = all ]; then
     # run serves every width: --extend reads whatever file it is handed, and its
     # line order IS the rank the minparent column is reported against.
     NSRCP=$(rows_in "$PAIRSRC")
+    [ "$PAIRSTOP" = all ] && PAIRSTOP="$NSRCP"
     if [ "$PAIRSTOP" -ge "$NSRCP" ]; then
         CUT="$PAIRSRC"
     else
@@ -337,11 +342,12 @@ if [ "$STAGE" = triples ] || [ "$STAGE" = all ]; then
     # there is, and naming that file after the request rather than the reality
     # would be the same untraceability this scheme exists to prevent.
     NPAR=$(rows_in "$CUT")
-    if [ "$EXHAUSTIVE" = 1 ]; then
-        TRISUF="_exhaustive"
-    else
-        TRISUF="_p$NPAR"
-    fi
+    # "_exhaustive" is earned, not asked for: it means every candidate of this
+    # restriction was reachable, which needs the parent set to have been complete
+    # -- the same transitive test that gates the fast path. Otherwise the name
+    # carries the parent count, so a narrower run cannot overwrite a wider one.
+    PCFLAG=$(parents_complete_flag "$PAIRSRC" "$NPAR")
+    if [ -n "$PCFLAG" ]; then TRISUF="_exhaustive"; else TRISUF="_p$NPAR"; fi
     TRIOUT="$SHARED/triple_singletons${SUF}${TRISUF}.csv"
     # Completeness comes from the pair run's OWN sidecar, not from counting lines
     # against a constant here: only that run knows how many candidates its flags
@@ -364,7 +370,6 @@ if [ "$STAGE" = triples ] || [ "$STAGE" = all ]; then
     fi
     TFLAG=""
     [ "$THREADS" -gt 0 ] && TFLAG="--threads $THREADS"
-    PCFLAG=$(parents_complete_flag "$PAIRSRC" "$NPAR")
     [ -n "$PCFLAG" ] && echo "parents are complete: skipping the parent table" \
         | tee -a "$LOC/singles.log"
     # --top bounds what is WRITTEN, never what is searched, so even an exhaustive
@@ -436,10 +441,11 @@ if [ "$STAGE" = quads ] || [ "$STAGE" = all ]; then
     # answers, so they must not share a filename.
     QNAME="$SUF"
     [ "$DISJTRI" = 1 ] && QNAME="${SUF}_disjointtriples"
-    QUADOUT="$SHARED/quad_singletons${QNAME}_t$NTRI.csv"
+    QPCFLAG=$(parents_complete_flag "$TSRC" "$NTRI")
+    if [ -n "$QPCFLAG" ]; then QUADOUT="$SHARED/quad_singletons${QNAME}_exhaustive.csv"
+    else QUADOUT="$SHARED/quad_singletons${QNAME}_t$NTRI.csv"; fi
     TFLAG=""
     [ "$THREADS" -gt 0 ] && TFLAG="--threads $THREADS"
-    QPCFLAG=$(parents_complete_flag "$TSRC" "$NTRI")
     [ -n "$QPCFLAG" ] && echo "parents are complete: skipping the parent table" \
         | tee -a "$LOC/singles.log"
     ./solver/pairsplit --metric singles --extend "$TCUT" --top "$TOP" \
@@ -492,10 +498,11 @@ if [ "$STAGE" = quints ] || [ "$STAGE" = all ]; then
     fi
     QNAME2="$SUF"
     [ "$DISJQUAD" = 1 ] && QNAME2="${SUF}_disjointquads"
-    QUINTOUT="$SHARED/quint_singletons${QNAME2}_q$NQUAD.csv"
+    QQPCFLAG=$(parents_complete_flag "$QSRC" "$NQUAD")
+    if [ -n "$QQPCFLAG" ]; then QUINTOUT="$SHARED/quint_singletons${QNAME2}_exhaustive.csv"
+    else QUINTOUT="$SHARED/quint_singletons${QNAME2}_q$NQUAD.csv"; fi
     TFLAG=""
     [ "$THREADS" -gt 0 ] && TFLAG="--threads $THREADS"
-    QQPCFLAG=$(parents_complete_flag "$QSRC" "$NQUAD")
     [ -n "$QQPCFLAG" ] && echo "parents are complete: skipping the parent table" \
         | tee -a "$LOC/singles.log"
     ./solver/pairsplit --metric singles --extend "$QCUT" --top "$TOP" \
