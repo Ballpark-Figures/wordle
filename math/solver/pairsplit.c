@@ -74,6 +74,31 @@ static int      NG, NA;
 static uint8_t *PAT;                 /* NG * NA, row-major */
 static char   (*GWORD)[WBUF];
 static int      SINGLES = 0;         /* --metric singles: rank by singleton count */
+static int      DISJOINT = 0;        /* --disjoint: no letter may repeat across the opener */
+static uint32_t *LMASK;              /* per word, bit i set iff letter i occurs */
+
+/* ---- letter masks, for --disjoint ---------------------------------------
+ * bit i of LMASK[g] is set iff word g contains letter i, so a word with a
+ * REPEATED letter has fewer than WORDLEN bits.  Two words share no letter iff
+ * their masks AND to zero, and a pair reaches 10 distinct letters iff both have
+ * 5 bits and overlap nowhere -- which makes the whole test one AND and one
+ * branch, cheap enough to sit in front of the scoring loop and reject 94% of
+ * pairs before any work happens. */
+static int popcount32(uint32_t x) {
+    int n = 0;
+    while (x) { x &= x - 1; n++; }
+    return n;
+}
+
+static void build_masks(int wordlen) {
+    LMASK = malloc(sizeof(uint32_t) * NG);
+    for (int g = 0; g < NG; g++) {
+        uint32_t m = 0;
+        for (int i = 0; i < wordlen && GWORD[g][i]; i++)
+            m |= 1u << (GWORD[g][i] - 'a');
+        LMASK[g] = m;
+    }
+}
 
 /* g3 is -1 in pair mode and a real index in --extend (triple) mode */
 /* g3 is -1 in pair mode and a real index in --extend (triple) mode.
@@ -170,7 +195,14 @@ static void heap_sift_down(Pair *h, int n, int i) {
     }
 }
 
-static void heap_push(Pair *h, int *n, int cap, Pair v) {
+/* Returns 1 if the candidate was KEPT.  Callers use that to decide whether it is
+ * even worth testing against the global running best: a candidate good enough to
+ * beat the global leader is better than everything, so it necessarily beats this
+ * thread's own worst kept entry and lands here first.  Gating on the return value
+ * therefore cannot miss an improvement -- and it keeps the clock read and the
+ * shared load out of the 84M-iteration path, where they cost more than the
+ * scoring loop itself. */
+static int heap_push(Pair *h, int *n, int cap, Pair v) {
     if (*n < cap) {
         int i = (*n)++;
         h[i] = v;
@@ -180,10 +212,13 @@ static void heap_push(Pair *h, int *n, int cap, Pair v) {
             Pair t = h[i]; h[i] = h[p]; h[p] = t;
             i = p;
         }
+        return 1;
     } else if (v.key < h[0].key) {
         h[0] = v;
         heap_sift_down(h, *n, 0);
+        return 1;
     }
+    return 0;
 }
 
 static int find_word(char (*list)[WBUF], int n, const char *w) {
@@ -266,6 +301,54 @@ static void sort3(int32_t *a, int32_t *b, int32_t *c) {
     if (*a > *b) { t = *a; *a = *b; *b = t; }
 }
 
+/* ---- the running best, announced as it improves ------------------------
+ * Every thread keeps its own heap, so nothing here knew the GLOBAL leader until
+ * the merge at the end -- a long run showed progress percentages and no results.
+ * BEST_KEY is that leader's sort key, shared.
+ *
+ * The hot path reads it WITHOUT taking a lock and only enters the critical
+ * section when the candidate looks better.  A stale read is harmless in both
+ * directions: too high costs one needless critical entry, which then re-checks
+ * and does nothing; too low can only happen if another thread just improved the
+ * best, in which case that thread already printed a better line.  Improvements
+ * are bounded by the metric's range (a few hundred), so this cannot flood.
+ *
+ * TIES ARE NOT ANNOUNCED, unlike the solver's sweep: at 84M candidates a metric
+ * with a few hundred distinct values ties constantly, and printing those would
+ * bury the improvements they are tied with.  The heap still KEEPS ties; this is
+ * only about what gets printed. */
+static int64_t BEST_KEY = INT64_MAX;
+static double  T0;
+
+static void announce(Pair v) {
+    int64_t seen;
+#ifdef _OPENMP
+#pragma omp atomic read
+#endif
+    seen = BEST_KEY;
+    if (v.key >= seen) return;
+#ifdef _OPENMP
+#pragma omp critical (bestline)
+#endif
+    {
+        if (v.key < BEST_KEY) {
+            BEST_KEY = v.key;
+            double dt = now_s() - T0;
+            if (v.g3 >= 0)
+                fprintf(stderr, "[%6.0fs] %s %s %s  ", dt, GWORD[v.g1], GWORD[v.g2],
+                        GWORD[v.g3]);
+            else
+                fprintf(stderr, "[%6.0fs] %s %s  ", dt, GWORD[v.g1], GWORD[v.g2]);
+            if (SINGLES)
+                fprintf(stderr, "singles=%d  nowin=%d  ssq=%lld  NEW BEST\n",
+                        v.singles, v.nowin, (long long)v.ssq);
+            else
+                fprintf(stderr, "ssq=%lld  NEW BEST\n", (long long)v.ssq);
+            fflush(stderr);
+        }
+    }
+}
+
 int main(int argc, char **argv) {
     const char *datadir = "data", *outpath = NULL, *patpath = NULL, *guesslist = NULL;
     const char *extend = NULL;
@@ -290,6 +373,12 @@ int main(int argc, char **argv) {
          * pattern combinations exactly one answer produces -- instead of by ssq.
          * Both are computed in the same pass; this only picks the sort key and
          * the output columns.  Higher is better, so the heap's key is negated. */
+        /* --disjoint: keep only openers whose words share no letter and repeat
+         * none -- 10 distinct letters for a pair, 15 for a triple.  It shrinks
+         * the space by ~17x for pairs and ~2600x for triples, which is what
+         * makes an EXHAUSTIVE triple sweep possible at all; the answer is then
+         * the best DISJOINT opener, a different and smaller claim. */
+        else if (!strcmp(argv[i], "--disjoint")) DISJOINT = 1;
         else if (!strcmp(argv[i], "--metric") && i + 1 < argc) {
             const char *m = argv[++i];
             if (!strcmp(m, "singles")) SINGLES = 1;
@@ -342,6 +431,19 @@ int main(int argc, char **argv) {
         for (int g = 0; g < NG; g++) sel[nsel++] = g;
     }
 
+    build_masks(5);
+    if (DISJOINT) {
+        /* A word with a repeated letter can never be in a disjoint opener, so
+         * drop it from the opener set once here rather than testing it inside
+         * the quadratic loop. */
+        int kept = 0;
+        for (int i = 0; i < nsel; i++)
+            if (popcount32(LMASK[sel[i]]) == 5) sel[kept++] = sel[i];
+        fprintf(stderr, "--disjoint: %d of %d openers have 5 distinct letters\n",
+                kept, nsel);
+        nsel = kept;
+    }
+
     int64_t npairs = (int64_t)nsel * (nsel - 1) / 2;
     fprintf(stderr, "ranking %lld unordered pairs by %s, keeping the best %d\n",
             (long long)npairs, SINGLES ? "SINGLETON COUNT" : "ssq", top);
@@ -356,9 +458,14 @@ int main(int argc, char **argv) {
 
     Pair **heaps = calloc(nth, sizeof(Pair *));
     int   *hn    = calloc(nth, sizeof(int));
+    /* How many candidates were actually SCORED, per thread.  Not derivable from
+     * the inputs once --disjoint or the canonical-parent filter is in play, and
+     * it is what tells a later run whether a parent file is complete. */
+    int64_t *ranked = calloc(nth, sizeof(int64_t));
     for (int t = 0; t < nth; t++) heaps[t] = malloc(sizeof(Pair) * top);
 
     double t0 = now_s();
+    T0 = t0;
     int64_t done_g1 = 0;
 
     /* ------------------------------------------------------- TRIPLE MODE ----
@@ -442,9 +549,15 @@ int main(int argc, char **argv) {
 
                 int32_t ca = g1 < g2 ? g1 : g2, cb = g1 < g2 ? g2 : g1;
 
+                /* A parent pair that is not itself disjoint can produce no
+                 * disjoint triple, so it is skipped whole rather than per word. */
+                uint32_t pmask = LMASK[g1] | LMASK[g2];
+                if (DISJOINT && popcount32(pmask) != 10) continue;
+
                 for (int sk = 0; sk < nsel; sk++) {
                     int g3 = sel[sk];
                     if (g3 == g1 || g3 == g2) continue;
+                    if (DISJOINT && (pmask & LMASK[g3])) continue;
 
                     /* emit this triple only from its FIRST present parent pair,
                      * so each distinct triple is produced exactly once */
@@ -463,6 +576,7 @@ int main(int argc, char **argv) {
                     if (rik && (!minpar || rik < minpar)) minpar = rik;
                     if (rjk && (!minpar || rjk < minpar)) minpar = rjk;
 
+                    ranked[tid]++;
                     const uint8_t *row3 = PAT + (size_t)g3 * NA;
                     int64_t ssq = 0;
                     int32_t singles = 0, nowin = 0;
@@ -490,7 +604,7 @@ int main(int argc, char **argv) {
                     }
                     Pair pv = { SINGLES ? -(int64_t)singles : ssq, ssq,
                                 g1, g2, g3, minpar, singles, nowin };
-                    heap_push(heap, n, top, pv);
+                    if (heap_push(heap, n, top, pv)) announce(pv);
                 }
 
 #ifdef _OPENMP
@@ -557,6 +671,8 @@ int main(int argc, char **argv) {
 
             for (int sj = si + 1; sj < nsel; sj++) {
                 int g2 = sel[sj];
+                if (DISJOINT && (LMASK[g1] & LMASK[g2])) continue;
+                ranked[tid]++;
                 const uint8_t *row2 = PAT + (size_t)g2 * NA;
                 int64_t ssq = 0;
                 int32_t singles = 0, nowin = 0;
@@ -585,7 +701,7 @@ int main(int argc, char **argv) {
                 }
                 Pair pv = { SINGLES ? -(int64_t)singles : ssq, ssq,
                             g1, g2, -1, 0, singles, nowin };
-                heap_push(heap, n, top, pv);
+                if (heap_push(heap, n, top, pv)) announce(pv);
             }
 
 #ifdef _OPENMP
@@ -646,6 +762,35 @@ merge: ;   /* a label must precede a statement, not a declaration, before C23 */
                     (long long)all[i].ssq);
     }
     fclose(out);
+
+    /* ---- the sidecar --------------------------------------------------
+     * `<out>.meta` records what this run actually COVERED: how many candidates
+     * were scored and how many were written.  A consumer cannot recompute the
+     * first from the inputs -- --disjoint and the canonical-parent filter both
+     * remove candidates by a rule, not by a count -- so without it there is no
+     * way to tell a complete ranking from a truncated one after the fact, and a
+     * screen looks exactly like a proof.  It is a SEPARATE file rather than a
+     * header line because the CSVs are read by tools that want plain columns. */
+    int64_t nranked = 0;
+    for (int t = 0; t < nth; t++) nranked += ranked[t];
+    char metapath[1200];
+    snprintf(metapath, sizeof metapath, "%s.meta", outpath);
+    FILE *mf = fopen(metapath, "w");
+    if (mf) {
+        fprintf(mf, "mode=%s\n", extend ? "triple" : "pair");
+        fprintf(mf, "metric=%s\n", SINGLES ? "singles" : "ssq");
+        fprintf(mf, "disjoint=%d\n", DISJOINT);
+        fprintf(mf, "guesslist=%s\n", guesslist ? guesslist : "");
+        fprintf(mf, "openers=%d\n", nsel);
+        fprintf(mf, "scored=%lld\n", (long long)nranked);
+        fprintf(mf, "written=%d\n", keep);
+        fprintf(mf, "complete=%d\n", keep >= nranked ? 1 : 0);
+        fclose(mf);
+    }
+    fprintf(stderr, "scored %lld candidates, wrote %d (%s)\n",
+            (long long)nranked, keep,
+            keep >= nranked ? "COMPLETE -- every candidate is in the file"
+                            : "TRUNCATED -- the file is the head of the ranking");
 
     if (extend && SINGLES)
         fprintf(stderr, "wrote %d DISTINCT triples to %s in %.0fs (most singletons %d: %s %s %s)\n",

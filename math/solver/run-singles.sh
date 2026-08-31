@@ -13,6 +13,9 @@
 #     bash solver/run-singles.sh all --answers               # answer words only
 #     bash solver/run-singles.sh triples --answers --exhaustive
 #
+#     bash solver/run-singles.sh pairs   --disjoint --exhaustive
+#     bash solver/run-singles.sh triples --disjoint --exhaustive
+#
 # WHAT THIS COMPUTES, precisely:
 #
 #   For each opener -- one word, or two or three words committed to BLIND up
@@ -56,10 +59,22 @@
 # every count is still over the same 2315 words.  There are only
 # C(2315, 2) = 2,678,455 answer pairs, 31x fewer than the unrestricted 84M.
 #
-# --exhaustive (with --answers) makes the TRIPLE stage a PROOF rather than a
-# screen: it feeds EVERY answer pair to the extension, so every one of the
-# C(2315, 3) = 2,067,969,935 answer triples is reached and the top of the file is
-# the true maximum.  This is the one configuration here where the greedy caveat
+# --disjoint KEEPS ONLY OPENERS WHOSE WORDS SHARE NO LETTER and repeat none: 10
+# distinct letters for a pair, 15 for a triple.  Of the 12972 guesses, 8322 have
+# 5 distinct letters, and they form 5,020,842 disjoint pairs -- 6% of the 84M --
+# and roughly 139 million disjoint triples against 3.6e11 unrestricted.  THAT
+# 2600x cut is what makes an exhaustive triple sweep possible over the full guess
+# list, which is otherwise about a day and a half of work.
+#
+# The result is then the best DISJOINT opener, which is a DIFFERENT AND SMALLER
+# CLAIM than the best opener.  Nothing here shows the unrestricted optimum is
+# disjoint; the restriction is a modelling choice, so say "the best 15-distinct-
+# letter triple", never "the best triple".  --disjoint composes with --answers.
+#
+# --exhaustive makes the TRIPLE stage a PROOF rather than a screen: it feeds
+# EVERY pair the pair stage ranked to the extension, so every triple reachable
+# within the current restriction is scored and the top of the file is the true
+# maximum for that restriction.  This is the one configuration here where the greedy caveat
 # above does NOT apply, and it is worth the wait for exactly that reason.  The
 # full pair list is ~70 MB, too big to commit, so it goes to data/local/ and only
 # the triple ranking lands in data/shared/.  EXTRAPOLATED at about 40-45 minutes:
@@ -98,6 +113,7 @@ TOP=100000          # rows kept; the full ranking is far too large to store
 PAIRSTOP=100000     # pairs fed to the triple stage; about 11 min at this width
 THREADS=0           # 0 = let OpenMP pick, which is right on both machines
 ANSWERS=0           # --answers: only the 2315 answer words may open
+DISJOINT=0          # --disjoint: 10 distinct letters per pair, 15 per triple
 EXHAUSTIVE=0        # --exhaustive: feed EVERY pair to the triple stage
 
 while [ $# -gt 0 ]; do
@@ -107,17 +123,22 @@ while [ $# -gt 0 ]; do
         --pairs-top)  PAIRSTOP="$2"; shift 2 ;;
         --threads)    THREADS="$2";  shift 2 ;;
         --answers)    ANSWERS=1;     shift ;;
+        --disjoint)   DISJOINT=1;    shift ;;
         --exhaustive) EXHAUSTIVE=1;  shift ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
     esac
 done
 
-# C(2315, 2).  Naming it makes the exhaustive widths self-explanatory below.
-NANSPAIRS=2678455
+# The exhaustive widths are no longer a constant: --answers and --disjoint each
+# change how many pairs exist, so the count comes from the pair stage's own
+# sidecar rather than from a number written here that a new flag would silently
+# invalidate.  BIGTOP just has to exceed any of them.
+BIGTOP=100000000
 
-if [ "$EXHAUSTIVE" = 1 ] && [ "$ANSWERS" = 0 ]; then
-    echo "--exhaustive needs --answers: extending all 84129906 unrestricted" >&2
-    echo "pairs by 12972 words each is not a run anyone should start here." >&2
+if [ "$EXHAUSTIVE" = 1 ] && [ "$ANSWERS" = 0 ] && [ "$DISJOINT" = 0 ]; then
+    echo "--exhaustive needs --answers or --disjoint: extending all 84129906" >&2
+    echo "unrestricted pairs by 12972 words each is roughly a day and a half," >&2
+    echo "which is not a run anyone should start by accident." >&2
     exit 1
 fi
 
@@ -126,9 +147,14 @@ fi
 # same filename, and no way to tell afterwards which produced the file.
 SUF=""
 GLIST=""
+DFLAG=""
 if [ "$ANSWERS" = 1 ]; then
     SUF="_answers"
     GLIST="--guess-list data/shared/words/mystery.txt"
+fi
+if [ "$DISJOINT" = 1 ]; then
+    SUF="${SUF}_disjoint"
+    DFLAG="--disjoint"
 fi
 
 # Exhaustive means EVERY pair is a parent, so the pair stage must keep them all,
@@ -137,8 +163,8 @@ fi
 PAIROUT="$SHARED/pair_singletons$SUF.csv"
 PAIRKEEP="$TOP"
 if [ "$EXHAUSTIVE" = 1 ]; then
-    PAIRKEEP="$NANSPAIRS"
-    PAIRSTOP="$NANSPAIRS"
+    PAIRKEEP="$BIGTOP"
+    PAIRSTOP="$BIGTOP"
     PAIROUT="$LOC/pair_singletons${SUF}_all.csv"
 fi
 
@@ -175,7 +201,7 @@ if [ "$STAGE" = pairs ] || [ "$STAGE" = both ] || [ "$STAGE" = all ]; then
     TFLAG=""
     [ "$THREADS" -gt 0 ] && TFLAG="--threads $THREADS"
     ./solver/pairsplit --metric singles --top "$PAIRKEEP" \
-        --out "$PAIROUT" $GLIST $TFLAG \
+        --out "$PAIROUT" $GLIST $DFLAG $TFLAG \
         2>&1 | tee -a "$LOC/singles.log"
 fi
 
@@ -211,18 +237,31 @@ if [ "$STAGE" = triples ] || [ "$STAGE" = all ]; then
     # line order IS the rank the minparent column is reported against.
     CUT="$LOC/pairs${SUF}_top$PAIRSTOP.csv"
     head -n $((PAIRSTOP + 1)) "$PAIRSRC" > "$CUT"
-    NCUT=$(( $(grep -c . "$CUT") - 1 ))
-    if [ "$EXHAUSTIVE" = 1 ] && [ "$NCUT" -lt "$NANSPAIRS" ]; then
-        echo "--exhaustive needs all $NANSPAIRS pairs as parents, found $NCUT in" >&2
-        echo "$PAIRSRC -- rerun the pair stage with --answers --exhaustive first." >&2
-        exit 1
+    # Completeness comes from the pair run's OWN sidecar, not from counting lines
+    # against a constant here: only that run knows how many candidates its flags
+    # left to score.
+    if [ "$EXHAUSTIVE" = 1 ]; then
+        META="$PAIRSRC.meta"
+        [ -f "$META" ] || {
+            echo "no coverage sidecar at $META -- that pair file predates the" >&2
+            echo "completeness check, so it cannot be shown to be exhaustive." >&2
+            echo "rerun the pair stage with the same flags plus --exhaustive." >&2
+            exit 1
+        }
+        grep -q "^complete=1$" "$META" || {
+            echo "$PAIRSRC is a TRUNCATED ranking, per $META:" >&2
+            sed -n 's/^scored=/  candidates scored: /p;s/^written=/  rows written:     /p' "$META" >&2
+            echo "extending it would be a screen, not a proof -- rerun the pair" >&2
+            echo "stage with --exhaustive first." >&2
+            exit 1
+        }
     fi
     TFLAG=""
     [ "$THREADS" -gt 0 ] && TFLAG="--threads $THREADS"
     # --top bounds what is WRITTEN, never what is searched, so even an exhaustive
     # run emits a file that fits in the repo while still visiting every triple.
     ./solver/pairsplit --metric singles --extend "$CUT" --top "$TOP" \
-        --out "$SHARED/triple_singletons$SUF.csv" $GLIST $TFLAG \
+        --out "$SHARED/triple_singletons$SUF.csv" $GLIST $DFLAG $TFLAG \
         2>&1 | tee -a "$LOC/singles.log"
 fi
 
