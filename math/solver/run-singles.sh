@@ -335,10 +335,6 @@ if [ "$STAGE" = quads ] || [ "$STAGE" = all ]; then
     if [ "$DISJOINT" = 1 ]; then
         echo "4th word: DISJOINT -- 20 distinct letters across all four." \
             | tee -a "$LOC/singles.log"
-        echo "NOTE only about 5% of disjoint triples admit ANY disjoint 4th word" \
-            | tee -a "$LOC/singles.log"
-        echo "(0.06 on average, sampled), so most parents contribute nothing." \
-            | tee -a "$LOC/singles.log"
     else
         echo "4th word: unrestricted -- any of the 12972 legal words." \
             | tee -a "$LOC/singles.log"
