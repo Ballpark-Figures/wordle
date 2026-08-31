@@ -115,7 +115,7 @@ static void build_masks(int wordlen) {
  * own real values, whichever one is steering. */
 typedef struct {
     int64_t key, ssq;
-    int32_t g1, g2, g3, minpar, singles, nowin;
+    int32_t g1, g2, g3, g4, minpar, singles, nowin;
 } Pair;
 
 static double now_s(void) {
@@ -286,45 +286,63 @@ static int cmp_words(const void *a, const void *b) {
     return x->g3 < y->g3 ? -1 : (x->g3 > y->g3);
 }
 
-/* ---- set of the parent pairs, keyed (lo << 32 | hi) ---------------------
- * A triple {i<j<k} is reachable from (i,j), (i,k) and (j,k), but only from the
- * ones that are actually IN the pair list.  Emitting it from the FIRST present
- * parent in that fixed order means every distinct triple is produced exactly
- * once, by exactly one (pair, third word) combination.
+/* ---- set of the PARENT OPENERS, keyed by their sorted word indices --------
+ * An opener of k+1 words is reachable from each of its k+1 sub-openers of size
+ * k, but only from the ones actually IN the parent list.  Emitting it from the
+ * FIRST present sub-opener in a fixed order means every distinct result is
+ * produced exactly once, by exactly one (parent, extra word) combination.
  *
  * This replaces generating duplicates and removing them afterwards.  Dedup after
  * the fact needs a guessed over-collection factor, and if the guess is low the
  * output is quietly short of what was asked for -- the same shape of mistake as
  * counting a word list before deduping it. Here the emitted count IS the number
- * of distinct reachable triples, with nothing to tune. */
+ * of distinct reachable openers, with nothing to tune.
+ *
+ * The key is positional in base NG, so it is EXACT rather than a hash: with
+ * NG <= 12972 a triple key is at most 12972^3 = 2.2e12, well inside 64 bits.
+ * Equal keys therefore mean equal openers, and a table hit needs no re-check. */
 static uint64_t *PSET;
-static int32_t  *PSET_RANK;      /* 1-based rank of that pair in the input file */
+static int32_t  *PSET_RANK;      /* 1-based rank of that parent in the input file */
 static int       PSET_MASK;
+static int       PARENTK = 2;    /* words per parent: 2 (pairs) or 3 (triples) */
 
-static void pset_build(const Pair *pairs, int n) {
+static void sortk(int32_t *w, int k) {
+    for (int i = 1; i < k; i++)              /* k is 2 or 3; insertion is right */
+        for (int j = i; j > 0 && w[j - 1] > w[j]; j--) {
+            int32_t t = w[j]; w[j] = w[j - 1]; w[j - 1] = t;
+        }
+}
+
+static uint64_t pkey(const int32_t *sorted, int k) {
+    uint64_t key = 0;
+    for (int i = 0; i < k; i++) key = key * (uint64_t)NG + (uint64_t)sorted[i];
+    return key;
+}
+
+static void pset_build(const Pair *parents, int n) {
     int bits = 1;
     while ((1 << bits) < n * 4) bits++;      /* keep it under 25% loaded */
     PSET_MASK = (1 << bits) - 1;
     PSET = calloc((size_t)PSET_MASK + 1, sizeof(uint64_t));
     PSET_RANK = calloc((size_t)PSET_MASK + 1, sizeof(int32_t));
     for (int i = 0; i < n; i++) {
-        int32_t a = pairs[i].g1, b = pairs[i].g2;
-        if (a > b) { int32_t t = a; a = b; b = t; }
-        uint64_t key = ((uint64_t)a << 32) | (uint32_t)b;
+        int32_t w[3] = { parents[i].g1, parents[i].g2, parents[i].g3 };
+        sortk(w, PARENTK);
+        uint64_t key = pkey(w, PARENTK);
         uint64_t h = (key * 0x9E3779B97F4A7C15ULL) >> 40;
         while (PSET[h & PSET_MASK]) {
             if (PSET[h & PSET_MASK] == key + 1) break;   /* already present */
             h++;
         }
         PSET[h & PSET_MASK] = key + 1;       /* +1 so 0 stays the empty marker */
-        PSET_RANK[h & PSET_MASK] = i + 1;    /* the file is in ascending-ssq order */
+        PSET_RANK[h & PSET_MASK] = i + 1;    /* the file is in ranked order */
     }
 }
 
-/* returns the pair's 1-based rank, or 0 if it is not in the list */
-static int pset_rank(int32_t a, int32_t b) {
-    if (a > b) { int32_t t = a; a = b; b = t; }
-    uint64_t key = ((uint64_t)a << 32) | (uint32_t)b;
+/* returns the parent's 1-based rank, or 0 if it is not in the list.  Takes the
+ * words already SORTED, since every caller builds them that way. */
+static int pset_rank_sorted(const int32_t *sorted) {
+    uint64_t key = pkey(sorted, PARENTK);
     uint64_t h = (key * 0x9E3779B97F4A7C15ULL) >> 40;
     for (;;) {
         uint64_t v = PSET[h & PSET_MASK];
@@ -334,14 +352,6 @@ static int pset_rank(int32_t a, int32_t b) {
     }
 }
 
-static int pset_has(int32_t a, int32_t b) { return pset_rank(a, b) != 0; }
-
-static void sort3(int32_t *a, int32_t *b, int32_t *c) {
-    int32_t t;
-    if (*a > *b) { t = *a; *a = *b; *b = t; }
-    if (*b > *c) { t = *b; *b = *c; *c = t; }
-    if (*a > *b) { t = *a; *a = *b; *b = t; }
-}
 
 /* ---- the running best, announced as it improves ------------------------
  * Every thread keeps its own heap, so nothing here knew the GLOBAL leader until
@@ -391,7 +401,10 @@ static void announce(Pair v) {
              * can afford TIED because it walks a short candidate list; here a
              * few hundred distinct values across 84M candidates would bury the
              * improvements under their own ties. */
-            if (v.g3 >= 0)
+            if (v.g4 >= 0)
+                fprintf(stderr, "[%7.0fs] %s %s %s %s  ", dt, GWORD[v.g1], GWORD[v.g2],
+                        GWORD[v.g3], GWORD[v.g4]);
+            else if (v.g3 >= 0)
                 fprintf(stderr, "[%7.0fs] %s %s %s  ", dt, GWORD[v.g1], GWORD[v.g2],
                         GWORD[v.g3]);
             else
@@ -553,12 +566,20 @@ int main(int argc, char **argv) {
         if (!plist) { fprintf(stderr, "out of memory for the parent list\n"); return 1; }
         FILE *pf = fopen(extend, "r");
         if (!pf) { fprintf(stderr, "cannot open %s\n", extend); return 1; }
+        /* ARITY IS READ FROM THE FILE, not from a flag: a parent file already
+         * says how many words its openers have, and asking the caller to repeat
+         * it just creates a way for the two to disagree.  A third column that
+         * parses as a word means triples, so extending gives quads. */
         char line[256];
         while (fgets(line, sizeof line, pf)) {
-            char w1[64], w2[64];
-            if (sscanf(line, "%63[^,],%63[^,],", w1, w2) != 2) continue;
+            char w1[64], w2[64], w3[64];
+            int nf = sscanf(line, "%63[^,],%63[^,],%63[^,],", w1, w2, w3);
+            if (nf < 2) continue;
             int a = lookup_word(w1), b = lookup_word(w2);
             if (a < 0 || b < 0) continue;            /* the header lands here */
+            int c = (nf >= 3) ? lookup_word(w3) : -1;
+            if (npl == 0) PARENTK = (c >= 0) ? 3 : 2;
+            if (PARENTK == 3 && c < 0) continue;
             if (npl == pcap) {
                 pcap *= 2;
                 Pair *grown = realloc(plist, sizeof(Pair) * (size_t)pcap);
@@ -568,15 +589,16 @@ int main(int argc, char **argv) {
                 }
                 plist = grown;
             }
-            plist[npl].g1 = a; plist[npl].g2 = b; plist[npl].g3 = -1;
-            plist[npl].key = 0; plist[npl].ssq = 0; npl++;
+            plist[npl].g1 = a; plist[npl].g2 = b; plist[npl].g3 = c;
+            plist[npl].g4 = -1; plist[npl].key = 0; plist[npl].ssq = 0; npl++;
         }
         fclose(pf);
         if (!npl) { fprintf(stderr, "no usable pairs in %s\n", extend); return 1; }
         pset_build(plist, npl);
-        fprintf(stderr, "extending %d pairs by %d words each = %lld triples "
+        fprintf(stderr, "extending %d %s by %d words each = %lld %s "
                 "(before canonical-parent filtering)\n",
-                npl, nsel, (long long)npl * nsel);
+                npl, PARENTK == 3 ? "triples" : "pairs", nsel,
+                (long long)npl * nsel, PARENTK == 3 ? "quads" : "triples");
 
 #ifdef _OPENMP
 #pragma omp parallel
@@ -590,12 +612,20 @@ int main(int argc, char **argv) {
             Pair *heap = heaps[tid];
             int  *n    = &hn[tid];
 
-            int      *jcnt = calloc((size_t)NPAT * NPAT, sizeof(int));
-            int      *jk   = malloc(sizeof(int) * (NA + 1));
+            /* Runs of answers sharing the parent's joint pattern.  Built by
+             * SUBDIVIDING one parent word at a time, which needs only the
+             * 243-entry counter and works for a parent of any size -- the old
+             * dense NPAT*NPAT key was pair-only and could not be extended to
+             * triples, where the key space is 14.3 million. */
             int      *jrs  = malloc(sizeof(int) * (NA + 1));
             int      *jrl  = malloc(sizeof(int) * (NA + 1));
-            int      *jfl  = malloc(sizeof(int) * (NA + 1));
+            char     *jwin = malloc(NA + 1);   /* run already all-green on a parent word */
+            int      *nrs  = malloc(sizeof(int) * (NA + 1));
+            int      *nrl  = malloc(sizeof(int) * (NA + 1));
+            char     *nwin = malloc(NA + 1);
+            int      *jfl  = malloc(sizeof(int) * (NPAT + 1));
             uint16_t *ord  = malloc(sizeof(uint16_t) * NA);
+            uint16_t *tmp  = malloc(sizeof(uint16_t) * NA);
             int      *cnt  = calloc(NPAT, sizeof(int));
             int      *tin  = malloc(sizeof(int) * NPAT);
 
@@ -603,68 +633,93 @@ int main(int argc, char **argv) {
 #pragma omp for schedule(dynamic, 4)
 #endif
             for (int pi = 0; pi < npl; pi++) {
-                int g1 = plist[pi].g1, g2 = plist[pi].g2;
-                const uint8_t *row1 = PAT + (size_t)g1 * NA;
-                const uint8_t *row2 = PAT + (size_t)g2 * NA;
+                int32_t pw[3] = { plist[pi].g1, plist[pi].g2, plist[pi].g3 };
 
-                /* group the answers by the pair's JOINT pattern, once */
-                int nj = 0;
-                for (int a = 0; a < NA; a++) {
-                    int key = (int)row1[a] * NPAT + (int)row2[a];
-                    if (jcnt[key]++ == 0) jk[nj++] = key;
+                /* one run over every answer, then split by each parent word */
+                for (int a = 0; a < NA; a++) ord[a] = (uint16_t)a;
+                int nj = 1; jrs[0] = 0; jrl[0] = NA; jwin[0] = 0;
+                for (int w = 0; w < PARENTK; w++) {
+                    const uint8_t *row = PAT + (size_t)pw[w] * NA;
+                    int out_nj = 0;
+                    for (int t = 0; t < nj; t++) {
+                        int st = jrs[t], len = jrl[t], nt = 0;
+                        for (int i = st; i < st + len; i++) {
+                            int pp = row[ord[i]];
+                            if (cnt[pp]++ == 0) tin[nt++] = pp;
+                        }
+                        int base = st;
+                        for (int i = 0; i < nt; i++) { jfl[tin[i]] = base; base += cnt[tin[i]]; }
+                        for (int i = st; i < st + len; i++) tmp[jfl[row[ord[i]]]++] = ord[i];
+                        int b2 = st;
+                        for (int i = 0; i < nt; i++) {
+                            int pp = tin[i];
+                            nrs[out_nj] = b2; nrl[out_nj] = cnt[pp];
+                            /* the flag RIDES the split: once a run is all-green
+                             * on some parent word it stays so for every piece */
+                            nwin[out_nj] = jwin[t] | (pp == ALL_GREEN);
+                            b2 += cnt[pp]; out_nj++;
+                            cnt[pp] = 0;
+                        }
+                    }
+                    memcpy(ord, tmp, sizeof(uint16_t) * NA);
+                    memcpy(jrs, nrs, sizeof(int) * out_nj);
+                    memcpy(jrl, nrl, sizeof(int) * out_nj);
+                    memcpy(jwin, nwin, out_nj);
+                    nj = out_nj;
                 }
-                int acc = 0;
-                for (int t = 0; t < nj; t++) {
-                    jrs[t] = acc; jrl[t] = jcnt[jk[t]]; acc += jrl[t];
-                }
-                for (int t = 0; t < nj; t++) { jcnt[jk[t]] = t; jfl[t] = jrs[t]; }
-                for (int a = 0; a < NA; a++)
-                    ord[jfl[jcnt[(int)row1[a] * NPAT + (int)row2[a]]]++] = (uint16_t)a;
-                for (int t = 0; t < nj; t++) jcnt[jk[t]] = 0;
 
-                int32_t ca = g1 < g2 ? g1 : g2, cb = g1 < g2 ? g2 : g1;
+                int32_t cw[3] = { pw[0], pw[1], pw[2] };
+                sortk(cw, PARENTK);
 
-                /* A parent pair that is not itself disjoint can produce no
-                 * disjoint triple, so it is skipped whole rather than per word. */
-                uint32_t pmask = LMASK[g1] | LMASK[g2];
-                if (DISJOINT && popcount32(pmask) != 10) continue;
+                /* A parent that is not itself disjoint can produce no disjoint
+                 * result, so it is skipped whole rather than once per word. */
+                uint32_t pmask = 0;
+                for (int w = 0; w < PARENTK; w++) pmask |= LMASK[pw[w]];
+                if (DISJOINT && popcount32(pmask) != 5 * PARENTK) continue;
 
                 for (int sk = 0; sk < nsel; sk++) {
-                    int g3 = sel[sk];
-                    if (g3 == g1 || g3 == g2) continue;
-                    if (DISJOINT && (pmask & LMASK[g3])) continue;
+                    int gx = sel[sk];
+                    int dup = 0;
+                    for (int w = 0; w < PARENTK; w++) if (gx == pw[w]) dup = 1;
+                    if (dup) continue;
+                    if (DISJOINT && (pmask & LMASK[gx])) continue;
 
-                    /* emit this triple only from its FIRST present parent pair,
-                     * so each distinct triple is produced exactly once */
-                    int32_t i3 = g1, j3 = g2, k3 = g3;
-                    sort3(&i3, &j3, &k3);
-                    int rij = pset_rank(i3, j3), rik = pset_rank(i3, k3),
-                        rjk = pset_rank(j3, k3);
-                    int32_t pa, pb;
-                    if      (rij) { pa = i3; pb = j3; }
-                    else if (rik) { pa = i3; pb = k3; }
-                    else          { pa = j3; pb = k3; }
-                    if (pa != ca || pb != cb) continue;
-                    /* smallest cut at which this triple becomes reachable */
-                    int minpar = 0;
-                    if (rij && (!minpar || rij < minpar)) minpar = rij;
-                    if (rik && (!minpar || rik < minpar)) minpar = rik;
-                    if (rjk && (!minpar || rjk < minpar)) minpar = rjk;
+                    /* Emit only from the FIRST present sub-opener, so each
+                     * distinct result is produced exactly once.  Sub-openers are
+                     * enumerated by dropping the LAST word first, which is the
+                     * order the pair case used and keeps its output unchanged. */
+                    int32_t full[4];
+                    for (int w = 0; w < PARENTK; w++) full[w] = pw[w];
+                    full[PARENTK] = gx;
+                    sortk(full, PARENTK + 1);
+                    int32_t canon[3];
+                    int minpar = 0, chosen = 0;
+                    for (int d = PARENTK; d >= 0; d--) {
+                        int32_t sub[3];
+                        int m = 0;
+                        for (int w = 0; w <= PARENTK; w++) if (w != d) sub[m++] = full[w];
+                        int r = pset_rank_sorted(sub);
+                        if (!r) continue;
+                        if (!minpar || r < minpar) minpar = r;
+                        if (!chosen) {
+                            chosen = 1;
+                            for (int w = 0; w < PARENTK; w++) canon[w] = sub[w];
+                        }
+                    }
+                    int mine = chosen;
+                    for (int w = 0; w < PARENTK && mine; w++)
+                        if (canon[w] != cw[w]) mine = 0;
+                    if (!mine) continue;
 
                     ranked[tid]++;
-                    const uint8_t *row3 = PAT + (size_t)g3 * NA;
+                    const uint8_t *rowx = PAT + (size_t)gx * NA;
                     int64_t ssq = 0;
                     int32_t singles = 0, nowin = 0;
                     for (int t = 0; t < nj; t++) {
                         int s2 = jrs[t], e2 = s2 + jrl[t], nt = 0;
-                        /* jk[t] is the PARENT PAIR's joint key, g1's pattern in
-                         * the high trit-block and g2's in the low one -- still
-                         * intact here, since only jcnt was cleared. A bucket
-                         * already all-green on either parent word is a singleton
-                         * the triple did not earn. */
-                        int win12 = jk[t] / NPAT == ALL_GREEN || jk[t] % NPAT == ALL_GREEN;
+                        int win = jwin[t];
                         for (int i = s2; i < e2; i++) {
-                            int pp = row3[ord[i]];
+                            int pp = rowx[ord[i]];
                             if (cnt[pp]++ == 0) tin[nt++] = pp;
                         }
                         for (int i = 0; i < nt; i++) {
@@ -673,12 +728,17 @@ int main(int argc, char **argv) {
                             ssq += v * v;
                             int one = v == 1;
                             singles += one;
-                            nowin += one & !(win12 | (pp == ALL_GREEN));
+                            nowin += one & !(win | (pp == ALL_GREEN));
                             cnt[pp] = 0;
                         }
                     }
-                    Pair pv = { SINGLES ? -(int64_t)singles : ssq, ssq,
-                                g1, g2, g3, minpar, singles, nowin };
+                    Pair pv;
+                    pv.key = SINGLES ? -(int64_t)singles : ssq;
+                    pv.ssq = ssq;
+                    pv.g1 = pw[0]; pv.g2 = pw[1];
+                    pv.g3 = PARENTK == 2 ? gx : pw[2];
+                    pv.g4 = PARENTK == 2 ? -1 : gx;
+                    pv.minpar = minpar; pv.singles = singles; pv.nowin = nowin;
                     if (heap_push(heap, n, top, pv)) announce(pv);
                 }
 
@@ -695,8 +755,8 @@ int main(int argc, char **argv) {
                             frac > 0 ? (el / frac - el) / 60.0 : 0.0);
                 }
             }
-            free(jcnt); free(jk); free(jrs); free(jrl); free(jfl);
-            free(ord); free(cnt); free(tin);
+            free(jrs); free(jrl); free(jwin); free(nrs); free(nrl); free(nwin);
+            free(jfl); free(ord); free(tmp); free(cnt); free(tin);
         }
         goto merge;
     }
@@ -775,8 +835,11 @@ int main(int argc, char **argv) {
                         cnt[p] = 0;
                     }
                 }
-                Pair pv = { SINGLES ? -(int64_t)singles : ssq, ssq,
-                            g1, g2, -1, 0, singles, nowin };
+                Pair pv;
+                pv.key = SINGLES ? -(int64_t)singles : ssq;
+                pv.ssq = ssq;
+                pv.g1 = g1; pv.g2 = g2; pv.g3 = -1; pv.g4 = -1;
+                pv.minpar = 0; pv.singles = singles; pv.nowin = nowin;
                 if (heap_push(heap, n, top, pv)) announce(pv);
             }
 
@@ -815,16 +878,30 @@ merge: ;   /* a label must precede a statement, not a declaration, before C23 */
     FILE *out = fopen(outpath, "w");
     if (!out) { fprintf(stderr, "cannot write %s\n", outpath); return 1; }
     if (extend && SINGLES) {
-        fprintf(out, "word1,word2,word3,singles,singles_nowin,ssq,minparent\n");
-        for (int i = 0; i < keep; i++)
-            fprintf(out, "%s,%s,%s,%d,%d,%lld,%d\n", GWORD[all[i].g1], GWORD[all[i].g2],
-                    GWORD[all[i].g3], all[i].singles, all[i].nowin,
-                    (long long)all[i].ssq, all[i].minpar);
+        if (PARENTK == 3) fprintf(out, "word1,word2,word3,word4,singles,singles_nowin,ssq,minparent\n");
+        else              fprintf(out, "word1,word2,word3,singles,singles_nowin,ssq,minparent\n");
+        for (int i = 0; i < keep; i++) {
+            if (PARENTK == 3)
+                fprintf(out, "%s,%s,%s,%s,%d,%d,%lld,%d\n", GWORD[all[i].g1],
+                        GWORD[all[i].g2], GWORD[all[i].g3], GWORD[all[i].g4],
+                        all[i].singles, all[i].nowin, (long long)all[i].ssq, all[i].minpar);
+            else
+                fprintf(out, "%s,%s,%s,%d,%d,%lld,%d\n", GWORD[all[i].g1],
+                        GWORD[all[i].g2], GWORD[all[i].g3], all[i].singles,
+                        all[i].nowin, (long long)all[i].ssq, all[i].minpar);
+        }
     } else if (extend) {
-        fprintf(out, "word1,word2,word3,ssq,minparent\n");
-        for (int i = 0; i < keep; i++)
-            fprintf(out, "%s,%s,%s,%lld,%d\n", GWORD[all[i].g1], GWORD[all[i].g2],
-                    GWORD[all[i].g3], (long long)all[i].ssq, all[i].minpar);
+        if (PARENTK == 3) fprintf(out, "word1,word2,word3,word4,ssq,minparent\n");
+        else              fprintf(out, "word1,word2,word3,ssq,minparent\n");
+        for (int i = 0; i < keep; i++) {
+            if (PARENTK == 3)
+                fprintf(out, "%s,%s,%s,%s,%lld,%d\n", GWORD[all[i].g1], GWORD[all[i].g2],
+                        GWORD[all[i].g3], GWORD[all[i].g4], (long long)all[i].ssq,
+                        all[i].minpar);
+            else
+                fprintf(out, "%s,%s,%s,%lld,%d\n", GWORD[all[i].g1], GWORD[all[i].g2],
+                        GWORD[all[i].g3], (long long)all[i].ssq, all[i].minpar);
+        }
     } else if (SINGLES) {
         /* its own schema, so the ssq screens every downstream tool already reads
          * keep the exact three columns they expect */
@@ -854,7 +931,7 @@ merge: ;   /* a label must precede a statement, not a declaration, before C23 */
     snprintf(metapath, sizeof metapath, "%s.meta", outpath);
     FILE *mf = fopen(metapath, "w");
     if (mf) {
-        fprintf(mf, "mode=%s\n", extend ? "triple" : "pair");
+        fprintf(mf, "mode=%s\n", extend ? (PARENTK == 3 ? "quad" : "triple") : "pair");
         fprintf(mf, "metric=%s\n", SINGLES ? "singles" : "ssq");
         fprintf(mf, "disjoint=%d\n", DISJOINT);
         fprintf(mf, "guesslist=%s\n", guesslist ? guesslist : "");
@@ -869,14 +946,23 @@ merge: ;   /* a label must precede a statement, not a declaration, before C23 */
             keep >= nranked ? "COMPLETE -- every candidate is in the file"
                             : "TRUNCATED -- the file is the head of the ranking");
 
-    if (extend && SINGLES)
-        fprintf(stderr, "wrote %d DISTINCT triples to %s in %.0fs (most singletons %d: %s %s %s)\n",
-                keep, outpath, now_s() - t0, all[0].singles,
-                GWORD[all[0].g1], GWORD[all[0].g2], GWORD[all[0].g3]);
-    else if (extend)
-        fprintf(stderr, "wrote %d DISTINCT triples to %s in %.0fs (best ssq %lld: %s %s %s)\n",
-                keep, outpath, now_s() - t0, (long long)all[0].ssq,
-                GWORD[all[0].g1], GWORD[all[0].g2], GWORD[all[0].g3]);
+    if (extend) {
+        char lead[64];
+        if (PARENTK == 3)
+            snprintf(lead, sizeof lead, "%s %s %s %s", GWORD[all[0].g1],
+                     GWORD[all[0].g2], GWORD[all[0].g3], GWORD[all[0].g4]);
+        else
+            snprintf(lead, sizeof lead, "%s %s %s", GWORD[all[0].g1],
+                     GWORD[all[0].g2], GWORD[all[0].g3]);
+        if (SINGLES)
+            fprintf(stderr, "wrote %d DISTINCT %s to %s in %.0fs (most singletons %d: %s)\n",
+                    keep, PARENTK == 3 ? "quads" : "triples", outpath,
+                    now_s() - t0, all[0].singles, lead);
+        else
+            fprintf(stderr, "wrote %d DISTINCT %s to %s in %.0fs (best ssq %lld: %s)\n",
+                    keep, PARENTK == 3 ? "quads" : "triples", outpath,
+                    now_s() - t0, (long long)all[0].ssq, lead);
+    }
     else if (SINGLES)
         fprintf(stderr, "wrote %d pairs to %s in %.0fs (most singletons %d: %s %s)\n",
                 keep, outpath, now_s() - t0, all[0].singles,

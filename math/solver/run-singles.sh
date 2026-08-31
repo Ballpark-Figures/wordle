@@ -6,6 +6,7 @@
 #     bash solver/run-singles.sh words            # just the single-word ranking
 #     bash solver/run-singles.sh pairs            # just the pair ranking
 #     bash solver/run-singles.sh triples          # extend the top pairs to triples
+#     bash solver/run-singles.sh quads            # extend the top triples by a 4th word
 #     bash solver/run-singles.sh all              # all three stages
 #     bash solver/run-singles.sh pairs --top 250000
 #     bash solver/run-singles.sh triples --pairs-top 20000
@@ -111,6 +112,8 @@ PATS=data/local/patterns/patterns.npy
 STAGE=both
 TOP=100000          # rows kept; the full ranking is far too large to store
 PAIRSTOP=100000     # pairs fed to the triple stage; about 11 min at this width
+TRIPSTOP=100000     # triples fed to the quad stage
+TRIPFROM=""         # which triple ranking to extend; default is the widest on disk
 THREADS=0           # 0 = let OpenMP pick, which is right on both machines
 ANSWERS=0           # --answers: only the 2315 answer words may open
 DISJOINT=0          # --disjoint: 10 distinct letters per pair, 15 per triple
@@ -118,9 +121,11 @@ EXHAUSTIVE=0        # --exhaustive: feed EVERY pair to the triple stage
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        words|pairs|triples|both|all) STAGE="$1"; shift ;;
+        words|pairs|triples|quads|both|all) STAGE="$1"; shift ;;
         --top)        TOP="$2";      shift 2 ;;
         --pairs-top)  PAIRSTOP="$2"; shift 2 ;;
+        --triples-top) TRIPSTOP="$2"; shift 2 ;;
+        --triples-from) TRIPFROM="$2"; shift 2 ;;
         --threads)    THREADS="$2";  shift 2 ;;
         --answers)    ANSWERS=1;     shift ;;
         --disjoint)   DISJOINT=1;    shift ;;
@@ -276,8 +281,49 @@ if [ "$STAGE" = triples ] || [ "$STAGE" = all ]; then
         2>&1 | tee -a "$LOC/singles.log"
 fi
 
+if [ "$STAGE" = quads ] || [ "$STAGE" = all ]; then
+    [ -x ./solver/pairsplit ] || {
+        echo "no pairsplit binary -- run 'sh build.sh' in solver/" >&2
+        exit 1
+    }
+    # WHICH triple ranking to build on is a real choice, not a default to bury:
+    # an exhaustive parent gives a quad screen with a proven base, a narrow one
+    # does not.  Absent --triples-from, prefer the exhaustive file and say so.
+    if [ -n "$TRIPFROM" ]; then
+        TSRC="$TRIPFROM"
+    elif [ -f "$SHARED/triple_singletons${SUF}_exhaustive.csv" ]; then
+        TSRC="$SHARED/triple_singletons${SUF}_exhaustive.csv"
+    else
+        # An EMPTY $SUF makes triple_singletons_* match the _answers_ and
+        # _disjoint_ files too, so an unrestricted run could silently build on a
+        # restricted parent -- a different search wearing the same prefix. Keep
+        # only names whose restriction is exactly this run's.
+        TSRC=$(ls -1S "$SHARED"/triple_singletons${SUF}_*.csv 2>/dev/null \
+               | grep -vE "_(answers|disjoint)" | head -1)
+        [ -n "$SUF" ] && TSRC=$(ls -1S "$SHARED"/triple_singletons${SUF}_*.csv 2>/dev/null | head -1)
+    fi
+    [ -n "$TSRC" ] && [ -f "$TSRC" ] || {
+        echo "no triple ranking found for this restriction" >&2
+        echo "run the triple stage first, or pass --triples-from FILE" >&2
+        exit 1
+    }
+    echo "parent triples: $TSRC" | tee -a "$LOC/singles.log"
+    TCUT="$LOC/triples${SUF}_top$TRIPSTOP.csv"
+    head -n $((TRIPSTOP + 1)) "$TSRC" > "$TCUT"
+    NTRI=$(( $(grep -c . "$TCUT") - 1 ))
+    QUADOUT="$SHARED/quad_singletons${SUF}_t$NTRI.csv"
+    TFLAG=""
+    [ "$THREADS" -gt 0 ] && TFLAG="--threads $THREADS"
+    # NO --disjoint here even under --disjoint: four disjoint words need 20 of
+    # the 26 letters, a far harsher cut than the triple stage's 15, and the ask
+    # was any 4th word.  Pass --disjoint explicitly to pairsplit if you want it.
+    ./solver/pairsplit --metric singles --extend "$TCUT" --top "$TOP" \
+        --out "$QUADOUT" $GLIST $TFLAG \
+        2>&1 | tee -a "$LOC/singles.log"
+fi
+
 echo "wrote:" | tee -a "$LOC/singles.log"
-for f in "$SHARED/guess_singletons$SUF.csv" "$PAIROUT" "$LOC/pair_singletons${SUF}_all.csv" ${TRIOUT:-}; do
+for f in "$SHARED/guess_singletons$SUF.csv" "$PAIROUT" "$LOC/pair_singletons${SUF}_all.csv" ${TRIOUT:-} ${QUADOUT:-}; do
     [ -f "$f" ] && echo "  $f" | tee -a "$LOC/singles.log"
 done
 # Every triple file for this restriction, so a run that did NOT touch the widest
