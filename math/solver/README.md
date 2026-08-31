@@ -529,7 +529,25 @@ bash solver/run-singles.sh pairs        # 84129906 blind pairs (~22s)
 bash solver/run-singles.sh triples      # extend the top pairs (~11 min)
 bash solver/run-singles.sh all          # all three
 bash solver/run-singles.sh triples --pairs-top 20000
+
+bash solver/run-singles.sh all --answers                  # answer words only
+bash solver/run-singles.sh pairs   --answers --exhaustive # ~1s
+bash solver/run-singles.sh triples --answers --exhaustive # ~40-45 min
 ```
+
+**`--answers` restricts which words may OPEN** to the 2315 answers — the same
+restriction `--guess-list mystery.txt` applies to the solver — and writes to its
+own `*_answers.csv` files, never over the unrestricted ones. The answer set is
+unchanged, so the counts mean the same thing; there are just
+C(2315, 2) = 2,678,455 pairs instead of 84M, which the pair stage clears in about
+a second.
+
+**`--answers --exhaustive` makes the triple stage a PROOF, not a screen.** It
+feeds *every* answer pair to the extension, so all
+C(2315, 3) = 2,067,969,935 answer triples are reached and the head of
+`triple_singletons_answers.csv` is the true maximum. This is the one
+configuration here where the greedy caveat does not apply. The full parent list
+is ~70 MB, so it goes to `data/local/`; only the triple ranking is committed.
 
 Writes `guess_singletons.csv`, `pair_singletons.csv` and
 `triple_singletons.csv` under `data/shared/singletons/`, log in

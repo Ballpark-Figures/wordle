@@ -6,7 +6,15 @@ This counts them, per guess, over the whole guess list.
 
     python3 tools/singletons.py            # 12972 guesses vs the 2315 answers
     python3 tools/singletons.py --full     # ... vs all 12972 words as answers
+    python3 tools/singletons.py --answers  # rank only the 2315 answer words
     python3 tools/singletons.py --top 50   # longer printed head
+
+--answers RESTRICTS WHICH WORDS ARE RANKED, not what they are counted against.
+It drops every guess that is not itself one of the 2315 answers, which is the
+same restriction `optturns --guess-list mystery.txt` applies to the solver. The
+counts are unchanged -- a word scores what it always scored -- so this is a
+filter on the rows, and ranks shift only because the field is smaller. Do not
+confuse it with --full, which changes the answer set and therefore the counts.
 
 THE ANSWER SET IS PART OF THE QUESTION, not a detail. A bucket's size is counted
 over whichever answer list the pattern matrix was built against, so the default
@@ -40,13 +48,19 @@ from build_patterns import load_patterns  # noqa: E402
 from wordle import all_green, load_words  # noqa: E402
 
 FULL = "--full" in sys.argv
+ANSWERS_ONLY = "--answers" in sys.argv
 TOP = 25
 if "--top" in sys.argv:
     TOP = int(sys.argv[sys.argv.index("--top") + 1])
 
 _MATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 OUT_DIR = os.path.join(_MATH, "data", "shared", "singletons")
-OUT = os.path.join(OUT_DIR, "guess_singletons_full.csv" if FULL else "guess_singletons.csv")
+_NAME = "guess_singletons"
+if FULL:
+    _NAME += "_full"
+if ANSWERS_ONLY:
+    _NAME += "_answers"
+OUT = os.path.join(OUT_DIR, _NAME + ".csv")
 
 guesses = load_words("guess")
 answers = guesses if FULL else load_words("mystery")
@@ -73,17 +87,23 @@ for lo in range(0, len(guesses), CHUNK):
     win_is_single[lo:lo + n] = hist[:, WIN] == 1
 nowin = singles - win_is_single
 
-order = sorted(range(len(guesses)), key=lambda i: (-singles[i], guesses[i]))
+keep = range(len(guesses))
+if ANSWERS_ONLY:
+    answer_set = set(load_words("mystery"))
+    keep = [i for i in keep if guesses[i] in answer_set]
+order = sorted(keep, key=lambda i: (-singles[i], guesses[i]))
 os.makedirs(OUT_DIR, exist_ok=True)
 with open(OUT, "w") as f:
-    f.write("# singleton feedback patterns per guess, over %d answers (%s)\n"
-            % (len(answers), "all words" if FULL else "the 2315 mystery answers"))
+    f.write("# singleton feedback patterns per guess, over %d answers (%s)%s\n"
+            % (len(answers), "all words" if FULL else "the 2315 mystery answers",
+               "; ranking restricted to answer words" if ANSWERS_ONLY else ""))
     f.write("word,singletons,singletons_nowin,rank\n")
     for r, i in enumerate(order, 1):
         f.write("%s,%d,%d,%d\n" % (guesses[i], singles[i], nowin[i], r))
 
-print("%d guesses x %d answers, %d patterns, %.1fs" %
-      (len(guesses), len(answers), NPAT, time.time() - t0))
+print("%d guesses x %d answers, %d patterns, %.1fs%s" %
+      (len(guesses), len(answers), NPAT, time.time() - t0,
+       "  (ranking %d answer words)" % len(order) if ANSWERS_ONLY else ""))
 print("wrote %s\n" % os.path.relpath(OUT, _MATH))
 print("%7s %12s %14s %8s" % ("word", "singletons", "singletons_nowin", "rank"))
 for r, i in enumerate(order[:TOP], 1):
@@ -91,5 +111,7 @@ for r, i in enumerate(order[:TOP], 1):
 print("...")
 for r, i in list(enumerate(order, 1))[-3:]:
     print("%7s %12d %14d %8d" % (guesses[i], singles[i], nowin[i], r))
-print("\nmean %.1f, median %d, max %d, min %d over %d guesses"
-      % (singles.mean(), int(np.median(singles)), singles.max(), singles.min(), len(guesses)))
+kept = singles[list(order)]
+print("\nmean %.1f, median %d, max %d, min %d over %d %s"
+      % (kept.mean(), int(np.median(kept)), kept.max(), kept.min(), len(kept),
+         "answer words" if ANSWERS_ONLY else "guesses"))
