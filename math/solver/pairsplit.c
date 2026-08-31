@@ -18,14 +18,23 @@
  * N.  Whatever comes out of the exact stage that follows is "best of the N pairs
  * screened", never "the optimal pair".  Say it that way.
  *
- * --metric singles RANKS BY A DIFFERENT QUANTITY, and the sentence above does
- * NOT apply to it in the same way.  A joint bucket of size one is a SINGLETON:
- * that pair of patterns is returned by exactly one answer, so seeing it names
- * the answer outright.  Ranking by how many singletons a pair produces is not a
- * proxy for anything -- it IS the quantity being asked for -- and since every
- * unordered pair is enumerated, the emitted head is the exact top of that
- * ranking, not a screen for a later stage.  It is still not a claim about
- * guesses-to-solve: a pair can win the singleton count and lose on total.
+ * --metric singles RANKS BY A DIFFERENT QUANTITY, and the sentence above applies
+ * to it differently in each mode.  A joint bucket of size one is a SINGLETON:
+ * that combination of patterns is returned by exactly one answer, so seeing it
+ * names the answer outright.  Ranking by how many singletons an opener produces
+ * is not a proxy for anything -- it IS the quantity being asked for.
+ *
+ *   PAIR mode is EXHAUSTIVE.  Every unordered pair is enumerated, so the emitted
+ *   head is the exact top of the ranking, not a screen for a later stage.
+ *
+ *   --extend (TRIPLE mode) is NOT.  It only ever sees triples reachable from a
+ *   pair in the file it is given, so the greedy caveat above applies in full: a
+ *   triple whose every two-word prefix missed the pair cut cannot be found, at
+ *   any width.  Its head is "best of the triples screened", never "the best
+ *   triple", whichever metric is steering.
+ *
+ * Neither is a claim about guesses-to-solve: an opener can win the singleton
+ * count and lose on total.
  *
  * Both quantities come out of the same pass -- ssq sums |bucket|^2 while the
  * singleton count sums (|bucket| == 1) -- so --metric only decides which one
@@ -298,13 +307,6 @@ int main(int argc, char **argv) {
         else { fprintf(stderr, "unknown arg: %s\n", argv[i]); return 1; }
     }
     if (!outpath) { fprintf(stderr, "pairsplit needs --out FILE\n"); return 1; }
-    /* The triple path counts singletons in its drain loop too, but nothing has
-     * checked that number against a reference, so it is refused rather than
-     * emitted untested. */
-    if (SINGLES && extend) {
-        fprintf(stderr, "--metric singles is pair-mode only, not --extend\n");
-        return 1;
-    }
 
     char path[1024];
     GWORD = malloc(sizeof(char[WBUF]) * 13000);
@@ -463,8 +465,15 @@ int main(int argc, char **argv) {
 
                     const uint8_t *row3 = PAT + (size_t)g3 * NA;
                     int64_t ssq = 0;
+                    int32_t singles = 0, nowin = 0;
                     for (int t = 0; t < nj; t++) {
                         int s2 = jrs[t], e2 = s2 + jrl[t], nt = 0;
+                        /* jk[t] is the PARENT PAIR's joint key, g1's pattern in
+                         * the high trit-block and g2's in the low one -- still
+                         * intact here, since only jcnt was cleared. A bucket
+                         * already all-green on either parent word is a singleton
+                         * the triple did not earn. */
+                        int win12 = jk[t] / NPAT == ALL_GREEN || jk[t] % NPAT == ALL_GREEN;
                         for (int i = s2; i < e2; i++) {
                             int pp = row3[ord[i]];
                             if (cnt[pp]++ == 0) tin[nt++] = pp;
@@ -473,10 +482,14 @@ int main(int argc, char **argv) {
                             int pp = tin[i];
                             int64_t v = cnt[pp];
                             ssq += v * v;
+                            int one = v == 1;
+                            singles += one;
+                            nowin += one & !(win12 | (pp == ALL_GREEN));
                             cnt[pp] = 0;
                         }
                     }
-                    Pair pv = { ssq, ssq, g1, g2, g3, minpar, 0, 0 };
+                    Pair pv = { SINGLES ? -(int64_t)singles : ssq, ssq,
+                                g1, g2, g3, minpar, singles, nowin };
                     heap_push(heap, n, top, pv);
                 }
 
@@ -608,7 +621,13 @@ merge: ;   /* a label must precede a statement, not a declaration, before C23 */
 
     FILE *out = fopen(outpath, "w");
     if (!out) { fprintf(stderr, "cannot write %s\n", outpath); return 1; }
-    if (extend) {
+    if (extend && SINGLES) {
+        fprintf(out, "word1,word2,word3,singles,singles_nowin,ssq,minparent\n");
+        for (int i = 0; i < keep; i++)
+            fprintf(out, "%s,%s,%s,%d,%d,%lld,%d\n", GWORD[all[i].g1], GWORD[all[i].g2],
+                    GWORD[all[i].g3], all[i].singles, all[i].nowin,
+                    (long long)all[i].ssq, all[i].minpar);
+    } else if (extend) {
         fprintf(out, "word1,word2,word3,ssq,minparent\n");
         for (int i = 0; i < keep; i++)
             fprintf(out, "%s,%s,%s,%lld,%d\n", GWORD[all[i].g1], GWORD[all[i].g2],
@@ -628,7 +647,11 @@ merge: ;   /* a label must precede a statement, not a declaration, before C23 */
     }
     fclose(out);
 
-    if (extend)
+    if (extend && SINGLES)
+        fprintf(stderr, "wrote %d DISTINCT triples to %s in %.0fs (most singletons %d: %s %s %s)\n",
+                keep, outpath, now_s() - t0, all[0].singles,
+                GWORD[all[0].g1], GWORD[all[0].g2], GWORD[all[0].g3]);
+    else if (extend)
         fprintf(stderr, "wrote %d DISTINCT triples to %s in %.0fs (best ssq %lld: %s %s %s)\n",
                 keep, outpath, now_s() - t0, (long long)all[0].ssq,
                 GWORD[all[0].g1], GWORD[all[0].g2], GWORD[all[0].g3]);

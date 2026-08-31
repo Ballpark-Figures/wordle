@@ -523,23 +523,34 @@ it names the answer outright. This ranks openers by how many they have.
 
 ```sh
 # from math/
-bash solver/run-singles.sh              # both stages
+bash solver/run-singles.sh              # words + pairs
 bash solver/run-singles.sh words        # 12972 single words   (~0.1s)
 bash solver/run-singles.sh pairs        # 84129906 blind pairs (~22s)
-bash solver/run-singles.sh pairs --top 250000
+bash solver/run-singles.sh triples      # extend the top pairs (~11 min)
+bash solver/run-singles.sh all          # all three
+bash solver/run-singles.sh triples --pairs-top 20000
 ```
 
-Writes `data/shared/singletons/guess_singletons.csv` and
-`data/shared/singletons/pair_singletons.csv`, log in `data/local/singletons/`.
-The word stage is `tools/singletons.py` (numpy); the pair stage is `pairsplit`
-with `--metric singles`, which counts joint buckets of size 1 in the same pass
-that computes `ssq` — the flag picks the sort key and the output columns, nothing
-else. `--metric singles` is pair-mode only; it refuses `--extend`.
+Writes `guess_singletons.csv`, `pair_singletons.csv` and
+`triple_singletons.csv` under `data/shared/singletons/`, log in
+`data/local/singletons/`. The word stage is `tools/singletons.py` (numpy); the
+pair and triple stages are `pairsplit` with `--metric singles`, which counts
+joint buckets of size 1 in the same pass that computes `ssq` — the flag picks the
+sort key and the output columns, nothing else.
 
-**This one is EXHAUSTIVE, unlike the ssq screen.** Every word and every unordered
-pair is evaluated, so the head of each file is the exact top of the ranking, not
-a heuristic shortlist feeding a later exact stage. The `--top N` cut only bounds
-what is written.
+**Words and pairs are EXHAUSTIVE, unlike the ssq screen.** Every word and every
+unordered pair is evaluated, so the head of those two files is the exact top of
+the ranking, not a heuristic shortlist feeding a later exact stage. The `--top N`
+cut only bounds what is written.
+
+**Triples are NOT, and cannot be.** C(12972, 3) is 3.6e11, so the triple stage
+extends only the top `--pairs-top` pairs by every third word — the same greedy
+construction as the ssq triple screen, and it carries the same caveat: a triple
+is reachable only if one of its three word *pairs* ranks inside the cut, so a
+strong triple built from three individually mediocre pairs cannot be found at any
+width. Report its head as "best of the triples screened". `minparent` is the best
+rank among the triple's parent pairs in this ranking, so filtering one wide run
+to `minparent <= N` reconstructs exactly what an N-pair run would have produced.
 
 **It is not a claim about guesses-to-solve.** An opener can lead this ranking and
 lose badly on total guesses — singling out many answers says nothing about how
