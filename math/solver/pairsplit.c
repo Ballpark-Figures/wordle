@@ -226,6 +226,48 @@ static int find_word(char (*list)[WBUF], int n, const char *w) {
     return -1;
 }
 
+/* ---- word -> index, in O(1) ---------------------------------------------
+ * find_word is a LINEAR scan, which is fine for a --guess-list read once but
+ * quadratic where it matters: a parent file is one lookup per row against 12972
+ * words, so 5,020,842 disjoint parents cost ~65 BILLION string compares before
+ * any scoring starts -- long enough to look like a hang.  This is the same table
+ * keyed by the word text, built once.
+ *
+ * Open addressing, power-of-two mask, load factor under 25%: no deletions, no
+ * resizing, and the keys are 5 bytes, so nothing fancier earns its complexity. */
+static int32_t *WIDX;
+static int      WIDX_MASK;
+
+static uint64_t whash(const char *w) {
+    uint64_t h = 1469598103934665603ULL;          /* FNV-1a */
+    for (const unsigned char *p = (const unsigned char *)w; *p; p++)
+        h = (h ^ *p) * 1099511628211ULL;
+    return h;
+}
+
+static void widx_build(void) {
+    int bits = 1;
+    while ((1 << bits) < NG * 4) bits++;
+    WIDX_MASK = (1 << bits) - 1;
+    WIDX = malloc(sizeof(int32_t) * ((size_t)WIDX_MASK + 1));
+    for (int i = 0; i <= WIDX_MASK; i++) WIDX[i] = -1;
+    for (int g = 0; g < NG; g++) {
+        uint64_t h = whash(GWORD[g]);
+        while (WIDX[h & WIDX_MASK] >= 0) h++;
+        WIDX[h & WIDX_MASK] = g;
+    }
+}
+
+static int lookup_word(const char *w) {
+    uint64_t h = whash(w);
+    for (;;) {
+        int32_t g = WIDX[h & WIDX_MASK];
+        if (g < 0) return -1;
+        if (!strcmp(GWORD[g], w)) return g;
+        h++;
+    }
+}
+
 static int cmp_pair(const void *a, const void *b) {
     const Pair *x = a, *y = b;
     if (x->key != y->key) return x->key < y->key ? -1 : 1;
@@ -407,6 +449,7 @@ int main(int argc, char **argv) {
     PAT = load_npy(path, &r, &c);
     NA = c;
     if (r != NG) { fprintf(stderr, "pattern rows %d != guesses %d\n", r, NG); return 1; }
+    widx_build();
     fprintf(stderr, "loaded %d guesses x %d answers\n", NG, NA);
 
     if (maxg1 > 0)
@@ -483,16 +526,32 @@ int main(int argc, char **argv) {
      * unordered here is a statement about the SCORE, not a claim that order is
      * irrelevant downstream. */
     if (extend) {
-        Pair *plist = malloc(sizeof(Pair) * 4000000);
-        int npl = 0;
+        /* GROWS.  This was a fixed 4,000,000 entries with no bounds check, which
+         * was silently fine while every parent file came from a --top cut at or
+         * below that, and became a heap overflow the moment --disjoint produced
+         * 5,020,842 parents: the run died with no message and no output, looking
+         * for all the world like it had finished.  A parent count is an INPUT,
+         * so it gets no compile-time ceiling. */
+        int pcap = 1 << 20, npl = 0;
+        Pair *plist = malloc(sizeof(Pair) * pcap);
+        if (!plist) { fprintf(stderr, "out of memory for the parent list\n"); return 1; }
         FILE *pf = fopen(extend, "r");
         if (!pf) { fprintf(stderr, "cannot open %s\n", extend); return 1; }
         char line[256];
         while (fgets(line, sizeof line, pf)) {
             char w1[64], w2[64];
             if (sscanf(line, "%63[^,],%63[^,],", w1, w2) != 2) continue;
-            int a = find_word(GWORD, NG, w1), b = find_word(GWORD, NG, w2);
+            int a = lookup_word(w1), b = lookup_word(w2);
             if (a < 0 || b < 0) continue;            /* the header lands here */
+            if (npl == pcap) {
+                pcap *= 2;
+                Pair *grown = realloc(plist, sizeof(Pair) * (size_t)pcap);
+                if (!grown) {
+                    fprintf(stderr, "out of memory growing the parent list to %d\n", pcap);
+                    return 1;
+                }
+                plist = grown;
+            }
             plist[npl].g1 = a; plist[npl].g2 = b; plist[npl].g3 = -1;
             plist[npl].key = 0; plist[npl].ssq = 0; npl++;
         }
