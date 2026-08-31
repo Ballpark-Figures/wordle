@@ -362,6 +362,14 @@ static void sort3(int32_t *a, int32_t *b, int32_t *c) {
 static int64_t BEST_KEY = INT64_MAX;
 static double  T0;
 
+/* Progress is TIME-throttled, the same mechanism optturns.c uses (`now_s() -
+ * last_report > 30.0`).  The interval differs deliberately: optturns reports on
+ * a sweep that runs for days, while these runs finish in seconds to minutes, and
+ * a 30s gate would emit two lines for the whole job.  The counter test in front
+ * is only there to keep 5 million clock reads out of the loop. */
+#define REPORT_SECS 1.0
+static double LAST_REPORT;
+
 static void announce(Pair v) {
     int64_t seen;
 #ifdef _OPENMP
@@ -376,11 +384,18 @@ static void announce(Pair v) {
         if (v.key < BEST_KEY) {
             BEST_KEY = v.key;
             double dt = now_s() - T0;
+            /* Same shape as optturns.c's NEW BEST lines -- [%7.0fs], two spaces
+             * between fields -- so the two solvers read alike.  Two deliberate
+             * differences: this stays on stderr, where every other pairsplit
+             * status line already goes, and it does NOT print TIED.  optturns
+             * can afford TIED because it walks a short candidate list; here a
+             * few hundred distinct values across 84M candidates would bury the
+             * improvements under their own ties. */
             if (v.g3 >= 0)
-                fprintf(stderr, "[%6.0fs] %s %s %s  ", dt, GWORD[v.g1], GWORD[v.g2],
+                fprintf(stderr, "[%7.0fs] %s %s %s  ", dt, GWORD[v.g1], GWORD[v.g2],
                         GWORD[v.g3]);
             else
-                fprintf(stderr, "[%6.0fs] %s %s  ", dt, GWORD[v.g1], GWORD[v.g2]);
+                fprintf(stderr, "[%7.0fs] %s %s  ", dt, GWORD[v.g1], GWORD[v.g2]);
             if (SINGLES)
                 fprintf(stderr, "singles=%d  nowin=%d  ssq=%lld  NEW BEST\n",
                         v.singles, v.nowin, (long long)v.ssq);
@@ -509,6 +524,7 @@ int main(int argc, char **argv) {
 
     double t0 = now_s();
     T0 = t0;
+    LAST_REPORT = t0;
     int64_t done_g1 = 0;
 
     /* ------------------------------------------------------- TRIPLE MODE ----
@@ -670,7 +686,8 @@ int main(int argc, char **argv) {
 #pragma omp atomic
 #endif
                 done_g1++;
-                if ((done_g1 & 255) == 0) {
+                if ((done_g1 & 63) == 0 && now_s() - LAST_REPORT >= REPORT_SECS) {
+                    LAST_REPORT = now_s();
                     double el = now_s() - t0;
                     double frac = (double)done_g1 / npl;
                     fprintf(stderr, "  pair %lld/%d  %.1f%%  (%.0fs, eta %.1f min)\n",
@@ -767,7 +784,8 @@ int main(int argc, char **argv) {
 #pragma omp atomic
 #endif
             done_g1++;
-            if ((done_g1 & 255) == 0) {
+            if ((done_g1 & 63) == 0 && now_s() - LAST_REPORT >= REPORT_SECS) {
+                LAST_REPORT = now_s();
                 /* Work is QUADRATIC in the remaining g1 range -- g1 near NG has
                  * almost no g2 partners left -- so progress must be measured in
                  * PAIRS retired, not in g1 values retired.  Scaling by g1/NG
