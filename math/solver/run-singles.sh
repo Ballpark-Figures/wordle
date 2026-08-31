@@ -9,6 +9,8 @@
 #     bash solver/run-singles.sh quads --disjoint-triples   # disjoint parents, ANY 4th word
 #     bash solver/run-singles.sh quads --disjoint            # 20 distinct letters, all four
 #     bash solver/run-singles.sh quads --disjoint --triples-top all   # every parent
+#     bash solver/run-singles.sh quints --disjoint-quads   # disjoint quads, ANY 5th word
+#     bash solver/run-singles.sh quints --disjoint         # 25 distinct letters, all five
 #     bash solver/run-singles.sh all              # all three stages
 #     bash solver/run-singles.sh pairs --top 250000
 #     bash solver/run-singles.sh triples --pairs-top 20000
@@ -129,11 +131,14 @@ THREADS=0           # 0 = let OpenMP pick, which is right on both machines
 ANSWERS=0           # --answers: only the 2315 answer words may open
 DISJOINT=0          # --disjoint: every word of the opener shares no letter
 DISJTRI=0           # --disjoint-triples: disjoint PARENTS only, 4th word free
+DISJQUAD=0          # --disjoint-quads: disjoint PARENTS only, 5th word free
+QUADSTOP=100000     # quads fed to the quint stage; "all" for every one
+QUADFROM=""         # which quad ranking to extend
 EXHAUSTIVE=0        # --exhaustive: feed EVERY pair to the triple stage
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        words|pairs|triples|quads|both|all) STAGE="$1"; shift ;;
+        words|pairs|triples|quads|quints|both|all) STAGE="$1"; shift ;;
         --top)        TOP="$2";      shift 2 ;;
         --pairs-top)  PAIRSTOP="$2"; shift 2 ;;
         --triples-top) TRIPSTOP="$2"; shift 2 ;;
@@ -142,6 +147,9 @@ while [ $# -gt 0 ]; do
         --answers)    ANSWERS=1;     shift ;;
         --disjoint)   DISJOINT=1;    shift ;;
         --disjoint-triples) DISJTRI=1; shift ;;
+        --disjoint-quads)   DISJQUAD=1; shift ;;
+        --quads-top)   QUADSTOP="$2"; shift 2 ;;
+        --quads-from)  QUADFROM="$2"; shift 2 ;;
         --exhaustive) EXHAUSTIVE=1;  shift ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
     esac
@@ -189,6 +197,11 @@ fi
 if [ "$DISJTRI" = 1 ] && [ "$STAGE" != quads ] && [ "$STAGE" != all ]; then
     echo "--disjoint-triples only applies to the quads stage; use --disjoint" >&2
     echo "to restrict the pair or triple stages themselves." >&2
+    exit 1
+fi
+if [ "$DISJQUAD" = 1 ] && [ "$STAGE" != quints ] && [ "$STAGE" != all ]; then
+    echo "--disjoint-quads only applies to the quints stage; use --disjoint" >&2
+    echo "to restrict the earlier stages themselves." >&2
     exit 1
 fi
 
@@ -407,8 +420,64 @@ if [ "$STAGE" = quads ] || [ "$STAGE" = all ]; then
         2>&1 | tee -a "$LOC/singles.log"
 fi
 
+if [ "$STAGE" = quints ] || [ "$STAGE" = all ]; then
+    [ -x ./solver/pairsplit ] || {
+        echo "no pairsplit binary -- run 'sh build.sh' in solver/" >&2
+        exit 1
+    }
+    # Same shape as the quad stage one level up: --disjoint-quads borrows the
+    # disjoint quad ranking as parents without inheriting the letter rule, while
+    # --disjoint carries it through to the 5th word (25 of 26 letters).
+    QQSUF="$SUF"
+    QQDFLAG="$DFLAG"
+    if [ "$DISJQUAD" = 1 ]; then
+        QQSUF="${SUF}_disjoint"
+        QQDFLAG=""
+    fi
+    if [ -n "$QUADFROM" ]; then
+        QSRC="$QUADFROM"
+    else
+        QSRC=$(ls -1S "$SHARED"/quad_singletons${QQSUF}_*.csv 2>/dev/null | head -1)
+        [ -z "$QQSUF" ] && QSRC=$(ls -1S "$SHARED"/quad_singletons_*.csv 2>/dev/null \
+                                 | grep -vE "_(answers|disjoint)" | head -1)
+    fi
+    [ -n "$QSRC" ] && [ -f "$QSRC" ] || {
+        echo "no quad ranking found for this restriction" >&2
+        echo "run the quads stage first, or pass --quads-from FILE" >&2
+        exit 1
+    }
+    echo "parent quads: $QSRC" | tee -a "$LOC/singles.log"
+    if [ "$DISJOINT" = 1 ]; then
+        echo "5th word: DISJOINT -- 25 distinct letters across all five." \
+            | tee -a "$LOC/singles.log"
+    else
+        echo "5th word: unrestricted -- any of the 12972 legal words." \
+            | tee -a "$LOC/singles.log"
+    fi
+    NQSRC=$(rows_in "$QSRC")
+    [ "$QUADSTOP" = all ] && QUADSTOP="$NQSRC"
+    if [ "$QUADSTOP" -ge "$NQSRC" ]; then
+        QCUT="$QSRC"; NQUAD="$NQSRC"
+    else
+        QCUT="$LOC/quads${QQSUF}_top$QUADSTOP.csv"
+        head -n $((QUADSTOP + 1)) "$QSRC" > "$QCUT"
+        NQUAD="$QUADSTOP"
+    fi
+    QNAME2="$SUF"
+    [ "$DISJQUAD" = 1 ] && QNAME2="${SUF}_disjointquads"
+    QUINTOUT="$SHARED/quint_singletons${QNAME2}_q$NQUAD.csv"
+    TFLAG=""
+    [ "$THREADS" -gt 0 ] && TFLAG="--threads $THREADS"
+    QQPCFLAG=$(parents_complete_flag "$QSRC" "$NQUAD")
+    [ -n "$QQPCFLAG" ] && echo "parents are complete: skipping the parent table" \
+        | tee -a "$LOC/singles.log"
+    ./solver/pairsplit --metric singles --extend "$QCUT" --top "$TOP" \
+        --out "$QUINTOUT" $GLIST $QQDFLAG $QQPCFLAG --parent-count "$NQUAD" $TFLAG \
+        2>&1 | tee -a "$LOC/singles.log"
+fi
+
 echo "wrote:" | tee -a "$LOC/singles.log"
-for f in "$SHARED/guess_singletons$SUF.csv" "$PAIROUT" "$LOC/pair_singletons${SUF}_all.csv" ${TRIOUT:-} ${QUADOUT:-}; do
+for f in "$SHARED/guess_singletons$SUF.csv" "$PAIROUT" "$LOC/pair_singletons${SUF}_all.csv" ${TRIOUT:-} ${QUADOUT:-} ${QUINTOUT:-}; do
     [ -f "$f" ] && echo "  $f" | tee -a "$LOC/singles.log"
 done
 # Every triple file for this restriction, so a run that did NOT touch the widest
