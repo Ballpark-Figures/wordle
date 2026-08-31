@@ -11,6 +11,10 @@
 #     bash solver/run-singles.sh quads --disjoint --triples-top all   # every parent
 #     bash solver/run-singles.sh quints --disjoint-quads   # disjoint quads, ANY 5th word
 #     bash solver/run-singles.sh quints --disjoint         # 25 distinct letters, all five
+#
+#     bash solver/run-singles.sh quads --min-letters 19 --triples-from FILE
+#         at least 19 distinct letters across the four, rather than all 20. The
+#         general form: --disjoint is exactly --min-letters (5 x words).
 #     bash solver/run-singles.sh all              # all three stages
 #     bash solver/run-singles.sh pairs --top 250000
 #     bash solver/run-singles.sh triples --pairs-top 20000
@@ -130,6 +134,7 @@ TRIPFROM=""         # which triple ranking to extend; default is the widest on d
 THREADS=0           # 0 = let OpenMP pick, which is right on both machines
 ANSWERS=0           # --answers: only the 2315 answer words may open
 DISJOINT=0          # --disjoint: every word of the opener shares no letter
+MINLET=0            # --min-letters N: at least N distinct letters in the opener
 DISJTRI=0           # --disjoint-triples: disjoint PARENTS only, 4th word free
 DISJQUAD=0          # --disjoint-quads: disjoint PARENTS only, 5th word free
 QUADSTOP=100000     # quads fed to the quint stage; "all" for every one
@@ -146,6 +151,7 @@ while [ $# -gt 0 ]; do
         --threads)    THREADS="$2";  shift 2 ;;
         --answers)    ANSWERS=1;     shift ;;
         --disjoint)   DISJOINT=1;    shift ;;
+        --min-letters) MINLET="$2";  shift 2 ;;
         --disjoint-triples) DISJTRI=1; shift ;;
         --disjoint-quads)   DISJQUAD=1; shift ;;
         --quads-top)   QUADSTOP="$2"; shift 2 ;;
@@ -187,6 +193,13 @@ fi
 if [ "$DISJOINT" = 1 ]; then
     SUF="${SUF}_disjoint"
     DFLAG="--disjoint"
+fi
+# --min-letters is the general form; --disjoint is its maximum. They get
+# different file names because they are different searches: 19-of-20 admits
+# openers 20 rejects, so sharing a name would let one overwrite the other.
+if [ "$MINLET" != 0 ]; then
+    SUF="${SUF}_L$MINLET"
+    DFLAG="--min-letters $MINLET"
 fi
 
 # Exhaustive means EVERY pair is a parent, so the pair stage must keep them all,

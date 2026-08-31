@@ -75,6 +75,15 @@ static uint8_t *PAT;                 /* NG * NA, row-major */
 static char   (*GWORD)[WBUF];
 static int      SINGLES = 0;         /* --metric singles: rank by singleton count */
 static int      DISJOINT = 0;        /* --disjoint: no letter may repeat across the opener */
+/* --min-letters M: keep openers whose words cover at least M DISTINCT letters.
+ *
+ * --disjoint is the maximum of this -- 5 per word, so 20 for a quad -- and is
+ * kept as the shorthand for it.  Asking for 19 instead admits one collision
+ * anywhere in the opener, which is a much larger space than 20 and a much
+ * smaller one than unrestricted, and is not expressible as a disjointness test.
+ * MINLET is resolved once the opener size is known, since --disjoint means a
+ * different number at every size. */
+static int      MINLET = 0;          /* 0 = no letter requirement */
 static uint32_t *LMASK;              /* per word, bit i set iff letter i occurs */
 
 /* ---- letter masks, for --disjoint ---------------------------------------
@@ -84,11 +93,7 @@ static uint32_t *LMASK;              /* per word, bit i set iff letter i occurs 
  * 5 bits and overlap nowhere -- which makes the whole test one AND and one
  * branch, cheap enough to sit in front of the scoring loop and reject 94% of
  * pairs before any work happens. */
-static int popcount32(uint32_t x) {
-    int n = 0;
-    while (x) { x &= x - 1; n++; }
-    return n;
-}
+static int popcount32(uint32_t x) { return __builtin_popcount(x); }
 
 static void build_masks(int wordlen) {
     LMASK = malloc(sizeof(uint32_t) * NG);
@@ -477,6 +482,8 @@ int main(int argc, char **argv) {
          * makes an EXHAUSTIVE triple sweep possible at all; the answer is then
          * the best DISJOINT opener, a different and smaller claim. */
         else if (!strcmp(argv[i], "--disjoint")) DISJOINT = 1;
+        else if (!strcmp(argv[i], "--min-letters") && i + 1 < argc)
+            MINLET = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--parents-complete")) PARENTS_COMPLETE = 1;
         else if (!strcmp(argv[i], "--parent-count") && i + 1 < argc)
             PARENT_COUNT = strtoll(argv[++i], NULL, 10);
@@ -534,16 +541,26 @@ int main(int argc, char **argv) {
     }
 
     build_masks(5);
-    if (DISJOINT) {
-        /* A word with a repeated letter can never be in a disjoint opener, so
-         * drop it from the opener set once here rather than testing it inside
-         * the quadratic loop. */
-        int kept = 0;
-        for (int i = 0; i < nsel; i++)
-            if (popcount32(LMASK[sel[i]]) == 5) sel[kept++] = sel[i];
-        fprintf(stderr, "--disjoint: %d of %d openers have 5 distinct letters\n",
-                kept, nsel);
-        nsel = kept;
+    /* How many words the RESULT has -- 2 for the pair sweep, parent + 1 when
+     * extending.  --disjoint means 5 per word, so it resolves differently at
+     * every size and can only be turned into a number here. */
+    int nwords_result = extend ? 0 : 2;      /* extend fills this in after the
+                                                parent file reveals PARENTK */
+    if (DISJOINT && !extend) MINLET = 5 * nwords_result;
+    if (MINLET > 0 && !extend) {
+        /* A word with a repeated letter can still belong to an opener that only
+         * needs M-of-25, so it is dropped ONLY when the demand is the maximum. */
+        if (MINLET == 5 * nwords_result) {
+            int kept = 0;
+            for (int i = 0; i < nsel; i++)
+                if (popcount32(LMASK[sel[i]]) == 5) sel[kept++] = sel[i];
+            fprintf(stderr, "--min-letters %d: %d of %d openers have 5 distinct letters\n",
+                    MINLET, kept, nsel);
+            nsel = kept;
+        } else {
+            fprintf(stderr, "--min-letters %d: repeat-letter words kept, they can "
+                    "still reach %d\n", MINLET, MINLET);
+        }
     }
 
     int64_t npairs = (int64_t)nsel * (nsel - 1) / 2;
@@ -679,6 +696,21 @@ int main(int argc, char **argv) {
             fprintf(stderr, "--parents-complete: streaming in chunks of %d, no parent "
                     "table (canonical parent holds the smallest %d words)\n", pcap, PARENTK);
         }
+        {
+            int nwr = PARENTK + 1;
+            if (DISJOINT) MINLET = 5 * nwr;
+            if (MINLET == 5 * nwr) {
+                int kept = 0;
+                for (int i = 0; i < nsel; i++)
+                    if (popcount32(LMASK[sel[i]]) == 5) sel[kept++] = sel[i];
+                fprintf(stderr, "--min-letters %d: %d of %d openers have 5 distinct letters\n",
+                        MINLET, kept, nsel);
+                nsel = kept;
+            } else if (MINLET > 0) {
+                fprintf(stderr, "--min-letters %d over %d words: repeat-letter words kept\n",
+                        MINLET, nwr);
+            }
+        }
         if (PARENTS_COMPLETE)
             fprintf(stderr, "extending %s by %d words each, streaming\n",
                     PARENTK == 4 ? "quads" : PARENTK == 3 ? "triples" : "pairs", nsel);
@@ -771,14 +803,17 @@ int main(int argc, char **argv) {
                  * result, so it is skipped whole rather than once per word. */
                 uint32_t pmask = 0;
                 for (int w = 0; w < PARENTK; w++) pmask |= LMASK[pw[w]];
-                if (DISJOINT && popcount32(pmask) != 5 * PARENTK) continue;
+                /* The best any single word can add is 5 new letters, so a parent
+                 * short of MINLET-5 cannot reach the target however it is
+                 * extended, and is skipped whole rather than once per word. */
+                if (MINLET > 0 && popcount32(pmask) + 5 < MINLET) continue;
 
                 for (int sk = 0; sk < nsel; sk++) {
                     int gx = sel[sk];
                     int dup = 0;
                     for (int w = 0; w < PARENTK; w++) if (gx == pw[w]) dup = 1;
                     if (dup) continue;
-                    if (DISJOINT && (pmask & LMASK[gx])) continue;
+                    if (MINLET > 0 && popcount32(pmask | LMASK[gx]) < MINLET) continue;
 
                     /* Emit only from the FIRST present sub-opener, so each
                      * distinct result is produced exactly once.  Sub-openers are
@@ -933,9 +968,10 @@ int main(int argc, char **argv) {
             for (int k = 0; k < nb; k++) cnt[touch[k]] = 0;
             free(fill);
 
+            if (MINLET > 0 && popcount32(LMASK[g1]) + 5 < MINLET) continue;
             for (int sj = si + 1; sj < nsel; sj++) {
                 int g2 = sel[sj];
-                if (DISJOINT && (LMASK[g1] & LMASK[g2])) continue;
+                if (MINLET > 0 && popcount32(LMASK[g1] | LMASK[g2]) < MINLET) continue;
                 ranked[tid]++;
                 const uint8_t *row2 = PAT + (size_t)g2 * NA;
                 int64_t ssq = 0;
