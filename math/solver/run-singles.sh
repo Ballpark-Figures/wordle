@@ -264,6 +264,30 @@ parents_complete_flag() {
     if ! grep -q "^mode=pair$" "$_src.meta"; then
         grep -q "^parents_complete=1$" "$_src.meta" || { echo ""; return; }
     fi
+    # THE LETTER DEMANDS MUST LINE UP TOO.  The shortcut assumes every sub-opener
+    # of a candidate is in the parent file. Removing one word drops at most 5
+    # letters, so a target needing L letters has sub-openers of at least L-5. If
+    # the parent file demanded MORE than that, some of those sub-openers were
+    # never in it, and the canonical one may be missing -- which silently drops
+    # results rather than failing.
+    #
+    #   L20 quads -> L25 quints: 25-5 = 20 >= 20, sound.
+    #   L20 quads -> L24 quints: 24-5 = 19 <  20, NOT sound.
+    _pl=$(sed -n 's/^min_letters=//p' "$_src.meta")
+    if [ -z "$_pl" ]; then
+        # sidecars written before min_letters: derive it from what is recorded
+        _pl=0
+        if grep -q "^disjoint=1$" "$_src.meta"; then
+            case "$(sed -n 's/^mode=//p' "$_src.meta")" in
+                pair) _pl=10 ;; triple) _pl=15 ;; quad) _pl=20 ;;
+            esac
+        fi
+    fi
+    if [ "$MINLET" = 0 ]; then
+        [ "$_pl" = 0 ] || { echo ""; return; }
+    else
+        [ $((MINLET - 5)) -ge "$_pl" ] || { echo ""; return; }
+    fi
     _w=$(sed -n 's/^written=//p' "$_src.meta")
     [ -n "$_w" ] && [ "$_ncut" = "$_w" ] && echo "--parents-complete" || echo ""
 }

@@ -1090,6 +1090,9 @@ merge: ;   /* a label must precede a statement, not a declaration, before C23 */
                 PARENTK == 3 ? "quad" : "triple") : "pair");
         fprintf(mf, "metric=%s\n", SINGLES ? "singles" : "ssq");
         fprintf(mf, "disjoint=%d\n", DISJOINT);
+        /* The letter demand IN FORCE, so a later stage can decide whether this
+         * file contains every sub-opener its own targets need. */
+        fprintf(mf, "min_letters=%d\n", MINLET);
         fprintf(mf, "guesslist=%s\n", guesslist ? guesslist : "");
         fprintf(mf, "openers=%d\n", nsel);
         fprintf(mf, "scored=%lld\n", (long long)nranked);
