@@ -237,6 +237,17 @@ if [ "$STAGE" = triples ] || [ "$STAGE" = all ]; then
     # line order IS the rank the minparent column is reported against.
     CUT="$LOC/pairs${SUF}_top$PAIRSTOP.csv"
     head -n $((PAIRSTOP + 1)) "$PAIRSRC" > "$CUT"
+    # The EFFECTIVE width, which is what the name has to carry: asking for more
+    # parents than the file holds is not an error, it just gives you every pair
+    # there is, and naming that file after the request rather than the reality
+    # would be the same untraceability this scheme exists to prevent.
+    NPAR=$(( $(grep -c . "$CUT") - 1 ))
+    if [ "$EXHAUSTIVE" = 1 ]; then
+        TRISUF="_exhaustive"
+    else
+        TRISUF="_p$NPAR"
+    fi
+    TRIOUT="$SHARED/triple_singletons${SUF}${TRISUF}.csv"
     # Completeness comes from the pair run's OWN sidecar, not from counting lines
     # against a constant here: only that run knows how many candidates its flags
     # left to score.
@@ -261,11 +272,25 @@ if [ "$STAGE" = triples ] || [ "$STAGE" = all ]; then
     # --top bounds what is WRITTEN, never what is searched, so even an exhaustive
     # run emits a file that fits in the repo while still visiting every triple.
     ./solver/pairsplit --metric singles --extend "$CUT" --top "$TOP" \
-        --out "$SHARED/triple_singletons$SUF.csv" $GLIST $DFLAG $TFLAG \
+        --out "$TRIOUT" $GLIST $DFLAG $TFLAG \
         2>&1 | tee -a "$LOC/singles.log"
 fi
 
 echo "wrote:" | tee -a "$LOC/singles.log"
-for f in "$SHARED/guess_singletons$SUF.csv" "$PAIROUT" "$LOC/pair_singletons${SUF}_all.csv" "$SHARED/triple_singletons$SUF.csv"; do
+for f in "$SHARED/guess_singletons$SUF.csv" "$PAIROUT" "$LOC/pair_singletons${SUF}_all.csv" ${TRIOUT:-}; do
     [ -f "$f" ] && echo "  $f" | tee -a "$LOC/singles.log"
+done
+# Every triple file for this restriction, so a run that did NOT touch the widest
+# one still shows you it is there -- the whole point of the per-width names.
+ls -1 "$SHARED"/triple_singletons${SUF}_*.csv 2>/dev/null | while read -r f; do
+    m="$f.meta"
+    if [ -f "$m" ]; then
+        echo "  (on disk) $f -- $(sed -n 's/^scored=/scored /p' "$m") candidates" \
+            | tee -a "$LOC/singles.log"
+    else
+        # A file with no sidecar predates the coverage check.  It still gets
+        # listed -- silence here would hide exactly the wide old result this
+        # listing exists to protect.
+        echo "  (on disk) $f -- coverage unknown, no sidecar" | tee -a "$LOC/singles.log"
+    fi
 done

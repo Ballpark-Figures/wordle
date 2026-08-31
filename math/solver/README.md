@@ -542,6 +542,27 @@ unchanged, so the counts mean the same thing; there are just
 C(2315, 2) = 2,678,455 pairs instead of 84M, which the pair stage clears in about
 a second.
 
+**`--disjoint`** keeps only openers whose words share no letter and repeat none —
+10 distinct letters for a pair, 15 for a triple. 8322 of the 12972 guesses
+qualify, forming 5,020,842 disjoint pairs (6% of 84M) and roughly 139M disjoint
+triples against 3.6e11 unrestricted, which is what makes an exhaustive triple
+sweep over the *full* guess list feasible at all. The result is the best
+*15-distinct-letter* triple — a smaller claim than the best triple, since nothing
+shows the unrestricted optimum is disjoint. Composes with `--answers`.
+
+**Every parent width gets its own triple file**, the same rule the all-words
+sweep applies to its `-k` values and for the same reason: the width decides which
+triples were reachable, so two widths are different searches. A 1000-parent run
+writes `triple_singletons_p1000.csv`, an exhaustive one writes
+`triple_singletons_exhaustive.csv`. A narrow rerun therefore cannot quietly
+replace a wide result with a weaker one that looks identical from the outside.
+
+**Every run writes a `<out>.meta` sidecar** recording candidates scored, rows
+written, and whether the two match. That cannot be recomputed from the inputs —
+`--disjoint` and the canonical-parent filter drop candidates by a rule, not a
+count — so without it a truncated ranking is indistinguishable from a complete
+one. `--exhaustive` reads it and refuses a truncated parent file.
+
 **`--answers --exhaustive` makes the triple stage a PROOF, not a screen.** It
 feeds *every* answer pair to the extension, so all
 C(2315, 3) = 2,067,969,935 answer triples are reached and the head of
