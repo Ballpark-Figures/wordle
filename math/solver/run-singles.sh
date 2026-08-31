@@ -11,6 +11,10 @@
 #     bash solver/run-singles.sh quads --disjoint --triples-top all   # every parent
 #     bash solver/run-singles.sh quints --disjoint-quads   # disjoint quads, ANY 5th word
 #     bash solver/run-singles.sh quints --disjoint         # 25 distinct letters, all five
+#     bash solver/run-singles.sh sextets --min-letters 25  # six words, 25+ letters
+#
+# NOTE six disjoint words would need 30 distinct letters and there are 26, so
+# --disjoint is refused at that size; --min-letters is the only sensible form.
 #
 #     bash solver/run-singles.sh quads --min-letters 19 --triples-from FILE
 #         at least 19 distinct letters across the four, rather than all 20. The
@@ -144,11 +148,14 @@ DISJTRI=0           # --disjoint-triples: disjoint PARENTS only, 4th word free
 DISJQUAD=0          # --disjoint-quads: disjoint PARENTS only, 5th word free
 QUADSTOP=all        # quads fed to the quint stage
 QUADFROM=""         # which quad ranking to extend
+QUINTSTOP=all       # quints fed to the sextet stage
+QUINTFROM=""        # which quint ranking to extend
+DISJQUINT=0         # --disjoint-quints: disjoint PARENTS only, 6th word free
 EXHAUSTIVE=0        # --exhaustive: feed EVERY pair to the triple stage
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        words|pairs|triples|quads|quints|both|all) STAGE="$1"; shift ;;
+        words|pairs|triples|quads|quints|sextets|both|all) STAGE="$1"; shift ;;
         --top)        TOP="$2";      shift 2 ;;
         --pairs-top)  PAIRSTOP="$2"; shift 2 ;;
         --triples-top) TRIPSTOP="$2"; shift 2 ;;
@@ -162,6 +169,9 @@ while [ $# -gt 0 ]; do
         --disjoint-quads)   DISJQUAD=1; shift ;;
         --quads-top)   QUADSTOP="$2"; shift 2 ;;
         --quads-from)  QUADFROM="$2"; shift 2 ;;
+        --quints-top)  QUINTSTOP="$2"; shift 2 ;;
+        --quints-from) QUINTFROM="$2"; shift 2 ;;
+        --disjoint-quints) DISJQUINT=1; shift ;;
         --exhaustive) EXHAUSTIVE=1;  shift ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
     esac
@@ -226,6 +236,10 @@ fi
 if [ "$DISJTRI" = 1 ] && [ "$STAGE" != quads ] && [ "$STAGE" != all ]; then
     echo "--disjoint-triples only applies to the quads stage; use --disjoint" >&2
     echo "to restrict the pair or triple stages themselves." >&2
+    exit 1
+fi
+if [ "$DISJQUINT" = 1 ] && [ "$STAGE" != sextets ] && [ "$STAGE" != all ]; then
+    echo "--disjoint-quints only applies to the sextets stage" >&2
     exit 1
 fi
 if [ "$DISJQUAD" = 1 ] && [ "$STAGE" != quints ] && [ "$STAGE" != all ]; then
@@ -438,6 +452,12 @@ if [ "$STAGE" = quads ] || [ "$STAGE" = all ]; then
                | grep -vE "_(answers|disjoint)" | head -1)
         [ -n "$QSUF" ] && TSRC=$(ls -1S "$SHARED"/triple_singletons${QSUF}_*.csv 2>/dev/null | head -1)
     fi
+    if [ -n "$TRIPFROM" ] && [ ! -f "$TRIPFROM" ]; then
+        echo "--triples-from: no such file: $TRIPFROM" >&2
+        echo "triple rankings on disk:" >&2
+        ls -1 "$SHARED"/triple_singletons*.csv 2>/dev/null | sed 's/^/  /' >&2
+        exit 1
+    fi
     [ -n "$TSRC" ] && [ -f "$TSRC" ] || {
         echo "no triple ranking found for this restriction" >&2
         echo "run the triple stage first, or pass --triples-from FILE" >&2
@@ -506,6 +526,14 @@ if [ "$STAGE" = quints ] || [ "$STAGE" = all ]; then
         [ -z "$QQSUF" ] && QSRC=$(ls -1S "$SHARED"/quad_singletons_*.csv 2>/dev/null \
                                  | grep -vE "_(answers|disjoint)" | head -1)
     fi
+    # Naming the file yourself and having it not exist is a DIFFERENT problem
+    # from nothing being found, and the old message reported the second for both.
+    if [ -n "$QUADFROM" ] && [ ! -f "$QUADFROM" ]; then
+        echo "--quads-from: no such file: $QUADFROM" >&2
+        echo "quad rankings on disk for this restriction:" >&2
+        ls -1 "$SHARED"/quad_singletons*.csv 2>/dev/null | sed 's/^/  /' >&2
+        exit 1
+    fi
     [ -n "$QSRC" ] && [ -f "$QSRC" ] || {
         echo "no quad ranking found for this restriction" >&2
         echo "run the quads stage first, or pass --quads-from FILE" >&2
@@ -542,8 +570,67 @@ if [ "$STAGE" = quints ] || [ "$STAGE" = all ]; then
         2>&1 | tee -a "$LOC/singles.log"
 fi
 
+if [ "$STAGE" = sextets ] || [ "$STAGE" = all ]; then
+    [ -x ./solver/pairsplit ] || {
+        echo "no pairsplit binary -- run 'sh build.sh' in solver/" >&2
+        exit 1
+    }
+    if [ "$DISJOINT" = 1 ]; then
+        echo "--disjoint at six words means 30 distinct letters, and there are 26." >&2
+        echo "use --min-letters N instead (26 is the ceiling)." >&2
+        exit 1
+    fi
+    SXSUF="$SUF"
+    SXDFLAG="$DFLAG"
+    if [ "$DISJQUINT" = 1 ]; then
+        SXSUF="${SUF}_disjoint"
+        SXDFLAG=""
+    fi
+    if [ -n "$QUINTFROM" ]; then
+        [ -f "$QUINTFROM" ] || {
+            echo "--quints-from: no such file: $QUINTFROM" >&2
+            echo "quint rankings on disk:" >&2
+            ls -1 "$SHARED"/quint_singletons*.csv 2>/dev/null | sed 's/^/  /' >&2
+            exit 1
+        }
+        XSRC="$QUINTFROM"
+    else
+        XSRC=$(ls -1S "$SHARED"/quint_singletons${SXSUF}_*.csv 2>/dev/null | head -1)
+        [ -z "$SXSUF" ] && XSRC=$(ls -1S "$SHARED"/quint_singletons_*.csv 2>/dev/null \
+                                 | grep -vE "_(answers|disjoint)" | head -1)
+    fi
+    [ -n "$XSRC" ] && [ -f "$XSRC" ] || {
+        echo "no quint ranking found for this restriction" >&2
+        echo "run the quints stage first, or pass --quints-from FILE" >&2
+        exit 1
+    }
+    echo "parent quints: $XSRC" | tee -a "$LOC/singles.log"
+    echo "6th word: any of the $NOPEN openers." | tee -a "$LOC/singles.log"
+    NXSRC=$(rows_in "$XSRC")
+    [ "$QUINTSTOP" = all ] && QUINTSTOP="$NXSRC"
+    if [ "$QUINTSTOP" -ge "$NXSRC" ]; then
+        XCUT="$XSRC"; NQUINT="$NXSRC"
+    else
+        XCUT="$LOC/quints${SXSUF}_top$QUINTSTOP.csv"
+        head -n $((QUINTSTOP + 1)) "$XSRC" > "$XCUT"
+        NQUINT="$QUINTSTOP"
+    fi
+    SXNAME="$SUF"
+    [ "$DISJQUINT" = 1 ] && SXNAME="${SUF}_disjointquints"
+    XPCFLAG=$(parents_complete_flag "$XSRC" "$NQUINT")
+    if [ -n "$XPCFLAG" ]; then SXOUT="$SHARED/sextet_singletons${SXNAME}_exhaustive.csv"
+    else SXOUT="$SHARED/sextet_singletons${SXNAME}_x$NQUINT.csv"; fi
+    [ -n "$XPCFLAG" ] && echo "parents are complete: skipping the parent table" \
+        | tee -a "$LOC/singles.log"
+    TFLAG=""
+    [ "$THREADS" -gt 0 ] && TFLAG="--threads $THREADS"
+    ./solver/pairsplit --metric singles --extend "$XCUT" --top "$TOP" \
+        --out "$SXOUT" $GLIST $SXDFLAG $XPCFLAG --parent-count "$NQUINT" $TFLAG \
+        2>&1 | tee -a "$LOC/singles.log"
+fi
+
 echo "wrote:" | tee -a "$LOC/singles.log"
-for f in "$SHARED/guess_singletons$SUF.csv" "$PAIROUT" "$LOC/pair_singletons${SUF}_all.csv" ${TRIOUT:-} ${QUADOUT:-} ${QUINTOUT:-}; do
+for f in "$SHARED/guess_singletons$SUF.csv" "$PAIROUT" "$LOC/pair_singletons${SUF}_all.csv" ${TRIOUT:-} ${QUADOUT:-} ${QUINTOUT:-} ${SXOUT:-}; do
     [ -f "$f" ] && echo "  $f" | tee -a "$LOC/singles.log"
 done
 # Every triple file for this restriction, so a run that did NOT touch the widest

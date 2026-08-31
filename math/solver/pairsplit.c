@@ -118,7 +118,7 @@ static void build_masks(int wordlen) {
  * under --metric singles, so one comparator serves both without the ordering
  * code knowing which metric is live.  ssq / singles / nowin always carry their
  * own real values, whichever one is steering. */
-#define MAXW 5                   /* words in the largest opener we sweep */
+#define MAXW 6                   /* words in the largest opener we sweep */
 
 /* The words are an ARRAY, not g1/g2/g3/...  Each time a size was added, every
  * field after the new one shifted under the positional initialisers, which is a
@@ -339,7 +339,7 @@ static int64_t   PARENT_COUNT = 0;
 static int       TOP_ALL = 0;
 
 static void sortk(int32_t *w, int k) {
-    for (int i = 1; i < k; i++)              /* k <= 5; insertion is right */
+    for (int i = 1; i < k; i++)              /* k <= 6; insertion is right */
         for (int j = i; j > 0 && w[j - 1] > w[j]; j--) {
             int32_t t = w[j]; w[j] = w[j - 1]; w[j - 1] = t;
         }
@@ -504,6 +504,10 @@ int main(int argc, char **argv) {
         else { fprintf(stderr, "unknown arg: %s\n", argv[i]); return 1; }
     }
     if (!outpath) { fprintf(stderr, "pairsplit needs --out FILE\n"); return 1; }
+    if (MINLET > 26) {
+        fprintf(stderr, "--min-letters %d is impossible: there are 26 letters\n", MINLET);
+        return 1;
+    }
 
     char path[1024];
     GWORD = malloc(sizeof(char[WBUF]) * 13000);
@@ -638,20 +642,22 @@ int main(int argc, char **argv) {
         #define READ_CHUNK() ({                                                \
             int _n = 0;                                                        \
             while (_n < pcap && fgets(line, sizeof line, pf)) {                \
-                char w1[64], w2[64], w3[64], w4[64];                            \
-                int nf = sscanf(line, "%63[^,],%63[^,],%63[^,],%63[^,],",       \
-                                w1, w2, w3, w4);                                \
+                char w1[64], w2[64], w3[64], w4[64], w5[64];                    \
+                int nf = sscanf(line, "%63[^,],%63[^,],%63[^,],%63[^,],%63[^,],",\
+                                w1, w2, w3, w4, w5);                            \
                 if (nf < 2) continue;                                          \
                 int a = lookup_word(w1), b = lookup_word(w2);                   \
                 if (a < 0 || b < 0) continue;      /* the header lands here */  \
                 int c = (nf >= 3) ? lookup_word(w3) : -1;                       \
                 int d = (nf >= 4) ? lookup_word(w4) : -1;                       \
+                int e = (nf >= 5) ? lookup_word(w5) : -1;                       \
                 if (nread == 0 && _n == 0)                                      \
-                    PARENTK = (d >= 0) ? 4 : (c >= 0) ? 3 : 2;                  \
+                    PARENTK = (e >= 0) ? 5 : (d >= 0) ? 4 : (c >= 0) ? 3 : 2;   \
                 if (PARENTK >= 3 && c < 0) continue;                            \
                 if (PARENTK >= 4 && d < 0) continue;                            \
+                if (PARENTK >= 5 && e < 0) continue;                            \
                 plist[_n].g[0] = a; plist[_n].g[1] = b; plist[_n].g[2] = c;      \
-                plist[_n].g[3] = d; plist[_n].g[4] = -1;                        \
+                plist[_n].g[3] = d; plist[_n].g[4] = e; plist[_n].g[5] = -1;    \
                 plist[_n].key = 0; plist[_n].ssq = 0; _n++;                     \
             }                                                                  \
             _n;                                                                \
@@ -663,17 +669,19 @@ int main(int argc, char **argv) {
              * that fills from index 0, and the pointer juggling needed to make
              * it append was where I put a bug that crashed the load outright. */
             while (fgets(line, sizeof line, pf)) {
-                char w1[64], w2[64], w3[64], w4[64];
-                int nf = sscanf(line, "%63[^,],%63[^,],%63[^,],%63[^,],",
-                                w1, w2, w3, w4);
+                char w1[64], w2[64], w3[64], w4[64], w5[64];
+                int nf = sscanf(line, "%63[^,],%63[^,],%63[^,],%63[^,],%63[^,],",
+                                w1, w2, w3, w4, w5);
                 if (nf < 2) continue;
                 int a = lookup_word(w1), b = lookup_word(w2);
                 if (a < 0 || b < 0) continue;          /* the header lands here */
                 int c = (nf >= 3) ? lookup_word(w3) : -1;
                 int d = (nf >= 4) ? lookup_word(w4) : -1;
-                if (npl == 0) PARENTK = (d >= 0) ? 4 : (c >= 0) ? 3 : 2;
+                int e = (nf >= 5) ? lookup_word(w5) : -1;
+                if (npl == 0) PARENTK = (e >= 0) ? 5 : (d >= 0) ? 4 : (c >= 0) ? 3 : 2;
                 if (PARENTK >= 3 && c < 0) continue;
                 if (PARENTK >= 4 && d < 0) continue;
+                if (PARENTK >= 5 && e < 0) continue;
                 if (npl == pcap) {
                     pcap *= 2;
                     Pair *grown = realloc(plist, sizeof(Pair) * (size_t)pcap);
@@ -684,7 +692,7 @@ int main(int argc, char **argv) {
                     plist = grown;
                 }
                 plist[npl].g[0] = a; plist[npl].g[1] = b; plist[npl].g[2] = c;
-                plist[npl].g[3] = d; plist[npl].g[4] = -1;
+                plist[npl].g[3] = d; plist[npl].g[4] = e; plist[npl].g[5] = -1;
                 plist[npl].key = 0; plist[npl].ssq = 0; npl++;
             }
             fclose(pf);
@@ -713,13 +721,16 @@ int main(int argc, char **argv) {
         }
         if (PARENTS_COMPLETE)
             fprintf(stderr, "extending %s by %d words each, streaming\n",
-                    PARENTK == 4 ? "quads" : PARENTK == 3 ? "triples" : "pairs", nsel);
+                    PARENTK == 5 ? "quints" : PARENTK == 4 ? "quads" :
+                    PARENTK == 3 ? "triples" : "pairs", nsel);
         else
             fprintf(stderr, "extending %d %s by %d words each = %lld %s "
                     "(before canonical-parent filtering)\n",
-                    npl, PARENTK == 4 ? "quads" : PARENTK == 3 ? "triples" : "pairs",
+                    npl, PARENTK == 5 ? "quints" : PARENTK == 4 ? "quads" :
+                    PARENTK == 3 ? "triples" : "pairs",
                     nsel, (long long)npl * nsel,
-                    PARENTK == 4 ? "quints" : PARENTK == 3 ? "quads" : "triples");
+                    PARENTK == 5 ? "sextets" : PARENTK == 4 ? "quints" :
+                    PARENTK == 3 ? "quads" : "triples");
 
       /* One pass over the whole list when it is resident; chunk after chunk when
        * it is streamed.  `pbase` is the running offset, so a parent's rank is
@@ -905,7 +916,8 @@ int main(int argc, char **argv) {
                     int64_t tot = PARENT_COUNT > 0 ? PARENT_COUNT : npl;
                     double frac = (double)done_g1 / (double)tot;
                     fprintf(stderr, "  %s %lld/%lld  %.1f%%  (%.0fs, eta %.1f min)\n",
-                            PARENTK == 4 ? "quad" : PARENTK == 3 ? "triple" : "pair",
+                            PARENTK == 5 ? "quint" : PARENTK == 4 ? "quad" :
+                            PARENTK == 3 ? "triple" : "pair",
                             (long long)done_g1, (long long)tot, 100.0 * frac, el,
                             frac > 0 ? (el / frac - el) / 60.0 : 0.0);
                 }
@@ -920,7 +932,8 @@ int main(int argc, char **argv) {
       }
         if (PARENTS_COMPLETE) fclose(pf);
         fprintf(stderr, "extended %lld %s\n", (long long)pbase,
-                PARENTK == 4 ? "quads" : PARENTK == 3 ? "triples" : "pairs");
+                PARENTK == 5 ? "quints" : PARENTK == 4 ? "quads" :
+                PARENTK == 3 ? "triples" : "pairs");
         goto merge;
     }
 
@@ -1086,8 +1099,8 @@ merge: ;   /* a label must precede a statement, not a declaration, before C23 */
     snprintf(metapath, sizeof metapath, "%s.meta", outpath);
     FILE *mf = fopen(metapath, "w");
     if (mf) {
-        fprintf(mf, "mode=%s\n", extend ? (PARENTK == 4 ? "quint" :
-                PARENTK == 3 ? "quad" : "triple") : "pair");
+        fprintf(mf, "mode=%s\n", extend ? (PARENTK == 5 ? "sextet" :
+                PARENTK == 4 ? "quint" : PARENTK == 3 ? "quad" : "triple") : "pair");
         fprintf(mf, "metric=%s\n", SINGLES ? "singles" : "ssq");
         fprintf(mf, "disjoint=%d\n", DISJOINT);
         /* The letter demand IN FORCE, so a later stage can decide whether this
@@ -1114,7 +1127,7 @@ merge: ;   /* a label must precede a statement, not a declaration, before C23 */
     for (int w = 0; w < nw; w++)
         lp += snprintf(lead + lp, sizeof lead - lp, "%s%s", w ? " " : "",
                        GWORD[all[0].g[w]]);
-    const char *what = extend ? (PARENTK == 4 ? "quints" :
+    const char *what = extend ? (PARENTK == 5 ? "sextets" : PARENTK == 4 ? "quints" :
                                  PARENTK == 3 ? "quads" : "triples") : "pairs";
     if (SINGLES)
         fprintf(stderr, "wrote %d %s%s to %s in %.0fs (most singletons %d: %s)\n",
