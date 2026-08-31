@@ -515,6 +515,45 @@ single-opener and plain `--sweep` paths, so `--trees` under `--optimal-only`
 creates an empty directory. Getting the winner's tree currently means a follow-up
 `--opener <winner> --trees <dir>` run at the same depth.
 
+## Singleton rankings (`pairsplit --metric singles`, `run-singles.sh`)
+
+A different question from everything above, and it does **not** run the solver: a
+feedback pattern is a **singleton** when exactly one answer produces it, so seeing
+it names the answer outright. This ranks openers by how many they have.
+
+```sh
+# from math/
+bash solver/run-singles.sh              # both stages
+bash solver/run-singles.sh words        # 12972 single words   (~0.1s)
+bash solver/run-singles.sh pairs        # 84129906 blind pairs (~22s)
+bash solver/run-singles.sh pairs --top 250000
+```
+
+Writes `data/shared/singletons/guess_singletons.csv` and
+`data/shared/singletons/pair_singletons.csv`, log in `data/local/singletons/`.
+The word stage is `tools/singletons.py` (numpy); the pair stage is `pairsplit`
+with `--metric singles`, which counts joint buckets of size 1 in the same pass
+that computes `ssq` — the flag picks the sort key and the output columns, nothing
+else. `--metric singles` is pair-mode only; it refuses `--extend`.
+
+**This one is EXHAUSTIVE, unlike the ssq screen.** Every word and every unordered
+pair is evaluated, so the head of each file is the exact top of the ranking, not
+a heuristic shortlist feeding a later exact stage. The `--top N` cut only bounds
+what is written.
+
+**It is not a claim about guesses-to-solve.** An opener can lead this ranking and
+lose badly on total guesses — singling out many answers says nothing about how
+the rest of the field splits. `clint`+`soare` tops the pair ranking at 642
+singletons, which is a fact about singletons and nothing else.
+
+**Two counts per row.** A word that is itself an answer always produces an
+all-green bucket of size one — a singleton that tells you nothing you did not know
+by winning. `singles` counts every size-1 bucket, `singles_nowin` excludes the
+all-green ones; which is the right denominator is a modelling choice, so both are
+emitted. Both stages count over the 2315 mystery answers;
+`tools/singletons.py --full` counts over all 12972 words instead, which is a
+different question.
+
 ## Output format
 
 Each tree line is a complete replay of one game:

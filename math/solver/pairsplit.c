@@ -18,7 +18,24 @@
  * N.  Whatever comes out of the exact stage that follows is "best of the N pairs
  * screened", never "the optimal pair".  Say it that way.
  *
+ * --metric singles RANKS BY A DIFFERENT QUANTITY, and the sentence above does
+ * NOT apply to it in the same way.  A joint bucket of size one is a SINGLETON:
+ * that pair of patterns is returned by exactly one answer, so seeing it names
+ * the answer outright.  Ranking by how many singletons a pair produces is not a
+ * proxy for anything -- it IS the quantity being asked for -- and since every
+ * unordered pair is enumerated, the emitted head is the exact top of that
+ * ranking, not a screen for a later stage.  It is still not a claim about
+ * guesses-to-solve: a pair can win the singleton count and lose on total.
+ *
+ * Both quantities come out of the same pass -- ssq sums |bucket|^2 while the
+ * singleton count sums (|bucket| == 1) -- so --metric only decides which one
+ * ORDERS the heap and which columns are written.  singles_nowin excludes a
+ * bucket whose pattern is all-green on either word: a pair word that is itself
+ * an answer always contributes one such singleton, and it tells you nothing you
+ * did not know by winning.
+ *
  * Build:  see build.sh   Run:  ./pairsplit --top 10000 --out pairs.csv
+ *                             ./pairsplit --metric singles --out singles.csv
  *
  * WHY IT IS FAST ENOUGH.  84M pairs x 2315 answers is ~2e11 inner steps, so the
  * inner loop has to stay in L1.  For a fixed g1 the answers are reordered once
@@ -42,9 +59,12 @@
 #define NPAT  243
 #define WBUF  8
 
+#define ALL_GREEN (NPAT - 1)         /* 242 == "22222", the winning pattern */
+
 static int      NG, NA;
 static uint8_t *PAT;                 /* NG * NA, row-major */
 static char   (*GWORD)[WBUF];
+static int      SINGLES = 0;         /* --metric singles: rank by singleton count */
 
 /* g3 is -1 in pair mode and a real index in --extend (triple) mode */
 /* g3 is -1 in pair mode and a real index in --extend (triple) mode.
@@ -52,8 +72,17 @@ static char   (*GWORD)[WBUF];
  * pairs that are present in the list -- i.e. the smallest --extend cut at which
  * this triple becomes reachable at all.  Recording it means ONE run at a large
  * cut reconstructs exactly what any smaller cut would have produced: filter to
- * minpar <= N.  That is not an approximation; reachability is per-triple. */
-typedef struct { int64_t ssq; int32_t g1, g2, g3, minpar; } Pair;
+ * minpar <= N.  That is not an approximation; reachability is per-triple.
+ *
+ * `key` is what the heap and the sort ORDER BY, and lower is better in both
+ * metrics: it is ssq itself under --metric ssq, and MINUS the singleton count
+ * under --metric singles, so one comparator serves both without the ordering
+ * code knowing which metric is live.  ssq / singles / nowin always carry their
+ * own real values, whichever one is steering. */
+typedef struct {
+    int64_t key, ssq;
+    int32_t g1, g2, g3, minpar, singles, nowin;
+} Pair;
 
 static double now_s(void) {
     struct timespec ts;
@@ -124,8 +153,8 @@ static uint8_t *load_npy(const char *path, int *rows, int *cols) {
 static void heap_sift_down(Pair *h, int n, int i) {
     for (;;) {
         int l = 2*i + 1, r = l + 1, m = i;
-        if (l < n && h[l].ssq > h[m].ssq) m = l;
-        if (r < n && h[r].ssq > h[m].ssq) m = r;
+        if (l < n && h[l].key > h[m].key) m = l;
+        if (r < n && h[r].key > h[m].key) m = r;
         if (m == i) return;
         Pair t = h[i]; h[i] = h[m]; h[m] = t;
         i = m;
@@ -138,11 +167,11 @@ static void heap_push(Pair *h, int *n, int cap, Pair v) {
         h[i] = v;
         while (i > 0) {                      /* sift up */
             int p = (i - 1) / 2;
-            if (h[p].ssq >= h[i].ssq) break;
+            if (h[p].key >= h[i].key) break;
             Pair t = h[i]; h[i] = h[p]; h[p] = t;
             i = p;
         }
-    } else if (v.ssq < h[0].ssq) {
+    } else if (v.key < h[0].key) {
         h[0] = v;
         heap_sift_down(h, *n, 0);
     }
@@ -155,7 +184,7 @@ static int find_word(char (*list)[WBUF], int n, const char *w) {
 
 static int cmp_pair(const void *a, const void *b) {
     const Pair *x = a, *y = b;
-    if (x->ssq != y->ssq) return x->ssq < y->ssq ? -1 : 1;
+    if (x->key != y->key) return x->key < y->key ? -1 : 1;
     if (x->g1 != y->g1)   return x->g1 < y->g1 ? -1 : 1;
     if (x->g2 != y->g2)   return x->g2 < y->g2 ? -1 : 1;
     return x->g3 < y->g3 ? -1 : (x->g3 > y->g3);
@@ -248,6 +277,18 @@ int main(int argc, char **argv) {
          * extension of a screen that was itself heuristic, so a strong triple
          * whose best 2-word prefix missed the pair cut cannot be found here. */
         else if (!strcmp(argv[i], "--extend") && i + 1 < argc) extend = argv[++i];
+        /* --metric singles ranks by the number of SINGLETON joint buckets --
+         * pattern combinations exactly one answer produces -- instead of by ssq.
+         * Both are computed in the same pass; this only picks the sort key and
+         * the output columns.  Higher is better, so the heap's key is negated. */
+        else if (!strcmp(argv[i], "--metric") && i + 1 < argc) {
+            const char *m = argv[++i];
+            if (!strcmp(m, "singles")) SINGLES = 1;
+            else if (strcmp(m, "ssq")) {
+                fprintf(stderr, "--metric must be ssq or singles, not %s\n", m);
+                return 1;
+            }
+        }
         else if (!strcmp(argv[i], "--threads") && i + 1 < argc) threads = atoi(argv[++i]);
         /* TESTING ONLY: restrict the FIRST word to the first N of the guess list,
          * so a correctness check costs seconds instead of the full quadratic run.
@@ -257,6 +298,13 @@ int main(int argc, char **argv) {
         else { fprintf(stderr, "unknown arg: %s\n", argv[i]); return 1; }
     }
     if (!outpath) { fprintf(stderr, "pairsplit needs --out FILE\n"); return 1; }
+    /* The triple path counts singletons in its drain loop too, but nothing has
+     * checked that number against a reference, so it is refused rather than
+     * emitted untested. */
+    if (SINGLES && extend) {
+        fprintf(stderr, "--metric singles is pair-mode only, not --extend\n");
+        return 1;
+    }
 
     char path[1024];
     GWORD = malloc(sizeof(char[WBUF]) * 13000);
@@ -293,8 +341,8 @@ int main(int argc, char **argv) {
     }
 
     int64_t npairs = (int64_t)nsel * (nsel - 1) / 2;
-    fprintf(stderr, "ranking %lld unordered pairs, keeping the best %d\n",
-            (long long)npairs, top);
+    fprintf(stderr, "ranking %lld unordered pairs by %s, keeping the best %d\n",
+            (long long)npairs, SINGLES ? "SINGLETON COUNT" : "ssq", top);
 
 #ifdef _OPENMP
     if (threads > 0) omp_set_num_threads(threads);
@@ -337,7 +385,7 @@ int main(int argc, char **argv) {
             int a = find_word(GWORD, NG, w1), b = find_word(GWORD, NG, w2);
             if (a < 0 || b < 0) continue;            /* the header lands here */
             plist[npl].g1 = a; plist[npl].g2 = b; plist[npl].g3 = -1;
-            plist[npl].ssq = 0; npl++;
+            plist[npl].key = 0; plist[npl].ssq = 0; npl++;
         }
         fclose(pf);
         if (!npl) { fprintf(stderr, "no usable pairs in %s\n", extend); return 1; }
@@ -428,7 +476,7 @@ int main(int argc, char **argv) {
                             cnt[pp] = 0;
                         }
                     }
-                    Pair pv = { ssq, g1, g2, g3, minpar };
+                    Pair pv = { ssq, ssq, g1, g2, g3, minpar, 0, 0 };
                     heap_push(heap, n, top, pv);
                 }
 
@@ -498,8 +546,10 @@ int main(int argc, char **argv) {
                 int g2 = sel[sj];
                 const uint8_t *row2 = PAT + (size_t)g2 * NA;
                 int64_t ssq = 0;
+                int32_t singles = 0, nowin = 0;
                 for (int k = 0; k < nb; k++) {
                     int s = rs[k], e = s + rl[k], nt = 0;
+                    int win1 = touch[k] == ALL_GREEN;
                     for (int i = s; i < e; i++) {
                         int p = row2[ord[i]];
                         if (cnt[p]++ == 0) tin[nt++] = p;
@@ -508,10 +558,20 @@ int main(int argc, char **argv) {
                         int p = tin[i];
                         int64_t v = cnt[p];
                         ssq += v * v;
+                        /* branchless: the drain loop runs once per DISTINCT
+                         * pattern, so this rides along with the clear rather
+                         * than adding a pass. A bucket that is all-green on
+                         * either word is a singleton the pair did not earn --
+                         * the answer IS one of the two words -- so nowin drops
+                         * it while singles keeps it. */
+                        int one = v == 1;
+                        singles += one;
+                        nowin += one & !(win1 | (p == ALL_GREEN));
                         cnt[p] = 0;
                     }
                 }
-                Pair pv = { ssq, g1, g2, -1, 0 };
+                Pair pv = { SINGLES ? -(int64_t)singles : ssq, ssq,
+                            g1, g2, -1, 0, singles, nowin };
                 heap_push(heap, n, top, pv);
             }
 
@@ -553,6 +613,13 @@ merge: ;   /* a label must precede a statement, not a declaration, before C23 */
         for (int i = 0; i < keep; i++)
             fprintf(out, "%s,%s,%s,%lld,%d\n", GWORD[all[i].g1], GWORD[all[i].g2],
                     GWORD[all[i].g3], (long long)all[i].ssq, all[i].minpar);
+    } else if (SINGLES) {
+        /* its own schema, so the ssq screens every downstream tool already reads
+         * keep the exact three columns they expect */
+        fprintf(out, "word1,word2,singles,singles_nowin,ssq\n");
+        for (int i = 0; i < keep; i++)
+            fprintf(out, "%s,%s,%d,%d,%lld\n", GWORD[all[i].g1], GWORD[all[i].g2],
+                    all[i].singles, all[i].nowin, (long long)all[i].ssq);
     } else {
         fprintf(out, "word1,word2,ssq\n");
         for (int i = 0; i < keep; i++)
@@ -565,6 +632,10 @@ merge: ;   /* a label must precede a statement, not a declaration, before C23 */
         fprintf(stderr, "wrote %d DISTINCT triples to %s in %.0fs (best ssq %lld: %s %s %s)\n",
                 keep, outpath, now_s() - t0, (long long)all[0].ssq,
                 GWORD[all[0].g1], GWORD[all[0].g2], GWORD[all[0].g3]);
+    else if (SINGLES)
+        fprintf(stderr, "wrote %d pairs to %s in %.0fs (most singletons %d: %s %s)\n",
+                keep, outpath, now_s() - t0, all[0].singles,
+                GWORD[all[0].g1], GWORD[all[0].g2]);
     else
         fprintf(stderr, "wrote %d pairs to %s in %.0fs (best ssq %lld: %s %s)\n",
                 keep, outpath, now_s() - t0, (long long)all[0].ssq,
