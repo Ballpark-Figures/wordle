@@ -191,6 +191,19 @@ if [ "$DISJTRI" = 1 ] && [ "$STAGE" != quads ] && [ "$STAGE" != all ]; then
     exit 1
 fi
 
+
+# Is the CUT we are about to extend the complete parent set for its restriction?
+# Only then may --parents-complete be passed: on a partial list it silently drops
+# every result whose canonical parent is missing.  Both halves are checked -- the
+# source ran to completion, AND our cut kept every row of it.
+parents_complete_flag() {
+    _src="$1"; _ncut="$2"
+    [ -f "$_src.meta" ] || { echo ""; return; }
+    grep -q "^complete=1$" "$_src.meta" || { echo ""; return; }
+    _w=$(sed -n 's/^written=//p' "$_src.meta")
+    [ -n "$_w" ] && [ "$_ncut" = "$_w" ] && echo "--parents-complete" || echo ""
+}
+
 cd "$MATH" || exit 1
 
 [ -f "$PATS" ] || {
@@ -292,10 +305,13 @@ if [ "$STAGE" = triples ] || [ "$STAGE" = all ]; then
     fi
     TFLAG=""
     [ "$THREADS" -gt 0 ] && TFLAG="--threads $THREADS"
+    PCFLAG=$(parents_complete_flag "$PAIRSRC" "$NPAR")
+    [ -n "$PCFLAG" ] && echo "parents are complete: skipping the parent table" \
+        | tee -a "$LOC/singles.log"
     # --top bounds what is WRITTEN, never what is searched, so even an exhaustive
     # run emits a file that fits in the repo while still visiting every triple.
     ./solver/pairsplit --metric singles --extend "$CUT" --top "$TOP" \
-        --out "$TRIOUT" $GLIST $DFLAG $TFLAG \
+        --out "$TRIOUT" $GLIST $DFLAG $PCFLAG $TFLAG \
         2>&1 | tee -a "$LOC/singles.log"
 fi
 
@@ -350,8 +366,11 @@ if [ "$STAGE" = quads ] || [ "$STAGE" = all ]; then
     QUADOUT="$SHARED/quad_singletons${QNAME}_t$NTRI.csv"
     TFLAG=""
     [ "$THREADS" -gt 0 ] && TFLAG="--threads $THREADS"
+    QPCFLAG=$(parents_complete_flag "$TSRC" "$NTRI")
+    [ -n "$QPCFLAG" ] && echo "parents are complete: skipping the parent table" \
+        | tee -a "$LOC/singles.log"
     ./solver/pairsplit --metric singles --extend "$TCUT" --top "$TOP" \
-        --out "$QUADOUT" $GLIST $QDFLAG $TFLAG \
+        --out "$QUADOUT" $GLIST $QDFLAG $QPCFLAG $TFLAG \
         2>&1 | tee -a "$LOC/singles.log"
 fi
 

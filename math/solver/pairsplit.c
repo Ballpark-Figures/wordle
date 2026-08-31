@@ -305,6 +305,22 @@ static uint64_t *PSET;
 static int32_t  *PSET_RANK;      /* 1-based rank of that parent in the input file */
 static int       PSET_MASK;
 static int       PARENTK = 2;    /* words per parent: 2 (pairs) or 3 (triples) */
+/* --parents-complete: the parent file holds EVERY parent of its restriction.
+ *
+ * The hash table above exists to answer "which sub-openers are in the list", so
+ * that a result reachable from several of them is emitted exactly once.  When
+ * the list is COMPLETE that question has a closed-form answer: every sub-opener
+ * is present, so the canonical one is the parent holding the k SMALLEST words,
+ * and a result is emitted iff the added word is larger than every word of its
+ * parent.  One comparison, no table.
+ *
+ * Not a micro-optimisation.  For the 138,953,994 disjoint triples the table
+ * wants ~12 GB on top of the ~6 GB parent array, which does not fit in 24 GB and
+ * turns an exhaustive quad sweep into thrashing; without it the same run is
+ * ordinary.  Pass it ONLY when it is true -- on a partial list it silently drops
+ * every result whose canonical parent is missing -- which is why the wrapper
+ * sets it from the parent's own sidecar rather than from a guess. */
+static int       PARENTS_COMPLETE = 0;
 
 static void sortk(int32_t *w, int k) {
     for (int i = 1; i < k; i++)              /* k is 2 or 3; insertion is right */
@@ -449,6 +465,7 @@ int main(int argc, char **argv) {
          * makes an EXHAUSTIVE triple sweep possible at all; the answer is then
          * the best DISJOINT opener, a different and smaller claim. */
         else if (!strcmp(argv[i], "--disjoint")) DISJOINT = 1;
+        else if (!strcmp(argv[i], "--parents-complete")) PARENTS_COMPLETE = 1;
         else if (!strcmp(argv[i], "--metric") && i + 1 < argc) {
             const char *m = argv[++i];
             if (!strcmp(m, "singles")) SINGLES = 1;
@@ -594,7 +611,13 @@ int main(int argc, char **argv) {
         }
         fclose(pf);
         if (!npl) { fprintf(stderr, "no usable pairs in %s\n", extend); return 1; }
-        pset_build(plist, npl);
+        if (!PARENTS_COMPLETE) {
+            pset_build(plist, npl);
+        } else {
+            fprintf(stderr, "--parents-complete: skipping the parent table; "
+                    "canonical parent is the one holding the smallest %d words\n",
+                    PARENTK);
+        }
         fprintf(stderr, "extending %d %s by %d words each = %lld %s "
                 "(before canonical-parent filtering)\n",
                 npl, PARENTK == 3 ? "triples" : "pairs", nsel,
@@ -692,24 +715,37 @@ int main(int argc, char **argv) {
                     for (int w = 0; w < PARENTK; w++) full[w] = pw[w];
                     full[PARENTK] = gx;
                     sortk(full, PARENTK + 1);
-                    int32_t canon[3];
-                    int minpar = 0, chosen = 0;
-                    for (int d = PARENTK; d >= 0; d--) {
-                        int32_t sub[3];
-                        int m = 0;
-                        for (int w = 0; w <= PARENTK; w++) if (w != d) sub[m++] = full[w];
-                        int r = pset_rank_sorted(sub);
-                        if (!r) continue;
-                        if (!minpar || r < minpar) minpar = r;
-                        if (!chosen) {
-                            chosen = 1;
-                            for (int w = 0; w < PARENTK; w++) canon[w] = sub[w];
+                    int minpar;
+                    if (PARENTS_COMPLETE) {
+                        /* every sub-opener is present, so the canonical one is
+                         * the k smallest words -- i.e. this parent, iff the
+                         * added word is bigger than all of them */
+                        if (gx < cw[PARENTK - 1]) continue;
+                        /* NOTE the column then means the EMITTING parent's rank,
+                         * not the best rank across sub-openers: without the table
+                         * the others are unknown.  The sidecar records which. */
+                        minpar = pi + 1;
+                    } else {
+                        int32_t canon[3];
+                        int chosen = 0;
+                        minpar = 0;
+                        for (int d = PARENTK; d >= 0; d--) {
+                            int32_t sub[3];
+                            int m = 0;
+                            for (int w = 0; w <= PARENTK; w++) if (w != d) sub[m++] = full[w];
+                            int r = pset_rank_sorted(sub);
+                            if (!r) continue;
+                            if (!minpar || r < minpar) minpar = r;
+                            if (!chosen) {
+                                chosen = 1;
+                                for (int w = 0; w < PARENTK; w++) canon[w] = sub[w];
+                            }
                         }
+                        int mine = chosen;
+                        for (int w = 0; w < PARENTK && mine; w++)
+                            if (canon[w] != cw[w]) mine = 0;
+                        if (!mine) continue;
                     }
-                    int mine = chosen;
-                    for (int w = 0; w < PARENTK && mine; w++)
-                        if (canon[w] != cw[w]) mine = 0;
-                    if (!mine) continue;
 
                     ranked[tid]++;
                     const uint8_t *rowx = PAT + (size_t)gx * NA;
@@ -939,6 +975,10 @@ merge: ;   /* a label must precede a statement, not a declaration, before C23 */
         fprintf(mf, "scored=%lld\n", (long long)nranked);
         fprintf(mf, "written=%d\n", keep);
         fprintf(mf, "complete=%d\n", keep >= nranked ? 1 : 0);
+        fprintf(mf, "parents_complete=%d\n", PARENTS_COMPLETE);
+        if (extend)
+            fprintf(mf, "minparent_meaning=%s\n",
+                    PARENTS_COMPLETE ? "emitting-parent" : "best-of-sub-openers");
         fclose(mf);
     }
     fprintf(stderr, "scored %lld candidates, wrote %d (%s)\n",
