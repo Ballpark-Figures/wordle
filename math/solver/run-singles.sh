@@ -245,7 +245,15 @@ rows_in() {
 parents_complete_flag() {
     _src="$1"; _ncut="$2"
     [ -f "$_src.meta" ] || { echo ""; return; }
+    # complete=1 only says every SCORED row was written. --parents-complete needs
+    # more: that the file holds every parent of its restriction, which also
+    # requires the stage that produced it to have seen all of ITS parents. A pair
+    # sweep enumerates every pair by construction, so it needs no such witness;
+    # anything built by --extend does.
     grep -q "^complete=1$" "$_src.meta" || { echo ""; return; }
+    if ! grep -q "^mode=pair$" "$_src.meta"; then
+        grep -q "^parents_complete=1$" "$_src.meta" || { echo ""; return; }
+    fi
     _w=$(sed -n 's/^written=//p' "$_src.meta")
     [ -n "$_w" ] && [ "$_ncut" = "$_w" ] && echo "--parents-complete" || echo ""
 }
