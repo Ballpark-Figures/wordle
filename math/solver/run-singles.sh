@@ -134,6 +134,7 @@ STAGE=both
 TOP=all             # rows written; "all" keeps every scored candidate
 PAIRSTOP=all        # pairs fed to the triple stage
 TRIPSTOP=all        # triples fed to the quad stage
+PAIRFROM=""         # which pair ranking to extend; default is the widest on disk
 TRIPFROM=""         # which triple ranking to extend; default is the widest on disk
 THREADS=0           # 0 = let OpenMP pick, which is right on both machines
 ANSWERS=0           # --answers: only the 2315 answer words may open
@@ -151,6 +152,7 @@ while [ $# -gt 0 ]; do
         --top)        TOP="$2";      shift 2 ;;
         --pairs-top)  PAIRSTOP="$2"; shift 2 ;;
         --triples-top) TRIPSTOP="$2"; shift 2 ;;
+        --pairs-from)   PAIRFROM="$2"; shift 2 ;;
         --triples-from) TRIPFROM="$2"; shift 2 ;;
         --threads)    THREADS="$2";  shift 2 ;;
         --answers)    ANSWERS=1;     shift ;;
@@ -209,12 +211,16 @@ fi
 # Exhaustive means EVERY pair is a parent, so the pair stage must keep them all,
 # and 2.7M rows is ~70 MB -- regenerable in seconds, so it goes to local/ rather
 # than into the committed tree.
-PAIROUT="$SHARED/pair_singletons$SUF.csv"
+if [ "$TOP" = all ]; then
+    PAIROUT="$SHARED/pair_singletons${SUF}_exhaustive.csv"
+else
+    PAIROUT="$SHARED/pair_singletons${SUF}_top$TOP.csv"
+fi
 PAIRKEEP="$TOP"
 if [ "$EXHAUSTIVE" = 1 ]; then
     PAIRKEEP=all
     PAIRSTOP="$BIGTOP"
-    PAIROUT="$LOC/pair_singletons${SUF}_all.csv"
+    PAIROUT="$LOC/pair_singletons${SUF}_exhaustive.csv"
 fi
 
 if [ "$DISJTRI" = 1 ] && [ "$STAGE" != quads ] && [ "$STAGE" != all ]; then
@@ -310,8 +316,10 @@ if [ "$STAGE" = triples ] || [ "$STAGE" = all ]; then
     # narrow run can read it directly.  Preferring it means one exhaustive pair
     # run serves every width, instead of demanding a second, narrower run that
     # would recompute a prefix already on disk.
-    ALLPAIRS="$LOC/pair_singletons${SUF}_all.csv"
-    if [ "$EXHAUSTIVE" = 1 ]; then
+    ALLPAIRS="$LOC/pair_singletons${SUF}_exhaustive.csv"
+    if [ -n "$PAIRFROM" ]; then
+        PAIRSRC="$PAIRFROM"
+    elif [ "$EXHAUSTIVE" = 1 ]; then
         PAIRSRC="$ALLPAIRS"
     elif [ -f "$PAIROUT" ]; then
         PAIRSRC="$PAIROUT"
