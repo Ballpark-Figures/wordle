@@ -321,6 +321,11 @@ static int       PARENTK = 2;    /* words per parent: 2 (pairs) or 3 (triples) *
  * every result whose canonical parent is missing -- which is why the wrapper
  * sets it from the parent's own sidecar rather than from a guess. */
 static int       PARENTS_COMPLETE = 0;
+/* Total parents in the file, so a STREAMED run can still report a percentage and
+ * an ETA.  Streaming does not make the total unknown -- the caller read it from
+ * the parent's sidecar before opening the file -- it only means this code cannot
+ * derive it by having everything in memory. */
+static int64_t   PARENT_COUNT = 0;
 
 static void sortk(int32_t *w, int k) {
     for (int i = 1; i < k; i++)              /* k is 2 or 3; insertion is right */
@@ -466,6 +471,8 @@ int main(int argc, char **argv) {
          * the best DISJOINT opener, a different and smaller claim. */
         else if (!strcmp(argv[i], "--disjoint")) DISJOINT = 1;
         else if (!strcmp(argv[i], "--parents-complete")) PARENTS_COMPLETE = 1;
+        else if (!strcmp(argv[i], "--parent-count") && i + 1 < argc)
+            PARENT_COUNT = strtoll(argv[++i], NULL, 10);
         else if (!strcmp(argv[i], "--metric") && i + 1 < argc) {
             const char *m = argv[++i];
             if (!strcmp(m, "singles")) SINGLES = 1;
@@ -578,51 +585,93 @@ int main(int argc, char **argv) {
          * 5,020,842 parents: the run died with no message and no output, looking
          * for all the world like it had finished.  A parent count is an INPUT,
          * so it gets no compile-time ceiling. */
-        int pcap = 1 << 20, npl = 0;
+        /* STREAMED when the parents are complete.
+         *
+         * Reading the whole list first was fine for a ranked cut someone chose,
+         * and absurd for the 138,953,994 disjoint triples: 6 GB of parents held
+         * in RAM, several minutes of parsing, and not one candidate scored until
+         * all of it was done.  Nothing here needs the list as a WHOLE -- each
+         * parent is independent -- so with --parents-complete it is read in
+         * chunks and each chunk is worked as it arrives.  Memory is then flat in
+         * the parent count and scoring starts immediately.
+         *
+         * The table path still loads everything, because deciding which
+         * sub-opener is canonical genuinely needs to see them all. */
+        int pcap = PARENTS_COMPLETE ? (1 << 20) : (1 << 20), npl = 0;
         Pair *plist = malloc(sizeof(Pair) * pcap);
         if (!plist) { fprintf(stderr, "out of memory for the parent list\n"); return 1; }
         FILE *pf = fopen(extend, "r");
         if (!pf) { fprintf(stderr, "cannot open %s\n", extend); return 1; }
-        /* ARITY IS READ FROM THE FILE, not from a flag: a parent file already
-         * says how many words its openers have, and asking the caller to repeat
-         * it just creates a way for the two to disagree.  A third column that
-         * parses as a word means triples, so extending gives quads. */
         char line[256];
-        while (fgets(line, sizeof line, pf)) {
-            char w1[64], w2[64], w3[64];
-            int nf = sscanf(line, "%63[^,],%63[^,],%63[^,],", w1, w2, w3);
-            if (nf < 2) continue;
-            int a = lookup_word(w1), b = lookup_word(w2);
-            if (a < 0 || b < 0) continue;            /* the header lands here */
-            int c = (nf >= 3) ? lookup_word(w3) : -1;
-            if (npl == 0) PARENTK = (c >= 0) ? 3 : 2;
-            if (PARENTK == 3 && c < 0) continue;
-            if (npl == pcap) {
-                pcap *= 2;
-                Pair *grown = realloc(plist, sizeof(Pair) * (size_t)pcap);
-                if (!grown) {
-                    fprintf(stderr, "out of memory growing the parent list to %d\n", pcap);
-                    return 1;
-                }
-                plist = grown;
-            }
-            plist[npl].g1 = a; plist[npl].g2 = b; plist[npl].g3 = c;
-            plist[npl].g4 = -1; plist[npl].key = 0; plist[npl].ssq = 0; npl++;
-        }
-        fclose(pf);
-        if (!npl) { fprintf(stderr, "no usable pairs in %s\n", extend); return 1; }
+        int64_t nread = 0;          /* parents consumed across every chunk */
+
+        /* fills plist with up to `pcap` parents; returns how many, 0 at EOF */
+        #define READ_CHUNK() ({                                                \
+            int _n = 0;                                                        \
+            while (_n < pcap && fgets(line, sizeof line, pf)) {                \
+                char w1[64], w2[64], w3[64];                                   \
+                int nf = sscanf(line, "%63[^,],%63[^,],%63[^,],", w1, w2, w3); \
+                if (nf < 2) continue;                                          \
+                int a = lookup_word(w1), b = lookup_word(w2);                   \
+                if (a < 0 || b < 0) continue;      /* the header lands here */  \
+                int c = (nf >= 3) ? lookup_word(w3) : -1;                       \
+                if (nread == 0 && _n == 0) PARENTK = (c >= 0) ? 3 : 2;          \
+                if (PARENTK == 3 && c < 0) continue;                            \
+                plist[_n].g1 = a; plist[_n].g2 = b; plist[_n].g3 = c;           \
+                plist[_n].g4 = -1; plist[_n].key = 0; plist[_n].ssq = 0; _n++;  \
+            }                                                                  \
+            _n;                                                                \
+        })
+
         if (!PARENTS_COMPLETE) {
+            /* The table needs every parent resident, so read the whole file,
+             * growing as it goes.  Deliberately NOT expressed via READ_CHUNK:
+             * that fills from index 0, and the pointer juggling needed to make
+             * it append was where I put a bug that crashed the load outright. */
+            while (fgets(line, sizeof line, pf)) {
+                char w1[64], w2[64], w3[64];
+                int nf = sscanf(line, "%63[^,],%63[^,],%63[^,],", w1, w2, w3);
+                if (nf < 2) continue;
+                int a = lookup_word(w1), b = lookup_word(w2);
+                if (a < 0 || b < 0) continue;          /* the header lands here */
+                int c = (nf >= 3) ? lookup_word(w3) : -1;
+                if (npl == 0) PARENTK = (c >= 0) ? 3 : 2;
+                if (PARENTK == 3 && c < 0) continue;
+                if (npl == pcap) {
+                    pcap *= 2;
+                    Pair *grown = realloc(plist, sizeof(Pair) * (size_t)pcap);
+                    if (!grown) {
+                        fprintf(stderr, "out of memory growing the parent list to %d\n", pcap);
+                        return 1;
+                    }
+                    plist = grown;
+                }
+                plist[npl].g1 = a; plist[npl].g2 = b; plist[npl].g3 = c;
+                plist[npl].g4 = -1; plist[npl].key = 0; plist[npl].ssq = 0; npl++;
+            }
+            fclose(pf);
+            if (!npl) { fprintf(stderr, "no usable parents in %s\n", extend); return 1; }
             pset_build(plist, npl);
         } else {
-            fprintf(stderr, "--parents-complete: skipping the parent table; "
-                    "canonical parent is the one holding the smallest %d words\n",
-                    PARENTK);
+            npl = READ_CHUNK();
+            if (!npl) { fprintf(stderr, "no usable parents in %s\n", extend); return 1; }
+            fprintf(stderr, "--parents-complete: streaming in chunks of %d, no parent "
+                    "table (canonical parent holds the smallest %d words)\n", pcap, PARENTK);
         }
-        fprintf(stderr, "extending %d %s by %d words each = %lld %s "
-                "(before canonical-parent filtering)\n",
-                npl, PARENTK == 3 ? "triples" : "pairs", nsel,
-                (long long)npl * nsel, PARENTK == 3 ? "quads" : "triples");
+        if (PARENTS_COMPLETE)
+            fprintf(stderr, "extending %s by %d words each, streaming\n",
+                    PARENTK == 3 ? "triples" : "pairs", nsel);
+        else
+            fprintf(stderr, "extending %d %s by %d words each = %lld %s "
+                    "(before canonical-parent filtering)\n",
+                    npl, PARENTK == 3 ? "triples" : "pairs", nsel,
+                    (long long)npl * nsel, PARENTK == 3 ? "quads" : "triples");
 
+      /* One pass over the whole list when it is resident; chunk after chunk when
+       * it is streamed.  `pbase` is the running offset, so a parent's rank is
+       * still its position in the FILE and not in the chunk it arrived in. */
+      int64_t pbase = 0;
+      for (;;) {
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -724,7 +773,7 @@ int main(int argc, char **argv) {
                         /* NOTE the column then means the EMITTING parent's rank,
                          * not the best rank across sub-openers: without the table
                          * the others are unknown.  The sidecar records which. */
-                        minpar = pi + 1;
+                        minpar = (int)(pbase + pi + 1);
                     } else {
                         int32_t canon[3];
                         int chosen = 0;
@@ -782,18 +831,28 @@ int main(int argc, char **argv) {
 #pragma omp atomic
 #endif
                 done_g1++;
-                if ((done_g1 & 63) == 0 && now_s() - LAST_REPORT >= REPORT_SECS) {
+                if ((done_g1 & 1023) == 0 && now_s() - LAST_REPORT >= REPORT_SECS) {
                     LAST_REPORT = now_s();
                     double el = now_s() - t0;
-                    double frac = (double)done_g1 / npl;
-                    fprintf(stderr, "  pair %lld/%d  %.1f%%  (%.0fs, eta %.1f min)\n",
-                            (long long)done_g1, npl, 100.0 * frac, el,
+                    int64_t tot = PARENT_COUNT > 0 ? PARENT_COUNT : npl;
+                    double frac = (double)done_g1 / (double)tot;
+                    fprintf(stderr, "  %s %lld/%lld  %.1f%%  (%.0fs, eta %.1f min)\n",
+                            PARENTK == 3 ? "triple" : "pair",
+                            (long long)done_g1, (long long)tot, 100.0 * frac, el,
                             frac > 0 ? (el / frac - el) / 60.0 : 0.0);
                 }
             }
             free(jrs); free(jrl); free(jwin); free(nrs); free(nrl); free(nwin);
             free(jfl); free(ord); free(tmp); free(cnt); free(tin);
         }
+        pbase += npl;
+        if (!PARENTS_COMPLETE) break;          /* the whole list was one pass */
+        npl = READ_CHUNK();
+        if (!npl) break;
+      }
+        if (PARENTS_COMPLETE) fclose(pf);
+        fprintf(stderr, "extended %lld %s\n", (long long)pbase,
+                PARENTK == 3 ? "triples" : "pairs");
         goto merge;
     }
 

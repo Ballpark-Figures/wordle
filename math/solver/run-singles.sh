@@ -8,6 +8,7 @@
 #     bash solver/run-singles.sh triples          # extend the top pairs to triples
 #     bash solver/run-singles.sh quads --disjoint-triples   # disjoint parents, ANY 4th word
 #     bash solver/run-singles.sh quads --disjoint            # 20 distinct letters, all four
+#     bash solver/run-singles.sh quads --disjoint --triples-top all   # every parent
 #     bash solver/run-singles.sh all              # all three stages
 #     bash solver/run-singles.sh pairs --top 250000
 #     bash solver/run-singles.sh triples --pairs-top 20000
@@ -192,6 +193,19 @@ if [ "$DISJTRI" = 1 ] && [ "$STAGE" != quads ] && [ "$STAGE" != all ]; then
 fi
 
 
+# Rows in a ranking, WITHOUT rescanning it. The sidecar already records what the
+# run wrote, and counting 139M lines of a 4 GB file to rediscover that took
+# longer than the work it was guarding.
+rows_in() {
+    _f="$1"
+    if [ -f "$_f.meta" ]; then
+        _w=$(sed -n 's/^written=//p' "$_f.meta")
+        [ -n "$_w" ] && { echo "$_w"; return; }
+    fi
+    echo $(( $(grep -c . "$_f") - 1 ))
+}
+
+
 # Is the CUT we are about to extend the complete parent set for its restriction?
 # Only then may --parents-complete be passed: on a partial list it silently drops
 # every result whose canonical parent is missing.  Both halves are checked -- the
@@ -271,13 +285,18 @@ if [ "$STAGE" = triples ] || [ "$STAGE" = all ]; then
     # The cut is taken here rather than inside pairsplit so that one wide pair
     # run serves every width: --extend reads whatever file it is handed, and its
     # line order IS the rank the minparent column is reported against.
-    CUT="$LOC/pairs${SUF}_top$PAIRSTOP.csv"
-    head -n $((PAIRSTOP + 1)) "$PAIRSRC" > "$CUT"
+    NSRCP=$(rows_in "$PAIRSRC")
+    if [ "$PAIRSTOP" -ge "$NSRCP" ]; then
+        CUT="$PAIRSRC"
+    else
+        CUT="$LOC/pairs${SUF}_top$PAIRSTOP.csv"
+        head -n $((PAIRSTOP + 1)) "$PAIRSRC" > "$CUT"
+    fi
     # The EFFECTIVE width, which is what the name has to carry: asking for more
     # parents than the file holds is not an error, it just gives you every pair
     # there is, and naming that file after the request rather than the reality
     # would be the same untraceability this scheme exists to prevent.
-    NPAR=$(( $(grep -c . "$CUT") - 1 ))
+    NPAR=$(rows_in "$CUT")
     if [ "$EXHAUSTIVE" = 1 ]; then
         TRISUF="_exhaustive"
     else
@@ -311,7 +330,7 @@ if [ "$STAGE" = triples ] || [ "$STAGE" = all ]; then
     # --top bounds what is WRITTEN, never what is searched, so even an exhaustive
     # run emits a file that fits in the repo while still visiting every triple.
     ./solver/pairsplit --metric singles --extend "$CUT" --top "$TOP" \
-        --out "$TRIOUT" $GLIST $DFLAG $PCFLAG $TFLAG \
+        --out "$TRIOUT" $GLIST $DFLAG $PCFLAG --parent-count "$NPAR" $TFLAG \
         2>&1 | tee -a "$LOC/singles.log"
 fi
 
@@ -355,9 +374,23 @@ if [ "$STAGE" = quads ] || [ "$STAGE" = all ]; then
         echo "4th word: unrestricted -- any of the 12972 legal words." \
             | tee -a "$LOC/singles.log"
     fi
-    TCUT="$LOC/triples${QSUF}_top$TRIPSTOP.csv"
-    head -n $((TRIPSTOP + 1)) "$TSRC" > "$TCUT"
-    NTRI=$(( $(grep -c . "$TCUT") - 1 ))
+    # Only make a cut when one is actually being taken.  Asking for more parents
+    # than the file holds used to copy the whole thing -- 4 GB for the exhaustive
+    # disjoint triples -- to produce a byte-identical file.
+    NSRC=$(rows_in "$TSRC")
+    # "all" beats guessing a number bigger than the file: --triples-top 100000000
+    # LOOKS like everything and is a real cut of a 138,953,994-row ranking, which
+    # silently turns an exhaustive sweep into a screen and disables the
+    # parents-complete fast path with it.
+    [ "$TRIPSTOP" = all ] && TRIPSTOP="$NSRC"
+    if [ "$TRIPSTOP" -ge "$NSRC" ]; then
+        TCUT="$TSRC"
+        NTRI="$NSRC"
+    else
+        TCUT="$LOC/triples${QSUF}_top$TRIPSTOP.csv"
+        head -n $((TRIPSTOP + 1)) "$TSRC" > "$TCUT"
+        NTRI=$TRIPSTOP
+    fi
     # The name records BOTH halves of the search: which parents, and whether the
     # 4th word was restricted. They are different questions with different
     # answers, so they must not share a filename.
@@ -370,7 +403,7 @@ if [ "$STAGE" = quads ] || [ "$STAGE" = all ]; then
     [ -n "$QPCFLAG" ] && echo "parents are complete: skipping the parent table" \
         | tee -a "$LOC/singles.log"
     ./solver/pairsplit --metric singles --extend "$TCUT" --top "$TOP" \
-        --out "$QUADOUT" $GLIST $QDFLAG $QPCFLAG $TFLAG \
+        --out "$QUADOUT" $GLIST $QDFLAG $QPCFLAG --parent-count "$NTRI" $TFLAG \
         2>&1 | tee -a "$LOC/singles.log"
 fi
 
