@@ -323,6 +323,15 @@ static int       PARENTS_COMPLETE = 0;
  * the parent's sidecar before opening the file -- it only means this code cannot
  * derive it by having everything in memory. */
 static int64_t   PARENT_COUNT = 0;
+/* --top all: keep every scored candidate.
+ *
+ * The bound is per THREAD, and a fixed one reserves `top` slots in EACH of the
+ * 18 threads whether or not they fill -- which is why keeping 25 million rows
+ * appeared to need 20 GB and a reduced thread count.  Growing the arrays instead
+ * means each thread holds only what it actually produced, so the total is the
+ * real row count (about 1.1 GB for those 25 million) no matter how many threads
+ * are running.  Everything downstream -- merge, sort, write -- is unchanged. */
+static int       TOP_ALL = 0;
 
 static void sortk(int32_t *w, int k) {
     for (int i = 1; i < k; i++)              /* k <= 5; insertion is right */
@@ -440,7 +449,11 @@ int main(int argc, char **argv) {
     int top = 10000, threads = 0, maxg1 = 0;
 
     for (int i = 1; i < argc; i++) {
-        if (!strcmp(argv[i], "--top") && i + 1 < argc) top = atoi(argv[++i]);
+        if (!strcmp(argv[i], "--top") && i + 1 < argc) {
+            const char *v = argv[++i];
+            if (!strcmp(v, "all")) { TOP_ALL = 1; top = INT32_MAX; }
+            else top = atoi(v);
+        }
         else if (!strcmp(argv[i], "--out") && i + 1 < argc) outpath = argv[++i];
         else if (!strcmp(argv[i], "--data") && i + 1 < argc) datadir = argv[++i];
         else if (!strcmp(argv[i], "--patterns") && i + 1 < argc) patpath = argv[++i];
@@ -547,11 +560,16 @@ int main(int argc, char **argv) {
 
     Pair **heaps = calloc(nth, sizeof(Pair *));
     int   *hn    = calloc(nth, sizeof(int));
+    int   *hcap  = calloc(nth, sizeof(int));
     /* How many candidates were actually SCORED, per thread.  Not derivable from
      * the inputs once --disjoint or the canonical-parent filter is in play, and
      * it is what tells a later run whether a parent file is complete. */
     int64_t *ranked = calloc(nth, sizeof(int64_t));
-    for (int t = 0; t < nth; t++) heaps[t] = malloc(sizeof(Pair) * top);
+    for (int t = 0; t < nth; t++) {
+        hcap[t] = TOP_ALL ? (1 << 16) : top;      /* grows below when keeping all */
+        heaps[t] = malloc(sizeof(Pair) * (size_t)hcap[t]);
+        if (!heaps[t]) { fprintf(stderr, "out of memory for the result buffer\n"); return 1; }
+    }
 
     double t0 = now_s();
     T0 = t0;
@@ -830,7 +848,16 @@ int main(int argc, char **argv) {
                     pv.g[PARENTK] = gx;
                     for (int w = PARENTK + 1; w < MAXW; w++) pv.g[w] = -1;
                     pv.minpar = minpar; pv.singles = singles; pv.nowin = nowin;
-                    if (heap_push(heap, n, top, pv)) announce(pv);
+                    if (TOP_ALL) {
+                        if (hn[tid] == hcap[tid]) {
+                            hcap[tid] *= 2;
+                            Pair *g = realloc(heaps[tid], sizeof(Pair) * (size_t)hcap[tid]);
+                            if (!g) { fprintf(stderr, "out of memory keeping all rows\n"); exit(1); }
+                            heaps[tid] = g;
+                        }
+                        heaps[tid][hn[tid]++] = pv;
+                        announce(pv);
+                    } else if (heap_push(heap, n, top, pv)) announce(pv);
                 }
 
 #ifdef _OPENMP
@@ -942,7 +969,16 @@ int main(int argc, char **argv) {
                 pv.g[0] = g1; pv.g[1] = g2;
                 for (int w = 2; w < MAXW; w++) pv.g[w] = -1;
                 pv.minpar = 0; pv.singles = singles; pv.nowin = nowin;
-                if (heap_push(heap, n, top, pv)) announce(pv);
+                if (TOP_ALL) {
+                    if (hn[tid] == hcap[tid]) {
+                        hcap[tid] *= 2;
+                        Pair *g = realloc(heaps[tid], sizeof(Pair) * (size_t)hcap[tid]);
+                        if (!g) { fprintf(stderr, "out of memory keeping all rows\n"); exit(1); }
+                        heaps[tid] = g;
+                    }
+                    heaps[tid][hn[tid]++] = pv;
+                    announce(pv);
+                } else if (heap_push(heap, n, top, pv)) announce(pv);
             }
 
 #ifdef _OPENMP

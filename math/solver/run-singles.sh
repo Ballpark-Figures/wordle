@@ -174,6 +174,12 @@ fi
 SUF=""
 GLIST=""
 DFLAG=""
+# How many words may open, which --answers changes.  The messages below report
+# it rather than the 12972 they used to hardcode: under --answers an
+# "unrestricted" last word still comes from the 2315 answers, and saying 12972
+# there described a run that was not happening.
+NOPEN=12972
+[ "$ANSWERS" = 1 ] && NOPEN=2315
 if [ "$ANSWERS" = 1 ]; then
     SUF="_answers"
     GLIST="--guess-list data/shared/words/mystery.txt"
@@ -384,7 +390,7 @@ if [ "$STAGE" = quads ] || [ "$STAGE" = all ]; then
         echo "4th word: DISJOINT -- 20 distinct letters across all four." \
             | tee -a "$LOC/singles.log"
     else
-        echo "4th word: unrestricted -- any of the 12972 legal words." \
+        echo "4th word: unrestricted -- any of the $NOPEN openers." \
             | tee -a "$LOC/singles.log"
     fi
     # Only make a cut when one is actually being taken.  Asking for more parents
@@ -451,7 +457,7 @@ if [ "$STAGE" = quints ] || [ "$STAGE" = all ]; then
         echo "5th word: DISJOINT -- 25 distinct letters across all five." \
             | tee -a "$LOC/singles.log"
     else
-        echo "5th word: unrestricted -- any of the 12972 legal words." \
+        echo "5th word: unrestricted -- any of the $NOPEN openers." \
             | tee -a "$LOC/singles.log"
     fi
     NQSRC=$(rows_in "$QSRC")
