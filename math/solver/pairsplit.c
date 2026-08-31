@@ -587,7 +587,13 @@ int main(int argc, char **argv) {
      * it is what tells a later run whether a parent file is complete. */
     int64_t *ranked = calloc(nth, sizeof(int64_t));
     for (int t = 0; t < nth; t++) {
-        hcap[t] = TOP_ALL ? (1 << 16) : top;      /* grows below when keeping all */
+        /* ALWAYS start small and grow. A numeric --top is a CAP on what is kept,
+         * not a promise that many will be found, but it used to be allocated in
+         * full up front IN EVERY THREAD: --top 100000000 reserved 5.6 GB per
+         * thread, 100 GB across 18, which is swap rather than a search. The cap
+         * still evicts once the buffer reaches it; it just is not reserved. */
+        hcap[t] = 1 << 16;
+        if (!TOP_ALL && top < hcap[t]) hcap[t] = top;
         heaps[t] = malloc(sizeof(Pair) * (size_t)hcap[t]);
         if (!heaps[t]) { fprintf(stderr, "out of memory for the result buffer\n"); return 1; }
     }
@@ -894,16 +900,21 @@ int main(int argc, char **argv) {
                     pv.g[PARENTK] = gx;
                     for (int w = PARENTK + 1; w < MAXW; w++) pv.g[w] = -1;
                     pv.minpar = minpar; pv.singles = singles; pv.nowin = nowin;
-                    if (TOP_ALL) {
-                        if (hn[tid] == hcap[tid]) {
-                            hcap[tid] *= 2;
-                            Pair *g = realloc(heaps[tid], sizeof(Pair) * (size_t)hcap[tid]);
-                            if (!g) { fprintf(stderr, "out of memory keeping all rows\n"); exit(1); }
-                            heaps[tid] = g;
-                        }
-                        heaps[tid][hn[tid]++] = pv;
+                    /* Grow while below the cap, then let heap_push evict.
+                     * The append MUST go through heap_push: it sifts, and a
+                     * plain append would leave the array unheaped, so the first
+                     * eviction would compare against a root that is not the
+                     * worst kept row and discard the wrong one. */
+                    if (hn[tid] == hcap[tid] && (TOP_ALL || hcap[tid] < top)) {
+                        int nc = hcap[tid] * 2;
+                        if (!TOP_ALL && nc > top) nc = top;
+                        hcap[tid] = nc;
+                        Pair *g = realloc(heaps[tid], sizeof(Pair) * (size_t)hcap[tid]);
+                        if (!g) { fprintf(stderr, "out of memory growing the buffer\n"); exit(1); }
+                        heaps[tid] = g;
+                    }
+                    if (heap_push(heaps[tid], n, TOP_ALL ? hcap[tid] : top, pv))
                         announce(pv);
-                    } else if (heap_push(heap, n, top, pv)) announce(pv);
                 }
 
 #ifdef _OPENMP
@@ -1018,16 +1029,21 @@ int main(int argc, char **argv) {
                 pv.g[0] = g1; pv.g[1] = g2;
                 for (int w = 2; w < MAXW; w++) pv.g[w] = -1;
                 pv.minpar = 0; pv.singles = singles; pv.nowin = nowin;
-                if (TOP_ALL) {
-                    if (hn[tid] == hcap[tid]) {
-                        hcap[tid] *= 2;
-                        Pair *g = realloc(heaps[tid], sizeof(Pair) * (size_t)hcap[tid]);
-                        if (!g) { fprintf(stderr, "out of memory keeping all rows\n"); exit(1); }
-                        heaps[tid] = g;
-                    }
-                    heaps[tid][hn[tid]++] = pv;
+                    /* Grow while below the cap, then let heap_push evict.
+                 * The append MUST go through heap_push: it sifts, and a
+                 * plain append would leave the array unheaped, so the first
+                 * eviction would compare against a root that is not the
+                 * worst kept row and discard the wrong one. */
+                if (hn[tid] == hcap[tid] && (TOP_ALL || hcap[tid] < top)) {
+                    int nc = hcap[tid] * 2;
+                    if (!TOP_ALL && nc > top) nc = top;
+                    hcap[tid] = nc;
+                    Pair *g = realloc(heaps[tid], sizeof(Pair) * (size_t)hcap[tid]);
+                    if (!g) { fprintf(stderr, "out of memory growing the buffer\n"); exit(1); }
+                    heaps[tid] = g;
+                }
+                if (heap_push(heaps[tid], n, TOP_ALL ? hcap[tid] : top, pv))
                     announce(pv);
-                } else if (heap_push(heap, n, top, pv)) announce(pv);
             }
 
 #ifdef _OPENMP
