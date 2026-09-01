@@ -59,7 +59,12 @@
 #define NPAT       243
 #define ALL_GREEN  242
 #define MAXG       13000
-#define MAXD       20
+/* Bounds the per-thread arena, which is indexed BY DEPTH so recursion levels
+ * cannot clobber each other -- an array bound, not a modelling limit. Costs
+ * ~0.23 MB per thread per level (lbg and ord dominate), so headroom is cheap.
+ * 20 was carried over from optturns.c, where the answer set is 2315; there is
+ * no reason for a problem with 11,881,376 answers to inherit it. */
+#define MAXD       32
 #define NSTR       11881376L            /* 26**5 */
 #define INF        ((long long)1 << 60)
 
@@ -335,13 +340,29 @@ static long long lbound(uint64_t n, int d) {
 typedef struct {
     State    subs[MAXD][NPAT];
     uint64_t cn[MAXD][NPAT];
-    int      pats[MAXD][NPAT];
     long long lbg[MAXD][MAXG];
     int64_t  ord[MAXD][MAXG];
     long long nodes;
 } Ctx;
 
 static long long solve(const State *st, uint64_t n, int d, Ctx *ctx);
+
+/* A single opener emits NOTHING until it finishes, and at this scale that can be
+ * a very long silence -- which reads as a hang rather than as work.  So report
+ * the node rate periodically.  The races on G_LAST and G_NODES are benign: the
+ * worst case is a duplicated or skipped line, and neither feeds a result. */
+static double    G_T0, G_LAST;
+static long long G_NODES;
+
+static void progress(int d, uint64_t n) {
+    double now = now_s();
+    if (now - G_LAST < 5.0) return;
+    G_LAST = now;
+    fprintf(stderr, "[%7.0fs] %lld nodes  %.0f nodes/s  (deepest live: d=%d, n=%llu)\n",
+            now - G_T0, G_NODES, G_NODES / (now - G_T0 + 1e-9), d,
+            (unsigned long long)n);
+    fflush(stderr);
+}
 
 static long long eval_guess(const State *st, uint64_t n, int d, int g,
                             long long best, Ctx *ctx) {
@@ -412,6 +433,11 @@ static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
 
     long long nodes0 = ctx->nodes++;
     long long best = INF;
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
+    G_NODES++;
+    if ((G_NODES & 0x3FF) == 0) progress(d, n);
 
     /* Pass 1: each guess's partition profile gives its lower bound, and (under
      * --topk) its sum of squared bin sizes -- the split-quality score the K
@@ -579,7 +605,19 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--data") && i + 1 < argc) datadir = argv[++i];
         else { fprintf(stderr, "unknown arg: %s\n", argv[i]); return 1; }
     }
-    if (depth < 1 || depth >= MAXD) { fprintf(stderr, "--depth out of range\n"); return 1; }
+    if (depth < 1 || depth >= MAXD) {
+        fprintf(stderr, "--depth %d out of range (1..%d; raise MAXD and rebuild)\n",
+                depth, MAXD - 1);
+        return 1;
+    }
+    /* --depth-max indexes the SAME per-depth arena, so it needs the SAME bound.
+     * Without this an out-of-range --depth-max wrote past lbg/ord and corrupted
+     * memory silently, while an out-of-range --depth refused cleanly. */
+    if (depthmax >= MAXD) {
+        fprintf(stderr, "--depth-max %d out of range (1..%d; raise MAXD and rebuild)\n",
+                depthmax, MAXD - 1);
+        return 1;
+    }
     if (depthmax < depth) depthmax = depth;
 
     char path[1024];
@@ -629,6 +667,8 @@ int main(int argc, char **argv) {
 #endif
     fprintf(stderr, "phantom-final: %ld of %ld answers are not legal guesses\n",
             NSTR - NG, NSTR);
+
+    G_T0 = G_LAST = now_s();
 
     FILE *out = outpath ? fopen(outpath, "a") : NULL;
     if (outpath && !out) { fprintf(stderr, "cannot append to %s\n", outpath); return 1; }
