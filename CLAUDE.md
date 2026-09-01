@@ -326,6 +326,41 @@ The one sweep whose ANSWER set is the LARGER of the two — the mirror image of
   guess list. Verified on `slate`'s tree: 12972 answers covered once each, exactly
   2315 lines won by a real play and 10657 by a phantom, tree summing to the CSV.
 
+## All 26^5 strings as a candidate set — `strspace.py` (CONSTRAINTS, not lists)
+The strategy grid is (guess set) x (answer set) over A=2315, W=12972, S=26^5=11881376.
+The four cells avoiding S are solvable by `optturns` flags; **the five involving S are
+NOT reachable by any flag, `--topk` included** — `--topk` limits BRANCHING, and every
+blocker is REPRESENTATION: candidate indices are `uint16_t`, guess indices are packed
+into 20 bits (`(lb << 20) | g`, `& 0xFFFFF`), the per-thread arena is sized by
+`MAXA`/`MAXG` (~1.9 GB/thread at S), and `PAT` is a dense NG x NA matrix (27.5 GB for
+S x A, 154 GB for W x S, ~141 TB for S x S).
+- **`math/strspace.py` is the answer-side fix: carry the candidate set as CONSTRAINTS.**
+  Per-position allowed-letter masks + per-letter `lo`/`hi` counts — ~72 bytes whatever
+  the candidate count, hashable as-is (so it doubles as a TT key), refined once per
+  pattern to split, and SIZED by a DP over positions carrying only the CONSTRAINED
+  letters' counts. Never enumerates. `alpha` and `length` are parameters so it can be
+  checked exhaustively on a small alphabet.
+- **THE REPEATED-LETTER TRAP, and why a spot check misses it.** Yellows are a PREFIX of
+  a letter's non-green copies — `wordle.pattern` marks greens, then hands out the
+  answer's spare copies LEFT TO RIGHT — so for one letter the non-green copies read
+  yellow…yellow, grey…grey. A grey followed by a yellow of the SAME letter is
+  UNREACHABLE, not merely empty. The count bounds cannot see this (both orders give
+  identical `lo`/`hi`), so omitting the test makes `abb` report 8 non-empty patterns
+  where 7 exist. **A distinct-letter guess like `salet` never exercises it** — the 26^5
+  check passed while `abb` was broken.
+- **`python3 tools/checkstrspace.py` is the gate.** Exhaustive at alpha=4/L=3 and
+  alpha=3/L=4 (every guess, every reachable state to depth 2, ~682k states) against
+  brute force AND against `wordle.pattern`; plus the real 26^5 space checked against an
+  actual numpy filter. Run it alongside `solver/validate.sh` and `checkpatterns.py`.
+- **ROOT SYMMETRY collapses the guess side, and it is a PROOF, not a heuristic.** With
+  no constraints 26^5 is invariant under any alphabet permutation, so two guesses with
+  the same POSITIONAL SHAPE (the set partition of positions induced by equal letters)
+  have isomorphic partitions. Measured: all 11881376 root probes fall into **52 classes**
+  (Bell(5)) giving just **7 distinct partition profiles** — 52.3 hours of naive Python
+  root sweep down to 0.23 s. **This is exact only at the ROOT**; deeper, symmetry is
+  broken by the letters already mentioned, though unmentioned letters stay
+  interchangeable. Do not assume the full collapse below the root without re-deriving it.
+
 ## Gameplay layout
 - (Describe this video's on-screen layout and the assets in `animations/assets/`.)
 
