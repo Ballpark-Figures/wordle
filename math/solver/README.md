@@ -350,6 +350,60 @@ one. If no opener solves all 12972 words within 6, the run says so explicitly
 rather than returning a number. Report any result as optimal **subject to a
 6-guess guarantee**.
 
+## Unguessable answers (`--phantom-final`) — the `ansall` cell
+
+    bash solver/run-ansall-sweep.sh --depth 7                  # from math/
+    bash solver/run-ansall-sweep.sh --depth 7 --optimal-only -k 50
+
+The mirror image of the answers-only sweep: the **2315 answers are the only legal
+guesses**, and **all 12972 words are possible answers**. It is the one
+configuration where the answer set is the LARGER of the two, so 10657 answers can
+never be played.
+
+**The scoring rule.** An answer outside the guess list is charged *narrow the
+candidate set down to that one word, then add one* — a PHANTOM final guess
+standing in for the naming move. An answer inside the guess list is charged
+normally: it must actually be played to be won. The two coincide arithmetically
+at a singleton (`solve` returns 1 for `n == 1` either way), so the recursion needs
+no new accounting. What needed guarding is the handful of shortcuts that assumed
+`ANS2G[a] >= 0`:
+
+* `n == 2` returns 3 ("guess one: 1 + 2") only while at least one of the pair is
+  playable. When **neither** is, the pair has to be SPLIT and each half then costs
+  its own phantom move: **4**. No guess can do better — one guess cannot resolve
+  either candidate when neither can be named — so the first separating guess
+  proves the value and there is nothing to search.
+* The candidate-first guess orderings (the `d == 2` closed form, `--topk`'s
+  below-cutoff top-up, `best_move`'s rescan) skip unplayable candidates.
+* `best_move` takes whichever of a pair IS legal; at `n == 1` with none legal it
+  returns -1 and `emit_tree` writes the phantom line itself.
+* Depth normalisation (`d = min(d, n)`) still holds: any splitting guess drops the
+  largest bucket to `n-1`, so `f(n) <= 1 + f(n-1) = n`, and a state with no
+  splitting guess at all is INF at every depth.
+
+**`--phantom-final` is opt-in and inert when answers ⊆ guesses.** It relaxes the
+`answer %s not a legal guess` check — the guard that catches a mistyped
+`--answer-list` — so it has to be asked for. It is deliberately **not** in the TT
+salt, because it provably changes nothing when every answer is playable. Verified
+both ways: `solver/validate.sh` still reproduces all five totals with identical
+node counts, and the answers-only cell run WITH the flag still returns
+`slate 7973`, the committed `ansturns` value.
+
+**The cap binds and is part of the objective**, so `--depth` is required and every
+depth gets its own CSV. Depth 7 is confirmed feasible (`slate` 54892 / 4.23158
+under `--topk 30`, an upper bound); whether 6 is feasible is unresolved — the
+counting bound does not rule it out, so only a real search settles it.
+
+**Prerequisite: the SQUARE matrix** (`python3 build_patterns.py --full`). The
+answer set is `guess.txt`, so the matrix must be 12972x12972 before
+`--guess-list` compacts its rows down to the 2315.
+
+**Trees carry the phantom.** `emit_tree` writes the answer itself as the final,
+unplayable naming move, which keeps every line a complete replay ending
+all-green. `tools/checktrees.py` now checks guess LEGALITY against the sweep's
+guess list and exempts exactly that case — last move of the line, equal to the
+answer, answer not in the guess list.
+
 ## `--topk K`: trade exactness for tractability
 
 At every branching point, rank the legal guesses by **sum of squared bin sizes**

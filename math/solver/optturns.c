@@ -137,6 +137,26 @@ static int      NG, NA;
  * the legal guesses differ, and a shared key would return that wrong value. */
 static uint64_t GSALT = 0;
 
+/* --phantom-final: allow ANSWERS THAT ARE NOT LEGAL GUESSES.
+ *
+ * Every other mode requires the answer set to sit inside the guess set, so the
+ * last guess of every line is the answer itself and costs 1.  When the answer
+ * set is the LARGER of the two (2315 guesses against all 12972 words, say),
+ * most answers can never be played.  The scoring rule for those is "narrow the
+ * candidate set down to that one word, then add one" -- a PHANTOM final guess
+ * standing in for the naming move the guess list cannot make.
+ *
+ * That is the SAME arithmetic the guessable answers already get (`n == 1`
+ * returns 1 either way), so the recursion needs no new accounting: an answer
+ * inside the guess set is still won by being played, an answer outside it is
+ * won one guess after it becomes the only candidate.  What DOES change is a
+ * handful of shortcuts that assume `ANS2G[a] >= 0`; each is guarded below.
+ *
+ * It is OPT-IN because the "answer %s not a legal guess" check it relaxes is
+ * the guard that catches a mistyped --answer-list.  Off, every existing
+ * invocation is bit-identical; on, ANS2G may hold -1. */
+static int PHANTOM = 0;
+
 /* --topk: at every branching point consider only the K guesses that split the
  * candidate set most evenly (smallest sum of squared bin sizes), instead of all
  * NG of them.  0 = unlimited = the exact solver.
@@ -671,14 +691,33 @@ static int eval_guess(const uint16_t *S, int n, int d, int g, int best,
 static int solve(const uint16_t *S, int n, int d, const Cons *C, Ctx *ctx) {
     if (n == 1) return 1;
     if (d <= 1) return INF;
-    if (n == 2) return 3;                       /* guess one: 1 + 2 */
+    if (n == 2) {
+        /* Guess either candidate: 1 if it is the answer, 2 if it is the other. */
+        if (!PHANTOM || ANS2G[S[0]] >= 0 || ANS2G[S[1]] >= 0) return 3;
+        /* Under --phantom-final NEITHER may be played, so the pair has to be
+         * SPLIT by some third guess and each half then costs its own phantom
+         * naming move: 2 (the splitter, charged to both) + 1 + 1 = 4.  No guess
+         * can do better -- one guess cannot resolve either candidate when
+         * neither is playable -- so the first separating guess proves the value
+         * and there is nothing to search.  Hard mode falls through to the
+         * general search instead, since there the legal set is constrained;
+         * it never reaches here anyway, its answers all being legal guesses. */
+        if (!HARD) {
+            for (int g = 0; g < NG; g++)
+                if (PAT[(size_t)g * NA + S[0]] != PAT[(size_t)g * NA + S[1]]) return 4;
+            return INF;                         /* no guess separates the two */
+        }
+    }
 
     /* Depth normalisation: every guess in an optimal line strictly shrinks the
      * candidate set, so n candidates are always resolved within n guesses --
      * beyond that the budget cannot bind and f(S,d) == f(S,n).  Collapsing the
      * key raises the TT hit rate for small sets reached with lots of budget.
      * Holds in hard mode too: a candidate is always a legal guess, so guessing
-     * candidates one at a time resolves n of them in at most n turns. */
+     * candidates one at a time resolves n of them in at most n turns.  And
+     * under --phantom-final, where that is no longer true: any splitting guess
+     * drops the largest bucket to n-1, so f(n) <= 1 + f(n-1) = n still, and a
+     * state with no splitting guess at all is INF at every depth. */
     if (d > n) d = n;
 
     int lb0 = LBTAB[d][n];
@@ -705,6 +744,7 @@ static int solve(const uint16_t *S, int n, int d, const Cons *C, Ctx *ctx) {
             int lim = (pass == 0) ? n : nleg;
             for (int t = 0; t < lim; t++) {
                 int g = (pass == 0) ? ANS2G[S[t]] : (HARD ? (int)leg[t] : t);
+                if (g < 0) continue;            /* --phantom-final: unplayable candidate */
                 const pat_t *row = PAT + (size_t)g * NA;
                 /* Count every element -- never break early.  bp[] must end up
                  * holding EVERY touched pattern or the clear loop below leaks
@@ -784,6 +824,7 @@ static int solve(const uint16_t *S, int n, int d, const Cons *C, Ctx *ctx) {
         if (n <= TOPK)
             for (int i = 0; i < n; i++) {
                 int g = ANS2G[S[i]];
+                if (g < 0) continue;            /* --phantom-final: unplayable candidate */
                 if (mark[g] != tag && lbg[g] < INF) {
                     mark[g] = tag;
                     ssq[K++] = ((int64_t)lbg[g] << 20) | (int64_t)g;
@@ -846,7 +887,16 @@ static int solve(const uint16_t *S, int n, int d, const Cons *C, Ctx *ctx) {
  * been evicted, rescan for a guess achieving the known value (eval_guess with
  * bound v+1 returns v exactly when g is optimal, else INF). */
 static int best_move(const uint16_t *S, int n, int d, const Cons *C, Ctx *ctx) {
-    if (n == 1 || n == 2) return ANS2G[S[0]];   /* a candidate is always legal */
+    /* A candidate is normally always legal, so playing one resolves n <= 2.
+     * Under --phantom-final take whichever of the two IS legal; when neither is,
+     * fall through and search for the separating guess solve() priced at 4.
+     * n == 1 with no legal naming move returns -1: emit_tree reads that as the
+     * phantom final and writes the line itself. */
+    if (n == 1) return ANS2G[S[0]];
+    if (n == 2) {
+        if (ANS2G[S[0]] >= 0) return ANS2G[S[0]];
+        if (ANS2G[S[1]] >= 0) return ANS2G[S[1]];
+    }
     int v = solve(S, n, d, C, ctx);
     if (v >= INF) return -1;
     if (d > n) d = n;
@@ -860,6 +910,7 @@ static int best_move(const uint16_t *S, int n, int d, const Cons *C, Ctx *ctx) {
         int lim = (pass == 0) ? n : nleg;
         for (int t = 0; t < lim; t++) {
             int g = (pass == 0) ? ANS2G[S[t]] : (HARD ? (int)leg[t] : t);
+            if (g < 0) continue;                /* --phantom-final: unplayable candidate */
             if (eval_guess(S, n, d, g, v + 1, C, ctx) == v) return g;
         }
     }
@@ -870,6 +921,15 @@ static int best_move(const uint16_t *S, int n, int d, const Cons *C, Ctx *ctx) {
  * The final guess always equals the answer, so each line is a complete replay. */
 static int emit_tree(FILE *out, const uint16_t *S, int n, int d,
                      char *path, int plen, int ply, const Cons *C, Ctx *ctx) {
+    /* --phantom-final: the set is down to one word that cannot be played.  The
+     * scoring charges one more guess for naming it, so write the answer itself
+     * as that final guess -- which keeps the line a complete replay ending
+     * all-green, exactly the invariant checktrees.py verifies.  The only thing
+     * it is not is a LEGAL guess, and only on the last move of such a line. */
+    if (n == 1 && ANS2G[S[0]] < 0) {
+        fprintf(out, "%s %d %.*s%s\n", AWORD[S[0]], ply + 1, plen, path, AWORD[S[0]]);
+        return 0;
+    }
     int g = best_move(S, n, d, C, ctx);
     if (g < 0) return -1;
     const char *gw = GWORD[g];
@@ -1429,6 +1489,7 @@ int main(int argc, char **argv) {
         /* kept as the N=1 alias so runs already launched with it keep working */
         else if (!strcmp(argv[i], "--pair-early-finish")) PAIR_ADAPT = 1;
         else if (!strcmp(argv[i], "--optimal-only")) optonly = 1;
+        else if (!strcmp(argv[i], "--phantom-final")) PHANTOM = 1;
         else if (!strcmp(argv[i], "--order") && i + 1 < argc) {
             const char *o = argv[++i];
             if (!strcmp(o, "ssq")) ORDER_SSQ = 1;
@@ -1587,7 +1648,17 @@ int main(int argc, char **argv) {
 
     for (int a = 0; a < NA; a++) {
         ANS2G[a] = find_word(GWORD, NG, AWORD[a]);
-        if (ANS2G[a] < 0) { fprintf(stderr, "answer %s not a legal guess\n", AWORD[a]); return 1; }
+        if (ANS2G[a] < 0 && !PHANTOM) {
+            fprintf(stderr, "answer %s not a legal guess "
+                    "(pass --phantom-final to score it as narrow-to-one plus one)\n", AWORD[a]);
+            return 1;
+        }
+    }
+    if (PHANTOM) {
+        int unplayable = 0;
+        for (int a = 0; a < NA; a++) if (ANS2G[a] < 0) unplayable++;
+        fprintf(stderr, "phantom-final: %d of %d answers are not legal guesses "
+                "(scored as narrow-to-one plus one)\n", unplayable, NA);
     }
     uint64_t seed = 0xD1B54A32D192ED03ULL;
     for (int a = 0; a < NA; a++) { ZOB0[a] = splitmix64(&seed); ZOB1[a] = splitmix64(&seed); }

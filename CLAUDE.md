@@ -290,6 +290,42 @@ rather than new binaries. **`math/solver/README.md` has the full detail.**
   (the README describes Linux behaviour). The linker unlinks and recreates, so the
   live process keeps its old inode and is unaffected — but the safety net is absent.
 
+## `ansall`: 2315 guesses, ALL 12972 words as answers (`--phantom-final`)
+The one sweep whose ANSWER set is the LARGER of the two — the mirror image of
+`ansturns`. `bash solver/run-ansall-sweep.sh --depth D` (from `math/`).
+- **The scoring rule, stated exactly.** 10657 of the 12972 answers are not legal
+  guesses, so they can never be PLAYED. Those are charged **narrow the candidates
+  to that one word, then add one** — a PHANTOM final guess standing in for the
+  naming move. The 2315 answers that ARE legal guesses are charged normally: they
+  must actually be played to be won. The two rules coincide arithmetically at a
+  singleton (`n == 1` returns 1 either way), which is why the recursion needs no
+  new accounting — only a handful of `ANS2G[a] >= 0` shortcuts needed guarding.
+- **`--phantom-final` is OPT-IN, and inert when answers ⊆ guesses.** It relaxes the
+  `answer %s not a legal guess` check, which is the guard that catches a mistyped
+  `--answer-list`, so it must be asked for. VERIFIED inert: with it on, the
+  answers-only cell still returns `slate 7973`, the committed `ansturns` value, and
+  `solver/validate.sh` still reproduces all five totals with identical node counts
+  (salet 16672). It is deliberately NOT in the TT salt for that reason.
+- **The one shortcut that genuinely changes is `n == 2`.** It returns 3 ("guess
+  one: 1 + 2") only while at least one of the pair is playable. When NEITHER is,
+  the pair must be SPLIT and each half then costs its own phantom move: **4**,
+  proven by the first separating guess — there is nothing to search.
+- **THE CAP BINDS AND IS PART OF THE OBJECTIVE, so `--depth` is REQUIRED and every
+  depth gets its OWN CSV** (`opener_totals_d7.csv`, `optimal_d7_k50.csv`, …).
+  Normal mode's "any opener can follow SALET's tree" escape is unavailable twice
+  over here — the answer set is the 12972, and SALET is not even a legal guess.
+  **Depth 7 is CONFIRMED feasible** (`slate` 54892 / 4.23158 under `--topk 30`, an
+  upper bound). **Whether depth 6 is feasible is UNRESOLVED** — the counting bound
+  does not rule it out, so settling it needs a real search, not an argument.
+- Data under `math/data/{shared,local}/ansall/`. **`WORDLE_SOLVER=ansall`** reads
+  it, but because the cap is in the filename it needs **`WORDLE_CSV=<path>`** too;
+  like `ansturns` the name is not a binary, so the `tt*` tools cannot attach to it.
+- **`checktrees.py` now verifies guess LEGALITY** against the sweep's guess list —
+  new coverage for every sweep, and the load-bearing check here. A phantom final is
+  the sole exemption: last move of the line, equal to the answer, answer not in the
+  guess list. Verified on `slate`'s tree: 12972 answers covered once each, exactly
+  2315 lines won by a real play and 10657 by a phantom, tree summing to the CSV.
+
 ## Gameplay layout
 - (Describe this video's on-screen layout and the assets in `animations/assets/`.)
 
