@@ -44,7 +44,12 @@ if [ $# -eq 0 ]; then
   # score for every unordered pair of guesses. Separate program because it shares
   # nothing with the solver but the .npy loader.
   gcc $BASE $OMP -o pairsplit pairsplit.c
-  echo "built ./optturns, ./hardturns and ./pairsplit  (5 letters, Wordle lists)"
+  # strturns is the W -> S cell: the same objective over ALL 26**5 strings as
+  # answers. Separate program because it shares no data structure with the
+  # solver -- no pattern matrix and no candidate list, since neither survives
+  # 11,881,376 answers; the candidate set is carried as CONSTRAINTS instead.
+  gcc $BASE $OMP -o strturns strturns.c
+  echo "built ./optturns, ./hardturns, ./pairsplit and ./strturns  (5 letters, Wordle lists)"
   exit 0
 fi
 

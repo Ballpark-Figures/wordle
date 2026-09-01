@@ -143,6 +143,54 @@ def refine(st, guess, code):
 
     if sum(lo) > length:
         return None
+    return _canon(allow, lo, hi, length, alpha)
+
+
+def _canon(allow, lo, hi, length, alpha):
+    """Put a state in canonical form, or return None if it is contradictory.
+
+    Two propagations, both implied by the constraints they come from -- so the
+    SET is unchanged and only the representation moves:
+
+      * `hi[c] == 0` means c appears nowhere, so clear it from EVERY position
+        mask. Refinement only clears the position it was guessed at, which
+        leaves the same set described two different ways -- bad for a
+        transposition table keyed on the state -- and leaves a dead letter in
+        the counting DP's constrained list, where it costs work for nothing.
+      * a position with a single allowed letter FORCES that letter, so it lifts
+        that letter's floor.
+
+    Then two cheap contradiction tests: a letter cannot be required more often
+    than it has positions available, and the floors cannot exceed the length.
+    """
+    allow = list(allow)
+    lo = list(lo)
+    hi = list(hi)
+    for c in range(alpha):
+        if hi[c] == 0:
+            bit = ~(1 << c)
+            for i in range(length):
+                allow[i] &= bit
+    forced = [0] * alpha
+    for i in range(length):
+        if allow[i] == 0:
+            return None
+        if allow[i] & (allow[i] - 1) == 0:          # exactly one letter legal
+            forced[allow[i].bit_length() - 1] += 1
+    avail = [0] * alpha
+    for i in range(length):
+        m = allow[i]
+        while m:
+            b = m & -m
+            avail[b.bit_length() - 1] += 1
+            m ^= b
+    for c in range(alpha):
+        if forced[c] > lo[c]:
+            lo[c] = forced[c]
+        if lo[c] > hi[c] or lo[c] > avail[c]:
+            return None
+    if sum(lo) > length:
+        return None
     return State(allow, lo, hi, length, alpha)
 
 
