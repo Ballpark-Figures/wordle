@@ -361,6 +361,54 @@ S x A, 154 GB for W x S, ~141 TB for S x S).
   broken by the letters already mentioned, though unmentioned letters stay
   interchangeable. Do not assume the full collapse below the root without re-deriving it.
 
+## `strturns` — the W to S cell (12972 word guesses, all 26^5 strings as answers)
+`solver/strturns.c`, built by `sh build.sh`. Carries the candidate set as CONSTRAINTS
+(`strspace.py` is the reference implementation and the oracle), precomputes one ATOM per
+(word, pattern), and counts by DP rather than enumerating. `tools/checkstrturns.py` diffs
+its state arithmetic against `strspace.py` over a shared deterministic walk — run it and
+`checkstrspace.py` after touching either.
+- **`--allow-unsolved` CHANGES THE OBJECTIVE and is opt-in for that reason.** By default,
+  missing the `--depth` cap is fatal and the opener reports INFEASIBLE. Under the flag it
+  becomes a COUNTED violation and the objective is LEXICOGRAPHIC: fewest unsolved answers
+  first, then fewest guesses. **A total from such a run is NOT comparable with a default
+  run or with any other cell** — it is "best coverage at this cap, cheapest way to get it".
+  Every line printing it carries `unsolved=`, and the CSV gains an `unsolved` column, so
+  the two can never be mistaken for each other.
+  - Both halves ride in one `long long` as `unsolved * 1e9 + guesses`; guesses cannot
+    reach 1e9 (at most `NSTR * MAXD`, ~3.8e8), so the fields never carry and plain integer
+    add/compare give the lexicographic order for free.
+  - **The COUNT is free** (it is in the packed value); only EXAMPLES need a tree walk, and
+    that walk stops as soon as it has `--list-unsolved` of them (default 100). So listing
+    is affordable even when millions are unsolved.
+  - `avg-played` divides by ALL 11881376 answers, not the solved ones: every answer was
+    charged for each guess actually played on its path, including ones that ran out of
+    budget. Dividing by the solved count would attribute their guesses to somebody else.
+- **`MAXD` is an ARRAY BOUND, not a modelling limit** — it sizes the per-thread arena,
+  which is indexed BY DEPTH so recursion levels cannot clobber each other. ~0.23 MB per
+  thread per level, so raising it is cheap; it is 32, not optturns' 20.
+- **`--topk` limits which guesses are RECURSED INTO, not which are PROFILED.** Pass 1
+  scans all 12972 guesses x 243 patterns at EVERY node whatever `n` is, so a 3-candidate
+  state costs the same ~10 ms as a big one. MEASURED at depth 19: ~95 nodes/s with almost
+  every node holding 3-85 candidates. **A small-`n` path (enumerate and use direct pattern
+  computation below a few hundred candidates) is the outstanding optimisation.**
+- **INFEASIBLE under `--topk` says NOTHING about the cap** — a single bad guess returns INF
+  for the whole tree. Worse here than elsewhere: the beam ranks by split EVENNESS while the
+  binding constraint is letter COVERAGE (the all-grey branch survives as strings over the
+  unguessed letters), so the beam systematically discards the guesses that make progress.
+- **Depth 6 is IMPOSSIBLE for `salet`, provably and without running anything.** All-grey
+  feedback leaves exactly the strings over the unguessed letters, `(26-|L|)**5`, so
+  isolating one needs 25 letters seen — 5 pairwise letter-disjoint words including the
+  opener. 432 words are disjoint from `salet` and **no 4 of them are mutually disjoint**
+  (4 disjoint words would need 20 of the 21 remaining letters). So coverage caps at 24,
+  leaving >= 2**5 = 32 candidates, needing a 6th guess to split and a 7th to name:
+  **depth >= 7 for `salet`**. Measured chain confirms the mechanism: 21**5, 16**5, 11**5,
+  6**5, 1.
+- **THE SEARCH IS NOT YET VERIFIED.** The state arithmetic is checked exhaustively; the
+  objective accounting, phantom rule and bounds are not. The gate to build is `ALPHA`/`L`
+  as compile-time constants (like `WORDLEN` in optturns) so a build at alpha=4/length=3
+  can be diffed against a brute-force Python solver. Until then treat every total it
+  prints as provisional.
+
 ## Gameplay layout
 - (Describe this video's on-screen layout and the assets in `animations/assets/`.)
 

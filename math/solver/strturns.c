@@ -82,6 +82,29 @@ static int32_t *WORDIDX;                /* string index -> guess index, or -1 */
 static int      BRANCH = NPAT - 1;
 static int      TOPK = 0;
 
+/* --allow-unsolved changes the OBJECTIVE, which is why it is opt-in.
+ *
+ * By default, failing to resolve an answer within --depth is fatal: solve()
+ * returns INF and the whole opener reports INFEASIBLE, with no way to say how
+ * much was unreachable.  Under --allow-unsolved, exceeding the cap becomes a
+ * COUNTED VIOLATION instead, and the objective becomes LEXICOGRAPHIC: fewest
+ * unsolved answers first, then fewest guesses.
+ *
+ * A total produced this way is NOT the same quantity as the default one and is
+ * NOT comparable with the other cells of the grid -- it is "the best coverage
+ * achievable at this cap, and the cheapest way to achieve that coverage".  Every
+ * line that prints it says `unsolved=` so the two can never be confused.
+ *
+ * Both halves ride in ONE long long: unsolved * USCALE + guesses.  Guesses can
+ * never reach USCALE (at most NSTR * MAXD, about 3.8e8), so the fields do not
+ * carry into each other and plain integer add and compare give exactly the
+ * lexicographic order.  INF stays far above any real packed value. */
+static int      ALLOW_UNSOLVED = 0;
+static int      LIST_UNSOLVED = 100;
+#define USCALE      1000000000LL
+#define UNS(v)      ((v) / USCALE)
+#define GUESSES(v)  ((v) % USCALE)
+
 static double now_s(void) {
     struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t);
     return t.tv_sec + t.tv_nsec * 1e-9;
@@ -284,7 +307,7 @@ static int build_atom(State *s, const uint8_t *g, int code) {
 
 /* --------------------------------------------- transposition table + bound */
 
-typedef struct { uint64_t h0, h1x; long long val; int32_t d; uint32_t work; } Entry;
+typedef struct { uint64_t h0, h1x; long long val; int32_t d, bestg; uint32_t work, pad; } Entry;
 static Entry   *TT;
 static uint64_t TT_BUCKETS;
 static int      TT_OFF = 0;
@@ -301,19 +324,20 @@ static void hash_state(const State *s, int d, uint64_t *h0, uint64_t *h1) {
     *h0 = a ? a : 1; *h1 = b;
 }
 
-static int tt_get(uint64_t h0, uint64_t h1, int d, long long *val) {
+static int tt_get(uint64_t h0, uint64_t h1, int d, long long *val, int *bestg) {
     if (TT_OFF) return 0;
     Entry *bk = TT + (h0 & (TT_BUCKETS - 1)) * 2;
     for (int i = 0; i < 2; i++)
         if (bk[i].h0 == h0 && bk[i].h1x == (h1 ^ (uint64_t)bk[i].val) && bk[i].d == d) {
-            *val = bk[i].val; return 1;
+            *val = bk[i].val; if (bestg) *bestg = bk[i].bestg; return 1;
         }
     return 0;
 }
 
-static void tt_put(uint64_t h0, uint64_t h1, int d, long long val, uint32_t work) {
+static void tt_put(uint64_t h0, uint64_t h1, int d, long long val, int bestg, uint32_t work) {
     if (TT_OFF) return;
-    Entry e; e.h0 = h0; e.val = val; e.h1x = h1 ^ (uint64_t)val; e.d = d; e.work = work;
+    Entry e; e.h0 = h0; e.val = val; e.h1x = h1 ^ (uint64_t)val; e.d = d;
+    e.bestg = bestg; e.work = work; e.pad = 0;
     Entry *bk = TT + (h0 & (TT_BUCKETS - 1)) * 2;
     if (bk[0].h0 == 0) { bk[0] = e; return; }
     if (bk[1].h0 == 0) { bk[1] = e; return; }
@@ -334,7 +358,12 @@ static long long lbound(uint64_t n, int d) {
         if (!rem) return total;
         if (cap < (unsigned long long)NSTR) cap *= (unsigned)BRANCH;
     }
-    return INF;
+    /* `rem` answers cannot fit in d guesses however the tree is built, so under
+     * --allow-unsolved that is a floor on the violation count -- a real bound on
+     * the leading field, not just on guesses.  The unsolved ones are charged no
+     * guesses, which keeps it a lower bound. */
+    if (!ALLOW_UNSOLVED) return INF;
+    return (long long)rem * USCALE + total;
 }
 
 typedef struct {
@@ -387,6 +416,8 @@ static long long eval_guess(const State *st, uint64_t n, int d, int g,
         if (v >= INF) return INF;
         lbrest += v;
     }
+    /* Every candidate is charged this guess.  Children then add their own packed
+     * (unsolved, guesses); the fields never carry, so one add does both. */
     long long total = (long long)n;
     for (int k = 0; k < np; k++) {
         long long own = lbound(cn[k], d - 1);
@@ -402,7 +433,10 @@ static long long eval_guess(const State *st, uint64_t n, int d, int g,
 
 static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
     if (n == 1) return 1;                       /* played, or the phantom naming move */
-    if (d <= 1) return INF;
+    /* Out of budget with more than one candidate left.  By default that is fatal;
+     * under --allow-unsolved every remaining candidate is a violation, and none
+     * of them is charged a further guess because none is played. */
+    if (d <= 1) return ALLOW_UNSOLVED ? (long long)n * USCALE : INF;
     if (n == 2) {
         /* Either candidate playable: guess it -- 1 if right, 2 if not.  Neither
          * playable: the pair must be SPLIT and each half then costs its own
@@ -414,7 +448,10 @@ static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
             for (int g = 0; g < NG; g++)
                 if (pattern_codes(GCODE[g], two[0]) != pattern_codes(GCODE[g], two[1]))
                     return 4;
-            return INF;                         /* no guess separates them */
+            /* No guess separates them, so neither can ever be pinned down.
+             * Cannot arise for the 12972-word guess set, which provably
+             * separates every pair of strings, but the code must not assume it. */
+            return ALLOW_UNSOLVED ? 2 * USCALE : INF;
         }
     }
     /* Depth normalisation: n candidates always resolve within n guesses (any
@@ -429,7 +466,7 @@ static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
     uint64_t h0, h1;
     hash_state(st, d, &h0, &h1);
     long long cached;
-    if (tt_get(h0, h1, d, &cached)) return cached;
+    if (tt_get(h0, h1, d, &cached, NULL)) return cached;
 
     long long nodes0 = ctx->nodes++;
     long long best = INF;
@@ -468,7 +505,13 @@ static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
         lbg[g] = lv;
         ord[m++] = ((int64_t)(TOPK > 0 ? (int64_t)(ss >> 12) : lv) << 20) | g;
     }
-    if (!m) { tt_put(h0, h1, d, INF, 1); return INF; }
+    if (!m) {
+        /* Not one legal guess splits this set.  Same reasoning as the n == 2
+         * case: unreachable with the word list, but not assumed. */
+        long long v = ALLOW_UNSOLVED ? (long long)n * USCALE : INF;
+        tt_put(h0, h1, d, v, -1, 1);
+        return v;
+    }
 
     for (int i = 1; i < m; i++) {                /* ascending by key */
         int64_t k = ord[i]; int j = i - 1;
@@ -476,16 +519,102 @@ static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
         ord[j + 1] = k;
     }
     int lim = (TOPK > 0 && TOPK < m) ? TOPK : m;
+    int bestg = -1;
     for (int i = 0; i < lim; i++) {
         int g = (int)(ord[i] & 0xFFFFF);
         if (TOPK == 0 && lbg[g] >= best) break;  /* sorted by lb: none left can win */
         long long v = eval_guess(st, n, d, g, best, ctx);
-        if (v < best) best = v;
+        if (v < best) { best = v; bestg = g; }
         if (best <= lb0) break;                  /* provably optimal */
     }
+    /* Under --allow-unsolved nothing is ever unreachable, so a state with no
+     * improving guess still has a value: give up here and count the lot. */
+    if (best >= INF && ALLOW_UNSOLVED) { best = (long long)n * USCALE; bestg = -1; }
     long long work = ctx->nodes - nodes0;
-    tt_put(h0, h1, d, best, work > 0xFFFFFFFFLL ? 0xFFFFFFFFu : (uint32_t)work);
+    tt_put(h0, h1, d, best, bestg, work > 0xFFFFFFFFLL ? 0xFFFFFFFFu : (uint32_t)work);
     return best;
+}
+
+/* Gather the answers the chosen strategy leaves unresolved, by walking the line
+ * solve() actually picked (the guess is stored in its table entry).  The COUNT
+ * never needs this -- it rides in the packed return value and is free -- so this
+ * runs only when the count is small enough to be worth listing.
+ *
+ * `*nout` is capped at `cap`, but `*total` keeps counting, so the caller can say
+ * "and N more" honestly rather than silently truncating. */
+static void collect_unsolved(const State *st, uint64_t n, int d, Ctx *ctx,
+                             uint8_t (*out)[L], int *nout, int cap) {
+    if (*nout >= cap) return;                   /* have enough examples: stop */
+    if (n == 1) return;
+    if ((uint64_t)d > n) d = (int)n;            /* same normalisation solve() uses */
+
+    if (d <= 1) {                               /* out of budget: all of them */
+        if (*nout < cap) {
+            int got = enum_small(st, out + *nout, cap - *nout);
+            if (got > cap - *nout) got = cap - *nout;   /* it may report one past */
+            *nout += got;
+        }
+        return;
+    }
+    long long val; int bestg = -1;
+    uint64_t h0, h1;
+    hash_state(st, d, &h0, &h1);
+    if (!tt_get(h0, h1, d, &val, &bestg)) {
+        val = solve(st, n, d, ctx);
+        if (!tt_get(h0, h1, d, &val, &bestg)) bestg = -1;
+    }
+    if (UNS(val) == 0) return;                  /* nothing unresolved below here */
+    if (bestg < 0) {                            /* gave up here, or an n == 2 leaf */
+        if (*nout < cap) {
+            int got = enum_small(st, out + *nout, cap - *nout);
+            if (got > cap - *nout) got = cap - *nout;
+            *nout += got;
+        }
+        return;
+    }
+    const State *at = ATOM + (size_t)bestg * NPAT;
+    const uint8_t *ok = AOK + (size_t)bestg * NPAT;
+    for (int pp = 0; pp < NPAT; pp++) {
+        if (!ok[pp] || pp == ALL_GREEN) continue;
+        State sub;
+        if (!meet(&sub, st, &at[pp])) continue;
+        uint64_t c = count_state(&sub);
+        if (!c) continue;
+        collect_unsolved(&sub, c, d - 1, ctx, out, nout, cap);
+        if (*nout >= cap) return;
+    }
+}
+
+static void report_unsolved(const State *root, int g, int depth, long long val, Ctx *ctx) {
+    long long un = UNS(val);
+    if (un <= 0 || LIST_UNSOLVED <= 0) return;
+    /* The COUNT is free -- it rides in the packed value -- so the walk only has
+     * to surface EXAMPLES, and can stop the moment it has enough.  That is what
+     * makes listing affordable even when millions are unsolved. */
+    int cap = LIST_UNSOLVED;
+    uint8_t (*out)[L] = malloc((size_t)cap * L);
+    int nout = 0;
+    const State *at = ATOM + (size_t)g * NPAT;
+    const uint8_t *ok = AOK + (size_t)g * NPAT;
+    for (int pp = 0; pp < NPAT; pp++) {
+        if (!ok[pp] || pp == ALL_GREEN) continue;
+        State sub;
+        if (!meet(&sub, root, &at[pp])) continue;
+        uint64_t c = count_state(&sub);
+        if (c) collect_unsolved(&sub, c, depth - 1, ctx, out, &nout, cap);
+        if (nout >= cap) break;
+    }
+    printf("  %lld unsolved", un);
+    if (nout) {
+        printf(":");
+        for (int i = 0; i < nout; i++) {
+            printf(" %c%c%c%c%c", 'a' + out[i][0], 'a' + out[i][1], 'a' + out[i][2],
+                   'a' + out[i][3], 'a' + out[i][4]);
+        }
+        if (un > nout) printf(" ... and %lld more", un - nout);
+    }
+    printf("\n");
+    free(out);
 }
 
 /* ------------------------------------------------------------ root driver */
@@ -594,6 +723,9 @@ int main(int argc, char **argv) {
             if (nopen < 64) openers[nopen++] = argv[++i]; else i++;
         }
         else if (!strcmp(argv[i], "--sweep")) sweep = 1;
+        else if (!strcmp(argv[i], "--allow-unsolved")) ALLOW_UNSOLVED = 1;
+        else if (!strcmp(argv[i], "--list-unsolved") && i + 1 < argc)
+            LIST_UNSOLVED = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--selftest") && i + 1 < argc) selftest_n = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--depth") && i + 1 < argc) depth = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--depth-max") && i + 1 < argc) depthmax = atoi(argv[++i]);
@@ -667,12 +799,19 @@ int main(int argc, char **argv) {
 #endif
     fprintf(stderr, "phantom-final: %ld of %ld answers are not legal guesses\n",
             NSTR - NG, NSTR);
+    if (ALLOW_UNSOLVED)
+        fprintf(stderr, "objective: fewest UNSOLVED answers first, then fewest guesses "
+                "-- NOT comparable with a default run\n");
 
     G_T0 = G_LAST = now_s();
 
     FILE *out = outpath ? fopen(outpath, "a") : NULL;
     if (outpath && !out) { fprintf(stderr, "cannot append to %s\n", outpath); return 1; }
-    if (out) { fprintf(out, "word,total,expected,depth,seconds\n"); fflush(out); }
+    if (out) {
+        fprintf(out, "word,total,expected,depth,seconds%s\n",
+                ALLOW_UNSOLVED ? ",unsolved" : "");
+        fflush(out);
+    }
 
     if (!sweep && nopen == 0) { openers[nopen++] = "salet"; }
 
@@ -694,22 +833,45 @@ int main(int argc, char **argv) {
             for (int dd = depth; dd <= depthmax; dd++) {
                 double d0 = now_s();
                 total = solve_opener(g, dd, ctx);
-                if (total < INF) { used = dd; break; }
-                printf("%s  INFEASIBLE at depth %d  (%.1fs, %lld nodes)%s\n",
-                       GWORD[g], dd, now_s() - d0, ctx->nodes,
-                       dd < depthmax ? " -- escalating" : " -- that was --depth-max");
+                /* Under --allow-unsolved nothing is ever INF, so "feasible" means
+                 * "nothing left unsolved" -- which is what escalation is for. */
+                if (total < INF && UNS(total) == 0) { used = dd; break; }
+                if (total < INF)
+                    printf("%s  depth %d: %lld unsolved, %lld guesses  (%.1fs, %lld nodes)%s\n",
+                           GWORD[g], dd, UNS(total), GUESSES(total), now_s() - d0,
+                           ctx->nodes,
+                           dd < depthmax ? " -- escalating" : " -- that was --depth-max");
+                else
+                    printf("%s  INFEASIBLE at depth %d  (%.1fs, %lld nodes)%s\n",
+                           GWORD[g], dd, now_s() - d0, ctx->nodes,
+                           dd < depthmax ? " -- escalating" : " -- that was --depth-max");
                 fflush(stdout);
+                if (total < INF && dd == depthmax) used = dd;
             }
             double dt = now_s() - s0;
-            if (total < INF)
-                printf("%s  total=%lld  expected=%.5f  d=%d  (%.1fs, %lld nodes)\n",
-                       GWORD[g], total, (double)total / NSTR, used, dt, ctx->nodes);
+            if (total < INF) {
+                long long un = UNS(total), gs = GUESSES(total);
+                /* Averaged over ALL answers, not just the solved ones: every
+                 * answer was charged for each guess actually played on its path,
+                 * including the ones that ran out of budget.  Dividing by the
+                 * solved count would attribute their guesses to somebody else. */
+                printf("%s  total=%lld  unsolved=%lld  avg-played=%.5f  d=%d"
+                       "  (%.1fs, %lld nodes)\n",
+                       GWORD[g], gs, un, (double)gs / NSTR,
+                       used ? used : depthmax, dt, ctx->nodes);
+                if (un > 0) {
+                    State rt; root_state(&rt);
+                    report_unsolved(&rt, g, used ? used : depthmax, total, ctx);
+                }
+            }
             fflush(stdout);
             depth = used ? used : depth;
             if (out) {
                 if (total >= INF) fprintf(out, "%s,,,,%.1f\n", GWORD[g], dt);
-                else fprintf(out, "%s,%lld,%.5f,%d,%.1f\n",
-                             GWORD[g], total, (double)total / NSTR, depth, dt);
+                else fprintf(out, "%s,%lld,%.5f,%d,%.1f,%lld\n",
+                             GWORD[g], GUESSES(total),
+                             (double)GUESSES(total) / NSTR,
+                             depth, dt, UNS(total));
                 fflush(out);
             }
         }
@@ -738,15 +900,20 @@ int main(int argc, char **argv) {
                     if (total >= INF)
                         printf("[%7.0fs] %5d/%d  %s  INFEASIBLE d>%d  %7.1fs\n",
                                el, completed, NG, GWORD[g], depth, dt);
-                    else
-                        printf("[%7.0fs] %5d/%d  %s  total=%lld  exp=%.5f  %7.1fs\n",
-                               el, completed, NG, GWORD[g], total,
-                               (double)total / NSTR, dt);
+                    else {
+                        long long un = UNS(total), gs = GUESSES(total);
+                        printf("[%7.0fs] %5d/%d  %s  total=%lld  unsolved=%lld"
+                               "  avg=%.5f  %7.1fs\n",
+                               el, completed, NG, GWORD[g], gs, un,
+                               (double)gs / NSTR, dt);
+                    }
                     fflush(stdout);
                     if (out) {
                         if (total >= INF) fprintf(out, "%s,,,,%.1f\n", GWORD[g], dt);
-                        else fprintf(out, "%s,%lld,%.5f,%d,%.1f\n",
-                                     GWORD[g], total, (double)total / NSTR, depth, dt);
+                        else fprintf(out, "%s,%lld,%.5f,%d,%.1f,%lld\n",
+                                     GWORD[g], GUESSES(total),
+                                     (double)GUESSES(total) / NSTR,
+                                     depth, dt, UNS(total));
                         fflush(out);
                     }
                 }
