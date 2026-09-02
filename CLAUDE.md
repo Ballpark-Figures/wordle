@@ -386,6 +386,29 @@ its state arithmetic against `strspace.py` over a shared deterministic walk — 
 - **`MAXD` is an ARRAY BOUND, not a modelling limit** — it sizes the per-thread arena,
   which is indexed BY DEPTH so recursion levels cannot clobber each other. ~0.23 MB per
   thread per level, so raising it is cheap; it is 32, not optturns' 20.
+- **`--by-class` collapses guesses the STATE cannot distinguish** (needs `--topk K >= 1`).
+  Letters are interchangeable when they share `(lo, hi)` and their allowed-position set;
+  positions when their `allow` masks match. Each is an exact automorphism, so an orbit's
+  guesses have ISOMORPHIC partitions — same bucket sizes, so same sum of squares and same
+  lower bound. MEASURED collapse: **12972 to 5 classes at the root** (the integer
+  partitions of 5 that any word realises) and **16 in the all-grey child of `abers`**.
+  Greens/yellows/greys separate automatically — different `(lo, hi, positions)` triples.
+  - **SOUND FOR PROFILES, NOT FOR VALUES.** The answer set is symmetric under letter
+    permutation; **the WORD LIST is not**. Orbit-mates' children differ by a letter
+    permutation, and a child's value depends on which words are legal guesses inside it.
+    So a representative's VALUE never transfers to its class — hence the `--topk 0` refusal.
+  - **At K = 1 it is not an approximation at all**, and that is its own oracle: the beam
+    ties across a class and breaks on lowest index, so the representative IS what plain
+    `--topk 1` picks. VERIFIED: `salet` d3 gives 23765539/11878555 both ways, 45s vs 5s.
+    **Differential-test any change to it that way.** At K > 1 it differs deliberately —
+    K distinct CLASSES rather than K arbitrary members of one tied class.
+  - The canonical key packs L fields of 8 bits, so it is under 2^40 and always positive.
+    **Never shift it right "for the sign bit"** — a `>> 1` drops the low bit of the last
+    field and silently MERGES two classes. That shipped once; the comment now says so.
+- **Sum of squares is BLIND WITHIN A SYMMETRY CLASS, by construction** — it is a function
+  of the partition profile alone. At the root all 8322 five-distinct words are one class,
+  so `-k 1` is not choosing `abers` on merit; it takes an arbitrary (lowest-index) member
+  of the best class. That is the explanation for ties in the ranking, not a coincidence.
 - **THE ROOT IS A BRANCHING POINT LIKE ANY OTHER — `--topk` restricts OPENERS too.**
   `-k 1` examines exactly ONE opener, the best by the same ascending sum-of-squares rule
   every other level uses; it does NOT sweep 12972. The winner is then the best of the K

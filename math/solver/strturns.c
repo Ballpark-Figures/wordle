@@ -99,6 +99,30 @@ static int      TOPK = 0;
  * never reach USCALE (at most NSTR * MAXD, about 3.8e8), so the fields do not
  * carry into each other and plain integer add and compare give exactly the
  * lexicographic order.  INF stays far above any real packed value. */
+/* --by-class: collapse guesses that the CURRENT state cannot tell apart.
+ *
+ * Two letters are interchangeable when they have the same (lo, hi) and are
+ * allowed at the same positions; two positions are interchangeable when their
+ * allow masks are equal.  Each condition is an exact automorphism of the state,
+ * so guesses in one orbit have ISOMORPHIC partitions -- identical bucket sizes,
+ * hence identical sum of squares and identical lower bound.  Early on the classes
+ * are coarse (after one guess, the 21 unmentioned letters are a single class),
+ * which is where the collapse is worth the most: 12972 guesses become 5 classes
+ * at the root and 16 in the all-grey child.
+ *
+ * IT IS SOUND FOR PROFILES, NOT FOR VALUES.  The answer set is symmetric under
+ * letter permutation; THE WORD LIST IS NOT.  Two guesses in one class produce
+ * isomorphic partitions, but their children differ by a letter permutation and a
+ * child's value depends on which words are legal guesses inside it -- which no
+ * letter permutation preserves.  So a representative's VALUE does not transfer to
+ * its class.
+ *
+ * That is why this is restricted to --topk 1 and refuses to run otherwise.  There
+ * it is not even an approximation: --topk ranks by sum of squares, every class
+ * member ties, and ties already break on the lowest guess index -- so taking the
+ * lowest-index member of each class picks exactly the word plain --topk 1 picks.
+ * Same answer, far less work, and plain --topk 1 is its oracle. */
+static int      BY_CLASS = 0;
 static int      ALLOW_UNSOLVED = 0;
 static int      LIST_UNSOLVED = 100;
 #define USCALE      1000000000LL
@@ -150,6 +174,92 @@ static int meet(State *out, const State *a, const State *b) {
         if (out->lo[c] > out->hi[c]) return 0;
     }
     return canon(out);
+}
+
+static uint8_t PERM5[120][L];
+static int     NPERM5 = 0;
+
+static void build_perms(void) {
+    uint8_t p[L];
+    for (int i = 0; i < L; i++) p[i] = (uint8_t)i;
+    /* plain lexicographic next-permutation walk; L is 5, so this is 120 of them */
+    for (;;) {
+        memcpy(PERM5[NPERM5++], p, L);
+        int i = L - 2;
+        while (i >= 0 && p[i] >= p[i + 1]) i--;
+        if (i < 0) break;
+        int j = L - 1;
+        while (p[j] <= p[i]) j--;
+        uint8_t t = p[i]; p[i] = p[j]; p[j] = t;
+        for (int a = i + 1, b = L - 1; a < b; a++, b--) { t = p[a]; p[a] = p[b]; p[b] = t; }
+    }
+}
+
+/* The state's symmetry: which letters are interchangeable, and which position
+ * permutations leave the state fixed. */
+typedef struct {
+    uint8_t lclass[ALPHA];
+    uint8_t perm[120][L];
+    int     nperm;
+} Sym;
+
+static void build_sym(const State *s, Sym *sy) {
+    uint32_t lkey[ALPHA];
+    for (int c = 0; c < ALPHA; c++) {
+        uint32_t pm = 0;
+        for (int i = 0; i < L; i++) if (s->allow[i] >> c & 1) pm |= 1u << i;
+        lkey[c] = ((uint32_t)s->lo[c] << 16) | ((uint32_t)s->hi[c] << 8) | pm;
+    }
+    int nc = 0;
+    for (int c = 0; c < ALPHA; c++) {
+        int j = 0;
+        while (j < c && lkey[j] != lkey[c]) j++;
+        sy->lclass[c] = (j < c) ? sy->lclass[j] : (uint8_t)nc++;
+    }
+    uint8_t pclass[L];
+    int np = 0;
+    for (int i = 0; i < L; i++) {
+        int j = 0;
+        while (j < i && s->allow[j] != s->allow[i]) j++;
+        pclass[i] = (j < i) ? pclass[j] : (uint8_t)np++;
+    }
+    sy->nperm = 0;
+    for (int k = 0; k < NPERM5; k++) {
+        int ok = 1;
+        for (int i = 0; i < L && ok; i++) if (pclass[PERM5[k][i]] != pclass[i]) ok = 0;
+        if (ok) memcpy(sy->perm[sy->nperm++], PERM5[k], L);
+    }
+}
+
+/* Canonical key of a guess under `sy`: the lexicographic minimum, over the
+ * state's position permutations, of the sequence of (letter class, occurrence
+ * within that class in order of first appearance).  Two guesses share a key
+ * exactly when the state cannot tell them apart. */
+/* The key packs L fields of 8 bits, so it never exceeds 2**40 and is always
+ * positive as a long long -- do NOT shift it right to "make room for the sign".
+ * A >> 1 drops the low bit of the last field, which silently MERGES two classes
+ * whose final letter differs only in its occurrence index. */
+static uint64_t canon_guess(const uint8_t *g, const Sym *sy) {
+    uint64_t best = ~0ULL;
+    for (int k = 0; k < sy->nperm; k++) {
+        const uint8_t *pm = sy->perm[k];
+        uint8_t lets[L], ids[L];
+        int nl = 0;
+        uint64_t key = 0;
+        for (int i = 0; i < L; i++) {
+            int c = g[pm[i]], j = 0;
+            while (j < nl && lets[j] != c) j++;
+            if (j == nl) {
+                int seen = 0;
+                for (int q = 0; q < nl; q++)
+                    if (sy->lclass[lets[q]] == sy->lclass[c]) seen++;
+                lets[nl] = (uint8_t)c; ids[nl] = (uint8_t)seen; nl++;
+            }
+            key = (key << 8) | ((uint64_t)sy->lclass[c] << 3) | ids[j];
+        }
+        if (key < best) best = key;
+    }
+    return best;
 }
 
 static const int POW6[L] = {1, 6, 36, 216, 1296};
@@ -543,8 +653,24 @@ static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
         if (TOPK > 0) {
             GuessKey *ord2 = ctx->ord[d];
             long long *val2 = ctx->lbg[d];
+            int nc2 = 0;
+            if (BY_CLASS) {
+                Sym sy; build_sym(st, &sy);
+                for (int g = 0; g < NG; g++) {
+                    ord2[nc2].key = (long long)canon_guess(GCODE[g], &sy);
+                    ord2[nc2].g = g; nc2++;
+                }
+                qsort(ord2, nc2, sizeof(GuessKey), cmp_guesskey);
+                int nr = 0;
+                for (int i = 0; i < nc2; i++)
+                    if (i == 0 || ord2[i].key != ord2[i - 1].key) ord2[nr++] = ord2[i];
+                nc2 = nr;
+            } else {
+                for (int g = 0; g < NG; g++) { ord2[nc2].key = 0; ord2[nc2].g = g; nc2++; }
+            }
             int m2 = 0;
-            for (int g = 0; g < NG; g++) {
+            for (int ci = 0; ci < nc2; ci++) {
+                int g = ord2[ci].g;
                 const State *at = ATOM + (size_t)g * NPAT;
                 const uint8_t *ok = AOK + (size_t)g * NPAT;
                 long long uns = 0, sing = 0, ss = 0;
@@ -600,8 +726,30 @@ static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
      * survivors are chosen by, computed from the same counts. */
     long long *lbg = ctx->lbg[d];
     GuessKey *ord = ctx->ord[d];
+
+    /* The guesses worth PROFILING.  Normally all of them; under --by-class one
+     * per symmetry class, taking the lowest index in each so the choice matches
+     * what the tie-break would have made anyway. */
+    int ncand = 0;
+    if (BY_CLASS) {
+        Sym sy; build_sym(st, &sy);
+        for (int g = 0; g < NG; g++) {
+            ord[ncand].key = (long long)canon_guess(GCODE[g], &sy);
+            ord[ncand].g = g;
+            ncand++;
+        }
+        qsort(ord, ncand, sizeof(GuessKey), cmp_guesskey);
+        int nr = 0;
+        for (int i = 0; i < ncand; i++)
+            if (i == 0 || ord[i].key != ord[i - 1].key) ord[nr++] = ord[i];
+        ncand = nr;
+    } else {
+        for (int g = 0; g < NG; g++) { ord[ncand].key = 0; ord[ncand].g = g; ncand++; }
+    }
+
     int m = 0;
-    for (int g = 0; g < NG; g++) {
+    for (int ci = 0; ci < ncand; ci++) {
+        int g = ord[ci].g;
         const State *at = ATOM + (size_t)g * NPAT;
         const uint8_t *ok = AOK + (size_t)g * NPAT;
         long long lv = (long long)n;
@@ -625,6 +773,8 @@ static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
         /* --topk ranks by sum of squared bin sizes (evenest split first), exact
          * -- see GuessKey.  Exact search ranks by the lower bound instead, which
          * is the better order to PROVE in. */
+        /* Safe to overwrite in place: m <= ci always, since a profiled guess
+         * either lands at or behind the slot it was read from. */
         ord[m].key = (TOPK > 0) ? (long long)ss : lv;
         ord[m].g = g;
         m++;
@@ -887,6 +1037,7 @@ int main(int argc, char **argv) {
         }
         else if (!strcmp(argv[i], "--sweep")) sweep = 1;
         else if (!strcmp(argv[i], "--allow-unsolved")) ALLOW_UNSOLVED = 1;
+        else if (!strcmp(argv[i], "--by-class")) BY_CLASS = 1;
         else if (!strcmp(argv[i], "--list-unsolved") && i + 1 < argc)
             LIST_UNSOLVED = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--selftest") && i + 1 < argc) selftest_n = atoi(argv[++i]);
@@ -899,6 +1050,24 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--out") && i + 1 < argc) outpath = argv[++i];
         else if (!strcmp(argv[i], "--data") && i + 1 < argc) datadir = argv[++i];
         else { fprintf(stderr, "unknown arg: %s\n", argv[i]); return 1; }
+    }
+    /* --by-class needs a BEAM.  The exact solver (--topk 0) must evaluate every
+     * guess, and a class representative's VALUE does not transfer to its class --
+     * the word list is not symmetric under letter permutation -- so collapsing
+     * there would silently break exactness rather than approximate it.
+     *
+     * With a beam it is fine, and at K = 1 it is not even an approximation: the
+     * ranking ties across a class and breaks on the lowest index, so the
+     * representative IS the word plain --topk 1 would pick.  At K > 1 it differs
+     * deliberately -- plain --topk K takes the K best WORDS, which when a class
+     * of thousands ties means K arbitrary members of ONE class, while this takes
+     * K distinct CLASSES.  Neither dominates; both are heuristics. */
+    if (BY_CLASS && TOPK <= 0) {
+        fprintf(stderr, "--by-class needs --topk K (K >= 1): it collapses guesses the "
+                        "state cannot distinguish, which is exact for the beam's "
+                        "ranking but NOT for their values, so the exact solver "
+                        "cannot use it\n");
+        return 1;
     }
     if (depth < 1 || depth >= MAXD) {
         fprintf(stderr, "--depth %d out of range (1..%d; raise MAXD and rebuild)\n",
@@ -914,6 +1083,8 @@ int main(int argc, char **argv) {
         return 1;
     }
     if (depthmax < depth) depthmax = depth;
+
+    build_perms();
 
     char path[1024];
     GWORD = malloc(sizeof(char[8]) * MAXG);
@@ -974,6 +1145,10 @@ int main(int argc, char **argv) {
     if (ALLOW_UNSOLVED)
         fprintf(stderr, "objective: fewest UNSOLVED answers first, then fewest guesses "
                 "-- NOT comparable with a default run\n");
+    if (BY_CLASS)
+        fprintf(stderr, "by-class: beam picks %d symmetry CLASS%s, lowest-index member "
+                "of each%s\n", TOPK, TOPK == 1 ? "" : "ES",
+                TOPK == 1 ? " (identical to plain --topk 1)" : "");
 
     G_T0 = G_LAST = now_s();
 
@@ -1070,13 +1245,37 @@ int main(int argc, char **argv) {
          * rules them out are dropped either way. */
         GuessKey *ord = malloc(sizeof(GuessKey) * NG);
         int nord = 0;
-        for (int g = 0; g < NG; g++) {
+        /* The root is the most symmetric state there is, so --by-class collapses
+         * the opener list hardest here: the 12972 words fall into the integer
+         * partitions of 5 that any word realises. */
+        int *cand = malloc(sizeof(int) * NG);
+        int ncand = 0;
+        if (BY_CLASS) {
+            State rt; root_state(&rt);
+            Sym sy; build_sym(&rt, &sy);
+            GuessKey *tmp = malloc(sizeof(GuessKey) * NG);
+            for (int g = 0; g < NG; g++) {
+                tmp[g].key = (long long)canon_guess(GCODE[g], &sy);
+                tmp[g].g = g;
+            }
+            qsort(tmp, NG, sizeof(GuessKey), cmp_guesskey);
+            for (int i = 0; i < NG; i++)
+                if (i == 0 || tmp[i].key != tmp[i - 1].key) cand[ncand++] = tmp[i].g;
+            free(tmp);
+            fprintf(stderr, "by-class: %d openers collapse to %d class%s\n",
+                    NG, ncand, ncand == 1 ? "" : "es");
+        } else {
+            for (int g = 0; g < NG; g++) cand[ncand++] = g;
+        }
+        for (int ci = 0; ci < ncand; ci++) {
+            int g = cand[ci];
             long long lb = root_lb(g, depth);
             if (lb >= INF && !ALLOW_UNSOLVED) continue;
             ord[nord].key = (TOPK > 0) ? root_ssq(g) : lb;
             ord[nord].g = g;
             nord++;
         }
+        free(cand);
         qsort(ord, nord, sizeof(GuessKey), cmp_guesskey);
         /* THE ROOT IS A BRANCHING POINT LIKE ANY OTHER.  --topk restricts the
          * guesses considered at EVERY branching point, and the first guess is not
