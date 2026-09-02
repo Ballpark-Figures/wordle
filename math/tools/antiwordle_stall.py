@@ -39,7 +39,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from antiwordle import TRITS, GuessSpace, StallSearch, cons_none, step
+from antiwordle import GuessSpace, StallSearch, cons_none, replay_prefix
 from build_patterns import load_patterns
 from wordle import load_words
 
@@ -74,10 +74,7 @@ def solve_one(space, PAT, answers, answer, after, max_nodes):
     col = np.asarray(PAT[:, ai])
     gi = space.index[answer]
 
-    cons = cons_none(space.word_len)
-    for w in after:                       # replay a prefix of real play, if given
-        wi = space.index[w]
-        cons = step(cons, space.letter_tuples[wi], TRITS[int(col[wi])])
+    cons = replay_prefix(space, col, after)   # refuses a prefix no game can reach
 
     search = LimitedSearch(space, col, gi, max_nodes=max_nodes)
     t0 = time.time()

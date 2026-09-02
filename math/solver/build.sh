@@ -54,7 +54,13 @@ if [ $# -eq 0 ]; then
   # matrix and no 16-bit index -- patterns are computed inline over 11881376
   # ordinals.
   gcc $BASE $OMP -o strguess strguess.c
-  echo "built ./optturns, ./hardturns, ./pairsplit, ./strturns and ./strguess  (5 letters)"
+  # antistall is ANTIWORDLE's stalling endgame -- the reverse objective, so it
+  # shares no search code with the solver: no depth cap, a maximum rather than a
+  # minimum, and no constraint struct at all, since with the answer fixed each
+  # guess's effect precomputes to a bitset and the state reduces to the legal set.
+  # Single-threaded, so no OpenMP.
+  gcc $BASE -o antistall antistall.c
+  echo "built ./optturns, ./hardturns, ./pairsplit, ./strturns, ./strguess and ./antistall  (5 letters)"
   exit 0
 fi
 

@@ -474,6 +474,30 @@ def longest_stall(space, pat_col, answer_index, cons=None):
     return total, search.line(cons), search
 
 
+def replay_prefix(space, pat_col, words, cons=None):
+    """Apply already-played words, REFUSING any that were not legal to play.
+
+    An illegal prefix names a state no game can reach: if `sulky` turned a letter
+    yellow, a follow-up without that letter was never a legal move, and searching
+    onward from it answers a question about a position that cannot occur. The
+    search would still be exact there, which is exactly why this has to raise
+    rather than warn — a wrong number is obvious, a right number about the wrong
+    position is not.
+
+    Shared by `tools/antiwordle_stall.py` and the C port's gate so the two agree
+    on which prefixes exist; `solver/antistall` enforces the same rule.
+    """
+    cons = cons_none(space.word_len) if cons is None else cons
+    for w in words:
+        if w not in space.index:
+            raise ValueError("%s is not a legal guess" % w)
+        if not legal(cons, w):
+            raise ValueError("%s is not legal at that point in the line" % w)
+        gi = space.index[w]
+        cons = step(cons, space.letter_tuples[gi], TRITS[int(pat_col[gi])])
+    return cons
+
+
 def replay(space, cons, words, answers_of):
     """Walk a transcript, returning the constraint after each guess.
 
