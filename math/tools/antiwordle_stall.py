@@ -62,10 +62,10 @@ class LimitedSearch(StallSearch):
         super().__init__(*a, **kw)
         self.max_nodes = max_nodes
 
-    def value(self, cons):
+    def value(self, cons, pool=None):
         if self.max_nodes and self.nodes > self.max_nodes:
             raise NodeLimit
-        return super().value(cons)
+        return super().value(cons, pool)
 
 
 def solve_one(space, PAT, answers, answer, after, max_nodes):

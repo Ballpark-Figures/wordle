@@ -292,6 +292,79 @@ def test_stall_vs_brute(answers, rng, trials, size):
           f"{trials} lists of {size}" if bad is None else str(bad))
 
 
+def test_bounds_admissible(answers, rng, trials, size):
+    """Neither upper bound ever falls BELOW the true value.
+
+    Checked separately rather than only through the pruned search, because an
+    inadmissible bound does not always change an answer — it changes it only when
+    it happens to cut the winning branch, so a search that agrees on a few cases
+    is weak evidence. Here each bound is compared against the exact value directly,
+    at every state an optimal line passes through.
+    """
+    bad = None
+    for _ in range(trials):
+        answer = rng.choice(answers)
+        pool_words = rng.sample([w for w in answers if w != answer], size - 1)
+        space = GuessSpace(pool_words + [answer])
+        ai = space.index[answer]
+        col = np.array([pattern(w, answer) for w in pool_words + [answer]])
+        search = StallSearch(space, col, ai)
+        cons = cons_none()
+        while True:
+            val = search.value(cons)
+            words = int(space.legal_mask(cons).sum())
+            res = search.resource_pool(cons) + 1
+            if val > words or val > res:
+                bad = (answer, val, words, res)
+                break
+            _, g = search.memo[cons]
+            if g is None:
+                break
+            cons = step(cons, space.letter_tuples[g], TRITS[int(col[g])])
+        if bad:
+            break
+    check("both bounds are admissible (never below the true value)", bad is None,
+          f"{trials} lists of {size}" if bad is None
+          else f"answer={bad[0]} value={bad[1]} word-bound={bad[2]} resource={bad[3]}")
+
+
+def test_pruned_equals_exhaustive(space, PAT, answers, rng, cases):
+    """The pruned search == the exhaustive one it replaced, on the real lists.
+
+    The bounds' own oracle: pruning is sound iff switching it off cannot change an
+    answer. Run from a mid-game state, because the exhaustive search cannot finish
+    from an empty board — which is the entire reason the bounds exist.
+    """
+    def state_after(answer):
+        col = np.asarray(PAT[:, answers.index(answer)])
+        cons = cons_none()
+        for w in ("sulky", "tempo"):        # a fixed, arbitrary opening prefix
+            wi = space.index[w]
+            cons = step(cons, space.letter_tuples[wi], TRITS[int(col[wi])])
+        return cons, col
+
+    # Most answers are throttled to near nothing by that prefix, and a two-node
+    # search proves nothing about pruning. So rank a sample by how much room is
+    # left and take the ROOMIEST -- the cases where the bounds do real work.
+    sample = rng.sample(answers, 20 * cases)
+    room = sorted(sample,
+                  key=lambda w: -int(space.legal_mask(state_after(w)[0]).sum()))
+
+    bad, seen = None, []
+    for answer in room[:cases]:
+        cons, col = state_after(answer)
+        gi = space.index[answer]
+        fast = StallSearch(space, col, gi)
+        slow = StallSearch(space, col, gi, prune=False)
+        vf, vs = fast.value(cons), slow.value(cons)
+        seen.append(f"{answer}={vf} ({slow.nodes}->{fast.nodes} nodes)")
+        if vf != vs:
+            bad = (answer, vf, vs)
+            break
+    check("pruned search == exhaustive search", bad is None,
+          "; ".join(seen) if bad is None else str(bad))
+
+
 def main():
     argv = sys.argv[1:]
     seed = int(argv[argv.index("--seed") + 1]) if "--seed" in argv else 12345
@@ -321,6 +394,8 @@ def main():
 
     print("\nthe search itself")
     test_stall_vs_brute(answers, rng, 3 if quick else 8, 14 if quick else 18)
+    test_bounds_admissible(answers, rng, 4 if quick else 12, 20 if quick else 40)
+    test_pruned_equals_exhaustive(space, PAT, answers, rng, 2 if quick else 5)
 
     print()
     if FAILS:

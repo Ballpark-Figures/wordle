@@ -226,6 +226,37 @@ class GuessSpace:
         """The permitted words as ascending indices."""
         return np.flatnonzero(self.legal_mask(cons))
 
+    def count_legal_delta(self, parent, child, idx):
+        """How many of `idx` stay legal under `child`, given all satisfy `parent`.
+
+        The child's legal set is a SUBSET of the parent's — legality only tightens
+        — so counting it means re-testing the parent's survivors against the few
+        fields the move actually moved, not testing 12972 words against 26 letters.
+        A guess touches at most WORD_LEN distinct letters, so this is a handful of
+        masked comparisons over a set that is usually tiny.
+
+        That cheapness is the whole point: it makes the WORD BOUND affordable per
+        child, and the word bound is the one that discriminates between a move
+        that keeps the game alive and one that ends it.
+        """
+        m = np.ones(len(idx), dtype=bool)
+        for i, c in enumerate(child.green):
+            if c >= 0 and parent.green[i] < 0:
+                m &= self.pos[i, c][idx]
+        for c in range(26):
+            k = child.minc[c]
+            if k > parent.minc[c]:
+                m &= self.cnt[c, k][idx]
+            mx = child.maxc[c]
+            if mx < parent.maxc[c]:
+                m &= ~self.cnt[c, mx + 1][idx]
+            new = child.yban[c] & ~parent.yban[c]
+            if new:
+                for i in range(self.word_len):
+                    if new >> i & 1:
+                        m &= ~self.pos[i, c][idx]
+        return int(m.sum())
+
 
 class StallSearch:
     """Longest legal chain of guesses before a KNOWN answer must be named.
@@ -234,52 +265,146 @@ class StallSearch:
     the feedback for every guess is already determined, so each guess has exactly
     ONE child and "survive as long as possible" is a longest path over the
     constraint DAG.  Memoised on the constraint itself, which is both correct (the
-    value depends on nothing else — no candidate set, no history) and where all
-    the speed comes from: thousands of guesses collapse onto far fewer distinct
+    value depends on nothing else — no candidate set, no history) and where much
+    of the speed comes from: thousands of guesses collapse onto far fewer distinct
     children, anagrams first among them.
 
     `value(cons)` counts the guesses REMAINING, including the forced final play of
     the answer, so a state whose only legal word is the answer is worth 1.
+
+    TWO UPPER BOUNDS PRUNE IT, both falling out of the monotonicity proof at the
+    top of this module, and the search takes whichever is smaller.
+
+      THE WORD BOUND, |L|.  Legality only ever tightens, so every word played from
+      here on is legal NOW; and a played word is never legal again, so they are
+      all distinct.  The game therefore cannot outlast the current legal set.
+      Exactly tight in an endgame where the legal words do not interfere — `?ummy`
+      against `mummy`, where you really do get to play all of them.
+
+      THE RESOURCE BOUND, the one that does the work up top.  |L| says "you cannot
+      outlast 12972 words", which prunes nothing at the start of a game.  But every
+      legal non-answer guess must spend something FINITE: it has a tile that is
+      yellow (adding a square to that letter's ban mask — necessarily a new one, or
+      the guess was illegal) or grey (pinning that letter's count, which can happen
+      only ONCE per letter, since a grey tile sets maxc to the true count exactly).
+      So count the units still unspent — letters not yet count-pinned, plus squares
+      not yet banned for the answer's own letters — and no line can be longer than
+      that, plus the final naming move.  At an empty board that is about 50 rather
+      than 12972.
+
+      Both are ADMISSIBLE (never below the truth), so pruning a child whose bound
+      cannot beat the incumbent leaves the value EXACT — no window is passed down
+      and nothing memoised is a bound, which is what keeps the table reusable.
+
+    The resource bound is maintained by DELTA rather than recomputed: a move spends
+    one unit per distinct grey letter plus one per yellow tile, both read straight
+    off the five tiles.  That per-move count is also the strict-tightening proof in
+    executable form — it is at least 1 for every non-answer guess.
     """
 
-    def __init__(self, space, pat_col, answer_index):
+    def __init__(self, space, pat_col, answer_index, prune=True):
         self.space = space
         self.pat_col = pat_col              # pattern of every word vs this answer
         self.answer = answer_index          # its index in `space`
+        # prune=False disables both bounds, leaving the exhaustive search they
+        # replaced. Kept as the ORACLE: a bound is admissible iff turning it off
+        # cannot change an answer, and tools/checkantiwordle.py diffs the two.
+        self.prune = prune
         self.memo = {}
         self.nodes = 0                      # states expanded (memo misses)
         self.edges = 0                      # child constraints recursed into
+        self.pruned = 0                     # children a bound ruled out unexplored
 
-    def children(self, cons):
-        """The DISTINCT constraints reachable in one legal non-answer guess.
+        self.answer_letters = space.letter_tuples[answer_index]
+        self.acount = [0] * 26
+        for c in self.answer_letters:
+            self.acount[c] += 1
+
+    def resource_pool(self, cons):
+        """Units of tightening still unspent — the resource bound, minus the +1.
+
+        Full recomputation, used once per entry point; inside the search the count
+        travels by delta.
+        """
+        pool = 0
+        for c in range(26):
+            if cons.maxc[c] > self.acount[c]:
+                pool += 1                   # this letter's count is still unpinned
+        for i, c in enumerate(self.answer_letters):
+            for c2 in range(26):
+                if (self.acount[c2] and c2 != c
+                        and not (cons.yban[c2] >> i & 1)):
+                    pool += 1               # square i still open to a yellow c2
+        return pool
+
+    def children(self, cons, pool, legal):
+        """Distinct one-move successors, best-bound first.
 
         Deduplicating here rather than recursing per word is the difference
         between a hopeless search and a feasible one: every guess that leaves the
         same constraint leaves the same future, and at the top of the game a great
-        many do.  Maps each child to one witness word, so a line can be recovered.
+        many do.  Each child keeps one witness word, so a line can be recovered.
+
+        Returns (bound, child, witness, child_pool) tuples sorted by DESCENDING
+        bound, which lets `value` stop at the first child that cannot beat the
+        incumbent — every one after it is worse.
         """
         out = {}
         letters, pat, trits = self.space.letter_tuples, self.pat_col, TRITS
-        for g in self.space.legal_list(cons):
+        for g in legal:
             g = int(g)
             if g == self.answer:
                 continue
-            child = step(cons, letters[g], trits[pat[g]])
+            gl = trits[pat[g]]
+            spent = 0                       # units this move costs -- always >= 1
+            greys = set()
+            for i, t in enumerate(gl):
+                if t == 1:
+                    spent += 1              # a yellow always bans a NEW square
+                elif t == 0:
+                    greys.add(letters[g][i])
+            spent += len(greys)             # each grey letter pins a count, once
+            child = step(cons, letters[g], gl)
             if child not in out:
-                out[child] = g
-        return out
+                out[child] = (g, pool - spent)
 
-    def value(self, cons):
+        # Score each DISTINCT child by both bounds and keep the smaller. The word
+        # bound is what separates a move that leaves the game alive from one that
+        # strangles it; the resource bound is nearly flat this deep and would rank
+        # them all the same. Descending, so `value` can stop at the first child
+        # that cannot beat its incumbent.
+        scored = []
+        for child, (g, cpool) in out.items():
+            words = self.space.count_legal_delta(cons, child, legal)
+            scored.append((min(cpool + 1, words), child, g, cpool))
+        scored.sort(key=lambda t: -t[0])
+        return scored
+
+    def value(self, cons, pool=None):
         hit = self.memo.get(cons)
         if hit is not None:
             return hit[0]
+        if pool is None:
+            pool = self.resource_pool(cons)
         self.nodes += 1
-        best, best_move = 1, None           # name the answer now and be done
-        for child, g in self.children(cons).items():
-            self.edges += 1
-            v = 1 + self.value(child)
-            if v > best:
-                best, best_move = v, g
+
+        legal = np.flatnonzero(self.space.legal_mask(cons))
+        ceiling = min(len(legal), pool + 1)   # nothing here can beat this
+        if not self.prune:
+            ceiling = len(legal) + 1          # unreachable: every branch explored
+
+        best, best_move = 1, None             # name the answer now and be done
+        if best < ceiling:
+            for bound, child, g, cpool in self.children(cons, pool, legal):
+                if self.prune and 1 + bound <= best:
+                    self.pruned += 1          # sorted desc: the rest are no better
+                    break
+                self.edges += 1
+                v = 1 + self.value(child, cpool)
+                if v > best:
+                    best, best_move = v, g
+                    if best >= ceiling:
+                        break                 # hit the ceiling; nothing can beat it
         self.memo[cons] = (best, best_move)
         return best
 
