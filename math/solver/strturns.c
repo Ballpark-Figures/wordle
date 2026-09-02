@@ -985,15 +985,19 @@ int main(int argc, char **argv) {
         fflush(out);
     }
 
-    /* NO DEFAULT OPENER, DELIBERATELY.  This program exists to find good
-     * openers, so any opener literal in here would be an answer asserted rather
-     * than derived -- and one imported from the 2315-answer problem (which is
-     * what used to sit here) would carry a relevance it does not have.  Refusing
-     * to run is the only default that cannot bias a result. */
+    /* NO DEFAULT OPENER, DELIBERATELY -- but no refusal either.  This program
+     * exists to find good openers, so an opener literal here would be an answer
+     * asserted rather than derived (what used to sit here was SALET, imported
+     * from the 2315-answer problem, carrying a relevance it does not have).
+     *
+     * Sweeping instead picks no favourite at all: it examines EVERY opener, in
+     * an order the program derives, and reports each one's unsolved count as it
+     * lands.  So "whatever the starter actually is" is answered by the run, and
+     * nothing is biased by the default. */
     if (!sweep && nopen == 0) {
-        fprintf(stderr, "give --opener WORD (repeatable) or --sweep; there is no "
-                        "default opener, and there should not be one\n");
-        return 1;
+        sweep = 1;
+        fprintf(stderr, "no --opener given: sweeping every opener in derived order "
+                        "(there is no default starter, and there should not be one)\n");
     }
 
     if (!sweep) {
@@ -1075,9 +1079,18 @@ int main(int argc, char **argv) {
         }
         qsort(ord, nord, sizeof(GuessKey), cmp_guesskey);
         if (nord)
-            fprintf(stderr, "sweep order: %d openers by ascending %s (first %s, key %lld)\n",
+            /* NB the COMPLETION order will not match this: the sweep is an
+             * omp for over the openers, so they finish as threads free up. */
+            fprintf(stderr, "sweep order: %d openers by ascending %s (first %s, key %lld)"
+                    " -- completions arrive out of order, %d at a time\n",
                     nord, TOPK > 0 ? "root sum of squares" : "root lower bound",
-                    GWORD[ord[0].g], ord[0].key);
+                    GWORD[ord[0].g], ord[0].key,
+#ifdef _OPENMP
+                    omp_get_max_threads()
+#else
+                    1
+#endif
+                    );
         else
             fprintf(stderr, "sweep order: no opener can solve within depth %d\n", depth);
 
