@@ -300,9 +300,30 @@ class StallSearch:
     one unit per distinct grey letter plus one per yellow tile, both read straight
     off the five tiles.  That per-move count is also the strict-tightening proof in
     executable form — it is at least 1 for every non-answer guess.
+
+    THE MEMO IS KEYED TWICE, AND THE SECOND KEY IS THE LEGAL SET, NOT THE
+    CONSTRAINT.  The constraint is the obvious key and it is a poor one: many
+    different constraints permit exactly the same words, and keyed that way each is
+    searched again from scratch.
+
+      WHY THE LEGAL SET SUFFICES.  Playing g turns the constraint C into C and D(g),
+      where D(g) — the greens, ban bits and count caps that guess's feedback
+      imposes — depends only on (g, pattern(g, answer)) and NOT on C.  A word w
+      already legal under C is legal under C and D(g) exactly when it satisfies
+      D(g): every field is a conjunction (floors take a max, ceilings a min, ban
+      masks a union, and two greens on one square must agree, both being the
+      answer's letter there).  So the child's legal set is {w in L : w satisfies
+      D(g)} — a function of L and g alone.  By induction the whole future, and
+      therefore the VALUE, is a function of L alone.
+
+      SO TWO LAYERS.  The constraint key is checked first because it is free; on a
+      miss the legal set is packed to bytes and checked, and a hit there is written
+      back to the constraint key so the same state stays cheap next time.  Set
+      `set_memo=False` to key on the constraint only, which is what the gate diffs
+      against — the theorem above is exactly the claim that this changes no value.
     """
 
-    def __init__(self, space, pat_col, answer_index, prune=True):
+    def __init__(self, space, pat_col, answer_index, prune=True, set_memo=True):
         self.space = space
         self.pat_col = pat_col              # pattern of every word vs this answer
         self.answer = answer_index          # its index in `space`
@@ -310,10 +331,13 @@ class StallSearch:
         # replaced. Kept as the ORACLE: a bound is admissible iff turning it off
         # cannot change an answer, and tools/checkantiwordle.py diffs the two.
         self.prune = prune
-        self.memo = {}
-        self.nodes = 0                      # states expanded (memo misses)
+        self.set_memo = set_memo
+        self.memo = {}                      # constraint -> (value, move)
+        self.by_set = {}                    # packed legal set -> (value, move)
+        self.nodes = 0                      # states expanded (both memos missed)
         self.edges = 0                      # child constraints recursed into
         self.pruned = 0                     # children a bound ruled out unexplored
+        self.set_hits = 0                   # states the legal-set key alone caught
 
         self.answer_letters = space.letter_tuples[answer_index]
         self.acount = [0] * 26
@@ -384,11 +408,22 @@ class StallSearch:
         hit = self.memo.get(cons)
         if hit is not None:
             return hit[0]
+
+        mask = self.space.legal_mask(cons)
+        key = None
+        if self.set_memo:
+            key = np.packbits(mask).tobytes()
+            hit = self.by_set.get(key)
+            if hit is not None:                # same words permitted, same future
+                self.memo[cons] = hit
+                self.set_hits += 1
+                return hit[0]
+
         if pool is None:
             pool = self.resource_pool(cons)
         self.nodes += 1
 
-        legal = np.flatnonzero(self.space.legal_mask(cons))
+        legal = np.flatnonzero(mask)
         ceiling = min(len(legal), pool + 1)   # nothing here can beat this
         if not self.prune:
             ceiling = len(legal) + 1          # unreachable: every branch explored
@@ -406,6 +441,8 @@ class StallSearch:
                     if best >= ceiling:
                         break                 # hit the ceiling; nothing can beat it
         self.memo[cons] = (best, best_move)
+        if key is not None:
+            self.by_set[key] = (best, best_move)
         return best
 
     def line(self, cons):

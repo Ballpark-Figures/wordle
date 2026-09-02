@@ -328,31 +328,44 @@ def test_bounds_admissible(answers, rng, trials, size):
           else f"answer={bad[0]} value={bad[1]} word-bound={bad[2]} resource={bad[3]}")
 
 
+def state_after(space, PAT, answers, answer, prefix=("sulky", "tempo")):
+    """The constraint after playing a fixed opening prefix against `answer`.
+
+    An arbitrary prefix, and it has to be one: an EMPTY board is out of reach for
+    the exhaustive reference, which is the whole reason the bounds exist, so every
+    differential test here runs from mid-game.
+    """
+    col = np.asarray(PAT[:, answers.index(answer)])
+    cons = cons_none()
+    for w in prefix:
+        wi = space.index[w]
+        cons = step(cons, space.letter_tuples[wi], TRITS[int(col[wi])])
+    return cons, col
+
+
+def roomiest(space, PAT, answers, rng, cases):
+    """The `cases` sampled answers left with the most room after the prefix.
+
+    Most answers are throttled to almost nothing, and a two-node search proves
+    nothing about pruning or memo keying — the first cut of this gate happily
+    "passed" on 135-node states while the pruning it was testing did 4% of what it
+    should have. Ranking by surviving legal words puts the work where it counts.
+    """
+    sample = rng.sample(answers, 20 * cases)
+    ranked = sorted(sample, key=lambda w: -int(
+        space.legal_mask(state_after(space, PAT, answers, w)[0]).sum()))
+    return ranked[:cases]
+
+
 def test_pruned_equals_exhaustive(space, PAT, answers, rng, cases):
     """The pruned search == the exhaustive one it replaced, on the real lists.
 
     The bounds' own oracle: pruning is sound iff switching it off cannot change an
-    answer. Run from a mid-game state, because the exhaustive search cannot finish
-    from an empty board — which is the entire reason the bounds exist.
+    answer.
     """
-    def state_after(answer):
-        col = np.asarray(PAT[:, answers.index(answer)])
-        cons = cons_none()
-        for w in ("sulky", "tempo"):        # a fixed, arbitrary opening prefix
-            wi = space.index[w]
-            cons = step(cons, space.letter_tuples[wi], TRITS[int(col[wi])])
-        return cons, col
-
-    # Most answers are throttled to near nothing by that prefix, and a two-node
-    # search proves nothing about pruning. So rank a sample by how much room is
-    # left and take the ROOMIEST -- the cases where the bounds do real work.
-    sample = rng.sample(answers, 20 * cases)
-    room = sorted(sample,
-                  key=lambda w: -int(space.legal_mask(state_after(w)[0]).sum()))
-
     bad, seen = None, []
-    for answer in room[:cases]:
-        cons, col = state_after(answer)
+    for answer in roomiest(space, PAT, answers, rng, cases):
+        cons, col = state_after(space, PAT, answers, answer)
         gi = space.index[answer]
         fast = StallSearch(space, col, gi)
         slow = StallSearch(space, col, gi, prune=False)
@@ -362,6 +375,33 @@ def test_pruned_equals_exhaustive(space, PAT, answers, rng, cases):
             bad = (answer, vf, vs)
             break
     check("pruned search == exhaustive search", bad is None,
+          "; ".join(seen) if bad is None else str(bad))
+
+
+def test_set_memo_matches(space, PAT, answers, rng, cases):
+    """Keying the memo on the LEGAL SET changes no value — the theorem, tested.
+
+    The claim is that the value depends only on which words are still playable,
+    not on the constraint that made them so: a guess's effect D(g) is fixed by
+    (g, its feedback) and does not consult the constraint, so a word already legal
+    stays legal exactly when it satisfies D(g). If that is wrong, two states
+    sharing a legal set have different values and set-keying returns one of them
+    for the other — silently, and only sometimes, which is why it is checked
+    against the constraint-keyed search rather than trusted from the argument.
+    """
+    bad, seen = None, []
+    for answer in roomiest(space, PAT, answers, rng, cases):
+        cons, col = state_after(space, PAT, answers, answer)
+        gi = space.index[answer]
+        bysets = StallSearch(space, col, gi, set_memo=True)
+        bycons = StallSearch(space, col, gi, set_memo=False)
+        vset, vcons = bysets.value(cons), bycons.value(cons)
+        seen.append(f"{answer}={vset} ({bycons.nodes}->{bysets.nodes} nodes, "
+                    f"{bysets.set_hits} set hits)")
+        if vset != vcons:
+            bad = (answer, vset, vcons)
+            break
+    check("legal-set memo == constraint memo", bad is None,
           "; ".join(seen) if bad is None else str(bad))
 
 
@@ -396,6 +436,7 @@ def main():
     test_stall_vs_brute(answers, rng, 3 if quick else 8, 14 if quick else 18)
     test_bounds_admissible(answers, rng, 4 if quick else 12, 20 if quick else 40)
     test_pruned_equals_exhaustive(space, PAT, answers, rng, 2 if quick else 5)
+    test_set_memo_matches(space, PAT, answers, rng, 2 if quick else 5)
 
     print()
     if FAILS:
