@@ -578,6 +578,49 @@ subject to a guarantee. Do not put the two in one table.
   identical to removed ones. The second checks the weight product from strings, a
   monotone log, and an exact CSV replay. Run both after any change to either file.
 
+## Multiwordle (k boards at once) — a SIMULATION, not a solver
+k hidden answers, one per board, every guess played on every unsolved board at once.
+**Nothing here searches or optimises** — it MEASURES one named heuristic by Monte
+Carlo, so its numbers carry a standard error and are not comparable with any
+`optturns`-family optimum.
+- **The strategy, exactly** (`math/multiwordle.py` states it and is the source of truth):
+  fixed opener on turn 1; then each turn take the unsolved board with the FEWEST
+  remaining candidates (ties by BOARD INDEX), and guess one of its candidates
+  UNIFORMLY AT RANDOM. A board is solved only when its answer is actually PLAYED —
+  narrowing it to one word still costs the naming guess — and a word played for one
+  board solves any other board it happens to match (**incidental solves count**).
+  Score = total guesses until all k are solved, opener included.
+- **THERE IS NO GUESS CAP, and none is needed** — the targeted board shrinks every
+  turn (an all-green reply solves it; any other reply eliminates the word just
+  played), so the game terminates on its own. **So this is expected guesses
+  OUTRIGHT** — the same footing as the adversarial hill-climb, and NOT the "optimum
+  subject to a guarantee" every optturns/hardturns/ansall total reports. Never put
+  the two in one table. `_MAX_TURNS` in `play_game` is a runaway ASSERTION derived
+  from that bound, not a modelling cap.
+- **THE OPENER IS AN INPUT, NOT A RESULT, and the code never defaults it.** The
+  wrapper supplies `laten` — rank 1 of `tools/singletons.py` over the 2315 (user's
+  choice, 2026-09-02) — but that is a SINGLE-BOARD quantity that optimises nothing
+  about the k-board total, and it is not even unique (`rotan` also scores 41; among
+  answer words `brute`/`chant` tie at 40). The user knows and chose it deliberately.
+  Say "the singleton-ranked opener", never "the best opener".
+- **Run it with `bash solver/run-multiwordle.sh -k K -t T` (from `math/`)**, attached,
+  same tee'd-log rules as the sweeps. `--seed` and `--opener` are the other knobs.
+  `tools/multiwordle_sim.py` REFUSES to start without `--out` AND without `--opener`.
+  **Each (k, opener, t, seed) is a different sample and gets its own file** —
+  `data/shared/multiwordle/k<K>_<opener>_t<T>_s<SEED>.csv`, one row per game (answers
+  + full guess sequence) with the summary as trailing `#` lines; log under
+  `data/local/multiwordle/`. Re-running the same four reproduces the file exactly.
+- **It is a Monte Carlo estimate** — the summary always prints a standard error, and
+  two runs differing by less than a couple of SEs have measured nothing. Rows flush
+  per game, so a Ctrl-C keeps the games already played (but writes no summary).
+- **`python3 tools/checkmultiwordle.py` is the GATE**: it replays the same seeds
+  through an independent implementation that keeps candidates as LISTS OF WORDS and
+  recomputes every feedback from the strings with `wordle.pattern` — no matrix, no
+  bitmaps — and demands byte-identical guess sequences at k=1/2/3/5. It also counts
+  how many turns actually hit a BOARD TIE and warns if none did, so a passing run
+  cannot silently mean the tie-break was never exercised. Run it alongside
+  `solver/validate.sh` and `tools/checkpatterns.py`.
+
 ## Gameplay layout
 - (Describe this video's on-screen layout and the assets in `animations/assets/`.)
 
