@@ -69,7 +69,7 @@ def parse_args(argv):
     prefix = []
     limit = None
     out = None
-    progress = 100
+    progress = 100          # --progress 1 prints a line per word
     i = 0
     while i < len(argv):
         a = argv[i]
@@ -198,8 +198,11 @@ def main(argv):
         if progress and (i + 1) % progress == 0:
             elapsed = time.time() - t0
             rate = (i + 1) / elapsed
-            print("  %d/%d words  %.2f/s  best so far %s %.4f  eta %.1f min"
-                  % (i + 1, len(todo), rate, min(best)[1], min(best)[0],
+            # Name the word this tick finished, so --progress 1 is a per-word
+            # printout rather than a bare counter.
+            print("  %d/%d  %-8s %.4f   best %s %.4f   %.1f/s  eta %.1f min"
+                  % (i + 1, len(todo), w, st["mean_guesses"],
+                     min(best)[1], min(best)[0], rate,
                      (len(todo) - i - 1) / rate / 60))
 
     print("\n%d words in %.1fs" % (len(todo), time.time() - t0))

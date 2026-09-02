@@ -44,6 +44,9 @@
 #     k=4, -t 1000    ~15 min          k=4, -t 10000   ~2.5 h
 #     k=6, -t 1000    ~21 min          k=6, -t 10000   ~3.4 h
 #
+# --progress N prints a line every N words, naming the word just finished, its
+# mean, the best so far, the rate and an ETA.  --progress 1 is a line per word.
+#
 # --limit N takes a PREFIX of the list in ITS OWN ORDER (alphabetical for the
 # word lists, best-first for a shortlist), and the run is RESUMABLE per word, so
 # a Ctrl-C costs at most the word in flight.
