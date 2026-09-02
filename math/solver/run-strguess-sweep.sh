@@ -57,11 +57,6 @@ esac
 cd "$MATH" || exit 1
 [ -x ./solver/strguess ] || { echo "no ./solver/strguess -- run 'sh build.sh' in solver/" >&2; exit 1; }
 
-if pgrep -x strguess >/dev/null; then
-    echo "strguess is already running (pid $(pgrep -x strguess | tr '\n' ' '))." >&2
-    exit 1
-fi
-
 TAG=${ANSWERS}_d$DEPTH
 [ -n "$DEPTHMAX" ] && TAG=${TAG}-$DEPTHMAX
 TAG=${TAG}_k$TOPK
@@ -70,6 +65,9 @@ OUTDIR=data/shared/strguess
 LOC=data/local/strguess/$TAG
 OUT=$OUTDIR/opener_totals_$TAG.csv
 mkdir -p "$OUTDIR" "$LOC"
+
+. "$(dirname "${BASH_SOURCE[0]}")/_guard.sh"
+guard_output strguess "$OUT" || exit 1
 
 FLAGS="--topk $TOPK --answers data/shared/words/$ANSWERS.txt"
 [ -n "$DEPTHMAX" ] && FLAGS="$FLAGS --depth-max $DEPTHMAX"

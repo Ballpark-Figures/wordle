@@ -75,12 +75,6 @@ cd "$MATH" || exit 1
 [ -x ./solver/strturns ] || { echo "no ./solver/strturns -- run 'sh build.sh' in solver/" >&2; exit 1; }
 [ -f data/shared/words/guess.txt ] || { echo "no guess list" >&2; exit 1; }
 
-if pgrep -x strturns >/dev/null; then
-    echo "strturns is already running (pid $(pgrep -x strturns | tr '\n' ' '))." >&2
-    echo "  ps -Ao pid,command | grep strturns" >&2
-    exit 1
-fi
-
 # EVERY (depth, K, mode) COMBINATION GETS ITS OWN FILES.  Each is a different
 # objective or a different search space, so sharing a CSV would interleave
 # incomparable totals and let a resume seed one run from another's numbers.
@@ -94,6 +88,9 @@ OUTDIR=data/shared/strturns
 LOC=data/local/strturns/$TAG
 OUT=$OUTDIR/opener_totals_$TAG.csv
 mkdir -p "$OUTDIR" "$LOC"
+
+. "$(dirname "${BASH_SOURCE[0]}")/_guard.sh"
+guard_output strturns "$OUT" || exit 1
 
 FLAGS="--topk $TOPK"
 [ "$BYCLASS" -eq 1 ] && FLAGS="$FLAGS --by-class"
