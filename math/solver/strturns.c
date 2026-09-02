@@ -535,27 +535,54 @@ static long long G_GUESSES, G_UNSOLVED;
 static int       G_CUR_BUCKET;
 static long long G_CUR_SIZE;
 
+/* Answers whose fate is DECIDED, counted where it is decided rather than when a
+ * whole root bucket finishes.  Root buckets are far too coarse: the first is a
+ * third of the space and takes minutes, so the percentage did not move at all.
+ *
+ * EXACT ONLY UNDER --topk 1, which is why it is gated on it: there, exactly one
+ * guess is evaluated per node, so every answer is decided in exactly one place.
+ * With a wider beam several guesses are evaluated at the same node and their
+ * subtrees would each count the same answers. The totals must add to NSTR, and
+ * the final line SAYS whether they did -- so a miscount shows up rather than
+ * quietly making a plausible bar. */
+static long long G_SOLVED, G_UNRESOLVED;
+
+static void progress(void);
+
+static void decide(long long solved, long long unresolved) {
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
+    G_SOLVED += solved;
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
+    G_UNRESOLVED += unresolved;
+    progress();
+}
+
 static void progress(void) {
     double now = now_s();
     if (now - G_LAST < 5.0) return;
     G_LAST = now;
     double el = now - G_T0;
     if (G_ANS_TOTAL > 0) {
-        double pct = 100.0 * (double)G_ANS_DONE / (double)G_ANS_TOTAL;
+        /* Prefer the per-answer counter where it is exact; fall back to whole
+         * root buckets otherwise. */
+        long long done = (TOPK == 1) ? (G_SOLVED + G_UNRESOLVED) : G_ANS_DONE;
+        double pct = 100.0 * (double)done / (double)G_ANS_TOTAL;
         char eta[32];
-        if (G_ANS_DONE > 0)
+        if (done > 0)
             snprintf(eta, sizeof eta, "%.0fs",
-                     el * (G_ANS_TOTAL - G_ANS_DONE) / (double)G_ANS_DONE);
+                     el * (G_ANS_TOTAL - done) / (double)done);
         else
             snprintf(eta, sizeof eta, "?");   /* nothing settled: say so, do not print 0 */
-        fprintf(stderr, "[%7.0fs] d=%d  %5.1f%% settled (%lld/%lld answers, %d/%d buckets%s)"
-                "  in bucket %d (%lld answers)  so far %lld guesses, %lld unsolved"
-                "  |  %lld nodes, %.0f/s, eta %s\n",
-                el, G_DEPTH, pct, G_ANS_DONE, G_ANS_TOTAL,
-                G_BUCKETS_DONE, G_BUCKETS_TOTAL,
+        fprintf(stderr, "[%7.0fs] d=%d %5.1f%%  %lld solved + %lld unsolved = %lld/%lld"
+                "  bucket %d/%d (%lld answers)%s  |  %lld nodes, %.0f/s, eta %s\n",
+                el, G_DEPTH, pct, G_SOLVED, G_UNRESOLVED, done, G_ANS_TOTAL,
+                G_CUR_BUCKET, G_BUCKETS_TOTAL, G_CUR_SIZE,
                 G_OPENERS > 1 ? ", summed over openers" : "",
-                G_CUR_BUCKET, G_CUR_SIZE,
-                G_GUESSES, G_UNSOLVED, G_NODES, G_NODES / (el + 1e-9), eta);
+                G_NODES, G_NODES / (el + 1e-9), eta);
     } else {
         fprintf(stderr, "[%7.0fs] %lld nodes, %.0f/s\n", el, G_NODES, G_NODES / (el + 1e-9));
     }
@@ -569,6 +596,13 @@ static long long eval_guess(const State *st, uint64_t n, int d, int g,
     int np = 0;
     const State *at = ATOM + (size_t)g * NPAT;
     const uint8_t *ok = AOK + (size_t)g * NPAT;
+    /* The all-green bucket is skipped below because this guess RESOLVES it, so
+     * nothing recurses into it -- which means it is also the one answer no base
+     * case would ever count.  Credit it here. */
+    if (ok[ALL_GREEN]) {
+        State win;
+        if (meet(&win, st, &at[ALL_GREEN]) && count_state(&win) == 1) decide(1, 0);
+    }
     for (int p = 0; p < NPAT; p++) {
         if (!ok[p] || p == ALL_GREEN) continue;
         State tmp;
@@ -607,13 +641,17 @@ static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
      * at depth 1 the root's children arrive with d == 0 and every singleton was
      * still being resolved. */
     if (n == 1) {
-        if (d >= 1) return 1;                   /* played, or the phantom naming move */
+        if (d >= 1) { decide(1, 0); return 1; }  /* played, or the phantom naming move */
+        decide(0, 1);
         return ALLOW_UNSOLVED ? USCALE : INF;   /* out of budget: it stays unsolved */
     }
     /* Out of budget with more than one candidate left.  By default that is fatal;
      * under --allow-unsolved every remaining candidate is a violation, and none
      * of them is charged a further guess because none is played. */
-    if (d <= 1) return ALLOW_UNSOLVED ? (long long)n * USCALE : INF;
+    if (d <= 1) {
+        decide(0, (long long)n);
+        return ALLOW_UNSOLVED ? (long long)n * USCALE : INF;
+    }
     if (n == 2) {
         /* Either candidate playable: guess it -- 1 if right, 2 if not.  Neither
          * playable: the pair must be SPLIT and each half then costs its own
@@ -621,13 +659,17 @@ static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
          * it because one guess cannot resolve a candidate it cannot name. */
         uint8_t two[2][L];
         if (enum_small(st, two, 2) == 2) {
-            if (WORDIDX[strindex(two[0])] >= 0 || WORDIDX[strindex(two[1])] >= 0) return 3;
+            if (WORDIDX[strindex(two[0])] >= 0 || WORDIDX[strindex(two[1])] >= 0) {
+                decide(2, 0); return 3;
+            }
             for (int g = 0; g < NG; g++)
-                if (pattern_codes(GCODE[g], two[0]) != pattern_codes(GCODE[g], two[1]))
-                    return 4;
+                if (pattern_codes(GCODE[g], two[0]) != pattern_codes(GCODE[g], two[1])) {
+                    decide(2, 0); return 4;
+                }
             /* No guess separates them, so neither can ever be pinned down.
              * Cannot arise for the 12972-word guess set, which provably
              * separates every pair of strings, but the code must not assume it. */
+            decide(0, 2);
             return ALLOW_UNSOLVED ? 2 * USCALE : INF;
         }
     }
@@ -738,6 +780,10 @@ static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
             int lim2 = (TOPK < m2) ? TOPK : m2;
             for (int i = 0; i < lim2; i++)
                 if (val2[ord2[i].g] < best2) { best2 = val2[ord2[i].g]; bg2 = ord2[i].g; }
+            /* This is the branch --topk takes, and it is where the depth-2 nodes
+             * actually return -- crediting only the exact branch below left the
+             * counter reading 3253 decided and 0 unsolved on a depth-4 run. */
+            decide((long long)n - UNS(best2), UNS(best2));
             tt_put(h0, h1, d, best2, bg2, 1);
             return best2;
         }
@@ -762,6 +808,7 @@ static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
             if (v < best2) { best2 = v; bg2 = g; }
             if (best2 <= floor2) break;           /* provably optimal */
         }
+        decide((long long)n - UNS(best2), UNS(best2));
         tt_put(h0, h1, d, best2, bg2, 1);
         return best2;
     }
@@ -829,6 +876,7 @@ static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
         /* Not one legal guess splits this set.  Same reasoning as the n == 2
          * case: unreachable with the word list, but not assumed. */
         long long v = ALLOW_UNSOLVED ? (long long)n * USCALE : INF;
+        decide(0, (long long)n);
         tt_put(h0, h1, d, v, -1, 1);
         return v;
     }
@@ -958,8 +1006,14 @@ static long long solve_opener(int g, int depth, Ctx *ctx) {
     if (G_OPENERS == 1) {
         G_ANS_DONE = 0; G_BUCKETS_DONE = 0; G_BUCKETS_TOTAL = 0; G_ANS_TOTAL = 0;
         G_GUESSES = 0; G_UNSOLVED = 0; G_CUR_BUCKET = 0; G_CUR_SIZE = 0;
+        G_SOLVED = 0; G_UNRESOLVED = 0;
     }
     G_DEPTH = depth;
+    /* The opener is itself an answer -- every word is, in this answer set -- and
+     * the root skips its all-green bucket because the opener resolves it.  So it
+     * is the one answer no node below ever accounts for.  (The balance check
+     * caught this: 11881375 decided against 11881376 expected.) */
+    if (ok[ALL_GREEN]) decide(1, 0);
 #ifdef _OPENMP
 #pragma omp atomic
 #endif
@@ -1332,6 +1386,19 @@ int main(int argc, char **argv) {
                        "  (%.1fs, %lld nodes)\n",
                        GWORD[g], gs, un, (double)gs / NSTR,
                        used, dt, ctx->nodes);
+                /* The progress counter is supposed to decide every answer
+                 * exactly once and agree with the result.  Say so either way,
+                 * rather than leaving a plausible-looking bar unchecked. */
+                if (TOPK == 1) {
+                    long long dec = G_SOLVED + G_UNRESOLVED;
+                    if (dec != NSTR || G_UNRESOLVED != un)
+                        printf("  WARNING: progress accounting decided %lld answers "
+                               "(expected %ld) with %lld unsolved (result says %lld)\n",
+                               dec, NSTR, G_UNRESOLVED, un);
+                    else
+                        printf("  progress accounting balances: %lld solved + %lld "
+                               "unsolved = %ld\n", G_SOLVED, G_UNRESOLVED, NSTR);
+                }
                 if (un > 0) {
                     State rt; root_state(&rt);
                     report_unsolved(&rt, g, used, total, ctx);
