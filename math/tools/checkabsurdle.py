@@ -26,7 +26,7 @@ import numpy as np
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
 from absurdle import (ALL_GREEN, N_PATTERNS, RANK, choose, respond,  # noqa: E402
-                      respond_all, tiebreak_key)
+                      respond_all, sizes_all, tiebreak_key)
 from build_patterns import load_patterns  # noqa: E402
 from wordle import load_words, pattern  # noqa: E402
 
@@ -137,6 +137,16 @@ for _ in range(2000):
     if code != min(tied, key=tiebreak_key):
         bad("tie-break picked %d, expected %d" % (code, min(tied, key=tiebreak_key)))
 print("   ok   2000 synthetic bucket tables")
+
+
+print("7. sizes_all() matches respond_all()'s sizes — size is tie-break-free")
+cand = np.arange(len(answers))
+for word in ["salet", "aesir"]:
+    _, sizes = respond_all(pat, cand)
+    if not np.array_equal(sizes, sizes_all(pat, cand)):
+        bad("sizes_all disagrees at %d candidates" % len(cand))
+    _, cand = respond(pat, cand, gindex[word])
+print("   ok   two states, all 12972 guesses each")
 
 print("FAIL" if fail else "PASS")
 sys.exit(1 if fail else 0)

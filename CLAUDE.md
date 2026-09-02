@@ -511,7 +511,14 @@ its state arithmetic against `strspace.py` over a shared deterministic walk — 
   the live site. Result in `math/data/shared/absurdle/`.
 - **TIES ARE NOT ENUMERATED YET.** Stage 1 stops at the FIRST witness, in ascending
   resulting-size order, so `aesir yauld tench whoop` is one optimum, not the optimum.
-  Stage 2 (every tied opener) and stage 3 (every tied sequence) are outstanding.
+  **Stage 2 is BUILT AND UNRUN**: `bash solver/run-absurdle-openers.sh` (from `math/`)
+  asks, for every one of the 12972 openers, whether a 4-guess win exists after it — the
+  yes rows are exactly the tied openers. Exact, not a screen: a win needs a singleton
+  after three guesses, so only second guesses leaving 238 or fewer candidates can finish,
+  and each such state is tested against all 12972 third guesses. Resumable per opener,
+  and states are memoised by content, so anagram openers share a continuation. Stage 3
+  (every tied SEQUENCE, not one witness each) is still outstanding, and is the expensive
+  one — it is the same scan with the early exit removed.
 
 ## Gameplay layout
 - (Describe this video's on-screen layout and the assets in `animations/assets/`.)

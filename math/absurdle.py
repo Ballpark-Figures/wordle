@@ -152,3 +152,15 @@ def play(seq, pat=None, guesses=None, answers=None):
         code, cand = respond(pat, cand, index[w])
         transcript.append((w, show(code), len(cand)))
     return transcript, code == ALL_GREEN
+
+
+def sizes_all(pat, cand, block=4096):
+    """Candidates left after each guess — WITHOUT resolving which pattern.
+
+    The host takes a LARGEST bucket, so the number of survivors is
+    `counts.max()` whatever the tie-break settles on: the tie-break decides the
+    PATTERN, never the SIZE. Any search question that only asks "how far does
+    this guess shrink the set" can therefore skip the preference table entirely.
+    `tools/checkabsurdle.py` asserts this agrees with respond_all's sizes.
+    """
+    return bucket_counts(pat, cand, block=block).max(axis=1)
