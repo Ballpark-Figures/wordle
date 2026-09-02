@@ -193,6 +193,43 @@ static int meet(State *out, const State *a, const State *b) {
     return canon(out);
 }
 
+/* ------------------------------------------- representative guesses over 26**5
+ *
+ * For the S -> S cell the guess set is every length-5 string, so it can neither
+ * be listed nor have its atoms precomputed (11881376 x 243 atoms would be 208 GB).
+ * It does not need to be: guesses in one symmetry orbit have isomorphic
+ * partitions, so only ONE PER CLASS has to be profiled -- and the classes are
+ * bounded no matter how deep the search goes.
+ *
+ * THE BOUND.  A tracked letter needs lo > 0, the floors sum to at most L, greys
+ * all collapse into one class (hi == 0 clears them from every mask), and the
+ * never-mentioned letters are a second.  So a state has AT MOST L + 2 = 7 letter
+ * classes, always.  A representative is then a set partition of the 5 positions
+ * with a class assigned to each block, which caps the enumeration at roughly
+ * sum_b S(5,b) * 7^b -- tens of thousands, against 11881376 raw guesses.
+ *
+ * RGS5 holds the 52 restricted-growth strings, i.e. the set partitions of five
+ * positions: RGS5[i][j] is the block containing position j. */
+static uint8_t RGS5[52][L];
+static int     NRGS5 = 0;
+
+static void build_rgs(void) {
+    uint8_t a[L];
+    a[0] = 0;
+    for (;;) {
+        memcpy(RGS5[NRGS5++], a, L);
+        int i = L - 1;
+        for (;;) {
+            if (i == 0) return;
+            int mx = 0;
+            for (int j = 0; j < i; j++) if (a[j] > mx) mx = a[j];
+            if (a[i] <= mx) { a[i]++; break; }
+            a[i] = 0; i--;
+        }
+        for (int j = i + 1; j < L; j++) a[j] = 0;
+    }
+}
+
 static uint8_t PERM5[120][L];
 static int     NPERM5 = 0;
 
@@ -277,6 +314,58 @@ static uint64_t canon_guess(const uint8_t *g, const Sym *sy) {
         if (key < best) best = key;
     }
     return best;
+}
+
+/* Every guess class of the FULL 26**5 space, one representative each, as letter
+ * codes.  Returns how many were written (capped at `max`).
+ *
+ * For each set partition of the positions, assign a letter class to each block
+ * and materialise it with distinct letters drawn from that class.  Distinct
+ * assignments can still be the same class -- two blocks both drawn from the
+ * "never mentioned" letters -- so the results are canonicalised and deduped, and
+ * what comes back is one guess per orbit under the state's symmetry. */
+static int enum_reps(const Sym *sy, uint8_t (*out)[L], int max, uint64_t *keys) {
+    int member[ALPHA][ALPHA], nmem[ALPHA] = {0}, nclass = 0;
+    for (int c = 0; c < ALPHA; c++) {
+        int k = sy->lclass[c];
+        if (k + 1 > nclass) nclass = k + 1;
+        member[k][nmem[k]++] = c;
+    }
+    int n = 0;
+    for (int r = 0; r < NRGS5; r++) {
+        const uint8_t *rgs = RGS5[r];
+        int nb = 0;
+        for (int i = 0; i < L; i++) if (rgs[i] + 1 > nb) nb = rgs[i] + 1;
+        int pick[L];                      /* block -> class */
+        for (int i = 0; i < nb; i++) pick[i] = 0;
+        for (;;) {
+            int used[ALPHA] = {0}, ok = 1;
+            uint8_t g[L];
+            for (int b = 0; b < nb && ok; b++) {
+                int cl = pick[b];
+                if (used[cl] >= nmem[cl]) ok = 0;   /* class has no letter left */
+                else {
+                    int letter = member[cl][used[cl]++];
+                    for (int i = 0; i < L; i++) if (rgs[i] == b) g[i] = (uint8_t)letter;
+                }
+            }
+            if (ok) {
+                uint64_t key = canon_guess(g, sy);
+                int seen = 0;
+                for (int i = 0; i < n; i++) if (keys[i] == key) { seen = 1; break; }
+                if (!seen) {
+                    if (n >= max) return n;
+                    keys[n] = key;
+                    memcpy(out[n], g, L);
+                    n++;
+                }
+            }
+            int b = nb - 1;
+            while (b >= 0 && ++pick[b] >= nclass) pick[b--] = 0;
+            if (b < 0) break;
+        }
+    }
+    return n;
 }
 
 static const int POW6[L] = {1, 6, 36, 216, 1296};
@@ -1290,6 +1379,38 @@ static int measure_branching(void) {
  * wrong total buried in a sweep.  The arithmetic below must stay bit-identical
  * to the Python side.
  */
+/* Print the guess classes of the FULL 26**5 space at the root and down one
+ * all-grey line, so the enumeration can be checked against what is already known:
+ * the root must give exactly the 7 integer partitions of 5. */
+static void dump_reps(void) {
+    static uint8_t reps[200000][L];
+    static uint64_t keys[200000];
+    State st; root_state(&st);
+    uint8_t probe[4][L] = {{18,0,11,4,19},{17,14,20,13,3},{2,7,8,15,25},{5,6,10,12,21}};
+    for (int step = 0; step <= 4; step++) {
+        Sym sy; build_sym(&st, &sy);
+        int nc = 0;
+        for (int c = 0; c < ALPHA; c++) if (sy.lclass[c] + 1 > nc) nc = sy.lclass[c] + 1;
+        double t0 = now_s();
+        int n = enum_reps(&sy, reps, 200000, keys);
+        printf("step %d: %llu candidates, %d letter classes, %d position perms "
+               "-> %d guess classes  (%.3fs)\n",
+               step, (unsigned long long)count_state(&st), nc, sy.nperm, n,
+               now_s() - t0);
+        if (step == 0) {
+            printf("   root representatives:");
+            for (int i = 0; i < n; i++)
+                printf(" %c%c%c%c%c", 'a'+reps[i][0], 'a'+reps[i][1], 'a'+reps[i][2],
+                       'a'+reps[i][3], 'a'+reps[i][4]);
+            printf("\n");
+        }
+        if (step == 4) break;
+        State at, nx;
+        if (!build_atom(&at, probe[step], 0) || !meet(&nx, &st, &at)) break;
+        st = nx;
+    }
+}
+
 static void selftest(int nwalk) {
     for (int seed = 0; seed < nwalk; seed++) {
         State st; root_state(&st);
@@ -1338,6 +1459,7 @@ int main(int argc, char **argv) {
     int no_out = 0;
     const char *openers[64]; int nopen = 0;
     int depth = 6, depthmax = -1, ttbits = 26, threads = 0, sweep = 0, selftest_n = 0;
+    int dump_reps_n = 0;
 
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--opener") && i + 1 < argc) {
@@ -1346,6 +1468,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--sweep")) sweep = 1;
         else if (!strcmp(argv[i], "--allow-unsolved")) ALLOW_UNSOLVED = 1;
         else if (!strcmp(argv[i], "--by-class")) BY_CLASS = 1;
+        else if (!strcmp(argv[i], "--dump-reps")) dump_reps_n = 1;
         else if (!strcmp(argv[i], "--small-n") && i + 1 < argc) SMALL_N = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--list-unsolved") && i + 1 < argc)
             LIST_UNSOLVED = atoi(argv[++i]);
@@ -1378,7 +1501,7 @@ int main(int argc, char **argv) {
      * else.  That happened -- a whole day of runs left no file behind -- so the
      * choice is now explicit rather than defaulted.  --no-out says "throw it
      * away" out loud; solver/run-strturns-sweep.sh sets --out for you. */
-    if (!outpath && !no_out && !selftest_n) {
+    if (!outpath && !no_out && !selftest_n && !dump_reps_n) {
         fprintf(stderr, "no --out: this run would print its answer and save NOTHING.\n"
                         "  use  bash solver/run-strturns-sweep.sh ...   (sets --out and "
                         "tees a log)\n"
@@ -1435,6 +1558,8 @@ int main(int argc, char **argv) {
     fprintf(stderr, "atoms: %ld reachable of %ld (%.0f MB, %.1fs)\n",
             nat, (long)NG * NPAT, sizeof(State) * (double)NG * NPAT / 1e6, now_s() - t0);
 
+    build_rgs();
+    if (dump_reps_n) { dump_reps(); return 0; }
     if (selftest_n) { selftest(selftest_n); return 0; }
 
     BRANCH = measure_branching();
