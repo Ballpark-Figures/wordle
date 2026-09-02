@@ -520,6 +520,64 @@ its state arithmetic against `strspace.py` over a shared deterministic walk — 
   (every tied SEQUENCE, not one witness each) is still outstanding, and is the expensive
   one — it is the same scan with the early exit removed.
 
+## Adversarial Wordle — the custom wordlist + the weight hill-climb
+The hangman video's adversarial search, ported. **A DIFFERENT OBJECTIVE from every
+other solver in this repo**: expected guesses OUTRIGHT, with NO depth cap — never
+comparable with an `optturns`/`hardturns`/`ansall` total, which are all optima
+subject to a guarantee. Do not put the two in one table.
+- **The word lists.** `math/build_freq_wordlist.py` ranks all 12972 guess words by
+  `wordfreq` 3.1.1's "large" English list — the SAME package and list hangman's
+  wordlist is built from, so a zipf means the same thing in both videos. Two committed
+  outputs: `words/guess_by_freq.txt` (every word + its zipf, no cutoff, so the cutoff
+  can move without regenerating) and **`words/custom.txt`, the candidate list: zipf
+  >= 2.5 PLUS every NYT answer word regardless of frequency — 4282 words.** 2.5 is
+  hangman's `DEFAULT_ZIPF`; the answer floor exists because 216 of the 2315 sit below
+  it and the game itself can pick them. NB hangman applies that cutoff on top of a
+  hunspell spellcheck and curated block/allow lists — **this list has NO such
+  curation**, only the frequency bar and the answer floor.
+- **`math/topk.py` is the guesser the adversary plays against.** The candidate list
+  carries non-normalised WEIGHTS; **all 12972 words are legal guesses**, candidate or
+  not. At each node it ranks guesses by `sum over p != all-green of n_p * (W_p / W)`
+  ascending — the expected number of candidate WORDS still alive — then recurses into
+  the K best and keeps whichever actually minimises expected guesses. Ties break on
+  lowest guess index.
+  - **The guesser SEES THE WEIGHTS, and that is load-bearing.** Against a fixed
+    weight-blind strategy the adversary's best move is to pile all weight on the single
+    hardest word, and the search is degenerate. Same as hangman's greedy.
+  - **A weight of 0 REMOVES a word from the game** — it is dropped before the search,
+    so it is not counted in `n_p` either. That matters BECAUSE the ranking rule counts
+    words: a zero-weight word left in the set would steer the guesser.
+  - **`MAXD` (32) is a recursion guard, NOT a modelling cap.** It cannot bind while
+    candidates are a subset of the guess list: a candidate guess always outranks a
+    non-splitting one, so every child is strictly smaller.
+  - **A lone survivor's index must be mapped through `ans2g` before it is used as a
+    GUESS.** The candidate and guess lists are different, so the raw index reads the
+    wrong pattern row — that bug hung the trace and is what `checktopk.py` caught.
+- **`math/freq_search.py` is hangman's `freq_search.py`, phase for phase.** Per
+  (letter, non-empty position-pattern) multiplier, start 1; a word's weight is the
+  PRODUCT of its patterns' multipliers (`salet` -> `s____ _a___ __l__ ___e_ ____t`).
+  Sequential Gauss-Seidel over ① x2 / /2 with a 0.125 floor and `0.125 <-> 0`,
+  ② +/- powers of two from the top scale down to 1, ③ +/- 0.5 / 0.25 / 0.125. **The
+  console lines and the per-change CSV match hangman's deliberately** — same
+  `pattern ->xM (move) avg=` format, same `loop N: C changes`, same replay via
+  `reconstruct`. Keep it that way. **281 knobs occur** on `custom.txt` (254 on the 2315).
+- **RUN IT WITH `bash solver/run-freq-search.sh -k K` (from `math/`), never a bare
+  `freq_search.py`** — the wrapper sets `--out` and tees the log, and the script
+  REFUSES to start without `--out` or an explicit `--no-out`. Each K is a different
+  guesser, so a different objective: its own CSV (`data/shared/freqsearch/topk<K>.csv`)
+  and its own log. There is no resume; a re-run restarts from all-ones.
+- **MEASURED COST (2026-09-02):** one k=1 objective evaluation over 4282 candidates x
+  12972 guesses is **~0.9 s** (uniform weights; it gets cheaper as the adversary zeroes
+  words). A phase loop is ~2 evaluations per knob, so ~9 min/loop at 281 knobs. Larger K
+  is exponential in depth and has no transposition table yet.
+- **The gates: `python3 math/tools/checktopk.py` and `math/tools/checkfreqsearch.py`.**
+  The first diffs the numba kernel against a pure-numpy reference implementing the
+  identical rules (k=1/2/3, exact agreement), checks the pattern slice against
+  `wordle.pattern` recomputed from the strings, the cost accounting against an
+  independent replay, every trace against the strings, and that zeroed words are
+  identical to removed ones. The second checks the weight product from strings, a
+  monotone log, and an exact CSV replay. Run both after any change to either file.
+
 ## Gameplay layout
 - (Describe this video's on-screen layout and the assets in `animations/assets/`.)
 
