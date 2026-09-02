@@ -122,6 +122,23 @@ static int      TOPK = 0;
  * member ties, and ties already break on the lowest guess index -- so taking the
  * lowest-index member of each class picks exactly the word plain --topk 1 picks.
  * Same answer, far less work, and plain --topk 1 is its oracle. */
+/* --small-n N: below N candidates, PROFILE guesses by computing patterns against
+ * the enumerated candidates directly instead of meeting 243 constraint atoms.
+ *
+ * MEASURED, and it is the reason this exists: the atom path costs ~25 us per
+ * guess at ONE candidate and ~119 us at a million -- the floor is building 243
+ * atoms, which does not care how many candidates there are.  Direct patterns cost
+ * O(n) instead, so at n = 10 the profiling pass drops by two orders of magnitude,
+ * and that is where nearly every node lives.
+ *
+ * Only the PROFILING changes.  The chosen guess's children are still built by
+ * meet, so the state representation, the transposition table and every value are
+ * untouched -- which is what lets the existing W -> S result serve as its oracle.
+ *
+ * OFF BY DEFAULT so nothing already running changes behaviour. */
+static int      SMALL_N = 0;
+#define SMALL_MAX 512
+
 static int      BY_CLASS = 0;
 static int      ALLOW_UNSOLVED = 0;
 static int      LIST_UNSOLVED = 100;
@@ -916,14 +933,42 @@ static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
         for (int g = 0; g < NG; g++) { ord[ncand].key = 0; ord[ncand].g = g; ncand++; }
     }
 
+    /* Small states profile by direct pattern computation; see SMALL_N. */
+    uint8_t cand[SMALL_MAX][L];
+    int use_small = (SMALL_N > 0 && n <= (uint64_t)SMALL_N && n <= SMALL_MAX);
+    if (use_small && enum_small(st, cand, SMALL_MAX) != (int)n) use_small = 0;
+    int scnt[NPAT], stouch[NPAT];
+    if (use_small) memset(scnt, 0, sizeof scnt);
+
     int m = 0;
     for (int ci = 0; ci < ncand; ci++) {
         int g = ord[ci].g;
-        const State *at = ATOM + (size_t)g * NPAT;
-        const uint8_t *ok = AOK + (size_t)g * NPAT;
         long long lv = (long long)n;
         int dead = 0, np = 0;
         unsigned long long ss = 0, biggest = 0;
+        if (use_small) {
+            /* Same buckets as the atom path: a candidate scoring pattern p is
+             * exactly a non-empty meet with atom p, so the counts are identical. */
+            int nt = 0;
+            for (uint64_t i = 0; i < n; i++) {
+                int p = pattern_codes(GCODE[g], cand[i]);
+                if (scnt[p]++ == 0) stouch[nt++] = p;
+            }
+            for (int k = 0; k < nt; k++) {
+                int p = stouch[k];
+                unsigned long long c = (unsigned long long)scnt[p];
+                if (p != ALL_GREEN && !dead) {
+                    np++;
+                    if (c > biggest) biggest = c;
+                    ss += c * c;
+                    long long v = lbound((uint64_t)c, d - 1);
+                    if (v >= INF) dead = 1; else lv += v;
+                }
+                scnt[p] = 0;
+            }
+        } else {
+        const State *at = ATOM + (size_t)g * NPAT;
+        const uint8_t *ok = AOK + (size_t)g * NPAT;
         for (int p = 0; p < NPAT; p++) {
             if (!ok[p] || p == ALL_GREEN) continue;
             State tmp;
@@ -936,6 +981,7 @@ static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
             long long v = lbound(c, d - 1);
             if (v >= INF) { dead = 1; break; }
             lv += v;
+        }
         }
         if (dead || (np == 1 && biggest == n)) { lbg[g] = INF; continue; }
         lbg[g] = lv;
@@ -1300,6 +1346,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--sweep")) sweep = 1;
         else if (!strcmp(argv[i], "--allow-unsolved")) ALLOW_UNSOLVED = 1;
         else if (!strcmp(argv[i], "--by-class")) BY_CLASS = 1;
+        else if (!strcmp(argv[i], "--small-n") && i + 1 < argc) SMALL_N = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--list-unsolved") && i + 1 < argc)
             LIST_UNSOLVED = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--selftest") && i + 1 < argc) selftest_n = atoi(argv[++i]);
