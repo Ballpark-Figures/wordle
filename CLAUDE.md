@@ -664,8 +664,12 @@ Carlo, so its numbers carry a standard error and are not comparable with any
     match. **Keep the cut generous**: discarding the true best word on one unlucky
     sample is unrecoverable, while an over-wide cut only costs time.
 - **`python3 tools/multiwordle_report.py` is the standing status report** — the
-  (k, n) grid at one sample size, plus `--all` for one row per file and `--trials T`
-  to pick the sample size. **The grid shows BARE MEANS** (user's preference,
+  (k, n) grid at one sample size, plus `--all` for one row per file, `--trials T` to
+  pick the sample size, and **`--rank SWEEP.csv` to print EVERY word of an opener
+  sweep in order** (rank, mean, stderr, gap to the leader in guesses and in leader-SEs,
+  spread). The `ses` column is a crowding yardstick, NOT a test: the leader's mean is
+  biased optimistic and common random numbers make the error on a DIFFERENCE smaller
+  than either word's SE. **The grid shows BARE MEANS** (user's preference,
   2026-09-02); `--stderr` puts the standard errors back, `--all` always carries them,
   and each CSV records its own — so check a difference against them, not against the
   digits on screen. It READS the summary lines each run wrote, recomputing
