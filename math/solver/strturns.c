@@ -476,6 +476,56 @@ static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
     G_NODES++;
     if ((G_NODES & 0x3FF) == 0) progress(d, n);
 
+    /* d == 2 CLOSED FORM: one guess left after this one, so the only thing a
+     * guess can do is FULLY DIVIDE the bucket -- every non-green part must be a
+     * singleton, since a part of two or more cannot be resolved by a single
+     * remaining guess.  That makes the value computable straight from the
+     * partition profile, with no recursion:
+     *
+     *     guesses  = n + (number of singleton non-green parts)
+     *     unsolved = the candidates sitting in parts of size 2 or more
+     *
+     * and the floor is 2n - 1: every candidate charged this guess, every one
+     * charged its naming guess, less the one resolved by an all-green.  So the
+     * FIRST guess that attains 2n - 1 is provably optimal and we stop looking --
+     * no sort, no second partition pass, no recursion.
+     * Build with -DNO_D2 to disable it and re-derive these nodes the general
+     * way: that is the DIFFERENTIAL TEST for this optimisation, and it must
+     * produce identical values at --topk 0.  (It does NOT match under --topk,
+     * and should not: the closed form scans every guess because it is exact and
+     * cheap, while the general path honours the beam.  optturns does the same.)
+     */
+#ifndef NO_D2
+    if (d == 2) {
+        long long best2 = ALLOW_UNSOLVED ? (long long)n * USCALE : INF;
+        int bg2 = -1;
+        long long floor2 = 2 * (long long)n - 1;
+        for (int g = 0; g < NG; g++) {
+            const State *at = ATOM + (size_t)g * NPAT;
+            const uint8_t *ok = AOK + (size_t)g * NPAT;
+            long long uns = 0, sing = 0;
+            for (int p = 0; p < NPAT; p++) {
+                if (!ok[p] || p == ALL_GREEN) continue;
+                State tmp;
+                if (!meet(&tmp, st, &at[p])) continue;
+                uint64_t c = count_state(&tmp);
+                if (!c) continue;
+                if (c == 1) sing++;
+                else {
+                    uns += (long long)c;
+                    if (!ALLOW_UNSOLVED) break;   /* cannot finish: abandon it */
+                }
+            }
+            if (uns && !ALLOW_UNSOLVED) continue;
+            long long v = uns * USCALE + (long long)n + sing;
+            if (v < best2) { best2 = v; bg2 = g; }
+            if (best2 <= floor2) break;           /* provably optimal */
+        }
+        tt_put(h0, h1, d, best2, bg2, 1);
+        return best2;
+    }
+#endif
+
     /* Pass 1: each guess's partition profile gives its lower bound, and (under
      * --topk) its sum of squared bin sizes -- the split-quality score the K
      * survivors are chosen by, computed from the same counts. */
@@ -641,6 +691,36 @@ static long long solve_opener(int g, int depth, Ctx *ctx) {
         total += v;
     }
     return total;
+}
+
+/* An opener's root lower bound: NSTR plus the bound on every surviving part, with
+ * no search at all.  This is what ORDERS the sweep.  File order -- which is
+ * alphabetical -- would let spelling decide what gets examined first, and since
+ * the early alphabet is thick with repeated-letter words (aahed, aalii, aargh),
+ * a stopped run would report on the structurally worst openers available: a
+ * 4-distinct-letter opener leaves an all-grey bucket of 22**5 = 5153632 against
+ * 21**5 = 4084101 for a 5-distinct one, and coverage is the binding constraint. */
+static long long root_lb(int g, int depth) {
+    State root; root_state(&root);
+    const State *at = ATOM + (size_t)g * NPAT;
+    const uint8_t *ok = AOK + (size_t)g * NPAT;
+    long long lb = NSTR;
+    for (int p = 0; p < NPAT; p++) {
+        if (!ok[p] || p == ALL_GREEN) continue;
+        State sub;
+        if (!meet(&sub, &root, &at[p])) continue;
+        uint64_t c = count_state(&sub);
+        if (!c) continue;
+        long long v = lbound(c, depth - 1);
+        if (v >= INF) return INF;
+        lb += v;
+    }
+    return lb;
+}
+
+static int cmp_ord(const void *a, const void *b) {
+    long long x = *(const long long *)a, y = *(const long long *)b;
+    return (x > y) - (x < y);
 }
 
 static int measure_branching(void) {
@@ -813,7 +893,16 @@ int main(int argc, char **argv) {
         fflush(out);
     }
 
-    if (!sweep && nopen == 0) { openers[nopen++] = "salet"; }
+    /* NO DEFAULT OPENER, DELIBERATELY.  This program exists to find good
+     * openers, so any opener literal in here would be an answer asserted rather
+     * than derived -- and one imported from the 2315-answer problem (which is
+     * what used to sit here) would carry a relevance it does not have.  Refusing
+     * to run is the only default that cannot bias a result. */
+    if (!sweep && nopen == 0) {
+        fprintf(stderr, "give --opener WORD (repeatable) or --sweep; there is no "
+                        "default opener, and there should not be one\n");
+        return 1;
+    }
 
     if (!sweep) {
         Ctx *ctx = calloc(1, sizeof(Ctx));
@@ -877,6 +966,23 @@ int main(int argc, char **argv) {
         }
         free(ctx);
     } else {
+        /* Visit openers in ASCENDING root lower bound -- derived and named, so a
+         * run stopped early has examined the most promising openers rather than
+         * the alphabetically first ones. */
+        long long *ord = malloc(sizeof(long long) * NG);
+        int nord = 0;
+        for (int g = 0; g < NG; g++) {
+            long long lb = root_lb(g, depth);
+            if (lb >= INF && !ALLOW_UNSOLVED) continue;
+            if (lb >= INF) lb = INF - 1;
+            ord[nord++] = lb * (long long)MAXG + g;
+        }
+        qsort(ord, nord, sizeof(long long), cmp_ord);
+        fprintf(stderr, "sweep order: %d openers by ascending root LB "
+                "(best %s at %lld)\n",
+                nord, nord ? GWORD[ord[0] % MAXG] : "-",
+                nord ? ord[0] / MAXG : 0LL);
+
         double sw = now_s();
         int completed = 0;
 #ifdef _OPENMP
@@ -887,7 +993,8 @@ int main(int argc, char **argv) {
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic, 1)
 #endif
-            for (int g = 0; g < NG; g++) {
+            for (int i = 0; i < nord; i++) {
+                int g = (int)(ord[i] % MAXG);
                 double s0 = now_s();
                 long long total = solve_opener(g, depth, ctx);
                 double dt = now_s() - s0;
@@ -899,12 +1006,12 @@ int main(int argc, char **argv) {
                     double el = now_s() - sw;
                     if (total >= INF)
                         printf("[%7.0fs] %5d/%d  %s  INFEASIBLE d>%d  %7.1fs\n",
-                               el, completed, NG, GWORD[g], depth, dt);
+                               el, completed, nord, GWORD[g], depth, dt);
                     else {
                         long long un = UNS(total), gs = GUESSES(total);
                         printf("[%7.0fs] %5d/%d  %s  total=%lld  unsolved=%lld"
                                "  avg=%.5f  %7.1fs\n",
-                               el, completed, NG, GWORD[g], gs, un,
+                               el, completed, nord, GWORD[g], gs, un,
                                (double)gs / NSTR, dt);
                     }
                     fflush(stdout);
@@ -920,6 +1027,7 @@ int main(int argc, char **argv) {
             }
             free(ctx);
         }
+        free(ord);
     }
     if (out) fclose(out);
     return 0;
