@@ -366,11 +366,32 @@ static long long lbound(uint64_t n, int d) {
     return (long long)rem * USCALE + total;
 }
 
+/* THE ranking rule, and the only one.  Every place that orders guesses -- the
+ * per-node guess loop, the d == 2 closed form, and the opener sweep -- sorts
+ * these, so "what does --topk rank by" and "how are ties broken" have a single
+ * answer instead of one per call site.
+ *
+ * The key is NOT packed alongside the guess index.  Packing is what broke this
+ * before: a sum of squares reaches ~1.4e14 at the root, so it had to be shifted
+ * down 12 bits to leave room for the index -- which made every guess tie at any
+ * node with fewer than about 64 candidates, silently turning --topk into
+ * alphabetical order exactly where most nodes are.
+ *
+ * TIES BREAK ON THE LOWEST GUESS INDEX, everywhere.  That is arbitrary but it is
+ * ONE arbitrary rule, so two orderings of the same set never disagree. */
+typedef struct { long long key; int g; } GuessKey;
+
+static int cmp_guesskey(const void *a, const void *b) {
+    const GuessKey *x = a, *y = b;
+    if (x->key != y->key) return (x->key > y->key) - (x->key < y->key);
+    return (x->g > y->g) - (x->g < y->g);
+}
+
 typedef struct {
     State    subs[MAXD][NPAT];
     uint64_t cn[MAXD][NPAT];
     long long lbg[MAXD][MAXG];
-    int64_t  ord[MAXD][MAXG];
+    GuessKey ord[MAXD][MAXG];
     long long nodes;
 } Ctx;
 
@@ -497,9 +518,57 @@ static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
      */
 #ifndef NO_D2
     if (d == 2) {
+        /* One guess splits into at most BRANCH non-green parts, so it can resolve
+         * at most BRANCH singletons plus one all-green: 238 candidates, whatever
+         * n is.  Two consequences, and the first is the bigger win:
+         *   - by default, where nothing may be left unsolved, n > BRANCH + 1 is
+         *     INFEASIBLE outright and needs no scan at all;
+         *   - the attainable floor is NOT 2n - 1 once n exceeds that, so the old
+         *     floor could never be reached and the early exit never fired -- the
+         *     scan ran all 12972 guesses at every d == 2 node. */
+        long long smax = ((long long)n - 1 < (long long)BRANCH)
+                       ? (long long)n - 1 : (long long)BRANCH;
+        if (!ALLOW_UNSOLVED && (long long)n > smax + 1) {
+            tt_put(h0, h1, d, INF, -1, 1);
+            return INF;
+        }
         long long best2 = ALLOW_UNSOLVED ? (long long)n * USCALE : INF;
         int bg2 = -1;
-        long long floor2 = 2 * (long long)n - 1;
+        long long floor2 = ((long long)n - smax - 1) * USCALE
+                         + (long long)n + smax;
+        /* --topk APPLIES HERE TOO.  It used to not, which meant the beam did not
+         * describe the whole search and a --topk run quietly got exact answers at
+         * every depth-2 node.  Ranking needs every guess profiled anyway, so the
+         * floor's early exit only survives in the exact search below. */
+        if (TOPK > 0) {
+            GuessKey *ord2 = ctx->ord[d];
+            long long *val2 = ctx->lbg[d];
+            int m2 = 0;
+            for (int g = 0; g < NG; g++) {
+                const State *at = ATOM + (size_t)g * NPAT;
+                const uint8_t *ok = AOK + (size_t)g * NPAT;
+                long long uns = 0, sing = 0, ss = 0;
+                for (int p = 0; p < NPAT; p++) {
+                    if (!ok[p]) continue;
+                    State tmp;
+                    if (!meet(&tmp, st, &at[p])) continue;
+                    uint64_t c = count_state(&tmp);
+                    if (!c) continue;
+                    ss += (long long)c * (long long)c;
+                    if (p == ALL_GREEN) continue;
+                    if (c == 1) sing++; else uns += (long long)c;
+                }
+                if (uns && !ALLOW_UNSOLVED) continue;
+                val2[g] = uns * USCALE + (long long)n + sing;
+                ord2[m2].key = ss; ord2[m2].g = g; m2++;
+            }
+            qsort(ord2, m2, sizeof(GuessKey), cmp_guesskey);
+            int lim2 = (TOPK < m2) ? TOPK : m2;
+            for (int i = 0; i < lim2; i++)
+                if (val2[ord2[i].g] < best2) { best2 = val2[ord2[i].g]; bg2 = ord2[i].g; }
+            tt_put(h0, h1, d, best2, bg2, 1);
+            return best2;
+        }
         for (int g = 0; g < NG; g++) {
             const State *at = ATOM + (size_t)g * NPAT;
             const uint8_t *ok = AOK + (size_t)g * NPAT;
@@ -530,7 +599,7 @@ static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
      * --topk) its sum of squared bin sizes -- the split-quality score the K
      * survivors are chosen by, computed from the same counts. */
     long long *lbg = ctx->lbg[d];
-    int64_t *ord = ctx->ord[d];
+    GuessKey *ord = ctx->ord[d];
     int m = 0;
     for (int g = 0; g < NG; g++) {
         const State *at = ATOM + (size_t)g * NPAT;
@@ -553,7 +622,12 @@ static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
         }
         if (dead || (np == 1 && biggest == n)) { lbg[g] = INF; continue; }
         lbg[g] = lv;
-        ord[m++] = ((int64_t)(TOPK > 0 ? (int64_t)(ss >> 12) : lv) << 20) | g;
+        /* --topk ranks by sum of squared bin sizes (evenest split first), exact
+         * -- see GuessKey.  Exact search ranks by the lower bound instead, which
+         * is the better order to PROVE in. */
+        ord[m].key = (TOPK > 0) ? (long long)ss : lv;
+        ord[m].g = g;
+        m++;
     }
     if (!m) {
         /* Not one legal guess splits this set.  Same reasoning as the n == 2
@@ -563,15 +637,11 @@ static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
         return v;
     }
 
-    for (int i = 1; i < m; i++) {                /* ascending by key */
-        int64_t k = ord[i]; int j = i - 1;
-        while (j >= 0 && ord[j] > k) { ord[j + 1] = ord[j]; j--; }
-        ord[j + 1] = k;
-    }
+    qsort(ord, m, sizeof(GuessKey), cmp_guesskey);
     int lim = (TOPK > 0 && TOPK < m) ? TOPK : m;
     int bestg = -1;
     for (int i = 0; i < lim; i++) {
-        int g = (int)(ord[i] & 0xFFFFF);
+        int g = ord[i].g;
         if (TOPK == 0 && lbg[g] >= best) break;  /* sorted by lb: none left can win */
         long long v = eval_guess(st, n, d, g, best, ctx);
         if (v < best) { best = v; bestg = g; }
@@ -718,9 +788,22 @@ static long long root_lb(int g, int depth) {
     return lb;
 }
 
-static int cmp_ord(const void *a, const void *b) {
-    long long x = *(const long long *)a, y = *(const long long *)b;
-    return (x > y) - (x < y);
+/* The opener's root sum of squared bin sizes -- the same split-quality score the
+ * per-node loop ranks by under --topk, so the sweep and the search agree about
+ * what "most promising" means instead of using two different rules. */
+static long long root_ssq(int g) {
+    State root; root_state(&root);
+    const State *at = ATOM + (size_t)g * NPAT;
+    const uint8_t *ok = AOK + (size_t)g * NPAT;
+    long long ss = 0;
+    for (int p = 0; p < NPAT; p++) {
+        if (!ok[p]) continue;
+        State sub;
+        if (!meet(&sub, &root, &at[p])) continue;
+        uint64_t c = count_state(&sub);
+        ss += (long long)c * (long long)c;
+    }
+    return ss;
 }
 
 static int measure_branching(void) {
@@ -860,8 +943,17 @@ int main(int argc, char **argv) {
 
     BRANCH = measure_branching();
     fprintf(stderr, "branching: %d non-winning bins (max over %d guesses)\n", BRANCH, NG);
-    fprintf(stderr, "root LB(d=%d, n=%ld) = %lld  (%.5f avg)\n",
-            depth, NSTR, lbound(NSTR, depth), (double)lbound(NSTR, depth) / NSTR);
+    {   /* lbound returns a PACKED (unsolved, guesses) under --allow-unsolved, so
+         * it has to be decoded before it is shown -- printing it raw reported a
+         * bound of 11881375000000001 with an "average" of 999999915. */
+        long long rlb = lbound(NSTR, depth);
+        if (rlb >= INF)
+            fprintf(stderr, "root LB(d=%d, n=%ld) = INFEASIBLE\n", depth, NSTR);
+        else
+            fprintf(stderr, "root LB(d=%d, n=%ld): >= %lld guesses (%.5f avg)"
+                    ", >= %lld unsolved\n",
+                    depth, NSTR, GUESSES(rlb), (double)GUESSES(rlb) / NSTR, UNS(rlb));
+    }
 
     if (ttbits <= 0) { TT_OFF = 1; fprintf(stderr, "TT: disabled\n"); }
     else {
@@ -969,19 +1061,25 @@ int main(int argc, char **argv) {
         /* Visit openers in ASCENDING root lower bound -- derived and named, so a
          * run stopped early has examined the most promising openers rather than
          * the alphabetically first ones. */
-        long long *ord = malloc(sizeof(long long) * NG);
+        /* Ordered by the SAME rule the per-node loop uses: sum of squares under
+         * --topk, lower bound for the exact search.  Openers whose bound already
+         * rules them out are dropped either way. */
+        GuessKey *ord = malloc(sizeof(GuessKey) * NG);
         int nord = 0;
         for (int g = 0; g < NG; g++) {
             long long lb = root_lb(g, depth);
             if (lb >= INF && !ALLOW_UNSOLVED) continue;
-            if (lb >= INF) lb = INF - 1;
-            ord[nord++] = lb * (long long)MAXG + g;
+            ord[nord].key = (TOPK > 0) ? root_ssq(g) : lb;
+            ord[nord].g = g;
+            nord++;
         }
-        qsort(ord, nord, sizeof(long long), cmp_ord);
-        fprintf(stderr, "sweep order: %d openers by ascending root LB "
-                "(best %s at %lld)\n",
-                nord, nord ? GWORD[ord[0] % MAXG] : "-",
-                nord ? ord[0] / MAXG : 0LL);
+        qsort(ord, nord, sizeof(GuessKey), cmp_guesskey);
+        if (nord)
+            fprintf(stderr, "sweep order: %d openers by ascending %s (first %s, key %lld)\n",
+                    nord, TOPK > 0 ? "root sum of squares" : "root lower bound",
+                    GWORD[ord[0].g], ord[0].key);
+        else
+            fprintf(stderr, "sweep order: no opener can solve within depth %d\n", depth);
 
         double sw = now_s();
         int completed = 0;
@@ -994,7 +1092,7 @@ int main(int argc, char **argv) {
 #pragma omp for schedule(dynamic, 1)
 #endif
             for (int i = 0; i < nord; i++) {
-                int g = (int)(ord[i] % MAXG);
+                int g = ord[i].g;
                 double s0 = now_s();
                 long long total = solve_opener(g, depth, ctx);
                 double dt = now_s() - s0;
