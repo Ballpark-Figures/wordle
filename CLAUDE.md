@@ -467,6 +467,52 @@ its state arithmetic against `strspace.py` over a shared deterministic walk — 
   can be diffed against a brute-force Python solver. Until then treat every total it
   prints as provisional.
 
+## Absurdle (adversarial Wordle) — OUR word lists, NOT Absurdle's
+- **The host never commits to a word.** It holds a CANDIDATE SET (initially the answer
+  list), buckets it by the feedback each remaining candidate would give for your guess,
+  answers with the pattern of the **largest** bucket, and that bucket becomes the new
+  candidate set. Ties between equal-sized buckets break by: fewest GREENS, then fewest
+  YELLOWS, then the lowest number when the pattern is read left-to-right as digits
+  (grey 0, yellow 1, green 2). Unlimited guesses, and no depth cap in the rules, so any
+  cap we impose is OURS and is part of the objective.
+  - **Consequence that drives everything: all-green loses every tie-break** (it is the
+    most-green pattern), so the host hands you the win only when it has no choice. You
+    win **iff** the candidate set is already down to ONE word and you guess that word.
+  - **PROVENANCE: this rule is from qntm's Absurdle FAQ, read via search snippets, not
+    from source** (Absurdle is closed-source) and NOT yet checked against the live game.
+    Before any number ships, play a few openers on the real site and diff.
+- **WE USE OUR OWN LISTS, AND THEY ARE NOT VERIFIED TO BE ABSURDLE'S — say so whenever
+  a number is quoted.** Candidates are `math/data/shared/words/mystery.txt` (2315),
+  guesses are `guess.txt` (12972): the ORIGINAL Wordle lists, the same ones every other
+  sweep in this video uses. qntm describes Absurdle's lists as "very similar" to
+  Wordle's, not identical, and the NYT edited Wordle's lists after both were built. So a
+  sequence that wins here is **not guaranteed to win on absurdle.com**. Deliberate call
+  by the user (2026-09-02): consistency with the rest of the video beats matching a list
+  we cannot read.
+- **It is DETERMINISTIC and fully known, so this is NOT an adversarial search.** The
+  response is a pure function of (candidate set, guess), so a game is a single LINE of
+  play, not a tree, and a "strategy" is just a sequence of guesses. None of the
+  expected-turns machinery transfers — no averaging over 2315 answers, no minimax.
+- **THE FLOOR IS 4 GUESSES, AND IT IS PROVED ON OUR LISTS (2026-09-02).** A win needs
+  the set to be a SINGLETON before the naming guess, and one guess can shatter a set
+  into singletons only if every candidate gets a DISTINCT pattern — so at most 238, the
+  attainable-pattern count. The best opener leaves **168** candidates (`aesir`/`arise`/
+  `raise`/`reais`/`serai`, all on the all-grey reply); only **277** of the 12972 openers
+  leave 238 or fewer, and an exhaustive check of all 12972 second guesses against each of
+  those 277 states finds none reaching a singleton. So a 3-guess win is impossible and 4
+  is optimal — no longer "believed impossible", though still only for OUR lists.
+  Witness: **`aesir yauld tench whoop`**, 2315 to 168 to 15 to 1 to win.
+- **The pieces.** `math/absurdle.py` — host primitives (`respond`, `respond_all` ranks all
+  12972 continuations in one bincount pass, `play`). `tools/checkabsurdle.py` — the GATE,
+  fast path vs a brute-force reference plus the tie-break shortcuts; run it with
+  `solver/validate.sh` and `tools/checkpatterns.py`. `tools/absurdle_shortest.py` — the
+  floor proof plus one witness, 4 seconds end to end. `tools/absurdle_play.py` — a slow
+  replay sharing NO code with the rest, and the thing to diff against a game played on
+  the live site. Result in `math/data/shared/absurdle/`.
+- **TIES ARE NOT ENUMERATED YET.** Stage 1 stops at the FIRST witness, in ascending
+  resulting-size order, so `aesir yauld tench whoop` is one optimum, not the optimum.
+  Stage 2 (every tied opener) and stage 3 (every tied sequence) are outstanding.
+
 ## Gameplay layout
 - (Describe this video's on-screen layout and the assets in `animations/assets/`.)
 
