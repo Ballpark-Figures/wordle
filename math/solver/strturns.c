@@ -508,19 +508,47 @@ typedef struct {
 static long long solve(const State *st, uint64_t n, int d, Ctx *ctx);
 
 /* A single opener emits NOTHING until it finishes, and at this scale that can be
- * a very long silence -- which reads as a hang rather than as work.  So report
- * the node rate periodically.  The races on G_LAST and G_NODES are benign: the
- * worst case is a duplicated or skipped line, and neither feeds a result. */
+ * a very long silence -- which reads as a hang rather than as work.
+ *
+ * The useful thing to report is not the node rate but HOW MUCH OF THE ANSWER
+ * SPACE IS SETTLED.  The root partition is walked bucket by bucket and every
+ * bucket's size is known up front, so completed buckets give a genuine
+ * denominator: what fraction of the 11,881,376 answers have been decided, how
+ * many guesses they cost, and how many of them ended up unsolved -- all running
+ * totals, all exact for the part finished so far.
+ *
+ * (The old line reported "deepest live: d=..., n=...", which was whichever node
+ * happened to trip the counter -- not the deepest, not representative, and no
+ * indication of progress.)
+ *
+ * Races on these are benign: a duplicated or skipped line, and nothing here
+ * feeds a result.  Under a multi-opener sweep the counters aggregate across the
+ * openers in flight, which the line says. */
 static double    G_T0, G_LAST;
 static long long G_NODES;
+static long long G_ANS_DONE, G_ANS_TOTAL;
+static int       G_BUCKETS_DONE, G_BUCKETS_TOTAL, G_OPENERS;
+static long long G_GUESSES, G_UNSOLVED;
 
-static void progress(int d, uint64_t n) {
+static void progress(void) {
     double now = now_s();
     if (now - G_LAST < 5.0) return;
     G_LAST = now;
-    fprintf(stderr, "[%7.0fs] %lld nodes  %.0f nodes/s  (deepest live: d=%d, n=%llu)\n",
-            now - G_T0, G_NODES, G_NODES / (now - G_T0 + 1e-9), d,
-            (unsigned long long)n);
+    double el = now - G_T0;
+    if (G_ANS_TOTAL > 0) {
+        double pct = 100.0 * (double)G_ANS_DONE / (double)G_ANS_TOTAL;
+        /* Extrapolate from settled answers, not from nodes: buckets differ
+         * enormously in cost, but the fraction of the space they cover is the
+         * thing actually being consumed. */
+        double eta = (G_ANS_DONE > 0) ? el * (G_ANS_TOTAL - G_ANS_DONE) / (double)G_ANS_DONE : 0.0;
+        fprintf(stderr, "[%7.0fs] %5.1f%% settled (%lld/%lld answers, %d/%d root buckets%s)"
+                "  so far %lld guesses, %lld unsolved  |  %lld nodes, %.0f/s, eta %.0fs\n",
+                el, pct, G_ANS_DONE, G_ANS_TOTAL, G_BUCKETS_DONE, G_BUCKETS_TOTAL,
+                G_OPENERS > 1 ? ", summed over openers in flight" : "",
+                G_GUESSES, G_UNSOLVED, G_NODES, G_NODES / (el + 1e-9), eta);
+    } else {
+        fprintf(stderr, "[%7.0fs] %lld nodes, %.0f/s\n", el, G_NODES, G_NODES / (el + 1e-9));
+    }
     fflush(stderr);
 }
 
@@ -563,7 +591,15 @@ static long long eval_guess(const State *st, uint64_t n, int d, int g,
 }
 
 static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
-    if (n == 1) return 1;                       /* played, or the phantom naming move */
+    /* One candidate left: naming it costs a guess, so it is only resolvable if
+     * there IS one left.  Without the d >= 1 test this charged a guess the budget
+     * did not have, which made --depth 1 and --depth 2 report identical results:
+     * at depth 1 the root's children arrive with d == 0 and every singleton was
+     * still being resolved. */
+    if (n == 1) {
+        if (d >= 1) return 1;                   /* played, or the phantom naming move */
+        return ALLOW_UNSOLVED ? USCALE : INF;   /* out of budget: it stays unsolved */
+    }
     /* Out of budget with more than one candidate left.  By default that is fatal;
      * under --allow-unsolved every remaining candidate is a violation, and none
      * of them is charged a further guess because none is played. */
@@ -605,7 +641,7 @@ static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
 #pragma omp atomic
 #endif
     G_NODES++;
-    if ((G_NODES & 0x3FF) == 0) progress(d, n);
+    if ((G_NODES & 0x3FF) == 0) progress();
 
     /* d == 2 CLOSED FORM: one guess left after this one, so the only thing a
      * guess can do is FULLY DIVIDE the bucket -- every non-green part must be a
@@ -899,6 +935,23 @@ static long long solve_opener(int g, int depth, Ctx *ctx) {
     State root; root_state(&root);
     const State *at = ATOM + (size_t)g * NPAT;
     const uint8_t *ok = AOK + (size_t)g * NPAT;
+    /* Count the buckets first so the progress line has a denominator from the
+     * outset rather than growing one as it goes. */
+    int nb = 0;
+    for (int p = 0; p < NPAT; p++) {
+        if (!ok[p] || p == ALL_GREEN) continue;
+        State sub;
+        if (meet(&sub, &root, &at[p]) && count_state(&sub)) nb++;
+    }
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
+    G_BUCKETS_TOTAL += nb;
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
+    G_ANS_TOTAL += NSTR;
+
     long long total = NSTR;
     for (int p = 0; p < NPAT; p++) {
         if (!ok[p] || p == ALL_GREEN) continue;
@@ -909,6 +962,24 @@ static long long solve_opener(int g, int depth, Ctx *ctx) {
         long long v = solve(&sub, c, depth - 1, ctx);
         if (v >= INF) return INF;
         total += v;
+        /* This bucket is decided: fold it into the running totals. */
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
+        G_ANS_DONE += (long long)c;
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
+        G_BUCKETS_DONE++;
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
+        G_GUESSES += GUESSES(v) + (long long)c;
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
+        G_UNSOLVED += UNS(v);
+        progress();
     }
     return total;
 }
@@ -1176,6 +1247,7 @@ int main(int argc, char **argv) {
     }
 
     if (!sweep) {
+        G_OPENERS = nopen;
         Ctx *ctx = calloc(1, sizeof(Ctx));
         for (int i = 0; i < nopen; i++) {
             int g = -1;
@@ -1310,6 +1382,8 @@ int main(int argc, char **argv) {
                     );
         else
             fprintf(stderr, "sweep order: no opener can solve within depth %d\n", depth);
+
+        G_OPENERS = nord;
 
         double sw = now_s();
         int completed = 0;
