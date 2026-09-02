@@ -636,6 +636,24 @@ Carlo, so its numbers carry a standard error and are not comparable with any
 - **It is a Monte Carlo estimate** — the summary always prints a standard error, and
   two runs differing by less than a couple of SEs have measured nothing. Rows flush
   per game, so a Ctrl-C keeps the games already played (but writes no summary).
+- **OPENER SWEEP: `bash solver/run-multiwordle-sweep.sh -k K -t T` (from `math/`)** —
+  the same fixed number of trials for EVERY word of a list (`--words guess|mystery|
+  <path>`, `--limit N` for an alphabetical prefix, `--prefix "W…"` to fix the opening
+  words before the swept one). Resumable per word. Data in
+  `data/shared/multiwordle/sweep_k<K>_t<T>_s<SEED>_<list>[_after-…][_limN].csv`.
+  Measured cost: ~15 min for all 12972 words at k=4/t=1000, ~2.5 h at t=10000.
+  - **COMMON RANDOM NUMBERS**: every opener faces the IDENTICAL sequence of answer
+    draws (draw stream re-seeded per word, kept SEPARATE from the strategy's picks),
+    so DIFFERENCES between words are much less noisy than their individual SEs. The
+    flip side: **a sweep cell will not match a `run-multiwordle.sh` run at the same
+    seed** — `multiwordle_sim.py` draws both from one stream, so they are different
+    samples of the same quantity.
+  - **THE WINNER'S CURSE IS REAL AT 12972 WORDS — the head of a sweep is a SHORTLIST,
+    NOT A WINNER.** The best-looking mean belongs to whichever word drew the kindest
+    sample, and at small `-t` the noise spread across 12972 words dwarfs one word's SE.
+    Sound use is two-stage: screen wide at small `-t`, then re-run the top few at large
+    `-t` or a fresh `--seed`. A word leading both is a finding; a word leading only the
+    screen is a coin flip. Never report a screen head as "the best opener".
 - **`python3 tools/multiwordle_report.py` is the standing status report** — the
   (k, n) grid at one sample size, plus `--all` for one row per file and `--trials T`
   to pick the sample size. **The grid shows BARE MEANS** (user's preference,

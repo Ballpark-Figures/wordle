@@ -44,6 +44,7 @@ from wordle import ALL_GREEN, load_words, pattern  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from multiwordle_sim import openers_from, summarise  # noqa: E402
+from multiwordle_sweep import PICK_OFFSET, load_done, sweep_word  # noqa: E402
 
 FAILS = []
 
@@ -194,6 +195,34 @@ def main(argv):
           and play_game(pat, ans2g, ia, [opener_g], a)
           == play_game(pat, ans2g, ib, [opener_g], b))
 
+    # --- the sweep: common random numbers, and an independent replay --------
+    k, t, seed = 3, 12, 4242
+    na = len(mystery)
+    two = [["laten"], ["clint"]]
+    seen = []
+    for opening in two:
+        rng = np.random.default_rng(seed)
+        seen.append([list(draw_answers(na, k, rng)) for _ in range(t)])
+    check("every swept opener faces the identical answer draws",
+          seen[0] == seen[1] and len(seen[0]) == t)
+
+    pick_stream = [list(draw_answers(na, k, np.random.default_rng(seed + PICK_OFFSET)))]
+    check("the pick stream is not the draw stream under another name",
+          pick_stream[0] != seen[0][0])
+
+    # replay sweep_word's t games in an independent loop and compare the summary
+    opening = ["clint"]
+    openers_g = [guesses.index(w) for w in opening]
+    st = sweep_word(pat, ans2g, na, k, t, seed, openers_g)
+    draw_rng = np.random.default_rng(seed)
+    pick_rng = np.random.default_rng(seed + PICK_OFFSET)
+    scores = [len(play_game(pat, ans2g, draw_answers(na, k, draw_rng),
+                            openers_g, pick_rng)) for _ in range(t)]
+    ref = summarise(scores, k)
+    check("sweep_word matches an independent replay of the same streams",
+          st == ref, "%.4f vs %.4f" % (st["mean_guesses"], ref["mean_guesses"]))
+    check("a sweep row totals its own trials", st["trials"] == t)
+
     # --- the summary totals what it summarises ------------------------------
     scores = [7, 9, 8, 12, 9, 10]
     st = summarise(scores, 3)
@@ -202,6 +231,16 @@ def main(argv):
           and abs(st["mean_per_board"] * 3 - st["mean_guesses"]) < 1e-9
           and st["trials"] == len(scores)
           and st["min"] == 7 and st["max"] == 12)
+
+    # --- the sweep's resume reads back what it wrote ------------------------
+    tmp = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                       "..", "data", "local", "multiwordle", "_checkresume.csv")
+    os.makedirs(os.path.dirname(tmp), exist_ok=True)
+    with open(tmp, "w") as f:
+        f.write("# a comment\nword,trials,mean\nlaten,10,3.9\nclint,10,3.8\n")
+    check("the sweep resumes from the words already in its CSV",
+          load_done(tmp) == {"laten", "clint"})
+    os.remove(tmp)
 
     print()
     if FAILS:
