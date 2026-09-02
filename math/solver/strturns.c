@@ -1027,6 +1027,45 @@ static long long root_ssq(int g) {
     return ss;
 }
 
+/* Solve `g` at the SMALLEST cap that works, raising it one guess at a time from
+ * `dmin` to `dmax`.  ONE function, used by the single-opener path AND the sweep:
+ * --depth-max used to be wired into the first only, so it was silently ignored
+ * in the very mode a bare run lands in.
+ *
+ * "Works" means feasible by default, and NOTHING LEFT UNSOLVED under
+ * --allow-unsolved -- where nothing is ever INF, so unsolved == 0 is the only
+ * sensible stopping test.
+ *
+ * NOTE WHAT THIS IS NOT.  It returns the best total at the FIRST cap that works.
+ * f(S,d) is non-increasing in d, so a deeper cap may admit a LOWER total by
+ * letting one answer run long to save guesses elsewhere.  So *used is the
+ * minimum working DEPTH and the total is optimal SUBJECT TO it -- not an
+ * unconstrained minimum. */
+static long long solve_escalating(int g, int dmin, int dmax, Ctx *ctx,
+                                  int *used, int chatty) {
+    long long total = INF;
+    for (int d = dmin; d <= dmax; d++) {
+        double t0 = now_s();
+        long long nodes0 = ctx->nodes;
+        total = solve_opener(g, d, ctx);
+        if (total < INF && UNS(total) == 0) { *used = d; return total; }
+        if (chatty) {
+            if (total < INF)
+                printf("%s  depth %d: %lld unsolved, %lld guesses  (%.1fs, %lld nodes)%s\n",
+                       GWORD[g], d, UNS(total), GUESSES(total), now_s() - t0,
+                       ctx->nodes - nodes0,
+                       d < dmax ? " -- escalating" : " -- that was --depth-max");
+            else
+                printf("%s  INFEASIBLE at depth %d  (%.1fs, %lld nodes)%s\n",
+                       GWORD[g], d, now_s() - t0, ctx->nodes - nodes0,
+                       d < dmax ? " -- escalating" : " -- that was --depth-max");
+            fflush(stdout);
+        }
+    }
+    *used = dmax;                               /* best effort at the ceiling */
+    return total;
+}
+
 static int measure_branching(void) {
     State root; root_state(&root);
     int best = 1;
@@ -1260,26 +1299,8 @@ int main(int argc, char **argv) {
              * long to save guesses elsewhere.  The number is optimal SUBJECT TO
              * the depth reported, not an unconstrained minimum. */
             double s0 = now_s();
-            long long total = INF;
-            int used = 0;
-            for (int dd = depth; dd <= depthmax; dd++) {
-                double d0 = now_s();
-                total = solve_opener(g, dd, ctx);
-                /* Under --allow-unsolved nothing is ever INF, so "feasible" means
-                 * "nothing left unsolved" -- which is what escalation is for. */
-                if (total < INF && UNS(total) == 0) { used = dd; break; }
-                if (total < INF)
-                    printf("%s  depth %d: %lld unsolved, %lld guesses  (%.1fs, %lld nodes)%s\n",
-                           GWORD[g], dd, UNS(total), GUESSES(total), now_s() - d0,
-                           ctx->nodes,
-                           dd < depthmax ? " -- escalating" : " -- that was --depth-max");
-                else
-                    printf("%s  INFEASIBLE at depth %d  (%.1fs, %lld nodes)%s\n",
-                           GWORD[g], dd, now_s() - d0, ctx->nodes,
-                           dd < depthmax ? " -- escalating" : " -- that was --depth-max");
-                fflush(stdout);
-                if (total < INF && dd == depthmax) used = dd;
-            }
+            int used = depthmax;
+            long long total = solve_escalating(g, depth, depthmax, ctx, &used, 1);
             double dt = now_s() - s0;
             if (total < INF) {
                 long long un = UNS(total), gs = GUESSES(total);
@@ -1290,20 +1311,19 @@ int main(int argc, char **argv) {
                 printf("%s  total=%lld  unsolved=%lld  avg-played=%.5f  d=%d"
                        "  (%.1fs, %lld nodes)\n",
                        GWORD[g], gs, un, (double)gs / NSTR,
-                       used ? used : depthmax, dt, ctx->nodes);
+                       used, dt, ctx->nodes);
                 if (un > 0) {
                     State rt; root_state(&rt);
-                    report_unsolved(&rt, g, used ? used : depthmax, total, ctx);
+                    report_unsolved(&rt, g, used, total, ctx);
                 }
             }
             fflush(stdout);
-            depth = used ? used : depth;
             if (out) {
                 if (total >= INF) fprintf(out, "%s,,,,%.1f\n", GWORD[g], dt);
                 else fprintf(out, "%s,%lld,%.5f,%d,%.1f,%lld\n",
                              GWORD[g], GUESSES(total),
                              (double)GUESSES(total) / NSTR,
-                             depth, dt, UNS(total));
+                             used, dt, UNS(total));
                 fflush(out);
             }
         }
@@ -1398,7 +1418,11 @@ int main(int argc, char **argv) {
             for (int i = 0; i < nord; i++) {
                 int g = ord[i].g;
                 double s0 = now_s();
-                long long total = solve_opener(g, depth, ctx);
+                int used = depthmax;
+                /* Quiet here: with many openers in flight the per-cap chatter
+                 * would interleave into noise.  The depth actually reached is on
+                 * the result line and in the CSV instead. */
+                long long total = solve_escalating(g, depth, depthmax, ctx, &used, 0);
                 double dt = now_s() - s0;
 #ifdef _OPENMP
 #pragma omp critical
@@ -1408,13 +1432,13 @@ int main(int argc, char **argv) {
                     double el = now_s() - sw;
                     if (total >= INF)
                         printf("[%7.0fs] %5d/%d  %s  INFEASIBLE d>%d  %7.1fs\n",
-                               el, completed, nord, GWORD[g], depth, dt);
+                               el, completed, nord, GWORD[g], depthmax, dt);
                     else {
                         long long un = UNS(total), gs = GUESSES(total);
                         printf("[%7.0fs] %5d/%d  %s  total=%lld  unsolved=%lld"
-                               "  avg=%.5f  %7.1fs\n",
+                               "  avg=%.5f  d=%d  %7.1fs\n",
                                el, completed, nord, GWORD[g], gs, un,
-                               (double)gs / NSTR, dt);
+                               (double)gs / NSTR, used, dt);
                     }
                     fflush(stdout);
                     if (out) {
@@ -1422,7 +1446,7 @@ int main(int argc, char **argv) {
                         else fprintf(out, "%s,%lld,%.5f,%d,%.1f,%lld\n",
                                      GWORD[g], GUESSES(total),
                                      (double)GUESSES(total) / NSTR,
-                                     depth, dt, UNS(total));
+                                     used, dt, UNS(total));
                         fflush(out);
                     }
                 }
