@@ -638,7 +638,10 @@ Carlo, so its numbers carry a standard error and are not comparable with any
   per game, so a Ctrl-C keeps the games already played (but writes no summary).
 - **`python3 tools/multiwordle_report.py` is the standing status report** — the
   (k, n) grid at one sample size, plus `--all` for one row per file and `--trials T`
-  to pick the sample size. It READS the summary lines each run wrote, recomputing
+  to pick the sample size. **The grid shows BARE MEANS** (user's preference,
+  2026-09-02); `--stderr` puts the standard errors back, `--all` always carries them,
+  and each CSV records its own — so check a difference against them, not against the
+  digits on screen. It READS the summary lines each run wrote, recomputing
   nothing, so it cannot disagree with its source. `n` is the opening's word count,
   read off the filename. **Compare down a column only**: a different opening is a
   different strategy, and same-size openings can come from rankings of very different

@@ -1,6 +1,7 @@
 """Standing status report for the multiwordle simulations: a table by k and n.
 
     python3 tools/multiwordle_report.py            # from math/
+    python3 tools/multiwordle_report.py --stderr   # show each mean's standard error
     python3 tools/multiwordle_report.py --trials 1000000   # only that sample size
     python3 tools/multiwordle_report.py --all      # every file, one row each
 
@@ -8,6 +9,11 @@ It READS the summary lines each run wrote into its own CSV and tabulates them.
 Nothing is recomputed here -- the mean and its standard error are the numbers the
 run itself reported, so this cannot disagree with the file it came from.  A run
 still in flight has no summary yet and is listed as RUNNING.
+
+THE GRID SHOWS BARE MEANS.  These are Monte Carlo estimates and every one of them
+has a standard error -- `--stderr` puts them back, `--all` always carries them,
+and each CSV records its own -- so before calling a difference real, check it
+against them rather than against the digits shown here.
 
 THE GRID IS BY (k, n), and n is the number of words in the OPENING, read off the
 filename.  Rows are only comparable down a column: a different opening is a
@@ -60,6 +66,7 @@ def grid(rows, trials, seed=0):
 
 
 def main(argv):
+    show_err = "--stderr" in argv
     if not os.path.isdir(DIR):
         raise SystemExit("no %s -- nothing has been run yet" % DIR)
     rows = scan()
@@ -87,28 +94,31 @@ def main(argv):
                          % (trials, ", ".join(str(x) for x in sizes)))
 
     ns = sorted(openings)
-    print("multiwordle: mean total guesses, t=%d, seed 0" % trials)
+    print("multiwordle: mean total guesses, t=%d, seed 0%s"
+          % (trials, "" if show_err else "  (--stderr for the standard errors)"))
     print("openings by n (the head of that size's singletons ranking):")
     for n in ns:
         for opening in sorted(openings[n]):
             print("  n=%d  %s" % (n, opening))
     print()
-    print("k    " + "".join("n=%-17d" % n for n in ns))
+    w = 19 if show_err else 12
+    print("k    " + "".join(("n=%-" + str(w - 2) + "d") % n for n in ns))
     for k in sorted({k for (k, _) in cells}):
         line = "%-5d" % k
         for n in ns:
             v = cells.get((k, n), "absent")
-            line += "%-19s" % ("--" if v == "absent" else "RUNNING" if v is None
-                               else "%s +/- %s" % (v[0], v[1]))
+            line += ("%-" + str(w) + "s") % (
+                "--" if v == "absent" else "RUNNING" if v is None
+                else "%s +/- %s" % (v[0], v[1]) if show_err else v[0])
         print(line.rstrip())
     print()
     print("min / median / max")
-    print("k    " + "".join("n=%-17d" % n for n in ns))
+    print("k    " + "".join("n=%-15d" % n for n in ns))
     for k in sorted({k for (k, _) in cells}):
         line = "%-5d" % k
         for n in ns:
             v = cells.get((k, n), "absent")
-            line += "%-19s" % ("--" if v == "absent" else "RUNNING" if v is None
+            line += "%-17s" % ("--" if v == "absent" else "RUNNING" if v is None
                                else "%s/%s/%s" % (v[2], v[3], v[4]))
         print(line.rstrip())
     return 0
