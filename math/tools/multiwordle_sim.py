@@ -3,10 +3,12 @@
 Run it through the wrapper, which sets --out and tees a log:
 
     bash solver/run-multiwordle.sh -k 4 -t 10000            # from math/, or anywhere
-    bash solver/run-multiwordle.sh -k 4 -t 10000 --seed 7
+    bash solver/run-multiwordle.sh -k 4 -t 10000 -n 2        # open with the top PAIR
+    bash solver/run-multiwordle.sh -k 4 -t 10000 -n 3 --seed 7
     bash solver/run-multiwordle.sh -k 4 -t 10000 --openers "clint soare"
-    bash solver/run-multiwordle.sh -k 4 -t 10000 \
-        --openers-from data/shared/singletons/pair_singletons.csv
+
+The wrapper's -n names the SIZE of the opening (default 1) and resolves it against
+the singletons ranking for that size, so no opening word is hardcoded anywhere.
 
 WHAT THIS MEASURES, precisely: the EXPECTED TOTAL GUESSES to solve all k boards,
 over random draws of the k answers AND over the strategy's own coin flips.  The

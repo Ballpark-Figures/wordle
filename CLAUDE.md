@@ -609,16 +609,25 @@ Carlo, so its numbers carry a standard error and are not comparable with any
   about the k-board total, and it is not even unique (`rotan` also scores 41; among
   answer words `brute`/`chant` tie at 40). The user knows and chose it deliberately.
   Say "the singleton-ranked opening", never "the best opening".
-  - **`--openers-from FILE` derives it from a committed ranking** — the first data
-    row, every leading `word*` column — so one flag covers a word, a pair, a triple
-    or a quad, and the CSV records the source path. Prefer it over retyping a result.
+  - **`-n N` (default 1) names the SIZE of the opening** and resolves it against that
+    size's singletons ranking — `guess_`/`pair_`/`triple_singletons.csv` for 1/2/3 —
+    so **no opening word is hardcoded anywhere**; the words it resolved to are echoed,
+    recorded in the CSV header with their source path, and land in the filename.
+    `--openers-from FILE` is the same mechanism pointed at any ranking CSV (first data
+    row, every leading `word*` column).
+  - **`-n 4` and up REFUSE, and that is deliberate.** Every quad/quint run is written
+    under a name recording its own restriction (`--disjoint`, `--min-letters`,
+    exhaustive vs truncated) and those are DIFFERENT QUESTIONS, not variants of one —
+    so the wrapper lists what is on disk and makes the user pick with `--openers-from`
+    rather than guessing. Settle which quad ranking is canonical before wiring one in.
   - **WORDS AND PAIRS ARE EXHAUSTIVE; TRIPLES AND QUADS ARE GREEDY SCREENS**
     (`solver/run-singles.sh` says so). So `clint soare` IS the top pair, but a
     triple/quad head is "best of those screened" — never call such a run "the best
     triple/quad".
-- **Run it with `bash solver/run-multiwordle.sh -k K -t T` (from `math/`)**, attached,
-  same tee'd-log rules as the sweeps. Other knobs: `--seed`, and one of `--opener W`
-  (repeatable) / `--openers "A B"` / `--openers-from FILE`.
+- **Run it with `bash solver/run-multiwordle.sh -k K -t T [-n N]` (from `math/`)**,
+  attached, same tee'd-log rules as the sweeps. Other knobs: `--seed`, and to name an
+  opening explicitly, `--opener W` (repeatable) / `--openers "A B"` / `--openers-from
+  FILE`.
   `tools/multiwordle_sim.py` REFUSES to start without `--out` AND without an opening.
   **Each (k, opening, t, seed) is a different sample and gets its own file** —
   `data/shared/multiwordle/k<K>_<opening words joined by ->_t<T>_s<SEED>.csv`, one row

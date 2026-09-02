@@ -2,9 +2,9 @@
 # Simulate MULTIWORDLE games attached, with live output in this terminal.
 #
 #     bash solver/run-multiwordle.sh -k 4 -t 10000            # from math/, or anywhere
-#     bash solver/run-multiwordle.sh -k 4 -t 10000 --seed 7
+#     bash solver/run-multiwordle.sh -k 4 -t 10000 -n 2        # open with the top PAIR
+#     bash solver/run-multiwordle.sh -k 4 -t 10000 -n 3 --seed 7
 #     bash solver/run-multiwordle.sh -k 4 -t 10000 --openers "clint soare"
-#     bash solver/run-multiwordle.sh -k 4 -t 10000 --openers-from PAIRS_CSV
 #
 # WHAT THIS MEASURES, precisely:
 #
@@ -38,21 +38,32 @@
 # is currently exploring, chosen deliberately; change it and the result lands in
 # its own file.
 #
-# THREE WAYS TO NAME THE OPENING, all landing in their own output file:
+# FOUR WAYS TO NAME THE OPENING, all landing in their own output file:
 #
+#   -n N                   the head of the N-word singletons ranking.  DEFAULT 1,
+#                          so a plain run opens with the top single word and no
+#                          word is hardcoded anywhere -- the ranking is the source
+#                          of truth, and the words it resolved to are echoed and
+#                          land in the output filename.
 #   --opener WORD          one word; repeat the flag for more
 #   --openers "A B"        the whole sequence in one argument
-#   --openers-from FILE    the FIRST DATA ROW of a singletons ranking CSV, using
-#                          every leading word column -- so the same flag gives a
-#                          word, a pair, a triple or a quad, and the run records
-#                          which file it came from.  Prefer this over retyping a
-#                          result: the ranking stays the source of truth.
+#   --openers-from FILE    the FIRST DATA ROW of any singletons ranking CSV, using
+#                          every leading word column.  This is what -n resolves to;
+#                          use it directly when a size has several rankings and
+#                          you must pick one.
 #
-# THE RANKING BEHIND --openers-from IS NOT ALWAYS AN OPTIMUM.  run-singles.sh
-# evaluates every word and every one of the 84,129,906 pairs, so those two heads
-# are exact; TRIPLES AND QUADS ARE GREEDY SCREENS and their heads are "best of
-# those screened", never the best opening.  Nothing here checks that, so do not
-# describe a triple/quad run as using "the best" opening.
+# WHICH FILE -n READS.  1, 2 and 3 have one canonical ranking each
+# (guess_/pair_/triple_singletons.csv).  FOUR AND UP DO NOT: every quad and quint
+# run is written under a name recording its own restriction (--disjoint,
+# --min-letters, exhaustive vs truncated), and those are DIFFERENT QUESTIONS, not
+# variants of one.  So -n 4 refuses and lists what is on disk rather than guessing;
+# pick one with --openers-from.
+#
+# THE RANKING IS NOT ALWAYS AN OPTIMUM.  run-singles.sh evaluates every word and
+# every one of the 84,129,906 pairs, so -n 1 and -n 2 are exact heads; TRIPLES AND
+# QUADS ARE GREEDY SCREENS and their heads are "best of those screened", never the
+# best opening.  Nothing here checks that, so do not describe a triple/quad run as
+# using "the best" opening.
 #
 # USE THIS RATHER THAN CALLING tools/multiwordle_sim.py DIRECTLY.  It sets --out
 # so the games outlive the terminal, names the file after every parameter that
@@ -69,12 +80,12 @@ MATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 K=""
 T=""
 SEED=0
-# The user's current choice (2026-09-02), rank 1 by singletons over the 2315.
-# The first --opener/--openers/--openers-from REPLACES it; further --opener
-# flags then append, so "--opener a --opener b" is the pair a b, not just b.
-OPENING=laten
-DEFAULTED=1
+# How many words the opening uses, resolved against the singletons rankings.
+# No word is defaulted here: -n 1 reads the head of guess_singletons.csv.
+NOPEN=1
+OPENING=""
 SOURCE=""
+EXPLICIT=0
 PROGRESS=""
 
 while [ $# -gt 0 ]; do
@@ -82,11 +93,10 @@ while [ $# -gt 0 ]; do
         -k|--boards)  K="$2";        shift 2 ;;
         -t|--trials)  T="$2";        shift 2 ;;
         --seed)       SEED="$2";     shift 2 ;;
-        --opener)     [ "$DEFAULTED" = 1 ] && OPENING=""
-                      DEFAULTED=0
-                      OPENING="${OPENING:+$OPENING }$2"; shift 2 ;;
-        --openers)    DEFAULTED=0; OPENING="$2";  shift 2 ;;
-        --openers-from) DEFAULTED=0; SOURCE="$2"; OPENING=""; shift 2 ;;
+        -n|--num-openers) NOPEN="$2"; shift 2 ;;
+        --opener)     EXPLICIT=1; OPENING="${OPENING:+$OPENING }$2"; shift 2 ;;
+        --openers)    EXPLICIT=1; OPENING="$2";  shift 2 ;;
+        --openers-from) EXPLICIT=1; SOURCE="$2"; shift 2 ;;
         --progress)   PROGRESS="$2"; shift 2 ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
     esac
@@ -101,6 +111,12 @@ esac
 case "$SEED" in
     ''|*[!0-9]*) echo "--seed must be a non-negative number" >&2; exit 1 ;;
 esac
+case "$NOPEN" in
+    ''|*[!0-9]*|0) echo "-n must be a positive number (how many opening words)" >&2; exit 1 ;;
+esac
+if [ "$EXPLICIT" = 1 ] && [ -n "$OPENING" ] && [ -n "$SOURCE" ]; then
+    echo "--openers-from cannot be combined with --opener/--openers" >&2; exit 1
+fi
 
 cd "$MATH" || exit 1
 
@@ -110,9 +126,28 @@ PY=../.venv/bin/python
     echo "no data/local/patterns/patterns.npy -- run '$PY build_patterns.py' first" >&2
     exit 1; }
 
-if [ -n "$SOURCE" ] && [ -n "$OPENING" ]; then
-    echo "--openers-from cannot be combined with --opener/--openers" >&2; exit 1
+SINGLES=data/shared/singletons
+if [ "$EXPLICIT" = 0 ]; then
+    # -n names a SIZE; the ranking for that size names the words.
+    case "$NOPEN" in
+        1) SOURCE=$SINGLES/guess_singletons.csv ;;
+        2) SOURCE=$SINGLES/pair_singletons.csv ;;
+        3) SOURCE=$SINGLES/triple_singletons.csv ;;
+        *) case "$NOPEN" in
+               4) PFX=quad ;; 5) PFX=quint ;; 6) PFX=sextet ;; *) PFX="" ;;
+           esac
+           echo "-n $NOPEN has no single canonical ranking: every run at that size" >&2
+           echo "  is written under a name recording its own restriction, and those" >&2
+           echo "  are different questions.  Pick one with --openers-from:" >&2
+           ls -1 $SINGLES/${PFX:-nothing}_singletons*.csv 2>/dev/null | sed 's/^/    /' >&2
+           [ -n "$PFX" ] || echo "    (no ranking of that size exists)" >&2
+           exit 1 ;;
+    esac
+    [ -f "$SOURCE" ] || {
+        echo "no $SOURCE -- build it with 'bash solver/run-singles.sh' first" >&2
+        exit 1; }
 fi
+
 if [ -n "$SOURCE" ]; then
     [ -f "$SOURCE" ] || { echo "no such ranking file: $SOURCE" >&2; exit 1; }
     case "$SOURCE" in
@@ -122,6 +157,13 @@ if [ -n "$SOURCE" ]; then
     # simulator re-reads the same first data row and records the source path.
     OPENING=$(awk -F, '!/^#/ && NF { if (h == "") { for (i = 1; i <= NF; i++) if ($i ~ /^word/) c = c " " i; h = 1; next } n = split(c, ix, " "); for (i = 1; i <= n; i++) printf "%s%s", (i > 1 ? " " : ""), $(ix[i]); print ""; exit }' "$SOURCE")
     [ -n "$OPENING" ] || { echo "could not read an opening from $SOURCE" >&2; exit 1; }
+    if [ "$EXPLICIT" = 0 ]; then
+        # The file must actually rank openings of the size -n asked for.
+        GOT=$(echo "$OPENING" | wc -w | tr -d ' ')
+        [ "$GOT" = "$NOPEN" ] || {
+            echo "$SOURCE ranks $GOT-word openings, but -n asked for $NOPEN" >&2
+            exit 1; }
+    fi
     echo "opening from $SOURCE: $OPENING"
 fi
 [ -n "$OPENING" ] || { echo "no opening words given" >&2; exit 1; }
