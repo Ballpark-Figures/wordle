@@ -386,6 +386,20 @@ its state arithmetic against `strspace.py` over a shared deterministic walk — 
 - **`MAXD` is an ARRAY BOUND, not a modelling limit** — it sizes the per-thread arena,
   which is indexed BY DEPTH so recursion levels cannot clobber each other. ~0.23 MB per
   thread per level, so raising it is cheap; it is 32, not optturns' 20.
+- **THE ROOT IS A BRANCHING POINT LIKE ANY OTHER — `--topk` restricts OPENERS too.**
+  `-k 1` examines exactly ONE opener, the best by the same ascending sum-of-squares rule
+  every other level uses; it does NOT sweep 12972. The winner is then the best of the K
+  openers EXAMINED, a deliberately weaker claim than the exact sweep's, and it is what
+  lets a small K finish. `solver/README.md` states this for `optturns`; strturns follows
+  it. (Written down because strturns was built swept-everything and had to be corrected.)
+- **ONE ranking rule, in `GuessKey` + `cmp_guesskey`, used by the per-node loop, the
+  `d == 2` form AND the sweep.** `--topk` ranks by ascending sum of squared bin sizes
+  (evenest split first); the exact search ranks by lower bound; ties ALWAYS break on the
+  lowest guess index. Do not add a fourth ordering — extend this one.
+  - **Never pack the key beside the guess index.** Doing so forced a `ss >> 12`, which
+    made every guess TIE at any node under ~64 candidates — i.e. almost all of them —
+    silently turning `--topk` into alphabetical order. Same bug shape as an
+    `lb * MAXG + g` overflow in the sweep. Use the comparator.
 - **`--topk` limits which guesses are RECURSED INTO, not which are PROFILED.** Pass 1
   scans all 12972 guesses x 243 patterns at EVERY node whatever `n` is, so a 3-candidate
   state costs the same ~10 ms as a big one. MEASURED at depth 19: ~95 nodes/s with almost

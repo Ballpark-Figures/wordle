@@ -996,8 +996,8 @@ int main(int argc, char **argv) {
      * nothing is biased by the default. */
     if (!sweep && nopen == 0) {
         sweep = 1;
-        fprintf(stderr, "no --opener given: sweeping every opener in derived order "
-                        "(there is no default starter, and there should not be one)\n");
+        fprintf(stderr, "no --opener given: ranking openers by the same rule every "
+                        "other level uses (there is no default starter)\n");
     }
 
     if (!sweep) {
@@ -1078,12 +1078,30 @@ int main(int argc, char **argv) {
             nord++;
         }
         qsort(ord, nord, sizeof(GuessKey), cmp_guesskey);
+        /* THE ROOT IS A BRANCHING POINT LIKE ANY OTHER.  --topk restricts the
+         * guesses considered at EVERY branching point, and the first guess is not
+         * special -- so -k 1 examines exactly ONE opener, the best by the same
+         * sum-of-squares rule every other level uses, not all 12972.  Sweeping
+         * the whole list under a beam would apply the beam everywhere except
+         * where it is most expensive.  (solver/README.md says this for optturns;
+         * it is the same rule here.)
+         *
+         * The consequence is a weaker claim, deliberately: the winner is the best
+         * of the K openers EXAMINED, not the best of all NG -- which is exactly
+         * what lets a small K finish. */
+        if (TOPK > 0 && TOPK < nord) {
+            fprintf(stderr, "topk %d: examining %d opener%s, not all %d "
+                    "(the root is a branching point too)\n",
+                    TOPK, TOPK, TOPK == 1 ? "" : "s", nord);
+            nord = TOPK;
+        }
         if (nord)
             /* NB the COMPLETION order will not match this: the sweep is an
              * omp for over the openers, so they finish as threads free up. */
-            fprintf(stderr, "sweep order: %d openers by ascending %s (first %s, key %lld)"
+            fprintf(stderr, "sweep: %d opener%s by ascending %s (first %s, key %lld)"
                     " -- completions arrive out of order, %d at a time\n",
-                    nord, TOPK > 0 ? "root sum of squares" : "root lower bound",
+                    nord, nord == 1 ? "" : "s",
+                    TOPK > 0 ? "root sum of squares" : "root lower bound",
                     GWORD[ord[0].g], ord[0].key,
 #ifdef _OPENMP
                     omp_get_max_threads()
