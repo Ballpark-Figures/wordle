@@ -584,12 +584,18 @@ k hidden answers, one per board, every guess played on every unsolved board at o
 Carlo, so its numbers carry a standard error and are not comparable with any
 `optturns`-family optimum.
 - **The strategy, exactly** (`math/multiwordle.py` states it and is the source of truth):
-  fixed opener on turn 1; then each turn take the unsolved board with the FEWEST
-  remaining candidates (ties by BOARD INDEX), and guess one of its candidates
-  UNIFORMLY AT RANDOM. A board is solved only when its answer is actually PLAYED —
-  narrowing it to one word still costs the naming guess — and a word played for one
-  board solves any other board it happens to match (**incidental solves count**).
-  Score = total guesses until all k are solved, opener included.
+  a fixed OPENING SEQUENCE of one or more words played BLIND in order; then each
+  turn take the unsolved board with the FEWEST remaining candidates (ties by BOARD
+  INDEX), and guess one of its candidates UNIFORMLY AT RANDOM. A board is solved
+  only when its answer is actually PLAYED — narrowing it to one word still costs the
+  naming guess — and a word played for one board solves any other board it happens
+  to match (**incidental solves count**). Score = total guesses until all k are
+  solved, opening included.
+- **BLIND MEANS BLIND**: every word of a multi-word opening is played whatever the
+  boards look like, stopping early only if all k are already solved. That matches
+  how the singleton ranking for pairs/triples is defined (two answers share a bucket
+  iff they reply identically to EVERY word), so the partition the greedy inherits
+  does not depend on the order — only an incidental solve can.
 - **THERE IS NO GUESS CAP, and none is needed** — the targeted board shrinks every
   turn (an all-green reply solves it; any other reply eliminates the word just
   played), so the game terminates on its own. **So this is expected guesses
@@ -597,28 +603,37 @@ Carlo, so its numbers carry a standard error and are not comparable with any
   subject to a guarantee" every optturns/hardturns/ansall total reports. Never put
   the two in one table. `_MAX_TURNS` in `play_game` is a runaway ASSERTION derived
   from that bound, not a modelling cap.
-- **THE OPENER IS AN INPUT, NOT A RESULT, and the code never defaults it.** The
+- **THE OPENING IS AN INPUT, NOT A RESULT, and the code never defaults it.** The
   wrapper supplies `laten` — rank 1 of `tools/singletons.py` over the 2315 (user's
   choice, 2026-09-02) — but that is a SINGLE-BOARD quantity that optimises nothing
   about the k-board total, and it is not even unique (`rotan` also scores 41; among
   answer words `brute`/`chant` tie at 40). The user knows and chose it deliberately.
-  Say "the singleton-ranked opener", never "the best opener".
+  Say "the singleton-ranked opening", never "the best opening".
+  - **`--openers-from FILE` derives it from a committed ranking** — the first data
+    row, every leading `word*` column — so one flag covers a word, a pair, a triple
+    or a quad, and the CSV records the source path. Prefer it over retyping a result.
+  - **WORDS AND PAIRS ARE EXHAUSTIVE; TRIPLES AND QUADS ARE GREEDY SCREENS**
+    (`solver/run-singles.sh` says so). So `clint soare` IS the top pair, but a
+    triple/quad head is "best of those screened" — never call such a run "the best
+    triple/quad".
 - **Run it with `bash solver/run-multiwordle.sh -k K -t T` (from `math/`)**, attached,
-  same tee'd-log rules as the sweeps. `--seed` and `--opener` are the other knobs.
-  `tools/multiwordle_sim.py` REFUSES to start without `--out` AND without `--opener`.
-  **Each (k, opener, t, seed) is a different sample and gets its own file** —
-  `data/shared/multiwordle/k<K>_<opener>_t<T>_s<SEED>.csv`, one row per game (answers
-  + full guess sequence) with the summary as trailing `#` lines; log under
-  `data/local/multiwordle/`. Re-running the same four reproduces the file exactly.
+  same tee'd-log rules as the sweeps. Other knobs: `--seed`, and one of `--opener W`
+  (repeatable) / `--openers "A B"` / `--openers-from FILE`.
+  `tools/multiwordle_sim.py` REFUSES to start without `--out` AND without an opening.
+  **Each (k, opening, t, seed) is a different sample and gets its own file** —
+  `data/shared/multiwordle/k<K>_<opening words joined by ->_t<T>_s<SEED>.csv`, one row
+  per game (answers + full guess sequence) with the summary as trailing `#` lines; log
+  under `data/local/multiwordle/`. Re-running the same four reproduces the file exactly.
 - **It is a Monte Carlo estimate** — the summary always prints a standard error, and
   two runs differing by less than a couple of SEs have measured nothing. Rows flush
   per game, so a Ctrl-C keeps the games already played (but writes no summary).
 - **`python3 tools/checkmultiwordle.py` is the GATE**: it replays the same seeds
   through an independent implementation that keeps candidates as LISTS OF WORDS and
   recomputes every feedback from the strings with `wordle.pattern` — no matrix, no
-  bitmaps — and demands byte-identical guess sequences at k=1/2/3/5. It also counts
-  how many turns actually hit a BOARD TIE and warns if none did, so a passing run
-  cannot silently mean the tie-break was never exercised. Run it alongside
+  bitmaps — and demands byte-identical guess sequences at k=1/2/3/5, across openings
+  of one, two, three and four words. It also tallies how many turns actually hit a
+  BOARD TIE and FAILS if none did anywhere, so a passing run cannot silently mean the
+  tie-break was never exercised. Run it alongside
   `solver/validate.sh` and `tools/checkpatterns.py`.
 
 ## Gameplay layout

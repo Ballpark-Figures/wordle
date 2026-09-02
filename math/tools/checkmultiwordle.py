@@ -13,8 +13,10 @@ lookup in PAT.  The reference here shares NONE of that -- it keeps candidates as
 LISTS OF WORDS and recomputes every feedback from the strings with
 `wordle.pattern`, the primitive the matrix itself was built from.  The two are
 driven from the same seed and must produce byte-identical guess sequences, which
-tests the strategy (board choice, tie-break, candidate pick, incidental solves,
-when a board counts as solved) and the answer-index-to-guess-index map at once.
+tests the strategy (blind opening, board choice, tie-break, candidate pick,
+incidental solves, when a board counts as solved) and the answer-index-to-guess-
+index map at once.  Multi-word openings are covered too, since a blind opening
+that stops early -- or one word too many -- changes the sequence immediately.
 
 WHY THE SEEDS LINE UP.  Both consume the generator in the same order -- the k
 answers, then one draw per non-opener guess -- and both index into their
@@ -22,9 +24,11 @@ candidates in ANSWER-LIST ORDER, since the mystery list is sorted on disk and
 filtering preserves order.  So a divergence in either the game logic or the
 order of random draws shows up as a differing sequence, not as noise.
 
-THE TIE-BREAK IS COUNTED, not assumed exercised: the run reports how many turns
-had two or more unsolved boards tied for fewest candidates, and warns if that
-never happened (in which case the differential says nothing about tie-breaking).
+THE TIE-BREAK IS COUNTED, not assumed exercised: the run tallies how many turns
+had two or more unsolved boards tied for fewest candidates, per k, and FAILS if
+that never happened anywhere (in which case the differential would say nothing
+about tie-breaking).  The tally is over the whole run rather than per k, since
+whether a particular k and seed happens to produce a tie is luck.
 """
 
 import os
@@ -39,7 +43,7 @@ from multiwordle import answer_to_guess, draw_answers, play_game  # noqa: E402
 from wordle import ALL_GREEN, load_words, pattern  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from multiwordle_sim import summarise  # noqa: E402
+from multiwordle_sim import openers_from, summarise  # noqa: E402
 
 FAILS = []
 
@@ -50,7 +54,7 @@ def check(name, ok, detail=""):
         FAILS.append(name)
 
 
-def reference_game(mystery, answer_words, opener, rng, ties):
+def reference_game(mystery, answer_words, opening, rng, ties):
     """Same strategy, from strings only: no pattern matrix, no bitmaps.
 
     Appends one entry to `ties` per turn where two or more unsolved boards tied
@@ -60,7 +64,8 @@ def reference_game(mystery, answer_words, opener, rng, ties):
     cands = [list(mystery) for _ in range(k)]     # answer-list order, preserved
     solved = [False] * k
     played = []
-    g = opener
+    pending = list(opening)
+    g = pending.pop(0)
     while True:
         played.append(g)
         for j in range(k):
@@ -73,6 +78,9 @@ def reference_game(mystery, answer_words, opener, rng, ties):
             cands[j] = [w for w in cands[j] if pattern(g, w) == fb]
         if all(solved):
             return played
+        if pending:
+            g = pending.pop(0)          # blind: the opening is played out
+            continue
         live = [(len(cands[j]), j) for j in range(k) if not solved[j]]
         best = min(live)[0]
         if sum(1 for n, _ in live if n == best) > 1:
@@ -94,32 +102,68 @@ def main(argv):
     check("ans2g maps every answer to its own guess word",
           all(mystery[i] == guesses[ans2g[i]] for i in range(len(mystery))))
 
-    opener = "laten"
-    opener_g = guesses.index(opener)
+    top_pair = openers_from("data/shared/singletons/pair_singletons.csv")
+    check("--openers-from reads a pair off the singletons ranking",
+          len(top_pair) == 2 and all(w in guesses for w in top_pair),
+          " ".join(top_pair))
+
+    # openings of one, two, three and four words -- the single word and the
+    # exact top pair, then heads of the (screened) triple and quad rankings
+    openings = [
+        ["laten"],
+        ["clint", "soare"],
+        ["canst", "horde", "blimp"],
+        ["bandy", "chimp", "fogle", "wurst"],
+    ]
+    opening = openings[0]
 
     # --- the differential: same seed, two independent implementations --------
-    ks = [1, 2, 3, 5]
-    for k in ks:
-        fast, ref = [], []
-        ties = []
-        rng = np.random.default_rng(20260902 + k)
-        for _ in range(games):
-            answer_idx = draw_answers(len(mystery), k, rng)
-            fast.append([guesses[g] for g in
-                         play_game(pat, ans2g, answer_idx, opener_g, rng)])
-        rng = np.random.default_rng(20260902 + k)
-        for _ in range(games):
-            answer_idx = draw_answers(len(mystery), k, rng)
-            ref.append(reference_game(mystery, [mystery[a] for a in answer_idx],
-                                      opener, rng, ties))
-        same = fast == ref
-        check("k=%d: %d games identical to the string replay" % (k, games), same,
-              "" if same else "first divergence at game %d"
-              % next(i for i in range(games) if fast[i] != ref[i]))
-        if k > 1:
-            check("k=%d: board tie-break was exercised" % k, bool(ties),
-                  "%d tied turns" % len(ties) if ties
-                  else "NO tied turns -- the differential says nothing about it")
+    ties_by_k = {}
+    for k in [1, 2, 3, 5]:
+        for opening in openings:
+            openers_g = [guesses.index(w) for w in opening]
+            fast, ref = [], []
+            ties = []
+            seed = 20260902 + k + 100 * len(opening)
+            rng = np.random.default_rng(seed)
+            for _ in range(games):
+                answer_idx = draw_answers(len(mystery), k, rng)
+                fast.append([guesses[g] for g in
+                             play_game(pat, ans2g, answer_idx, openers_g, rng)])
+            rng = np.random.default_rng(seed)
+            for _ in range(games):
+                answer_idx = draw_answers(len(mystery), k, rng)
+                ref.append(reference_game(mystery,
+                                          [mystery[a] for a in answer_idx],
+                                          opening, rng, ties))
+            same = fast == ref
+            check("k=%d, %d-word opening: %d games identical to the string replay"
+                  % (k, len(opening), games), same,
+                  "" if same else "first divergence at game %d"
+                  % next(i for i in range(games) if fast[i] != ref[i]))
+            ties_by_k[k] = ties_by_k.get(k, 0) + len(ties)
+
+    check("the board tie-break was exercised somewhere in the differential",
+          sum(ties_by_k.values()) > 0,
+          "tied turns by k: " + ", ".join("k=%d:%d" % kv
+                                          for kv in sorted(ties_by_k.items())))
+
+    # every word of a blind opening is played, even one that cannot help
+    opening = ["clint", "soare"]
+    openers_g = [guesses.index(w) for w in opening]
+    rng = np.random.default_rng(5)
+    blind = 0
+    for _ in range(20):
+        answer_idx = draw_answers(len(mystery), 2, rng)
+        played = [guesses[g] for g in
+                  play_game(pat, ans2g, answer_idx, openers_g, rng)]
+        if played[:2] == opening:
+            blind += 1
+    check("every word of a blind opening is played, in order", blind == 20,
+          "%d/20 games" % blind)
+
+    opening = ["laten"]
+    opener_g = guesses.index("laten")
 
     # --- invariants on a wider sample of games ------------------------------
     k = 4
@@ -127,7 +171,7 @@ def main(argv):
     named = atleast = 0
     for _ in range(40):
         answer_idx = draw_answers(len(mystery), k, rng)
-        played = play_game(pat, ans2g, answer_idx, opener_g, rng)
+        played = play_game(pat, ans2g, answer_idx, [opener_g], rng)
         words = [guesses[g] for g in played]
         if all(mystery[a] in words for a in answer_idx):
             named += 1
@@ -139,7 +183,7 @@ def main(argv):
     # from every board it did not solve) and this opener is not an answer word,
     # so the sequence holds the opener plus k distinct answers at minimum.
     check("no game finishes in fewer than 1 + k guesses (opener not an answer)",
-          opener not in mystery and atleast == 40, "%d/40 games" % atleast)
+          "laten" not in mystery and atleast == 40, "%d/40 games" % atleast)
 
     # --- determinism --------------------------------------------------------
     a = np.random.default_rng(99)
@@ -147,8 +191,8 @@ def main(argv):
     ia, ib = draw_answers(len(mystery), 3, a), draw_answers(len(mystery), 3, b)
     check("same seed reproduces the same game",
           list(ia) == list(ib)
-          and play_game(pat, ans2g, ia, opener_g, a)
-          == play_game(pat, ans2g, ib, opener_g, b))
+          and play_game(pat, ans2g, ia, [opener_g], a)
+          == play_game(pat, ans2g, ib, [opener_g], b))
 
     # --- the summary totals what it summarises ------------------------------
     scores = [7, 9, 8, 12, 9, 10]

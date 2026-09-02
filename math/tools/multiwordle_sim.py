@@ -1,10 +1,12 @@
-"""Simulate multiwordle games under the fixed-opener / smallest-board strategy.
+"""Simulate multiwordle games under the fixed-opening / smallest-board strategy.
 
 Run it through the wrapper, which sets --out and tees a log:
 
     bash solver/run-multiwordle.sh -k 4 -t 10000            # from math/, or anywhere
     bash solver/run-multiwordle.sh -k 4 -t 10000 --seed 7
-    bash solver/run-multiwordle.sh -k 4 -t 10000 --opener rotan
+    bash solver/run-multiwordle.sh -k 4 -t 10000 --openers "clint soare"
+    bash solver/run-multiwordle.sh -k 4 -t 10000 \
+        --openers-from data/shared/singletons/pair_singletons.csv
 
 WHAT THIS MEASURES, precisely: the EXPECTED TOTAL GUESSES to solve all k boards,
 over random draws of the k answers AND over the strategy's own coin flips.  The
@@ -13,7 +15,7 @@ math/multiwordle.py -- read that first; this file is the trial loop around it.
 
 IT IS A MONTE CARLO ESTIMATE, so it comes with a standard error and the summary
 always prints one.  Two runs differing by less than a couple of SEs have not
-measured a difference.  Everything is reproducible from (k, opener, t, seed),
+measured a difference.  Everything is reproducible from (k, opening, t, seed),
 which is why all four are in the output filename: a re-run of the same four
 reproduces the same file exactly, and a different seed is a different sample and
 gets its own file rather than being appended to an existing one.
@@ -21,9 +23,18 @@ gets its own file rather than being appended to an existing one.
 Rows are flushed as they are played, so a Ctrl-C keeps every game finished so
 far; the trailing `#` summary lines are written only on a clean finish.
 
-Answers are drawn from the 2315 mystery words; the opener is the only guess that
-need not be one of them, since every later guess is by construction a candidate
-of some board.
+Answers are drawn from the 2315 mystery words; the opening words are the only
+guesses that need not be among them, since every later guess is by construction
+a candidate of some board.
+
+--openers-from reads the FIRST DATA ROW of a singletons ranking and takes every
+leading `word*` column as the opening -- so the same flag supplies a single word,
+a pair, a triple or a quad, and the result file records which file it came from.
+It relies on that file's own ordering, and the ordering is only as good as the
+run behind it: words and pairs are exhaustive, so their heads are exact, but the
+triple and quad rankings are GREEDY SCREENS (see solver/run-singles.sh) and their
+heads are "best of those screened", never the best opening. Nothing here checks
+that, so do not describe such a run as using "the best" pair/triple/quad.
 """
 
 import os
@@ -41,10 +52,33 @@ from wordle import load_words  # noqa: E402
 COLUMNS = "game,guesses,answers,sequence"
 
 
+def openers_from(path):
+    """The opening named by the first data row of a singletons ranking CSV.
+
+    Takes every leading column whose name starts with `word`, so one file shape
+    covers guess_singletons (`word`), pair_ (`word1,word2`), triple_ and quad_.
+    """
+    header = None
+    with open(path) as f:
+        for line in f:
+            if line.startswith("#") or not line.strip():
+                continue
+            row = [c.strip() for c in line.rstrip("\n").split(",")]
+            if header is None:
+                header = row
+                cols = [i for i, c in enumerate(header) if c.startswith("word")]
+                if not cols:
+                    raise SystemExit("%s has no word column" % path)
+                continue
+            return [row[i] for i in cols]
+    raise SystemExit("%s has no data row" % path)
+
+
 def parse_args(argv):
     k = t = None
     seed = 0
-    opener = None
+    openers = []
+    source = None
     out = None
     progress = 1000
     i = 0
@@ -57,7 +91,12 @@ def parse_args(argv):
         elif a == "--seed":
             seed = int(argv[i + 1]); i += 2
         elif a == "--opener":
-            opener = argv[i + 1]; i += 2
+            openers.append(argv[i + 1]); i += 2
+        elif a == "--openers":
+            openers.extend(argv[i + 1].split()); i += 2
+        elif a == "--openers-from":
+            source = argv[i + 1]
+            openers.extend(openers_from(source)); i += 2
         elif a == "--out":
             out = argv[i + 1]; i += 2
         elif a == "--no-out":
@@ -70,20 +109,22 @@ def parse_args(argv):
         raise SystemExit("-k (number of boards) is required and must be >= 1")
     if t is None or t < 1:
         raise SystemExit("-t (number of trials) is required and must be >= 1")
-    if opener is None:
-        # The opener is an INPUT to this experiment, not something derived here,
+    if not openers:
+        # The opening is an INPUT to this experiment, not something derived here,
         # so it is never defaulted -- a silent default would make every result
         # file ambiguous about which strategy produced it.
         raise SystemExit(
-            "--opener is required: the opener is a parameter of the experiment.\n"
+            "an opening is required: it is a parameter of the experiment.\n"
             "Use the wrapper, which supplies one: bash solver/run-multiwordle.sh")
+    if len(set(openers)) != len(openers):
+        raise SystemExit("the opening repeats a word: %s" % " ".join(openers))
     if out is None:
         # The strturns lesson: a run that prints its answer and saves nothing is
         # a run lost.  Refuse rather than default.
         raise SystemExit(
             "--out is required (or --no-out to discard results deliberately).\n"
             "Use the wrapper, which sets it: bash solver/run-multiwordle.sh")
-    return k, t, seed, opener, out, progress
+    return k, t, seed, openers, source, out, progress
 
 
 def summarise(scores, k):
@@ -106,37 +147,44 @@ def summarise(scores, k):
 
 
 def main(argv):
-    k, t, seed, opener, out, progress = parse_args(argv)
+    k, t, seed, openers, source, out, progress = parse_args(argv)
 
     guesses = load_words("guess")
     answers = load_words("mystery")
-    if opener not in guesses:
-        raise SystemExit("opener %r is not in the 12972-word guess list" % opener)
+    for w in openers:
+        if w not in guesses:
+            raise SystemExit("opening word %r is not in the 12972-word guess list" % w)
     if k > len(answers):
         raise SystemExit("k=%d exceeds the %d answer words" % (k, len(answers)))
 
     pat = np.array(load_patterns())          # 12972 x 2315, ~30 MB, wants RAM
     ans2g = answer_to_guess(answers, guesses)
-    opener_g = guesses.index(opener)
+    openers_g = [guesses.index(w) for w in openers]
     rng = np.random.default_rng(seed)
 
     fh = None
     if out:
         os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
         fh = open(out, "w")
-        fh.write("# multiwordle, fixed opener then smallest-board greedy "
+        fh.write("# multiwordle, fixed opening then smallest-board greedy "
                  "(see math/multiwordle.py)\n")
-        fh.write("# boards=%d trials=%d opener=%s seed=%d\n" % (k, t, opener, seed))
+        fh.write("# boards=%d trials=%d opening=%s seed=%d\n"
+                 % (k, t, " ".join(openers), seed))
+        if source:
+            fh.write("# opening taken from the first data row of %s\n" % source)
         fh.write("# answers drawn without replacement from the 2315 mystery words; "
                  "no guess cap\n")
         fh.write(COLUMNS + "\n")
 
-    print("multiwordle: k=%d  trials=%d  opener=%s  seed=%d" % (k, t, opener, seed))
+    print("multiwordle: k=%d  trials=%d  opening=%s  seed=%d"
+          % (k, t, " ".join(openers), seed))
+    if source:
+        print("  opening from %s" % source)
     scores = []
     t0 = time.time()
     for game in range(t):
         answer_idx = draw_answers(len(answers), k, rng)
-        played = play_game(pat, ans2g, answer_idx, opener_g, rng)
+        played = play_game(pat, ans2g, answer_idx, openers_g, rng)
         scores.append(len(played))
         if fh:
             fh.write("%d,%d,%s,%s\n" % (
@@ -150,7 +198,8 @@ def main(argv):
 
     st = summarise(scores, k)
     lines = [
-        "trials %d, boards %d, opener %s, seed %d" % (t, k, opener, seed),
+        "trials %d, boards %d, opening %s, seed %d"
+        % (t, k, " ".join(openers), seed),
         "mean total guesses %.4f  +/- %.4f (standard error)"
         % (st["mean_guesses"], st["stderr"]),
         "sd %.4f   min %d   median %.1f   max %d"

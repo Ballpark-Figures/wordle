@@ -10,7 +10,9 @@ number of guesses until every board is solved, the opener included.
 
 THE STRATEGY IMPLEMENTED HERE, stated exactly, because it is the whole question:
 
-  1. Play a FIXED opener on turn 1 (the caller supplies it; see the note below).
+  1. Play a FIXED OPENING SEQUENCE of one or more words, in order, BLIND -- each
+     is played whatever the boards look like, the caller supplies them, and the
+     sequence stops early only if every board is already solved.
   2. Among the boards still unsolved, take the one with the FEWEST remaining
      candidates, breaking ties by BOARD INDEX (lowest wins).
   3. Guess a word drawn UNIFORMLY AT RANDOM from that board's remaining
@@ -24,14 +26,25 @@ answers still gives a distribution rather than a number.
 INCIDENTAL SOLVES COUNT.  The word played for board A can happen to be board B's
 answer; B is then solved too, for free, on that same turn.
 
-THE OPENER IS AN INPUT, NOT A RESULT.  It is passed in and never defaulted here.
-The one the video is currently exploring is the top of the SINGLETON ranking
-(`tools/singletons.py`, data/shared/singletons/guess_singletons.csv) -- but that
-ranking is a SINGLE-BOARD quantity: it counts how many of a guess's feedback
-patterns are produced by exactly one of the 2315 answers.  It optimises nothing
-about the k-board total, and it is not even unique (laten and rotan tie at 41).
-So the opener is a parameter of the experiment, deliberately, and every result
-file records which one produced it.
+BLIND MEANS BLIND.  With a multi-word opening, the second and later words are
+played even when a board is already down to one candidate -- that is what makes
+them an OPENING rather than part of the greedy, and it is the same assumption
+the singleton ranking for pairs and triples is computed under (two answers share
+a bucket iff they reply identically to EVERY word of the opening, so the count
+does not depend on the order the words are played in).  Order is therefore
+irrelevant to the partition the greedy inherits; it can still matter to an
+incidental solve, which is why the sequence is played in the order given.
+
+THE OPENING IS AN INPUT, NOT A RESULT.  It is passed in and never defaulted
+here.  The ones the video is currently exploring are the heads of the SINGLETON
+rankings (`tools/singletons.py` and `solver/run-singles.sh`,
+data/shared/singletons/) -- but those are SINGLE-BOARD quantities: they count how
+many feedback patterns are produced by exactly one of the 2315 answers.  They
+optimise nothing about the k-board total, they are not unique (laten and rotan
+tie at 41), and beyond pairs they are not even exhaustive -- the triple and quad
+rankings are greedy screens, so their heads are "best of those screened".  So the
+opening is a parameter of the experiment, deliberately, and every result file
+records which one produced it.
 
 THERE IS NO GUESS CAP, and none is needed.  The word played is always a
 candidate of the targeted board, and whatever comes back it leaves that board
@@ -61,14 +74,14 @@ def answer_to_guess(answers, guesses):
     return np.array([pos[w] for w in answers], dtype=np.int32)
 
 
-def play_game(pat, ans2g, answer_idx, opener_g, rng):
+def play_game(pat, ans2g, answer_idx, openers_g, rng):
     """Play one k-board game under the strategy above.
 
     pat        (n_guess, n_answer) pattern matrix
     ans2g      answer index -> guess index (from answer_to_guess)
     answer_idx (k,) ANSWER indices of the hidden words, one per board
-    opener_g   GUESS index of the fixed opener
-    rng        numpy Generator; consumed once per non-opener guess
+    openers_g  GUESS indices of the fixed opening sequence, in play order
+    rng        numpy Generator; consumed once per guess past the opening
 
     Returns the list of GUESS indices played, in order.  Its length is the
     game's score.
@@ -78,9 +91,13 @@ def play_game(pat, ans2g, answer_idx, opener_g, rng):
     alive = np.ones((k, na), dtype=bool)
     solved = np.zeros(k, dtype=bool)
     played = []
-    max_turns = 1 + k * na          # runaway assertion, not a cap; see module doc
+    pending = [int(g) for g in openers_g]
+    if not pending:
+        raise ValueError("the opening sequence is empty")
+    # runaway assertion, not a cap; see the module docstring
+    max_turns = len(pending) + k * na
 
-    g = int(opener_g)
+    g = pending.pop(0)
     while True:
         played.append(g)
         if len(played) > max_turns:
@@ -100,6 +117,9 @@ def play_game(pat, ans2g, answer_idx, opener_g, rng):
 
         if solved.all():
             return played
+        if pending:
+            g = pending.pop(0)      # the opening is blind: play it out
+            continue
 
         counts = alive.sum(axis=1)
         counts[solved] = na + 1          # solved boards are out of the running
