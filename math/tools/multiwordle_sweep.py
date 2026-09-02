@@ -30,9 +30,10 @@ two-stage: sweep wide at small `-t` to screen, then re-run the top few at large
 `-t` (or a fresh seed) and compare those.  A word that leads both is a finding; a
 word that leads only the screen is a coin flip.
 
-ORDER.  Words are visited in list order, which is alphabetical, so --limit takes
-an alphabetical PREFIX rather than a sample or a "best first" cut.  Nothing about
-the order favours any word: every one gets the same trials and the same games.
+ORDER.  Words are visited in the LIST'S OWN ORDER -- alphabetical for the word
+lists, best-first for a shortlist cut by tools/multiwordle_shortlist.py -- so
+--limit takes a prefix of that, never a sample.  Nothing about the order favours
+any word: every one gets the same trials and the same games.
 
 RESUMABLE.  One CSV row per word, flushed as it is finished, and a re-run skips
 words already in the file -- so a Ctrl-C costs at most the word in flight.

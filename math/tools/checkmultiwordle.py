@@ -44,6 +44,7 @@ from wordle import ALL_GREEN, load_words, pattern  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from multiwordle_sim import openers_from, summarise  # noqa: E402
+from multiwordle_shortlist import shortlist  # noqa: E402
 from multiwordle_sweep import PICK_OFFSET, load_done, sweep_word  # noqa: E402
 
 FAILS = []
@@ -231,6 +232,21 @@ def main(argv):
           and abs(st["mean_per_board"] * 3 - st["mean_guesses"]) < 1e-9
           and st["trials"] == len(scores)
           and st["min"] == 7 and st["max"] == 12)
+
+    # --- the shortlist cut keeps exactly what it claims to -------------------
+    rows = [("aaa", 4.00, 0.10), ("bbb", 4.05, 0.20), ("ccc", 4.30, 0.10),
+            ("ddd", 3.90, 0.10), ("eee", 4.40, 0.50)]
+    # best is ddd 3.90 se 0.10; 2 SE of the BEST's se keeps mean <= 4.10
+    keep, _ = shortlist(rows, se=2)
+    check("shortlist --se cuts on the best word's standard error",
+          [w for w, _, _ in keep] == ["ddd", "aaa", "bbb"])
+    # with each word's own se, eee (0.50) survives at 4.40 <= 3.90 + 2*0.50
+    keep, _ = shortlist(rows, se=2, own_se=True)
+    check("shortlist --own-se is the more permissive cut",
+          set(w for w, _, _ in keep) == {"ddd", "aaa", "bbb", "eee"})
+    keep, _ = shortlist(rows, top=2)
+    check("shortlist --top keeps the N best, best first",
+          [w for w, _, _ in keep] == ["ddd", "aaa"])
 
     # --- the sweep's resume reads back what it wrote ------------------------
     tmp = os.path.join(os.path.dirname(os.path.abspath(__file__)),

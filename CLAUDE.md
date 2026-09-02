@@ -654,6 +654,15 @@ Carlo, so its numbers carry a standard error and are not comparable with any
     Sound use is two-stage: screen wide at small `-t`, then re-run the top few at large
     `-t` or a fresh `--seed`. A word leading both is a finding; a word leading only the
     screen is a coin flip. Never report a screen head as "the best opener".
+  - **STAGE 2 IS ONE FLAG: `--shortlist-from <stage-1 sweep>.csv`** (`--se N`, default
+    10 standard errors of the best word's mean; or `--shortlist-top N`). It cuts the
+    list with `tools/multiwordle_shortlist.py`, writes it to
+    `data/shared/multiwordle/shortlist_<stage-1 stem>_se<N>.txt` best-first, and sweeps
+    only those. **PASS A FRESH `--seed`** — the draw stream is seeded per word, so
+    stage 2 at stage 1's seed replays stage 1's games as its first `-t`, re-using the
+    very sample that chose the shortlist; the wrapper WARNS (not fatal) when the seeds
+    match. **Keep the cut generous**: discarding the true best word on one unlucky
+    sample is unrecoverable, while an over-wide cut only costs time.
 - **`python3 tools/multiwordle_report.py` is the standing status report** — the
   (k, n) grid at one sample size, plus `--all` for one row per file and `--trials T`
   to pick the sample size. **The grid shows BARE MEANS** (user's preference,
