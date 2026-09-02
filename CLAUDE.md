@@ -686,6 +686,57 @@ Carlo, so its numbers carry a standard error and are not comparable with any
   tie-break was never exercised. Run it alongside
   `solver/validate.sh` and `tools/checkpatterns.py`.
 
+## FoxiMax (a miss ADDS a word) — a SIMULATION of one greedy heuristic
+[foximax.com](https://foximax.com/): hangman-style LETTER guessing where a letter that
+appears in NONE of the words on the grid adds ANOTHER word to solve. Like multiwordle
+this MEASURES a named heuristic by Monte Carlo — nothing searches or optimises — so its
+numbers carry a standard error and are not comparable with any `optturns`-family optimum.
+`math/foximax.py` states the game and the strategy exactly and is the source of truth.
+- **The rules, as modelled** (the site's about page is vague; these are the user's calls,
+  2026-09-02): one word starts on the grid; a turn spends a LETTER, never twice; the
+  letter HITS if it is in at least one word IN PLAY and its positions are then revealed
+  in every word at once; it MISSES if in none, and a miss ADDS one word. **A newcomer
+  arrives with EVERY letter guessed so far already revealed in it — hits and earlier
+  misses alike**, so a "miss" is only ever a claim about the words in play AT THAT
+  MOMENT, and a letter missed on turn 3 may sit inside the word turn 3 brought in. The
+  game ends when every word on the grid is fully revealed; the **SCORE is the WORD COUNT
+  = 1 + misses**.
+- **THE REAL GAME'S EIGHT-WORD CAP IS NOT MODELLED** (deliberate, user's call). Play
+  always runs to completion, so no game is a loss and the mean is an UNCONSTRAINED
+  expected word count — the same footing as multiwordle and the adversarial hill-climb,
+  NOT the "optimum subject to a guarantee" every optturns/hardturns/ansall total reports.
+  A run's losing fraction on the real site would be the fraction scoring above 8; nothing
+  computes or reports that.
+- **NO CAP IS NEEDED FOR TERMINATION** — every turn spends a distinct letter, so 26 turns
+  reveal everything. `play_game` ASSERTS that bound rather than imposing one.
+- **WE USE OUR OWN LIST — the 2315 mystery words**, as every other sweep in this video
+  does. FoxiMax's list is unknown to us and its dailies are not random draws, so a number
+  here describes THIS game on THIS list, never foximax.com.
+- **The strategy: greedy, one step, no search.** Guess the unguessed letter maximising
+  `P(hit) = 1 - prod over boards (1 - fraction of that board's candidates containing it)`
+  — each board uniform over its own remaining candidates, boards treated as INDEPENDENT
+  (an approximation: the words are drawn without replacement), ties broken alphabetically.
+  **It is DETERMINISTIC** — the rng is consumed only by the word draws, so a game's score
+  is a function of its word sequence alone.
+- **A board's state is the POSITION SET of every guessed letter** (empty = absent), and
+  because of rule 4 every board carries the full history, newcomers included. So one
+  `(n_words, 26)` int bitmap array (`position_masks`) is the whole feedback model, and a
+  reveal is one vectorised compare — there is no pattern matrix and `patterns.npy` is not
+  needed here.
+- **Run it with `bash solver/run-foximax.sh -t T [--seed S] [--words mystery|guess|PATH]`**
+  (from `math/`), attached, same tee'd-log rules as the sweeps. `tools/foximax_sim.py`
+  REFUSES to start without `--out`. **Each (word list, t, seed) is a different sample and
+  gets its own file** — `data/shared/foximax/t<T>_s<SEED>[_<list>].csv`, one row per game
+  (letters played, hit/miss string, the words) with the summary as trailing `#` lines; log
+  under `data/local/foximax/`. Rows flush per game, so a Ctrl-C keeps the games played.
+- **`python3 tools/checkfoximax.py` is the GATE**: it replays the same seeds through an
+  independent implementation that keeps candidates as LISTS OF WORDS, recomputes reveals
+  from the STRINGS, and computes the probabilities in EXACT RATIONALS (`Fraction`) so a
+  float slip in the fast path shows rather than being shared — demanding identical letter
+  sequences, hit flags and grids. It also tallies misses and newcomers carrying an earlier
+  guess and FAILS if either never happened, so a pass cannot silently mean rule 4 went
+  untested. Run it alongside `solver/validate.sh` and `tools/checkpatterns.py`.
+
 ## Gameplay layout
 - (Describe this video's on-screen layout and the assets in `animations/assets/`.)
 
