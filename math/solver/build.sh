@@ -49,7 +49,12 @@ if [ $# -eq 0 ]; then
   # solver -- no pattern matrix and no candidate list, since neither survives
   # 11,881,376 answers; the candidate set is carried as CONSTRAINTS instead.
   gcc $BASE $OMP -o strturns strturns.c
-  echo "built ./optturns, ./hardturns, ./pairsplit and ./strturns  (5 letters, Wordle lists)"
+  # strguess is the S -> A and S -> W cells: EVERY 26**5 string is a legal guess,
+  # the answers are a word list.  Separate again because the guess side has no
+  # matrix and no 16-bit index -- patterns are computed inline over 11881376
+  # ordinals.
+  gcc $BASE $OMP -o strguess strguess.c
+  echo "built ./optturns, ./hardturns, ./pairsplit, ./strturns and ./strguess  (5 letters)"
   exit 0
 fi
 
