@@ -527,8 +527,13 @@ static long long solve(const State *st, uint64_t n, int d, Ctx *ctx);
 static double    G_T0, G_LAST;
 static long long G_NODES;
 static long long G_ANS_DONE, G_ANS_TOTAL;
-static int       G_BUCKETS_DONE, G_BUCKETS_TOTAL, G_OPENERS;
+static int       G_BUCKETS_DONE, G_BUCKETS_TOTAL, G_OPENERS, G_DEPTH;
 static long long G_GUESSES, G_UNSOLVED;
+/* The bucket currently being solved.  Without this the line sits at 0.0% for as
+ * long as the FIRST bucket takes -- and the first is the all-grey one, 21**5 =
+ * 4084101 answers, a third of the whole space -- which reads as a hang. */
+static int       G_CUR_BUCKET;
+static long long G_CUR_SIZE;
 
 static void progress(void) {
     double now = now_s();
@@ -537,14 +542,19 @@ static void progress(void) {
     double el = now - G_T0;
     if (G_ANS_TOTAL > 0) {
         double pct = 100.0 * (double)G_ANS_DONE / (double)G_ANS_TOTAL;
-        /* Extrapolate from settled answers, not from nodes: buckets differ
-         * enormously in cost, but the fraction of the space they cover is the
-         * thing actually being consumed. */
-        double eta = (G_ANS_DONE > 0) ? el * (G_ANS_TOTAL - G_ANS_DONE) / (double)G_ANS_DONE : 0.0;
-        fprintf(stderr, "[%7.0fs] %5.1f%% settled (%lld/%lld answers, %d/%d root buckets%s)"
-                "  so far %lld guesses, %lld unsolved  |  %lld nodes, %.0f/s, eta %.0fs\n",
-                el, pct, G_ANS_DONE, G_ANS_TOTAL, G_BUCKETS_DONE, G_BUCKETS_TOTAL,
-                G_OPENERS > 1 ? ", summed over openers in flight" : "",
+        char eta[32];
+        if (G_ANS_DONE > 0)
+            snprintf(eta, sizeof eta, "%.0fs",
+                     el * (G_ANS_TOTAL - G_ANS_DONE) / (double)G_ANS_DONE);
+        else
+            snprintf(eta, sizeof eta, "?");   /* nothing settled: say so, do not print 0 */
+        fprintf(stderr, "[%7.0fs] d=%d  %5.1f%% settled (%lld/%lld answers, %d/%d buckets%s)"
+                "  in bucket %d (%lld answers)  so far %lld guesses, %lld unsolved"
+                "  |  %lld nodes, %.0f/s, eta %s\n",
+                el, G_DEPTH, pct, G_ANS_DONE, G_ANS_TOTAL,
+                G_BUCKETS_DONE, G_BUCKETS_TOTAL,
+                G_OPENERS > 1 ? ", summed over openers" : "",
+                G_CUR_BUCKET, G_CUR_SIZE,
                 G_GUESSES, G_UNSOLVED, G_NODES, G_NODES / (el + 1e-9), eta);
     } else {
         fprintf(stderr, "[%7.0fs] %lld nodes, %.0f/s\n", el, G_NODES, G_NODES / (el + 1e-9));
@@ -943,6 +953,13 @@ static long long solve_opener(int g, int depth, Ctx *ctx) {
         State sub;
         if (meet(&sub, &root, &at[p]) && count_state(&sub)) nb++;
     }
+    /* Escalation calls this once per cap, so without a reset the totals would
+     * accumulate across passes and pass 2 would open at ~50% settled. */
+    if (G_OPENERS == 1) {
+        G_ANS_DONE = 0; G_BUCKETS_DONE = 0; G_BUCKETS_TOTAL = 0; G_ANS_TOTAL = 0;
+        G_GUESSES = 0; G_UNSOLVED = 0; G_CUR_BUCKET = 0; G_CUR_SIZE = 0;
+    }
+    G_DEPTH = depth;
 #ifdef _OPENMP
 #pragma omp atomic
 #endif
@@ -959,6 +976,9 @@ static long long solve_opener(int g, int depth, Ctx *ctx) {
         if (!meet(&sub, &root, &at[p])) continue;
         uint64_t c = count_state(&sub);
         if (!c) continue;
+        G_CUR_BUCKET = G_BUCKETS_DONE + 1;
+        G_CUR_SIZE = (long long)c;
+        progress();
         long long v = solve(&sub, c, depth - 1, ctx);
         if (v >= INF) return INF;
         total += v;
