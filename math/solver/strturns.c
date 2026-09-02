@@ -444,6 +444,82 @@ static int tt_get(uint64_t h0, uint64_t h1, int d, long long *val, int *bestg) {
     return 0;
 }
 
+/* Snapshot the table so a stopped run restarts warm.  At --tt-bits 26 this is
+ * 5.4 GB, and rebuilding it is the bulk of a long run's cost.
+ *
+ * The header records everything the stored VALUES depend on: the guess set size,
+ * the answer space, and the three flags that change what a value MEANS (--topk,
+ * --allow-unsolved, --by-class).  A table from one configuration read by another
+ * would return confidently wrong numbers rather than missing, so a mismatch is
+ * refused rather than warned about. */
+typedef struct {
+    char    magic[8];
+    int32_t bits, ng, topk, allow, byclass, pad;
+    int64_t nstr;
+} TTHead;
+
+static void tt_save(const char *path, int bits) {
+    if (TT_OFF) return;
+    FILE *f = fopen(path, "wb");
+    if (!f) { fprintf(stderr, "cannot write %s\n", path); return; }
+    TTHead h;
+    memset(&h, 0, sizeof h);
+    memcpy(h.magic, "STRTT001", 8);
+    h.bits = bits; h.ng = NG; h.topk = TOPK;
+    h.allow = ALLOW_UNSOLVED; h.byclass = BY_CLASS; h.nstr = NSTR;
+    size_t n = (size_t)TT_BUCKETS * 2;
+    if (fwrite(&h, sizeof h, 1, f) != 1 || fwrite(TT, sizeof(Entry), n, f) != n)
+        fprintf(stderr, "short write saving %s\n", path);
+    else
+        fprintf(stderr, "table saved to %s (%.2f GB)\n",
+                path, n * sizeof(Entry) / 1e9);
+    fclose(f);
+}
+
+static int tt_load(const char *path, int bits) {
+    FILE *f = fopen(path, "rb");
+    if (!f) return 0;
+    TTHead h;
+    if (fread(&h, sizeof h, 1, f) != 1 || memcmp(h.magic, "STRTT001", 8)) {
+        fprintf(stderr, "%s is not a strturns table -- ignoring\n", path);
+        fclose(f); return 0;
+    }
+    if (h.bits != bits || h.ng != NG || h.nstr != NSTR || h.topk != TOPK ||
+        h.allow != ALLOW_UNSOLVED || h.byclass != BY_CLASS) {
+        fprintf(stderr, "%s was written under a different configuration "
+                "(bits %d/%d, topk %d/%d, allow %d/%d, by-class %d/%d) -- REFUSING, "
+                "its values would mean something else\n",
+                path, h.bits, bits, h.topk, TOPK, h.allow, ALLOW_UNSOLVED,
+                h.byclass, BY_CLASS);
+        fclose(f); exit(1);
+    }
+    size_t n = (size_t)TT_BUCKETS * 2;
+    size_t got = fread(TT, sizeof(Entry), n, f);
+    fclose(f);
+    if (got != n) { fprintf(stderr, "%s is truncated -- ignoring\n", path); return 0; }
+    fprintf(stderr, "table loaded from %s (%.2f GB)\n", path, n * sizeof(Entry) / 1e9);
+    return 1;
+}
+
+/* Openers already recorded in the CSV, so a restart continues rather than
+ * redoing work that is already on disk. */
+static int load_done(const char *path, uint8_t *done) {
+    FILE *f = fopen(path, "r");
+    if (!f) return 0;
+    char line[512];
+    int n = 0;
+    while (fgets(line, sizeof line, f)) {
+        uint8_t code[L];
+        int i = 0;
+        while (i < L && line[i] >= 'a' && line[i] <= 'z') { code[i] = (uint8_t)(line[i] - 'a'); i++; }
+        if (i != L || line[L] != ',') continue;
+        int g = WORDIDX[strindex(code)];
+        if (g >= 0 && !done[g]) { done[g] = 1; n++; }
+    }
+    fclose(f);
+    return n;
+}
+
 static void tt_put(uint64_t h0, uint64_t h1, int d, long long val, int bestg, uint32_t work) {
     if (TT_OFF) return;
     Entry e; e.h0 = h0; e.val = val; e.h1x = h1 ^ (uint64_t)val; e.d = d;
@@ -1212,6 +1288,8 @@ static int load_words(const char *path) {
 
 int main(int argc, char **argv) {
     const char *datadir = "data", *outpath = NULL;
+    const char *ttload = NULL, *ttsave = NULL;
+    int no_out = 0;
     const char *openers[64]; int nopen = 0;
     int depth = 6, depthmax = -1, ttbits = 26, threads = 0, sweep = 0, selftest_n = 0;
 
@@ -1232,6 +1310,9 @@ int main(int argc, char **argv) {
             TOPK = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--threads") && i + 1 < argc) threads = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--out") && i + 1 < argc) outpath = argv[++i];
+        else if (!strcmp(argv[i], "--no-out")) no_out = 1;
+        else if (!strcmp(argv[i], "--tt-save") && i + 1 < argc) ttsave = argv[++i];
+        else if (!strcmp(argv[i], "--tt-load") && i + 1 < argc) ttload = argv[++i];
         else if (!strcmp(argv[i], "--data") && i + 1 < argc) datadir = argv[++i];
         else { fprintf(stderr, "unknown arg: %s\n", argv[i]); return 1; }
     }
@@ -1246,6 +1327,19 @@ int main(int argc, char **argv) {
      * deliberately -- plain --topk K takes the K best WORDS, which when a class
      * of thousands ties means K arbitrary members of ONE class, while this takes
      * K distinct CLASSES.  Neither dominates; both are heuristics. */
+    /* A run can take hours; without --out its answer reaches stdout and nowhere
+     * else.  That happened -- a whole day of runs left no file behind -- so the
+     * choice is now explicit rather than defaulted.  --no-out says "throw it
+     * away" out loud; solver/run-strturns-sweep.sh sets --out for you. */
+    if (!outpath && !no_out && !selftest_n) {
+        fprintf(stderr, "no --out: this run would print its answer and save NOTHING.\n"
+                        "  use  bash solver/run-strturns-sweep.sh ...   (sets --out and "
+                        "tees a log)\n"
+                        "  or   --out FILE                              to choose a path\n"
+                        "  or   --no-out                                to discard it "
+                        "deliberately\n");
+        return 1;
+    }
     if (BY_CLASS && TOPK <= 0) {
         fprintf(stderr, "--by-class needs --topk K (K >= 1): it collapses guesses the "
                         "state cannot distinguish, which is exact for the beam's "
@@ -1317,6 +1411,7 @@ int main(int argc, char **argv) {
         if (!TT) { fprintf(stderr, "cannot allocate TT\n"); return 1; }
         fprintf(stderr, "TT: 2^%d entries, %.2f GB\n", ttbits,
                 TT_BUCKETS * 2.0 * sizeof(Entry) / 1e9);
+        if (ttload) tt_load(ttload, ttbits);
     }
 #ifdef _OPENMP
     if (threads > 0) omp_set_num_threads(threads);
@@ -1336,9 +1431,18 @@ int main(int argc, char **argv) {
 
     G_T0 = G_LAST = now_s();
 
+    /* Resume: anything already in the CSV is skipped, and the header is only
+     * written when the file is new -- so a restart appends rather than
+     * duplicating or re-solving. */
+    uint8_t *done = calloc(NG, 1);
+    int ndone = 0;
+    if (outpath) ndone = load_done(outpath, done);
+    if (ndone) fprintf(stderr, "resume: %d opener%s already in %s\n",
+                       ndone, ndone == 1 ? "" : "s", outpath);
+
     FILE *out = outpath ? fopen(outpath, "a") : NULL;
     if (outpath && !out) { fprintf(stderr, "cannot append to %s\n", outpath); return 1; }
-    if (out) {
+    if (out && !ndone) {
         fprintf(out, "word,total,expected,depth,seconds%s\n",
                 ALLOW_UNSOLVED ? ",unsolved" : "");
         fflush(out);
@@ -1366,6 +1470,10 @@ int main(int argc, char **argv) {
             int g = -1;
             for (int k = 0; k < NG; k++) if (!strcmp(GWORD[k], openers[i])) { g = k; break; }
             if (g < 0) { fprintf(stderr, "%s is not a legal guess\n", openers[i]); continue; }
+            if (done[g]) {
+                fprintf(stderr, "%s already in %s -- skipping\n", GWORD[g], outpath);
+                continue;
+            }
             /* Escalate the cap one guess at a time up to --depth-max, so the
              * run reports the MINIMUM FEASIBLE depth as well as the total.
              * NOTE what that is and is not: f(S,d) is non-increasing in d, so a
@@ -1504,6 +1612,7 @@ int main(int argc, char **argv) {
 #endif
             for (int i = 0; i < nord; i++) {
                 int g = ord[i].g;
+                if (done[g]) continue;          /* already in the CSV */
                 double s0 = now_s();
                 int used = depthmax;
                 /* Quiet here: with many openers in flight the per-cap chatter
@@ -1543,5 +1652,7 @@ int main(int argc, char **argv) {
         free(ord);
     }
     if (out) fclose(out);
+    free(done);
+    if (ttsave) tt_save(ttsave, ttbits);
     return 0;
 }

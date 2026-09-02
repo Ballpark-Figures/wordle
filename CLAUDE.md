@@ -367,6 +367,27 @@ S x A, 154 GB for W x S, ~141 TB for S x S).
 (word, pattern), and counts by DP rather than enumerating. `tools/checkstrturns.py` diffs
 its state arithmetic against `strspace.py` over a shared deterministic walk — run it and
 `checkstrspace.py` after touching either.
+- **RUN IT WITH `bash solver/run-strturns-sweep.sh --depth D` (from `math/`), NEVER a bare
+  `./solver/strturns`.** The binary writes a CSV only when given `--out`, so a bare run
+  prints its answer and saves NOTHING — a full day of multi-hour runs was lost that way
+  (2026-09-01) because the wrapper did not exist and every handover hand-rolled the
+  command line, which the shared CLAUDE.md forbids for exactly this reason. The binary now
+  REFUSES to start without `--out` or an explicit `--no-out`. The wrapper sets `--out`,
+  tees `sweep.log`, saves/reloads `tt.bin`, resumes from the CSV, and refuses to start a
+  second copy. Data under `math/data/{shared,local}/strturns/`, one file set per
+  (depth, K, mode) since each is a different objective.
+- **DEPTH IS AT LEAST 9, and that is PUBLISHED, not a guess.** Li & Zhu, *Playing
+  Mastermind with Wordle-like Feedback* (Amer. Math. Monthly 131(5) 2024,
+  arXiv:2209.13147) define "Clear Mastermind" = Mastermind with EXACTLY Wordle's feedback
+  (including the left-to-right yellow rule) over all k^n strings — the S→S cell verbatim —
+  and prove `floor(k/n) + n - 1 <= F(k,n) <= floor(k/n) + n` when `n` does not divide `k`.
+  At k=26, n=5 that gives **9 <= F(26,5) <= 10**. Their codebreaker may play ANY string, and
+  restricting guesses to words can only make it worse, so **W→S below depth 9 is provably
+  infeasible** — the depth 4/6/7/8 runs were all doomed before they started. F is WORST-CASE;
+  the paper says NOTHING about averages, and its depth-optimal constructions (probe the
+  alphabet in blocks) are terrible for the total. Table 1 also gives exact small values —
+  F(3,2)=3, F(4,3)=3, F(5,3)=4, F(5,4)=F(6,4)=F(7,4)=4, F(6,5)…F(9,5)=5 — **which are the
+  oracle for the unbuilt `ALPHA`/`L` verification gate.**
 - **`--allow-unsolved` CHANGES THE OBJECTIVE and is opt-in for that reason.** By default,
   missing the `--depth` cap is fatal and the opener reports INFEASIBLE. Under the flag it
   becomes a COUNTED violation and the objective is LEXICOGRAPHIC: fewest unsolved answers
