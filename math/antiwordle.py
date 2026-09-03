@@ -148,6 +148,42 @@ def step(cons, letters, trits):
     return Cons(tuple(green), tuple(minc), tuple(maxc), tuple(yban))
 
 
+def letters_bound(cons, word_len=WORD_LEN):
+    """PROPOSED upper bound: unused letters + non-green squares.
+
+    The idea (the user's, 2026-09-03): every guess must either introduce a letter
+    never played before, or — using only letters already seen — move a yellow to a
+    square it has not occupied. The first kind is capped by how many letters remain
+    untouched; the second by how many squares are not yet pinned green.
+
+    A letter counts as UNUSED when it has never appeared in a guess, which the
+    constraint records exactly: never revealed (minc 0) and never count-capped
+    (maxc still the word length).
+
+    TWO DIFFERENT THINGS GET CALLED "no greys", and only one of them empties the
+    letters term:
+      - a GUESS that returned no grey tiles. This can happen on move one -- an
+        anagram of the answer comes back all yellow and green -- and says nothing
+        at all about unplayed letters; 21 of them are still sitting there.
+      - a STATE where no letter could come back grey, every non-answer letter
+        already being dead. Only here does the term shrink, and even then not
+        automatically: burning every non-answer letter while some ANSWER letter
+        has never been played leaves that letter counted as unused.
+    So the term is not special-cased either way -- it is computed from the
+    constraint and audited as-is.
+
+    NOT YET PROVED, and deliberately NOT wired into either search. It is audited
+    against exact values by tools/auditbound.py, because a bound that is too small
+    does not produce an obviously wrong answer — it silently cuts the winning line
+    and under-reports the maximum. Returned WITHOUT the "-1": the audit is what
+    decides which constant is safe.
+    """
+    unused = sum(1 for c in range(26)
+                 if cons.minc[c] == 0 and cons.maxc[c] == word_len)
+    nongreen = sum(1 for g in cons.green if g < 0)
+    return unused + nongreen
+
+
 def legal(cons, word):
     """Scalar legality of one word under `cons` — the readable reference.
 
@@ -281,16 +317,24 @@ class StallSearch:
       Exactly tight in an endgame where the legal words do not interfere — `?ummy`
       against `mummy`, where you really do get to play all of them.
 
-      THE RESOURCE BOUND, the one that does the work up top.  |L| says "you cannot
-      outlast 12972 words", which prunes nothing at the start of a game.  But every
+      THE LETTERS BOUND, `letters_bound` — unused letters plus non-green squares.
+      Every guess either introduces a letter never played before, or, using only
+      letters already seen, moves a yellow onto a square it has not occupied. The
+      first is capped by the untouched letters, the second by the squares not yet
+      pinned green. MEASURED (tools/auditbound.py) at mean slack 12.1 against exact
+      values over 186521 reachable states, where the resource bound below sits at
+      29.0 — and their minimum equals this one alone, so it dominates rather than
+      supplements. Safe at a terminal state because only the answer shows five
+      greens, so every reachable state has at least one non-green square.
+
+      THE RESOURCE BOUND, kept because it is nearly free and cannot hurt.  Every
       legal non-answer guess must spend something FINITE: it has a tile that is
       yellow (adding a square to that letter's ban mask — necessarily a new one, or
       the guess was illegal) or grey (pinning that letter's count, which can happen
       only ONCE per letter, since a grey tile sets maxc to the true count exactly).
       So count the units still unspent — letters not yet count-pinned, plus squares
       not yet banned for the answer's own letters — and no line can be longer than
-      that, plus the final naming move.  At an empty board that is about 50 rather
-      than 12972.
+      that, plus the final naming move.
 
       Both are ADMISSIBLE (never below the truth), so pruning a child whose bound
       cannot beat the incumbent leaves the value EXACT — no window is passed down
@@ -400,7 +444,9 @@ class StallSearch:
         scored = []
         for child, (g, cpool) in out.items():
             words = self.space.count_legal_delta(cons, child, legal)
-            scored.append((min(cpool + 1, words), child, g, cpool))
+            scored.append((min(cpool + 1, words, letters_bound(child,
+                                                              self.space.word_len)),
+                           child, g, cpool))
         scored.sort(key=lambda t: -t[0])
         return scored
 
@@ -424,7 +470,8 @@ class StallSearch:
         self.nodes += 1
 
         legal = np.flatnonzero(mask)
-        ceiling = min(len(legal), pool + 1)   # nothing here can beat this
+        ceiling = min(len(legal), pool + 1,   # nothing here can beat this
+                      letters_bound(cons, self.space.word_len))
         if not self.prune:
             ceiling = len(legal) + 1          # unreachable: every branch explored
 
@@ -518,4 +565,5 @@ def show(code, word_len=WORD_LEN):
 
 
 __all__ = ["ALL_GREEN", "CONS_NONE", "Cons", "GuessSpace", "StallSearch",
-           "cons_none", "legal", "longest_stall", "replay", "show", "step"]
+           "TRITS", "cons_none", "legal", "letters_bound", "longest_stall",
+           "replay", "replay_prefix", "show", "step"]

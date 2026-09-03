@@ -260,6 +260,8 @@ typedef struct { int bound, g; } Cand;
 typedef struct {
     uint64_t *delta;              /* NG * BSW -- the words each guess still allows */
     int      *spent;              /* NG -- resource units each guess costs */
+    uint32_t *lmask;              /* NG -- 26-bit set of letters the guess uses */
+    uint8_t  *gmask;              /* NG -- squares this guess turns green */
     uint64_t  arena[MAXD][BSW];   /* the legal set at each recursion level */
     uint64_t  scratch[BSW];       /* one child, built then measured */
     Cand     *cand;               /* MAXD * NG -- children awaiting pass 2 */
@@ -288,12 +290,15 @@ static Ctx *ctx_new(void) {
     Ctx *c = calloc(1, sizeof(Ctx));
     c->delta  = malloc((size_t)NG * BSW * sizeof(uint64_t));
     c->spent  = malloc((size_t)NG * sizeof(int));
+    c->lmask  = malloc((size_t)NG * sizeof(uint32_t));
+    c->gmask  = malloc((size_t)NG * sizeof(uint8_t));
     c->cand   = malloc((size_t)MAXD * NG * sizeof(Cand));
     c->dedup  = malloc((size_t)DEDUP_SIZE * sizeof(uint64_t));
     c->dstamp = calloc((size_t)DEDUP_SIZE, sizeof(uint32_t));
     c->dedup_mask = DEDUP_SIZE - 1;
     c->stamp = 0;
-    if (!c->delta || !c->spent || !c->cand || !c->dedup || !c->dstamp) {
+    if (!c->delta || !c->spent || !c->cand || !c->dedup || !c->dstamp
+            || !c->lmask || !c->gmask) {
         fprintf(stderr, "out of memory for a search context\n"); exit(1);
     }
     return c;
@@ -355,6 +360,18 @@ static void ctx_load_answer(Ctx *c, int ai) {
                         for (int w = 0; w < BSW; w++) d[w] &= ~BS_POS[i][ch][w];
         }
         c->spent[g] = greys + yellows;
+
+        /* For the LETTERS BOUND. lmask is every letter the guess plays, so OR-ing
+         * it down a line tracks which letters have been used at all; gmask is the
+         * squares it pins green. Both are per-answer, since greenness is. */
+        uint32_t lm = 0;
+        uint8_t gm = 0;
+        for (int i = 0; i < WORDLEN; i++) {
+            lm |= 1u << (GWORD[g][i] - 'a');
+            if (green[i] >= 0) gm |= (uint8_t)(1u << i);
+        }
+        c->lmask[g] = lm;
+        c->gmask[g] = gm;
 
         /* The answer is legal under every feedback it could itself produce; if it
          * were not, play could dead-end and the whole search would be ill-posed. */
@@ -435,7 +452,31 @@ static inline int intersect(const uint64_t *parent, const uint64_t *d,
     return n;
 }
 
-static int value(Ctx *c, int depth, int nL, uint64_t h0, uint64_t h1, int pool) {
+/* THE LETTERS BOUND: untouched letters, plus squares not yet pinned green.
+ *
+ * Every guess either introduces a letter never played before, or -- using only
+ * letters already seen -- moves a yellow onto a square it has not occupied. The
+ * first kind is capped by the letters still untouched, the second by the squares
+ * still not green. Counting guesses INCLUSIVE of the final naming move is what
+ * makes the constant come out as a plain sum with no -1.
+ *
+ * It cannot fall below 1 in any reachable state: only the answer itself shows
+ * five greens, so at least one square is always non-green.
+ *
+ * MEASURED (tools/auditbound.py) at mean slack 12.1 against exact values over
+ * 186521 reachable states, where the resource bound sits at 29.0 -- and the two
+ * taken together are never tighter than this one alone. Carried by OR rather than
+ * recomputed, exactly as `pool` is carried by subtraction; neither enters the memo
+ * key, since both only ever bound, and the value depends on the legal set alone. */
+#define ALPHA_MASK 0x03FFFFFFu           /* 26 bits, one per letter */
+
+static inline int letters_bound(uint32_t used, uint8_t grn) {
+    return __builtin_popcount(ALPHA_MASK & ~used)
+         + (WORDLEN - __builtin_popcount((uint32_t)grn));
+}
+
+static int value(Ctx *c, int depth, int nL, uint64_t h0, uint64_t h1,
+                 int pool, uint32_t used, uint8_t grn) {
     int val, bestg;
     if (tt_get(h0, h1, &val, &bestg)) return val;
     if (nL <= 1) return 1;                    /* only the answer is playable */
@@ -444,7 +485,14 @@ static int value(Ctx *c, int depth, int nL, uint64_t h0, uint64_t h1, int pool) 
 
     c->nodes++;
     const uint64_t *L = c->arena[depth];
-    int ceiling = PRUNE ? (nL < pool + 1 ? nL : pool + 1) : nL + 1;
+    int ceiling = nL;
+    if (PRUNE) {
+        if (pool + 1 < ceiling) ceiling = pool + 1;
+        int lb = letters_bound(used, grn);
+        if (lb < ceiling) ceiling = lb;
+    } else {
+        ceiling = nL + 1;                 /* unreachable: every branch explored */
+    }
 
     /* PASS 1 -- expand every legal guess into its child, deduplicating by the
      * child's LEGAL SET.  Two guesses that leave the same words playable leave the
@@ -475,7 +523,12 @@ static int value(Ctx *c, int depth, int nL, uint64_t h0, uint64_t h1, int pool) 
             if (seen) continue;
 
             int cpool = pool - c->spent[g];
-            int bound = PRUNE ? (nC < cpool + 1 ? nC : cpool + 1) : nC;
+            int bound = nC;
+            if (PRUNE) {
+                if (cpool + 1 < bound) bound = cpool + 1;
+                int lb = letters_bound(used | c->lmask[g], grn | c->gmask[g]);
+                if (lb < bound) bound = lb;
+            }
             cand[ncand].bound = bound;
             cand[ncand].g = g;
             ncand++;
@@ -495,7 +548,7 @@ static int value(Ctx *c, int depth, int nL, uint64_t h0, uint64_t h1, int pool) 
                            &ch0, &ch1);
         c->edges++;
         int v = value(c, depth + 1, nC, ch0 ^ c->salt, ch1 ^ c->salt,
-                      pool - c->spent[g]);
+                      pool - c->spent[g], used | c->lmask[g], grn | c->gmask[g]);
         if (v < 0) return -1;                 /* node budget blown, unwind */
         v += 1;
         if (v > best) {
@@ -575,10 +628,11 @@ static int greedy_len(Ctx *c, int nL, const uint64_t *start) {
 
 /* Is there a line of at least `need` guesses (the naming move included)? */
 static int can_reach(Ctx *c, int depth, int nL, uint64_t h0, uint64_t h1,
-                     int pool, int need) {
+                     int pool, int need, uint32_t used, uint8_t grn) {
     if (need <= 1) return 1;                  /* the answer is always playable */
     if (nL < need) return 0;                  /* word bound */
     if (pool + 1 < need) return 0;            /* resource bound */
+    if (letters_bound(used, grn) < need) return 0;   /* letters bound */
     if (depth + 1 >= MAXD) { c->overflow = 1; return 0; }
     if (MAXNODES && c->nodes >= MAXNODES) { c->budget_blown = 1; return 0; }
 
@@ -610,7 +664,10 @@ static int can_reach(Ctx *c, int depth, int nL, uint64_t h0, uint64_t h1,
             }
             if (seen) continue;
             int cpool = pool - c->spent[g];
-            cand[ncand].bound = nC < cpool + 1 ? nC : cpool + 1;
+            int bound = nC < cpool + 1 ? nC : cpool + 1;
+            int lb = letters_bound(used | c->lmask[g], grn | c->gmask[g]);
+            if (lb < bound) bound = lb;
+            cand[ncand].bound = bound;
             cand[ncand].g = g;
             ncand++;
         }
@@ -625,7 +682,8 @@ static int can_reach(Ctx *c, int depth, int nL, uint64_t h0, uint64_t h1,
                            &ch0, &ch1);
         c->edges++;
         if (can_reach(c, depth + 1, nC, ch0 ^ c->salt, ch1 ^ c->salt,
-                      pool - c->spent[g], need - 1)) {
+                      pool - c->spent[g], need - 1,
+                      used | c->lmask[g], grn | c->gmask[g])) {
             tt_put(k0, k1, 1, g);
             return 1;
         }
@@ -641,9 +699,12 @@ static int can_reach(Ctx *c, int depth, int nL, uint64_t h0, uint64_t h1,
  * antiwordle.py, whose exhaustive search cannot reach an empty board.  A shared
  * mid-game state is the only place the two can be compared at all. */
 static int start_state(Ctx *c, int ai, char **after, int nafter,
-                       uint64_t *h0, uint64_t *h1, int *pool) {
+                       uint64_t *h0, uint64_t *h1, int *pool,
+                       uint32_t *used, uint8_t *grn) {
     int nL = intersect(BS_ALL, BS_ALL, c->arena[0], h0, h1);
     *pool = pool_start(ai);
+    *used = 0;
+    *grn = 0;
     for (int k = 0; k < nafter; k++) {
         int g = -1;
         for (int j = 0; j < NG; j++) if (!strcmp(GWORD[j], after[k])) { g = j; break; }
@@ -655,6 +716,8 @@ static int start_state(Ctx *c, int ai, char **after, int nafter,
         nL = intersect(c->arena[0], c->delta + (size_t)g * BSW, c->scratch, h0, h1);
         memcpy(c->arena[0], c->scratch, sizeof BS_ALL);
         *pool -= c->spent[g];
+        *used |= c->lmask[g];
+        *grn  |= c->gmask[g];
     }
     return nL;
 }
@@ -666,11 +729,13 @@ static int line_of(Ctx *c, int ai, char **after, int nafter,
                    char *out, size_t outsz) {
     uint64_t h0, h1;
     int pool;
-    int nL = start_state(c, ai, after, nafter, &h0, &h1, &pool);
+    uint32_t umask;
+    uint8_t gmk;
+    int nL = start_state(c, ai, after, nafter, &h0, &h1, &pool, &umask, &gmk);
     size_t used = 0;
     int depth = 0;
     for (;;) {
-        int total = value(c, depth, nL, h0 ^ c->salt, h1 ^ c->salt, pool);
+        int total = value(c, depth, nL, h0 ^ c->salt, h1 ^ c->salt, pool, umask, gmk);
         if (total < 0) return -1;
         int move = -1, val;
         tt_get(h0 ^ c->salt, h1 ^ c->salt, &val, &move);
@@ -684,6 +749,8 @@ static int line_of(Ctx *c, int ai, char **after, int nafter,
         nL = intersect(c->arena[depth], c->delta + (size_t)move * BSW,
                        c->arena[depth + 1], &h0, &h1);
         pool -= c->spent[move];
+        umask |= c->lmask[move];
+        gmk   |= c->gmask[move];
         depth++;
         if (depth + 1 >= MAXD) return -1;
     }
@@ -694,8 +761,10 @@ static int solve_one(Ctx *c, int ai, char **after, int nafter,
     ctx_load_answer(c, ai);
     uint64_t h0, h1;
     int pool;
-    int nL = start_state(c, ai, after, nafter, &h0, &h1, &pool);
-    int v = value(c, 0, nL, h0 ^ c->salt, h1 ^ c->salt, pool);
+    uint32_t umask;
+    uint8_t gmk;
+    int nL = start_state(c, ai, after, nafter, &h0, &h1, &pool, &umask, &gmk);
+    int v = value(c, 0, nL, h0 ^ c->salt, h1 ^ c->salt, pool, umask, gmk);
     if (c->overflow) {
         fprintf(stderr, "internal: recursion hit MAXD=%d on %s -- raise it\n",
                 MAXD, AWORD[ai]);
@@ -724,7 +793,9 @@ static void longest_line(Ctx *c, int ai, int need, char *out, size_t outsz) {
 
     uint64_t h0, h1;
     int pool;
-    int nL = start_state(c, ai, NULL, 0, &h0, &h1, &pool);
+    uint32_t umask;
+    uint8_t gmk;
+    int nL = start_state(c, ai, NULL, 0, &h0, &h1, &pool, &umask, &gmk);
     size_t used = 0;
     int depth = 0, budget = need;
     while (budget > 1 && depth + 2 < MAXD) {
@@ -741,7 +812,8 @@ static void longest_line(Ctx *c, int ai, int need, char *out, size_t outsz) {
                 int nC = intersect(L, c->delta + (size_t)g * BSW,
                                    c->arena[depth + 1], &t0, &t1);
                 if (can_reach(c, depth + 1, nC, t0 ^ c->salt, t1 ^ c->salt,
-                              pool - c->spent[g], budget - 1)) {
+                              pool - c->spent[g], budget - 1,
+                              umask | c->lmask[g], gmk | c->gmask[g])) {
                     chosen = g; chosen_n = nC; ch0 = t0; ch1 = t1;
                     break;
                 }
@@ -755,6 +827,8 @@ static void longest_line(Ctx *c, int ai, int need, char *out, size_t outsz) {
         (void)ch0; (void)ch1;
         nL = chosen_n;
         pool -= c->spent[chosen];
+        umask |= c->lmask[chosen];
+        gmk   |= c->gmask[chosen];
         budget--;
         depth++;
     }
@@ -801,10 +875,13 @@ static int run_longest(Ctx *c, FILE *out, int *todo, int ntodo,
         ctx_load_answer(c, ai);
         uint64_t h0, h1;
         int pool;
-        int nL = start_state(c, ai, NULL, 0, &h0, &h1, &pool);
+        uint32_t umask;
+        uint8_t gmk;
+        int nL = start_state(c, ai, NULL, 0, &h0, &h1, &pool, &umask, &gmk);
         int floor_tested = incumbent;
         int record = 0;
-        while (can_reach(c, 0, nL, h0 ^ c->salt, h1 ^ c->salt, pool, incumbent + 1)) {
+        while (can_reach(c, 0, nL, h0 ^ c->salt, h1 ^ c->salt, pool,
+                         incumbent + 1, umask, gmk)) {
             incumbent++;
             witness = ai;
             record = 1;
