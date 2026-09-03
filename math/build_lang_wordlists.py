@@ -43,7 +43,7 @@ Run:  .venv/bin/python math/build_lang_wordlists.py                  # every lan
       .venv/bin/python math/build_lang_wordlists.py --dry-run        # counts only
 
 Output (COMMITTED, like every other word list here):
-  math/data/shared/words/lang/<code>/len<L>/{guess,mystery}.txt  + a .meta
+  math/data/shared/words/lang/<accents>/<code>/len<L>/{guess,mystery}.txt + .meta
 """
 
 from __future__ import annotations
@@ -180,7 +180,7 @@ def write_lists(lang, length, accents, guesses, answers, stats,
 
 def main(argv: list[str]) -> None:
     langs, length, accents = list(LATIN), 5, "ascii"
-    out_root = os.path.join(_WORDS, "lang")
+    out_root = None
     ans_cut = guess_cut = None
     dry = False
     it = iter(argv)
@@ -206,6 +206,11 @@ def main(argv: list[str]) -> None:
                 f"unknown arg {a!r} (--langs/--length/--accents/--answer-cutoff/"
                 "--guess-cutoff/--out/--dry-run)"
             )
+
+    # The accent mode changes the ALPHABET, so the two modes are different word
+    # lists and must not overwrite each other -- it is part of the path.
+    if out_root is None:
+        out_root = os.path.join(_WORDS, "lang", accents)
 
     have = set(available_languages(WORDLIST))
     missing = [lg for lg in langs if lg not in have]
