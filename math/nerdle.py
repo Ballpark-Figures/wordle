@@ -8,9 +8,25 @@ WIDTH (8) of them.  A `width` parameter exists throughout ONLY so that
 tools/checknerdle.py can brute-force small widths exhaustively against an
 independent reference; the game is 8.
 
-A GUESS IS VALID iff all of the following hold.  These rules were settled with
-the user on 2026-09-03, several of them by trying candidates against the live
-game, and they are DELIBERATELY LOOSER than the rules for an ANSWER:
+A GUESS IS VALID iff all of the following hold.  EVERY ONE OF THESE RULES HAS
+BEEN CONFIRMED AGAINST THE LIVE GAME (2026-09-03), by typing the discriminating
+case in and reading back whether it was accepted as a valid calculation.  They
+are DELIBERATELY LOOSER than the rules for an ANSWER.  The probes, recorded
+because the point of running them was that they are not guessable:
+
+    -1+3=0+2    ACCEPTED   a unary minus opening a side
+    1*-2=-2     ACCEPTED   a unary minus after an operator
+    1---2=-1    ACCEPTED   three of them in a row
+    0-0=-0      ACCEPTED   `-0` as a number
+    1/2=2/4     ACCEPTED   a value that is not a whole number
+    1+1=2=2     REJECTED   a second `=`
+    12/0=12/0   REJECTED   division by zero
+
+The first four matter more than they look: at width 8, 50605 guesses -- 13.5% of
+the set -- carry a unary minus on the LEFT side alone, and more carry one only on
+the right.  Before those probes that whole block rested on a single recalled
+observation, and three distinct behaviours had been folded into one rule without
+ever being tested apart.
 
   1. EXACTLY ONE `=`, with at least one symbol on each side of it.
   2. Each side is an arithmetic expression over the binary operators `+ - * /`,
@@ -93,8 +109,9 @@ terms.  Normalisation is load-bearing beyond tidiness: walk_guesses_split uses
 the pair as a DICTIONARY KEY, so two equal values left unreduced would fail to
 join and silently drop guesses.
 
-KNOWN EDGE CASE, recorded rather than decided: rule 3 admits `-0` as a number,
-so `0-0=-0` is counted.  It has not been checked against the live game.
+EDGE CASE, now settled: rule 3 admits `-0` as a number, so `0-0=-0` is counted.
+The live game accepts it (2026-09-03), so that is the game's behaviour and not an
+artefact of how the rule was written.
 """
 
 from fractions import Fraction
@@ -404,6 +421,61 @@ def is_answer(s, width=WIDTH):
     the module docstring for why that is a settled decision and not a gap.
     """
     return answer_rules(s, width)
+
+
+# --------------------------------------------------------------------------
+# COMMUTATIVE EQUIVALENCE -- pass two.
+#
+# Nerdle accepts a rearrangement of the day's answer as a win, and its FAQ states
+# the test it applies (https://www.nerdlegame.com/faqs.html?faq=commutativity,
+# read 2026-09-03):
+#
+#     "To be accepted as commutative, your guess must still have all the same
+#      numbers, the same operators and the same answer as the one we're looking
+#      for."
+#
+# So an answer's class is keyed by the MULTISET of its left-side numbers, the
+# MULTISET of its left-side operators, and the answer itself.  Chosen by the user
+# on 2026-09-03 over two narrower algebraic readings, because this one is what the
+# game actually accepts.
+#
+# TWO CONSEQUENCES WORTH KNOWING, since both surprise people and both are why the
+# narrower readings were on the table at all:
+#
+#   * `-` AND `/` EFFECTIVELY MOVE, though neither commutes.  `9-8+7=8` and
+#     `9+7-8=8` have the same numbers, the same operators and the same answer, so
+#     the game takes either.  The FAQ's own examples only ever show `+` and `*`,
+#     which is what makes it look otherwise.
+#   * IT IS BROADER THAN ALGEBRAIC COMMUTATIVITY.  `2+1*3=5` and `3+2*1=5` pass
+#     the test but are not rearrangements of one another in any algebraic sense --
+#     their products are `1*3` and `2*1`.  A canonicaliser built on commuting
+#     operands would keep them apart; this one does not.
+#
+# The key is only meaningful for ANSWER-shaped strings, where every `-` is binary
+# and no number carries a sign.  Handing it a general guess would read a unary
+# minus as an operator and produce a key that means nothing.
+# --------------------------------------------------------------------------
+
+def commutative_key(s):
+    """The equivalence class of an ANSWER under Nerdle's stated rule.
+
+    Two answers are commutatively equivalent iff their keys are equal.  Pass only
+    strings accepted by is_answer -- see the note above.
+    """
+    lhs, rhs = s.split("=")
+    nums, ops = [], []
+    i = 0
+    while i < len(lhs):
+        if lhs[i] in DIGITS:
+            j = i
+            while j < len(lhs) and lhs[j] in DIGITS:
+                j += 1
+            nums.append(int(lhs[i:j]))
+            i = j
+        else:
+            ops.append(lhs[i])
+            i += 1
+    return tuple(sorted(nums)), tuple(sorted(ops)), int(rhs)
 
 
 # --------------------------------------------------------------------------

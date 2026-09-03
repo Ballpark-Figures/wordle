@@ -101,6 +101,19 @@ def ref_answer(s, width):
     return a is not None and b is not None and a == b
 
 
+def ref_key(s):
+    """The FAQ's commutativity test, tokenised by regex rather than by scanning.
+
+    "the same numbers, the same operators and the same answer" -- so the key is
+    the two multisets plus the answer.  Independent of nerdle.commutative_key in
+    how it finds the tokens, which is the only place the two could disagree.
+    """
+    lhs, rhs = s.split("=")
+    nums = tuple(sorted(int(n) for n in re.findall(r"\d+", lhs)))
+    ops = tuple(sorted(re.findall(r"[-+*/]", lhs)))
+    return nums, ops, int(rhs)
+
+
 def ref_intermediates(lhs):
     """Every intermediate value of an ANSWER's left side, via prefix eval.
 
@@ -127,7 +140,8 @@ def ref_intermediates(lhs):
 FEATURES = ("unary minus", "double negative", "leading zero", "division",
             "expression on the right", "no operator", "negative value",
             "non-integer value", "answer", "answer through a negative",
-            "answer through a fraction")
+            "answer through a fraction", "class of more than one",
+            "class where a minus or slash moved")
 seen = {f: 0 for f in FEATURES}
 
 
@@ -260,6 +274,41 @@ print("   ok   %d switch cases, %d loosenings keep every settled answer"
       % (len(SWITCH_CASES) + 3, len(ANS_ACCEPT) * 6))
 
 # -------------------------------------------------------------- 2. evaluator
+# Pass two.  SAME[i] is a set of answers that must all share one class; DIFF is
+# pairs that must not.  The `-` and `/` groups are the load-bearing ones: the
+# FAQ's test is about tokens, so they move even though neither operator
+# commutes, and a canonicaliser built on algebra would split them.
+SAME = [
+    ["12+34=46", "34+12=46"],
+    ["9-8+7=8", "9+7-8=8", "7-8+9=8", "7+9-8=8"],
+    ["1+2*3=7", "3*2+1=7", "1+3*2=7", "2*3+1=7"],
+    ["2+1*3=5", "3+2*1=5"],
+]
+DIFF = [
+    ("1+2*3=7", "1*2+3=5"),      # same numbers and operators, different answer
+    ("1+2*3=7", "1+6*1=7"),      # same operators and answer, different numbers
+    ("9-8+7=8", "9+8-7=10"),     # same numbers and operators, different answer
+]
+
+print("1d. the commutative classes")
+for group in SAME:
+    for s in group:
+        if not N.is_answer(s, len(s)):
+            bad("%r is used as a class witness but is not an answer" % s)
+        if N.commutative_key(s) != ref_key(s):
+            bad("commutative_key(%r) disagrees with the reference" % s)
+    keys = {N.commutative_key(s) for s in group}
+    if len(keys) != 1:
+        bad("%s should be one class, got %d" % (group, len(keys)))
+    else:
+        seen["class of more than one"] += 1
+        if any(c in "-/" for c in group[0].split("=")[0]):
+            seen["class where a minus or slash moved"] += 1
+for a, b in DIFF:
+    if N.commutative_key(a) == N.commutative_key(b):
+        bad("%r and %r should be different classes" % (a, b))
+print("   ok   %d classes hold together, %d pairs stay apart" % (len(SAME), len(DIFF)))
+
 print("2. nerdle.evaluate against Python's own parser, every side to length 4")
 sides = N.DIGITS + N.BINOPS
 n = mismatch = 0
@@ -295,10 +344,18 @@ for w in range(3, 7 if wide else 6):
     if mine_ans != ref_ans:
         bad("width %d: is_answer differs from the reference (missing %s, extra %s)"
             % (w, sorted(ref_ans - mine_ans)[:3], sorted(mine_ans - ref_ans)[:3]))
+    groups = {}
+    for s in sorted(ref_ans):
+        if N.commutative_key(s) != ref_key(s):
+            bad("width %d: commutative_key(%r) disagrees with the reference" % (w, s))
+        groups.setdefault(N.commutative_key(s), []).append(s)
+    if sum(len(g) for g in groups.values()) != len(ref_ans):
+        bad("width %d: the classes do not partition the answers" % w)
     for s in ref:
         note_features(s)
     print("   ok   width %d: %d guesses out of %d strings, both walkers exact; "
-          "%d answers, is_answer exact" % (w, len(ref), 15 ** w, len(ref_ans)))
+          "%d answers in %d classes, keys exact"
+          % (w, len(ref), 15 ** w, len(ref_ans), len(groups)))
 
 # ----------------------------------------------------------- 4. walkers agree
 print("4. the two walkers agree where brute force cannot reach")
