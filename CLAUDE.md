@@ -757,13 +757,23 @@ and IS the source of truth; read it before quoting any count. Run it with
   **`--method split`** enumerates each SIDE once with its exact value and joins the sides
   of each `=` position on it: ~7.6M side evaluations, the SAME set, orders of magnitude
   cheaper. Both are exact, so the method is deliberately NOT part of the filename.
-- **TWO ANSWER RULES ARE STILL OPEN, so NO answer filter exists and this output must never
-  be called the answer list.** Settled: an answer's right side is a bare NUMBER, no leading
-  zero appears anywhere (so `0` is not a legal operand or answer), no negatives, and the
-  left side must contain an operator. **OPEN: may an answer's left side pass through a
-  NEGATIVE intermediate (`1-2+3=2`) or a FRACTIONAL one (`1/2*4=2`)?** Settle both before
-  writing the filter — the answers are a strict subset of the guesses, so the guess list
-  does not depend on the outcome.
+- **THE ANSWER RULES are settled (2026-09-03) and are `nerdle.py`'s A1-A4**, applied by
+  `is_answer()` and by **`bash solver/run-nerdle-answers.sh [--width W]`**, which filters
+  the pass-one guess list (answers are a strict SUBSET of guesses). An answer is a valid
+  guess whose **right side is a bare NUMBER**, in which **no digit run begins with `0`**
+  (so no leading zeros and no bare `0` anywhere — `10` is fine), which writes **no unary
+  minus**, and whose **left side contains at least one operator**.
+- **THE INTERMEDIATE VALUES ARE DELIBERATELY UNCONSTRAINED, and that is a DECISION.** The
+  user settled that an answer's left side MAY pass through a negative value (`1-2+3=2`,
+  running total -1) and MAY pass through a fraction (`1/2*4=2`). Both stricter readings
+  were live until then and both give a **smaller** set, so a count computed under either
+  is a DIFFERENT quantity — never quote one as the answer count. A2/A3 make every operand
+  at least 1, so the only route to a negative is a subtraction in the running
+  left-to-right total and the only route to a fraction is a division inside a term; there
+  is nowhere else to look, which is why both questions had unambiguous answers.
+- **Width 8, rules as of 2026-09-03: 374246 valid GUESSES** (41.5s, `--method dfs`),
+  in `data/shared/nerdle/guesses_w8.txt.gz`. The answer count for that width has not been
+  run yet.
 - **Pass one counts equations AS WRITTEN** — `1+9=0+10` and `9+1=0+10` are two guesses, not
   one. Collapsing commutative equivalents is PASS TWO and nothing implements it yet.
 - **`python3 tools/checknerdle.py` is the GATE.** Its reference shares no code with
