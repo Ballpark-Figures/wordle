@@ -215,6 +215,44 @@ for s in ANS_REJECT:
         bad("%r should be rejected as an answer, the reference accepts it" % s)
 print("   ok   %d accepts, %d rejects" % (len(ANS_ACCEPT), len(ANS_REJECT)))
 
+# The switches on answer_rules() exist to compare our rule set with the live
+# game's, so a switch that silently does nothing would not fail any count -- it
+# would just quietly make a variant look identical to the settled rules and send
+# the comparison the wrong way.  Each case below is chosen so that exactly the
+# listed switches turn it from rejected to accepted, and nothing else does.
+SWITCH_CASES = [
+    ("1+0=1",    ["zero_operand", "leading_zeros"]),
+    ("1-1=0",    ["zero_answer", "leading_zeros"]),
+    ("1+2=03",   ["leading_zeros"]),
+    ("1-4=-3",   ["negative_answer", "expression_rhs"]),
+]
+ALL_SWITCHES = ["zero_operand", "zero_answer", "leading_zeros", "expression_rhs",
+                "negative_answer", "no_operator", "exact_division",
+                "nonneg_running"]
+
+print("1c. every rule switch flips exactly the cases it should")
+for s, expect in SWITCH_CASES:
+    w = len(s)
+    if N.answer_rules(s, w):
+        bad("%r should be rejected by the settled rules" % s)
+    got = [k for k in ALL_SWITCHES if N.answer_rules(s, w, **{k: True})]
+    if got != [k for k in ALL_SWITCHES if k in expect]:
+        bad("%r is admitted by switches %s, expected %s" % (s, got, expect))
+# The two tightenings must REMOVE the witnesses of the decisions they undo.
+for s, k in (("1/2*4=2", "exact_division"), ("1-2+3=2", "nonneg_running")):
+    if not N.answer_rules(s, len(s)):
+        bad("%r should be a settled answer" % s)
+    if N.answer_rules(s, len(s), **{k: True}):
+        bad("%r should be removed by %s" % (s, k))
+# No switch may change an answer that the settled rules already accept.
+for s in ANS_ACCEPT:
+    for k in ("zero_operand", "zero_answer", "leading_zeros", "expression_rhs",
+              "negative_answer", "no_operator"):
+        if not N.answer_rules(s, len(s), **{k: True}):
+            bad("loosening %s dropped the settled answer %r" % (k, s))
+print("   ok   %d switch cases, %d loosenings keep every settled answer"
+      % (len(SWITCH_CASES) + 2, len(ANS_ACCEPT) * 6))
+
 # -------------------------------------------------------------- 2. evaluator
 print("2. nerdle.evaluate against Python's own parser, every side to length 4")
 sides = N.DIGITS + N.BINOPS

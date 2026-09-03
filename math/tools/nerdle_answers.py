@@ -36,7 +36,43 @@ import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
-from nerdle import WIDTH, is_answer, is_valid_guess  # noqa: E402
+from nerdle import WIDTH, answer_rules, is_answer, is_valid_guess  # noqa: E402
+
+# Nerdle's own published figures, quoted from its FAQ (read 2026-09-03,
+# https://www.nerdlegame.com/faqs.html?faq=commutativity):
+#
+#   "As far as we can work out, there are over 100,000 valid solutions but...
+#    we have chosen 17,723 of these as there are quite a lot we thought you
+#    wouldn't like."
+#
+# THEY ARE A REFERENCE, NOT A TARGET.  17723 is a list they CHOSE, by their own
+# account on grounds of taste, so a rule set reproducing it exactly would be a
+# surprise and tuning switches until a count matches it is fitting noise.  What
+# the comparison is good for is the opposite: a variant that overshoots wildly
+# is ruled out, and a rule we can justify independently is worth more than one
+# that merely lands on the number.
+NERDLE_CHOSEN = 17723
+NERDLE_VALID = 100000
+
+# Each disputed clause on its own, then the combinations worth seeing.  The
+# first row is the settled rule set and is the only count that may be called
+# the answer count.
+VARIANTS = [
+    ("settled rules A1-A4",          {}),
+    ("+ bare 0 as an operand",       {"zero_operand": True}),
+    ("+ 0 as the answer",            {"zero_answer": True}),
+    ("+ both zeros",                 {"zero_operand": True, "zero_answer": True}),
+    ("+ negative answer",            {"negative_answer": True}),
+    ("+ operator-free left side",    {"no_operator": True}),
+    ("+ leading zeros anywhere",     {"leading_zeros": True}),
+    ("+ expression right side",      {"expression_rhs": True}),
+    ("- fractional intermediates",   {"exact_division": True}),
+    ("- negative intermediates",     {"nonneg_running": True}),
+    ("- both intermediate kinds",    {"exact_division": True, "nonneg_running": True}),
+    ("everything loosened",          {"zero_operand": True, "zero_answer": True,
+                                      "leading_zeros": True, "expression_rhs": True,
+                                      "negative_answer": True, "no_operator": True}),
+]
 
 RULES = "2026-09-03"      # the rule set in math/nerdle.py this output obeys
 
@@ -45,10 +81,13 @@ def parse_args(argv):
     width = WIDTH
     guesses = None
     out = None
+    variants = False
     i = 0
     while i < len(argv):
         a = argv[i]
-        if a == "--width":
+        if a == "--variants":
+            variants = True; i += 1
+        elif a == "--width":
             width = int(argv[i + 1]); i += 2
         elif a == "--guesses":
             guesses = argv[i + 1]; i += 2
@@ -66,7 +105,7 @@ def parse_args(argv):
         raise SystemExit(
             "--out is required (or --no-out to discard results deliberately).\n"
             "Use the wrapper, which sets it: bash solver/run-nerdle-answers.sh")
-    return width, guesses, out
+    return width, guesses, out, variants
 
 
 def open_maybe_gz(path, mode):
@@ -85,8 +124,53 @@ def meta_count(path):
     return None
 
 
+def run_variants(width, guesses, out):
+    """Count the answers under each disputed rule set, for comparison with the
+    live game's published figures.  Diagnostic only -- see NERDLE_CHOSEN."""
+    print("nerdle answer-rule variants: width=%d" % width)
+    print("reading %s" % guesses)
+    print()
+    print("Nerdle's FAQ: over %d valid solutions, of which they CHOSE %d"
+          % (NERDLE_VALID, NERDLE_CHOSEN))
+    print("as \"there are quite a lot we thought you wouldn't like\".  Their")
+    print("chosen list is a matter of taste, so treat it as a sanity check on")
+    print("the order of magnitude, NOT as a number to tune switches until we hit.")
+    print()
+    sys.stdout.flush()
+
+    t0 = time.time()
+    counts = [0] * len(VARIANTS)
+    read = 0
+    with open_maybe_gz(guesses, "rt") as src:
+        for line in src:
+            s = line.strip()
+            if not s or not is_valid_guess(s, width):
+                continue
+            read += 1
+            for k, (_, opts) in enumerate(VARIANTS):
+                if answer_rules(s, width, check_guess=False, **opts):
+                    counts[k] += 1
+
+    base = counts[0]
+    print("%-30s %10s %10s" % ("rule set", "answers", "vs A1-A4"))
+    for (name, _), c in zip(VARIANTS, counts):
+        delta = c - base
+        print("%-30s %10d %10s" % (name, c, "" if not delta else "%+d" % delta))
+    print("\n%d valid guesses read in %.1fs" % (read, time.time() - t0))
+
+    if out:
+        with open(out, "w") as f:
+            f.write("rule_set,answers,delta_vs_settled\n")
+            for (name, _), c in zip(VARIANTS, counts):
+                f.write("%s,%d,%+d\n" % (name, c, c - base))
+        print("wrote %s" % out)
+    return 0
+
+
 def main(argv):
-    width, guesses, out = parse_args(argv)
+    width, guesses, out, variants = parse_args(argv)
+    if variants:
+        return run_variants(width, guesses, out)
 
     print("nerdle answer filter: width=%d rules=%s" % (width, RULES))
     print("reading %s" % guesses)

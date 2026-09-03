@@ -29,6 +29,15 @@
 #   guess list for that width to exist; run solver/run-nerdle-enumerate.sh
 #   first if it does not.
 #
+#   --variants DOES NOT PRODUCE ANSWERS.  It counts the answers under each
+#   DISPUTED rule -- a bare `0` as an operand, `0` as the answer, leading zeros,
+#   an expression right side, and the two intermediate restrictions we decided
+#   against -- so our rule set can be compared with the live game's, which we
+#   cannot read.  Only the first row is the answer count; every other row is a
+#   different quantity and must never be quoted as one.  Nerdle's published
+#   17723 is a list they CHOSE on grounds of taste, so it is a sanity check on
+#   the order of magnitude, not a number to tune switches until we match.
+#
 # USE THIS RATHER THAN CALLING tools/nerdle_answers.py DIRECTLY.  It sets --out,
 # points --guesses at the right pass-one file, writes a .meta sidecar recording
 # the rule set, and tees a log.  The script refuses to start without --out.
@@ -38,10 +47,12 @@ set -u
 MATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 WIDTH=8
+VARIANTS=""
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        --width) WIDTH="$2"; shift 2 ;;
+        --width)    WIDTH="$2"; shift 2 ;;
+        --variants) VARIANTS=1; shift ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
     esac
 done
@@ -59,8 +70,13 @@ PY=../.venv/bin/python
 OUTDIR=data/shared/nerdle
 LOC=data/local/nerdle
 GUESSES="$OUTDIR/guesses_w${WIDTH}.txt.gz"
-STEM="answers_w${WIDTH}"
-OUT="$OUTDIR/$STEM.txt.gz"
+if [ -n "$VARIANTS" ]; then
+    STEM="answer_variants_w${WIDTH}"
+    OUT="$OUTDIR/$STEM.csv"
+else
+    STEM="answers_w${WIDTH}"
+    OUT="$OUTDIR/$STEM.txt.gz"
+fi
 mkdir -p "$OUTDIR" "$LOC"
 
 if [ ! -f "$GUESSES" ]; then
@@ -79,4 +95,4 @@ echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] nerdle answers $STEM" \
     | tee -a "$LOC/$STEM.log"
 
 "$PY" -u tools/nerdle_answers.py --width "$WIDTH" --guesses "$GUESSES" --out "$OUT" \
-    2>&1 | tee -a "$LOC/$STEM.log"
+    ${VARIANTS:+--variants} 2>&1 | tee -a "$LOC/$STEM.log"

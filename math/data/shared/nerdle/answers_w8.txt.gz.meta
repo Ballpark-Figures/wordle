@@ -1,0 +1,13 @@
+kind=answers
+width=8
+rules=2026-09-03
+as_written=1
+commutative_collapsed=0
+intermediates_constrained=0
+from=data/shared/nerdle/guesses_w8.txt.gz
+guesses_read=374246
+count=17356
+seconds=2.0
+eq_at_4=1318
+eq_at_5=10515
+eq_at_6=5523

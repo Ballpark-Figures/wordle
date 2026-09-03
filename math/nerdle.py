@@ -252,6 +252,123 @@ def is_valid_guess(s, width=WIDTH):
     return a is not None and b is not None and a == b   # rule 6
 
 
+def digit_runs(s):
+    """Yield (start index, text) for every maximal run of digits in s."""
+    i = 0
+    while i < len(s):
+        if s[i] in DIGITS:
+            j = i
+            while j < len(s) and s[j] in DIGITS:
+                j += 1
+            yield i, s[i:j]
+            i = j
+        else:
+            i += 1
+
+
+def lhs_intermediates(lhs):
+    """Every value an ANSWER-shaped left side passes through, as Fractions.
+
+    The running left-to-right totals are the values of the prefixes ending at
+    each `+` or `-`; a term's accumulations are the values of that term's own
+    prefixes ending at each `*` or `/`.  Together those are every value a person
+    working the expression out would write down.
+
+    Only meaningful for an answer-shaped side, where every `-` is binary.  This
+    is not used by the settled rules -- see the module docstring, where leaving
+    the intermediates unconstrained is a decision -- but answer_rules() can
+    constrain them, for comparing our rule set against the game's.
+    """
+    vals = []
+    for i, c in enumerate(lhs):
+        if c in "+-":
+            v = evaluate(lhs[:i])
+            if v is not None:
+                vals.append(v)
+    v = evaluate(lhs)
+    if v is not None:
+        vals.append(v)
+    start = 0
+    for i, c in enumerate(lhs + "+"):              # the sentinel closes the last term
+        if c in "+-" and i > start:
+            term = lhs[start:i]
+            for j, d in enumerate(term):
+                if d in "*/":
+                    tv = evaluate(term[:j])
+                    if tv is not None:
+                        vals.append(tv)
+            tv = evaluate(term)
+            if tv is not None:
+                vals.append(tv)
+            start = i + 1
+    return vals
+
+
+def answer_rules(s, width=WIDTH, zero_operand=False, zero_answer=False,
+                 leading_zeros=False, expression_rhs=False,
+                 negative_answer=False, no_operator=False,
+                 exact_division=False, nonneg_running=False, check_guess=True):
+    """The answer rules with every disputed clause exposed as a switch.
+
+    CALLED WITH NO SWITCHES THIS IS is_answer -- A1-A4 exactly, which is the
+    settled rule set and the only one whose count may be called the answer
+    count.  Every switch produces a DIFFERENT quantity and exists for one
+    purpose: comparing our rule set against the live game's, which we cannot
+    read.  Do not let a switched count leak into anything as "the answers".
+
+    Loosening: `zero_operand` admits a bare `0` as a left-side operand,
+    `zero_answer` admits `0` as the answer, `leading_zeros` drops A2 entirely,
+    `expression_rhs` drops A1 so the right side may be an expression,
+    `negative_answer` allows a single unary minus on the answer, `no_operator`
+    drops A4.  Tightening: `exact_division` requires every division to come out
+    whole, `nonneg_running` forbids the running total from going below zero.
+    """
+    # `check_guess=False` skips re-parsing a line already known to be a valid
+    # guess.  A variant sweep tests one line against a dozen rule sets and the
+    # parse is the expensive part; the caller validates once instead.
+    if check_guess and not is_valid_guess(s, width):
+        return False
+    lhs, rhs = s.split("=")
+    eq = len(lhs)
+
+    if not expression_rhs:                          # A1
+        body = rhs
+        if negative_answer and body.startswith("-"):
+            body = body[1:]                         # one sign only, not a double
+        if not body or any(c not in DIGITS for c in body):
+            return False
+
+    if not no_operator and not any(c in BINOPS for c in lhs):    # A4
+        return False
+
+    for i, c in enumerate(lhs):                     # A3, left side always
+        if c == "-" and (i == 0 or lhs[i - 1] in BINOPS):
+            return False
+    if not negative_answer and not expression_rhs and "-" in rhs:
+        return False
+
+    if not leading_zeros:                           # A2
+        answer_run = rhs.lstrip("-") if not expression_rhs else None
+        for start, text in digit_runs(s):
+            if text[0] != "0":
+                continue
+            if len(text) > 1:
+                return False                        # a genuine leading zero
+            if start > eq and text == answer_run:
+                if not zero_answer:
+                    return False
+            elif not zero_operand:
+                return False
+
+    if exact_division or nonneg_running:
+        mids = lhs_intermediates(lhs)
+        if exact_division and any(m.denominator != 1 for m in mids):
+            return False
+        if nonneg_running and any(m < 0 for m in mids):
+            return False
+    return True
+
+
 def is_answer(s, width=WIDTH):
     """Is this a legal ANSWER -- a guess that also satisfies A1-A4 above?
 
@@ -259,23 +376,7 @@ def is_answer(s, width=WIDTH):
     enumerated guess list.  Nothing here looks at the intermediate values; see
     the module docstring for why that is a settled decision and not a gap.
     """
-    if not is_valid_guess(s, width):
-        return False
-    lhs, rhs = s.split("=")
-    if any(c not in DIGITS for c in rhs):          # A1: only a number
-        return False
-    if not any(c in BINOPS for c in lhs):          # A4: a calculation
-        return False
-    for i, c in enumerate(s):
-        # A3: a `-` is unary exactly when nothing, an operator, or the `=` sits
-        # in front of it.  (A1 already rules one out on the right side.)
-        if c == "-" and (i == 0 or s[i - 1] in BINOPS or s[i - 1] == "="):
-            return False
-        # A2: a digit run may not START with a zero, which covers both a leading
-        # zero and the bare number 0.
-        if c == "0" and (i == 0 or s[i - 1] not in DIGITS):
-            return False
-    return True
+    return answer_rules(s, width)
 
 
 # --------------------------------------------------------------------------
