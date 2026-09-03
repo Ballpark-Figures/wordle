@@ -928,7 +928,11 @@ Run it with **`bash solver/run-nerdle-solve.sh [-k K] [--width W] [--rank-only]`
   - **THE PAIR LOOP IS CHUNKED BY FIRST GUESS, for the same reason the root scoring is** —
     a njit call never returns to the interpreter, and at `--top-n 10000` that is 50M pairs
     and the better part of an hour with Ctrl-C dead and nothing printed. Do not merge it
-    back into one call. The feedback table is int16 (every code plus the -1 marker fits),
+    back into one call. **Every improvement on the running best prints as it is met**
+    (ties do not, or a plateau floods the log); the running minimum must start from the
+    INCUMBENT, not from the row, or a row whose own minimum falls while staying above the
+    global best reports improvements that are nothing of the kind. The gate pins the log
+    strictly decreasing and ending on the winner. The feedback table is int16 (every code plus the -1 marker fits),
     which halves a 354 MB allocation at that N.
 - **`python3 tools/nerdle_symbols.py [--set answers|guesses|classes]`** reports symbol
   frequencies three ways (occurrences, equations containing, per equation) plus a position

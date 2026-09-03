@@ -241,6 +241,24 @@ else:
         elif [d for d, _ in calls] != sorted(d for d, _ in calls):
             bad("width %d: pair progress went backwards" % w)
 
+        # The incumbent log must be strictly decreasing and must END on the
+        # winner.  Reporting a row's own falling minimum without comparing it to
+        # the global best passes a naive eye and fails both of these.
+        best_log = []
+        gb = game(w, 1)
+        _, sc_b = gb.pair_scores(10, on_best=lambda s, f, t_, d, n, e:
+                                 best_log.append(s))
+        if sc_b != sc_f:
+            bad("width %d: the incumbent log changed the pair scores" % w)
+        elif not best_log:
+            bad("width %d: no best was ever reported" % w)
+        elif any(best_log[i] <= best_log[i + 1] for i in range(len(best_log) - 1)):
+            bad("width %d: the incumbent log is not strictly decreasing: %s"
+                % (w, best_log))
+        elif best_log[-1] != sc_f[0][0]:
+            bad("width %d: the last reported best is %d, the winner is %d"
+                % (w, best_log[-1], sc_f[0][0]))
+
         # A pair must never split WORSE than its better half alone: adding a
         # second blind guess can only refine the partition.
         og = np.empty(10, dtype=np.int64)

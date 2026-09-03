@@ -741,7 +741,7 @@ class NerdleTopK:
         return best_cost, best_g
 
     # ---- pair openers ------------------------------------------------------
-    def pair_scores(self, top_n, progress=None):
+    def pair_scores(self, top_n, progress=None, on_best=None):
         """Every pair drawn from the top_n single guesses, by joint sum of squares.
 
         Returns (the top_n guess indices, [(score, i, j)] sorted best first),
@@ -757,6 +757,12 @@ class NerdleTopK:
         single-guess score is.  It is not expected guesses, and it does not know
         that an answer won by the first guess is cheaper than one won by the
         second -- both simply leave the partition.
+
+        `on_best(score, first, second, done, total, elapsed)` is called for every
+        STRICT improvement on the running best, in the order the search meets
+        them, so a long run shows its incumbent rather than only its percentage.
+        Ties are not reported -- a plateau would otherwise flood the log -- but
+        they are still kept in the returned list, which the final sort orders.
         """
         S = np.arange(self.NA, dtype=np.int64)
         _, order = self.root_ranking()
@@ -782,8 +788,28 @@ class NerdleTopK:
             # whole sweep, not per pair.
             buf = np.zeros(self.NPAT * self.NPAT, dtype=np.int32)
             off = 0
+            best = None
             for i in range(nk):
+                lo_off = off
                 off = _pair_row(rows, i, np.int64(self.NPAT), buf, out, off)
+                if on_best is not None and off > lo_off:
+                    # Every strict improvement inside this row, in order.  The
+                    # running minimum drops exactly at those positions, so they
+                    # come out of one vectorised pass rather than a Python loop
+                    # over what can be 50 million entries.
+                    # The running minimum must START from the incumbent, not
+                    # from the row: a row whose own minimum falls while staying
+                    # above the global best would otherwise report improvements
+                    # that are nothing of the kind.
+                    seg = out[lo_off:off]
+                    start = np.iinfo(np.int64).max if best is None else best
+                    run = np.minimum.accumulate(np.concatenate(([start], seg)))
+                    for k in np.nonzero(run[1:] < run[:-1])[0]:
+                        j = i + 1 + int(k)
+                        on_best(int(seg[k]), self.guess_words[gs[i]],
+                                self.guess_words[gs[j]], lo_off + int(k) + 1,
+                                npairs, time.time() - t0)
+                    best = int(run[-1])
                 if progress is not None:
                     progress(off, npairs, time.time() - t0,
                              "first guess %d/%d" % (i + 1, nk))

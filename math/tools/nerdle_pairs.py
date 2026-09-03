@@ -91,12 +91,20 @@ def main(argv):
     print("\n%d guesses, %d answers, %d classes (built in %.1fs)"
           % (game.NG, game.NA, game.nclasses, time.time() - t0))
     print("ranking singles, then scoring %d pairs (Ctrl-C stops it within a"
-          " second)..." % (top_n * (top_n - 1) // 2))
+          " second)." % (top_n * (top_n - 1) // 2))
+    print("Every improvement on the running best is printed as it is met; ties")
+    print("are not, or a plateau would flood the log.")
     sys.stdout.flush()
 
     NT.attach_ranking(game, progress=NT.progress_printer(10.0))
+    def show_best(score, first, second, done, total, elapsed):
+        print("  NEW BEST %12d  %-11s %-11s   %6.2f%%  %7.1fs"
+              % (score, first, second, 100.0 * done / total, elapsed))
+        sys.stdout.flush()
+
     t1 = time.time()
-    gs, scored = game.pair_scores(top_n, progress=NT.progress_printer(10.0))
+    gs, scored = game.pair_scores(top_n, progress=NT.progress_printer(10.0),
+                                  on_best=show_best)
     secs = time.time() - t1
 
     scores, order = game.root_ranking()
