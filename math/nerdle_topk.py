@@ -55,6 +55,7 @@ from __future__ import annotations
 
 import gzip
 import os
+import sys
 
 import numpy as np
 
@@ -174,16 +175,23 @@ if _HAVE_NUMBA:
         return score
 
     @njit(cache=True)
-    def _scores(G, A, S, gclass, aclass, width, cnt, bins, touched, out):
-        """Score EVERY guess into `out`, for ranking the whole list at once.
+    def _scores(G, A, S, gclass, aclass, width, cnt, bins, touched, out, lo, hi):
+        """Score guesses [lo, hi) into `out`.
 
-        The top-k insertion in _rank is O(k) per guess, which is fine for a beam
-        of a few but quadratic when k is the whole guess list.  Scoring into an
-        array and sorting afterwards is what makes the full root ranking
-        affordable, and it produces the identical order: a stable argsort breaks
-        ties on the lower index, exactly as the insertion does.
+        The top-k insertion in _rank is O(k) per guess, fine for a beam of a few
+        but quadratic when k is the whole guess list.  Scoring into an array and
+        sorting afterwards is what makes the full root ranking affordable, and it
+        gives the identical order: a stable argsort breaks ties on the lower
+        index, exactly as the insertion does.
+
+        IT TAKES A RANGE SO THE CALLER CAN CHUNK IT, and that is not a
+        performance knob.  A njit function never returns to the interpreter, so
+        Python cannot run its SIGINT handler while one is executing: scoring all
+        374246 guesses in a single call made Ctrl-C do nothing for nearly two
+        minutes.  Returning between blocks is what makes the slow step
+        interruptible, and what lets it report progress at all.
         """
-        for g in range(G.shape[0]):
+        for g in range(lo, hi):
             out[g] = _score(G, g, A, S, gclass, aclass, width, cnt, bins, touched)
 
     @njit(cache=True)
@@ -399,7 +407,29 @@ def ranking_path(width, data_dir=None):
     return os.path.join(data_dir or _DATA, "root_rank_w%d.csv.gz" % width)
 
 
-def attach_ranking(game, note=print):
+def progress_printer(every=10.0):
+    """A progress callback that prints at most one line per `every` seconds.
+
+    Shared by every long step here rather than reimplemented per tool: a step
+    can have thousands of reports and most arrive instantly, so a line each is
+    noise.  The signature is the one root_ranking and solve both call.
+    """
+    state = {"last": 0.0}
+
+    def report(done, total, elapsed, note):
+        if elapsed - state["last"] < every and done < total:
+            return
+        state["last"] = elapsed
+        frac = done / total if total else 1.0
+        eta = (elapsed / frac - elapsed) if frac > 0 else 0.0
+        print("  %6.1f%%  %8d/%d  %7.1fs elapsed  ~%.0fs left   %s"
+              % (100 * frac, done, total, elapsed, eta, note))
+        sys.stdout.flush()
+
+    return report
+
+
+def attach_ranking(game, note=print, progress=None):
     """Give `game` its root ranking: from disk if usable, else compute and store.
 
     ONE place decides that, so the solver and the pair screen cannot drift on
@@ -419,7 +449,7 @@ def attach_ranking(game, note=print):
     else:
         note("root ranking: %s not found -- computing it now (the slow step)"
              % path)
-    game.root_ranking()
+    game.root_ranking(progress=progress)
     save_ranking(path, game)
     note("root ranking: wrote %s" % path)
     return path, False
@@ -473,23 +503,35 @@ class NerdleTopK:
             self.set_root_ranking(*ranking)
 
     # ---- the root ranking, computed once ------------------------------------
-    def root_ranking(self):
+    def root_ranking(self, progress=None, block=2000):
         """(score per guess, guess indices best first) over the whole answer set.
 
         MEMOISED, and the single source of the ranking for everything here: the
         beam's root, the pair screen and the printed table all read it.  It used
-        to be recomputed at each of those, which at width 8 is about 111 seconds
-        a time -- a single solve paid it twice.
+        to be recomputed at each, which at width 8 is about 110 seconds a time --
+        a single solve paid it twice.
+
+        SCORED IN BLOCKS OF `block` GUESSES so the run stays interruptible: a
+        njit call does not return to the interpreter, so a single whole-list call
+        swallows Ctrl-C for the entire two minutes.  `progress(done, total,
+        elapsed, note)` is called between blocks.
 
         Ties break on the lower guess index, via a STABLE argsort over a list
         already in canonical symbol order.
         """
         if self._root is None:
+            import time
+            t0 = time.time()
             S = np.arange(self.NA, dtype=np.int64)
             scores = np.empty(self.NG, dtype=np.int64)
             if self.use_numba:
-                _scores(self.G, self.A, S, self.gclass, self.aclass, self.width,
-                        self._cnt, self._bins, self._touched, scores)
+                for lo in range(0, self.NG, block):
+                    hi = min(lo + block, self.NG)
+                    _scores(self.G, self.A, S, self.gclass, self.aclass,
+                            self.width, self._cnt, self._bins, self._touched,
+                            scores, lo, hi)
+                    if progress is not None:
+                        progress(hi, self.NG, time.time() - t0, "scoring guesses")
             else:
                 for g in range(self.NG):
                     keep = S[self.aclass[S] != self.gclass[g]]

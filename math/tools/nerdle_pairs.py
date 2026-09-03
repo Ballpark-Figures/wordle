@@ -81,7 +81,7 @@ def main(argv):
     print("ranking singles, then scoring %d pairs..." % (top_n * (top_n - 1) // 2))
     sys.stdout.flush()
 
-    NT.attach_ranking(game)
+    NT.attach_ranking(game, progress=NT.progress_printer(10.0))
     t1 = time.time()
     gs, scored = game.pair_scores(top_n)
     secs = time.time() - t1

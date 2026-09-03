@@ -38,27 +38,6 @@ from nerdle import WIDTH  # noqa: E402
 RULES = "2026-09-03"
 
 
-def make_progress(every):
-    """Print at most one progress line per `every` seconds.
-
-    Time-based rather than per-bucket: the root can have thousands of buckets
-    and most finish instantly, so a line each would be noise.
-    """
-    state = {"last": 0.0}
-
-    def report(done, total, elapsed, note):
-        if elapsed - state["last"] < every and done < total:
-            return
-        state["last"] = elapsed
-        frac = done / total if total else 1.0
-        eta = (elapsed / frac - elapsed) if frac > 0 else 0.0
-        print("  %6.1f%%  %6d/%d answers  %7.1fs elapsed  ~%.0fs left   %s"
-              % (100 * frac, done, total, elapsed, eta, note))
-        sys.stdout.flush()
-
-    return report
-
-
 def parse_args(argv):
     width, k, out, top, rank_only = WIDTH, 1, None, 10, False
     i = 0
@@ -117,7 +96,7 @@ def main(argv):
     sys.stdout.flush()
 
     t1 = time.time()
-    NT.attach_ranking(game)
+    NT.attach_ranking(game, progress=NT.progress_printer(10.0))
     ranking = root_ranking(game, top)
     rank_secs = time.time() - t1
     print("\nroot ranking, best %d by sum of squared bins (%.1fs):" % (len(ranking), rank_secs))
@@ -134,7 +113,7 @@ def main(argv):
         t2 = time.time()
         # One walk, cached -- asking for the total and the opener separately
         # used to run the whole search twice.
-        total = game.total_guesses(progress=make_progress(10.0))
+        total = game.total_guesses(progress=NT.progress_printer(10.0))
         solve_secs = time.time() - t2
         expected = total / game.NA
         opener = game.opener()

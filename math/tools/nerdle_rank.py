@@ -70,11 +70,11 @@ def main(argv):
     game = NT.NerdleTopK(width=width, k=1)
     print("\n%d guesses, %d answers, %d classes (built in %.1fs)"
           % (game.NG, game.NA, game.nclasses, time.time() - t0))
-    print("scoring every guess (this is the slow step)...")
+    print("scoring every guess (the slow step; Ctrl-C stops it within a second)...")
     sys.stdout.flush()
 
     t1 = time.time()
-    scores, order = game.root_ranking()
+    scores, order = game.root_ranking(progress=NT.progress_printer(10.0))
     secs = time.time() - t1
     print("\nscored %d guesses in %.1fs" % (game.NG, secs))
     print("\n%4s %-11s %14s" % ("rank", "guess", "sum of squares"))

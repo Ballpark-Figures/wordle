@@ -240,6 +240,28 @@ else:
             bad("width %d: the best pair scores %d, worse than the best single at %d"
                 % (w, score, int(os_[0])))
 
+# --------------------------------------- 5a. the ranking chunks identically
+print("5a. block-scoring the ranking changes nothing")
+ga = game(6, 1)
+gb = game(6, 1)
+sa, oa = ga.root_ranking(block=7)          # many tiny blocks
+sb, ob = gb.root_ranking(block=10 ** 9)    # one call, as it used to be
+if not (np.array_equal(sa, sb) and np.array_equal(oa, ob)):
+    bad("scoring in blocks gives a different ranking from one call")
+else:
+    calls = []
+    gc = game(6, 1)
+    gc.root_ranking(block=7, progress=lambda d, t, e, n: calls.append((d, t)))
+    if not calls:
+        bad("block scoring reported no progress")
+    elif [d for d, _ in calls] != sorted(d for d, _ in calls):
+        bad("ranking progress went backwards")
+    elif calls[-1][0] != gc.NG:
+        bad("ranking progress ended at %d of %d" % (calls[-1][0], gc.NG))
+    else:
+        print("   ok   %d guesses, identical in blocks of 7 and in one call, "
+              "%d progress reports" % (ga.NG, len(calls)))
+
 # ------------------------------------------------- 5b. the stored ranking
 print("5b. the stored ranking round-trips, and a foreign one is refused")
 import tempfile  # noqa: E402

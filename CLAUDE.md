@@ -877,6 +877,12 @@ Run it with **`bash solver/run-nerdle-solve.sh [-k K] [--width W] [--rank-only]`
     REFUSED, never used.** Re-enumerating the answers retires it automatically. Silently
     reusing one would leave every score confidently wrong rather than missing — the same
     hazard as a foreign `tt.bin`.
+  - **THE SCORING IS CHUNKED (`block`, default 2000 guesses) AND THAT IS NOT A PERF
+    KNOB.** A njit call never returns to the interpreter, so Python cannot run its SIGINT
+    handler while one runs: scoring all 374246 in one call made **Ctrl-C do nothing for
+    ~110s**. Returning between blocks is what makes the slow step interruptible and what
+    lets it report progress. Do not merge it back into one call. An interrupt leaves NO
+    partial file — the save happens only after the ranking completes.
   - **It is a RANKING, NOT A RESULT.** A good first-guess score says nothing about what
     happens after the reply; quote the solver's number, not this one.
 - **ONE scoring rule, in `_score`**, called by both the per-node top-k ranking and the
