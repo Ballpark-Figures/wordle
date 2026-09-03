@@ -184,10 +184,11 @@ def main(argv: list[str]) -> None:
     if not langs:
         raise SystemExit(f"no language lists found under {root}")
 
-    done = set()
+    done = {}
     if os.path.exists(out):                       # resume: skip finished languages
         rows = read_words(out)
-        done = {line.split(",")[0] for line in rows[1:]}
+        for line in rows[1:]:
+            done[line.split(",")[0]] = dict(zip(COLUMNS, line.split(",")))
         if done:
             print(f"resuming {out}: {len(done)} language(s) already done")
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
@@ -195,16 +196,21 @@ def main(argv: list[str]) -> None:
         with open(out, "w", encoding="utf-8") as fh:
             fh.write(",".join(COLUMNS) + "\n")
 
-    print(f"top-{k} beam, length {length}, expected guesses OUTRIGHT (no depth cap)")
-    print(f"{'lang':<6}{'guesses':>9}{'answers':>9}{'alpha':>7}"
-          f"{'opener':>12}{'expected':>10}{'secs':>8}")
+    def show(row: dict, note: str = "") -> None:
+        print(f"{row['lang']:<6}{row['opener']:>10}{row['expected_guesses']:>14}"
+              f"{row['answers']:>9}{row['guesses']:>9}{row['seconds']:>8}{note}")
+
+    print(f"top-{k} beam, length {length}, average guesses OUTRIGHT (no depth cap)")
+    print(f"{'lang':<6}{'opener':>10}{'avg guesses':>14}"
+          f"{'answers':>9}{'guesses':>9}{'secs':>8}")
     for lg in langs:
+        # A resumed language still prints, so the table on screen is the whole
+        # run rather than only the part this invocation happened to compute.
         if lg in done:
+            show(done[lg], "  (done earlier)")
             continue
         row = solve_language(lg, root, length, k)
-        print(f"{row['lang']:<6}{row['guesses']:>9}{row['answers']:>9}"
-              f"{row['alphabet_size']:>7}{row['opener']:>12}"
-              f"{row['expected_guesses']:>10}{row['seconds']:>8}")
+        show(row)
         with open(out, "a", encoding="utf-8") as fh:   # flush per language
             fh.write(",".join(str(row[c]) for c in COLUMNS) + "\n")
 
