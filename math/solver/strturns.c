@@ -136,6 +136,23 @@ static int      TOPK = 0;
  * untouched -- which is what lets the existing W -> S result serve as its oracle.
  *
  * OFF BY DEFAULT so nothing already running changes behaviour. */
+/* --guess-space all: the legal guesses become EVERY 26**5 string rather than the
+ * 12972 words -- the S -> S cell.  The guess set cannot be listed and its atoms
+ * cannot be precomputed (208 GB), so at each node one representative per symmetry
+ * class is enumerated (see enum_reps) and its atoms are built transiently.
+ *
+ * MEASURED class counts: 7 at the root, 36 down an all-grey line, 173-174 once a
+ * green pins a position.  So the guess space stays in the hundreds at every node,
+ * which is what makes this affordable at all. */
+static int      ALL_GUESSES = 0;
+#define MAXREPS 4096
+
+/* A guess, however it was obtained: its letter codes plus its 243 atoms.  The
+ * word-list path points at the precomputed tables; the 26**5 path points at a
+ * transient buffer.  ONE representation, so the search has one implementation
+ * rather than one per guess source. */
+typedef struct { const uint8_t *gc; const State *at; const uint8_t *ok; } Guess;
+
 static int      SMALL_N = 0;
 #define SMALL_MAX 512
 
@@ -684,8 +701,36 @@ typedef struct {
     uint64_t cn[MAXD][NPAT];
     long long lbg[MAXD][MAXG];
     GuessKey ord[MAXD][MAXG];
+    State    atbuf[MAXD][NPAT];        /* --guess-space all: transient atoms */
+    uint8_t  okbuf[MAXD][NPAT];
     long long nodes;
 } Ctx;
+
+/* Point a Guess at the precomputed tables for word `g`. */
+static void guess_of_index(int g, Guess *q) {
+    q->gc = GCODE[g];
+    q->at = ATOM + (size_t)g * NPAT;
+    q->ok = AOK + (size_t)g * NPAT;
+}
+
+/* Build a Guess for arbitrary letter codes, into caller-owned scratch.  243
+ * atoms at ~100 ns each, so ~25 us -- affordable because only a few hundred
+ * representatives are profiled per node, not 11881376 guesses. */
+static void guess_of_codes(const uint8_t *gc, State *atbuf, uint8_t *okbuf, Guess *q) {
+    for (int p = 0; p < NPAT; p++) okbuf[p] = build_atom(&atbuf[p], gc, p) ? 1 : 0;
+    q->gc = gc; q->at = atbuf; q->ok = okbuf;
+}
+
+/* The i-th guess AT THIS NODE.  In word mode `id` indexes the 12972 list and the
+ * atoms are precomputed; under --guess-space all it indexes this node's
+ * representatives and the atoms are built into the caller's scratch.  Either way
+ * the search sees a Guess and nothing else changes -- which is what keeps the
+ * word-mode behaviour bit-identical. */
+static void get_guess(int id, uint8_t (*reps)[L], State *atbuf, uint8_t *okbuf,
+                      Guess *q) {
+    if (ALL_GUESSES) guess_of_codes(reps[id], atbuf, okbuf, q);
+    else             guess_of_index(id, q);
+}
 
 static long long solve(const State *st, uint64_t n, int d, Ctx *ctx);
 
@@ -771,13 +816,13 @@ static void progress(void) {
     fflush(stderr);
 }
 
-static long long eval_guess(const State *st, uint64_t n, int d, int g,
+static long long eval_guess(const State *st, uint64_t n, int d, const Guess *q,
                             long long best, Ctx *ctx) {
     State *subs = ctx->subs[d];
     uint64_t *cn = ctx->cn[d];
     int np = 0;
-    const State *at = ATOM + (size_t)g * NPAT;
-    const uint8_t *ok = AOK + (size_t)g * NPAT;
+    const State *at = q->at;
+    const uint8_t *ok = q->ok;
     /* The all-green bucket is skipped below because this guess RESOLVES it, so
      * nothing recurses into it -- which means it is also the one answer no base
      * case would ever count.  Credit it here. */
@@ -1006,7 +1051,17 @@ static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
      * per symmetry class, taking the lowest index in each so the choice matches
      * what the tie-break would have made anyway. */
     int ncand = 0;
-    if (BY_CLASS) {
+    /* --guess-space all: one representative per symmetry class of the FULL 26**5
+     * space, enumerated fresh at this node.  Measured at 7 classes at the root,
+     * 36 down an all-grey line and 174 once a green pins a position, so this list
+     * is short however deep the search goes. */
+    uint8_t reps[MAXREPS][L];
+    if (ALL_GUESSES) {
+        static __thread uint64_t rkeys[MAXREPS];
+        Sym sy; build_sym(st, &sy);
+        int nr = enum_reps(&sy, reps, MAXREPS, rkeys);
+        for (int i = 0; i < nr; i++) { ord[ncand].key = 0; ord[ncand].g = i; ncand++; }
+    } else if (BY_CLASS) {
         Sym sy; build_sym(st, &sy);
         for (int g = 0; g < NG; g++) {
             ord[ncand].key = (long long)canon_guess(GCODE[g], &sy);
@@ -1032,6 +1087,7 @@ static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
     int m = 0;
     for (int ci = 0; ci < ncand; ci++) {
         int g = ord[ci].g;
+        Guess q; get_guess(g, reps, ctx->atbuf[d], ctx->okbuf[d], &q);
         long long lv = (long long)n;
         int dead = 0, np = 0;
         unsigned long long ss = 0, biggest = 0;
@@ -1040,7 +1096,7 @@ static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
              * exactly a non-empty meet with atom p, so the counts are identical. */
             int nt = 0;
             for (uint64_t i = 0; i < n; i++) {
-                int p = pattern_codes(GCODE[g], cand[i]);
+                int p = pattern_codes(q.gc, cand[i]);
                 if (scnt[p]++ == 0) stouch[nt++] = p;
             }
             for (int k = 0; k < nt; k++) {
@@ -1056,8 +1112,8 @@ static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
                 scnt[p] = 0;
             }
         } else {
-        const State *at = ATOM + (size_t)g * NPAT;
-        const uint8_t *ok = AOK + (size_t)g * NPAT;
+        const State *at = q.at;
+        const uint8_t *ok = q.ok;
         for (int p = 0; p < NPAT; p++) {
             if (!ok[p] || p == ALL_GREEN) continue;
             State tmp;
@@ -1098,7 +1154,8 @@ static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
     for (int i = 0; i < lim; i++) {
         int g = ord[i].g;
         if (TOPK == 0 && lbg[g] >= best) break;  /* sorted by lb: none left can win */
-        long long v = eval_guess(st, n, d, g, best, ctx);
+        Guess q; get_guess(g, reps, ctx->atbuf[d], ctx->okbuf[d], &q);
+        long long v = eval_guess(st, n, d, &q, best, ctx);
         if (v < best) { best = v; bestg = g; }
         if (best <= lb0) break;                  /* provably optimal */
     }
@@ -1385,29 +1442,46 @@ static int measure_branching(void) {
 static void dump_reps(void) {
     static uint8_t reps[200000][L];
     static uint64_t keys[200000];
-    State st; root_state(&st);
+    /* Two lines, because they cost very differently.  All-grey keeps every
+     * position mask identical, so the full position symmetry survives and the
+     * class count stays tiny.  Greens PIN positions and break that symmetry,
+     * which is the case that decides whether an S -> S run is affordable. */
+    struct { const char *name; uint8_t g[L]; int pat[4]; } line[2] = {
+        { "all grey",     {18,0,11,4,19}, {0, 0, 0, 0} },
+        /* salet scoring: green at 0; then green at 0 + yellow at 1; etc.
+         * codes are base 3 with position 0 most significant. */
+        { "with greens",  {18,0,11,4,19}, {162, 189, 168, 162} },
+    };
     uint8_t probe[4][L] = {{18,0,11,4,19},{17,14,20,13,3},{2,7,8,15,25},{5,6,10,12,21}};
-    for (int step = 0; step <= 4; step++) {
-        Sym sy; build_sym(&st, &sy);
-        int nc = 0;
-        for (int c = 0; c < ALPHA; c++) if (sy.lclass[c] + 1 > nc) nc = sy.lclass[c] + 1;
-        double t0 = now_s();
-        int n = enum_reps(&sy, reps, 200000, keys);
-        printf("step %d: %llu candidates, %d letter classes, %d position perms "
-               "-> %d guess classes  (%.3fs)\n",
-               step, (unsigned long long)count_state(&st), nc, sy.nperm, n,
-               now_s() - t0);
-        if (step == 0) {
-            printf("   root representatives:");
-            for (int i = 0; i < n; i++)
-                printf(" %c%c%c%c%c", 'a'+reps[i][0], 'a'+reps[i][1], 'a'+reps[i][2],
-                       'a'+reps[i][3], 'a'+reps[i][4]);
-            printf("\n");
+    for (int ln = 0; ln < 2; ln++) {
+        printf("=== %s line\n", line[ln].name);
+        State st; root_state(&st);
+        for (int step = 0; step <= 4; step++) {
+            Sym sy; build_sym(&st, &sy);
+            int nc = 0;
+            for (int c = 0; c < ALPHA; c++) if (sy.lclass[c] + 1 > nc) nc = sy.lclass[c] + 1;
+            double t0 = now_s();
+            int n = enum_reps(&sy, reps, 200000, keys);
+            double te = now_s() - t0;
+            printf("  step %d: %12llu candidates, %d letter classes, %3d pos perms"
+                   " -> %6d guess classes (%.3fs enum)\n",
+                   step, (unsigned long long)count_state(&st), nc, sy.nperm, n, te);
+            if (ln == 0 && step == 0) {
+                printf("     root reps:");
+                for (int i = 0; i < n; i++)
+                    printf(" %c%c%c%c%c", 'a'+reps[i][0], 'a'+reps[i][1], 'a'+reps[i][2],
+                           'a'+reps[i][3], 'a'+reps[i][4]);
+                printf("\n");
+            }
+            if (step == 4) break;
+            State at, nx;
+            const uint8_t *g = (step == 0) ? line[ln].g : probe[step];
+            int pc = (ln == 0) ? 0 : (step == 0 ? line[ln].pat[0] : 0);
+            if (!build_atom(&at, g, pc) || !meet(&nx, &st, &at)) {
+                printf("     (line ends: infeasible refinement)\n"); break;
+            }
+            st = nx;
         }
-        if (step == 4) break;
-        State at, nx;
-        if (!build_atom(&at, probe[step], 0) || !meet(&nx, &st, &at)) break;
-        st = nx;
     }
 }
 
