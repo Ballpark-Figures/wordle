@@ -760,9 +760,10 @@ and IS the source of truth; read it before quoting any count. Run it with
 - **THE ANSWER RULES are settled (2026-09-03) and are `nerdle.py`'s A1-A4**, applied by
   `is_answer()` and by **`bash solver/run-nerdle-answers.sh [--width W]`**, which filters
   the pass-one guess list (answers are a strict SUBSET of guesses). An answer is a valid
-  guess whose **right side is a bare NUMBER**, in which **no digit run begins with `0`**
-  (so no leading zeros and no bare `0` anywhere — `10` is fine), which writes **no unary
-  minus**, and whose **left side contains at least one operator**.
+  guess whose **right side is a bare NUMBER**, in which **no digit run begins with `0`
+  EXCEPT that the ANSWER may be `0` itself** (so `1+2=03` and `1*0+7=7` are out but
+  `12-3*4=0` is in; `10` is fine), which writes **no unary minus**, and whose **left side
+  contains at least one operator**.
 - **THE INTERMEDIATE VALUES ARE DELIBERATELY UNCONSTRAINED, and that is a DECISION.** The
   user settled that an answer's left side MAY pass through a negative value (`1-2+3=2`,
   running total -1) and MAY pass through a fraction (`1/2*4=2`). Both stricter readings
@@ -771,9 +772,22 @@ and IS the source of truth; read it before quoting any count. Run it with
   at least 1, so the only route to a negative is a subtraction in the running
   left-to-right total and the only route to a fraction is a division inside a term; there
   is nowhere else to look, which is why both questions had unambiguous answers.
-- **Width 8, rules as of 2026-09-03: 374246 valid GUESSES** (41.5s, `--method dfs`),
-  in `data/shared/nerdle/guesses_w8.txt.gz`. The answer count for that width has not been
-  run yet.
+- **BOTH OF NERDLE'S PUBLISHED COUNTS ARE REPRODUCED, and that is how A2's zero-answer
+  exception was established.** Its FAQ gives "over 100,000 valid solutions" of which it
+  "chose 17,723". At width 8: the settled rules give **exactly 17723**; without the
+  exception 17356; with A2 dropped entirely **112566** (their "over 100,000"); also
+  allowing bare `0` OPERANDS 25489, which overshoots and is ruled out. So their
+  valid-solution set is ours with leading zeros allowed, and their cull drops leading
+  zeros and `0` operands while KEEPING `0` as an answer. **The 17723 was a prediction,
+  not a fit** — the switch was named as the likeliest single explanation of the 367 gap
+  before the run. It is still an inference from two counts rather than a rule anyone has
+  read, so **a past answer of `0` would settle it outright**.
+- **`bash solver/run-nerdle-answers.sh --variants`** counts the answers under each
+  disputed clause (`answer_rules()` carries them as switches). **Only the first row is the
+  answer count**; every other row is a different quantity. Do not add switches until a
+  number matches — a mismatch is evidence about the rules.
+- **Width 8, rules as of 2026-09-03: 374246 valid GUESSES** (41.5s, `--method dfs`) and
+  **17723 ANSWERS**, in `data/shared/nerdle/`.
 - **Pass one counts equations AS WRITTEN** — `1+9=0+10` and `9+1=0+10` are two guesses, not
   one. Collapsing commutative equivalents is PASS TWO and nothing implements it yet.
 - **`python3 tools/checknerdle.py` is the GATE.** Its reference shares no code with

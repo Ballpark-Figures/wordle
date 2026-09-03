@@ -45,12 +45,14 @@ from nerdle import WIDTH, answer_rules, is_answer, is_valid_guess  # noqa: E402
 #    we have chosen 17,723 of these as there are quite a lot we thought you
 #    wouldn't like."
 #
-# THEY ARE A REFERENCE, NOT A TARGET.  17723 is a list they CHOSE, by their own
-# account on grounds of taste, so a rule set reproducing it exactly would be a
-# surprise and tuning switches until a count matches it is fitting noise.  What
-# the comparison is good for is the opposite: a variant that overshoots wildly
-# is ruled out, and a rule we can justify independently is worth more than one
-# that merely lands on the number.
+# BOTH FIGURES ARE NOW REPRODUCED, which is how A2's zero-answer exception was
+# established (2026-09-03, and the reasoning is written out in math/nerdle.py):
+# the settled rules give exactly 17723, and dropping A2 entirely gives 112566,
+# the "over 100,000".  That was a genuine prediction rather than a fit -- the
+# switch was picked as the likeliest single explanation of a 367 gap before the
+# run -- but it remains an inference from two published counts, so treat a
+# future mismatch as evidence about the rules and not as a reason to add
+# switches until the number comes back.
 NERDLE_CHOSEN = 17723
 NERDLE_VALID = 100000
 
@@ -59,9 +61,8 @@ NERDLE_VALID = 100000
 # the answer count.
 VARIANTS = [
     ("settled rules A1-A4",          {}),
+    ("- 0 as the answer",            {"zero_answer": False}),
     ("+ bare 0 as an operand",       {"zero_operand": True}),
-    ("+ 0 as the answer",            {"zero_answer": True}),
-    ("+ both zeros",                 {"zero_operand": True, "zero_answer": True}),
     ("+ negative answer",            {"negative_answer": True}),
     ("+ operator-free left side",    {"no_operator": True}),
     ("+ leading zeros anywhere",     {"leading_zeros": True}),
@@ -69,9 +70,9 @@ VARIANTS = [
     ("- fractional intermediates",   {"exact_division": True}),
     ("- negative intermediates",     {"nonneg_running": True}),
     ("- both intermediate kinds",    {"exact_division": True, "nonneg_running": True}),
-    ("everything loosened",          {"zero_operand": True, "zero_answer": True,
-                                      "leading_zeros": True, "expression_rhs": True,
-                                      "negative_answer": True, "no_operator": True}),
+    ("everything loosened",          {"zero_operand": True, "leading_zeros": True,
+                                      "expression_rhs": True, "negative_answer": True,
+                                      "no_operator": True}),
 ]
 
 RULES = "2026-09-03"      # the rule set in math/nerdle.py this output obeys

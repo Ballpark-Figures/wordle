@@ -87,9 +87,10 @@ def ref_valid(s, width):
 # The ANSWER rules (A1-A4) as a single regular expression: a number, then at
 # least one operator-and-number, then `=`, then a number, with `(?!0)` in front
 # of every number so no digit run can begin with a zero.  No `-` can be unary
-# because a number never starts with one.  Deliberately one flat pattern rather
-# than the four separate tests the implementation uses.
-ANS_RE = re.compile(r"^(?!0)\d+(?:[-+*/](?!0)\d+)+=(?!0)\d+$")
+# because a number never starts with one.  The right side is `0|(?!0)\d+`, which
+# is A2's exception: the ANSWER alone may be a bare zero.  Deliberately one flat
+# pattern rather than the four separate tests the implementation uses.
+ANS_RE = re.compile(r"^(?!0)\d+(?:[-+*/](?!0)\d+)+=(?:0|(?!0)\d+)$")
 
 
 def ref_answer(s, width):
@@ -193,9 +194,9 @@ print("   ok   %d accepts, %d rejects" % (len(ACCEPT), len(REJECT)))
 # here specifically to pin the two decisions settled on 2026-09-03: an answer
 # may pass through a negative value and through a fraction.
 ANS_ACCEPT = ["12+34=46", "1+1=2", "10-3=7", "9+8-7=10", "1+2*3=7",
-              "8/2*3=12", "9*8/6=12", "1-2+3=2", "1/2*4=2"]
+              "8/2*3=12", "9*8/6=12", "1-2+3=2", "1/2*4=2", "12-3*4=0"]
 ANS_REJECT = ["0012=012", "1+9=0+10", "10-20=-10", "1+2=03", "5=000005",
-              "1--2=3", "1+2+3=06", "1+0=1", "1+2=3+0", "12+34=45"]
+              "1--2=3", "1+2+3=06", "1+0=1", "1+2=3+0", "12+34=45", "1*0+7=7"]
 
 print("1b. the named ANSWER cases")
 for s in ANS_ACCEPT:
@@ -222,7 +223,6 @@ print("   ok   %d accepts, %d rejects" % (len(ANS_ACCEPT), len(ANS_REJECT)))
 # listed switches turn it from rejected to accepted, and nothing else does.
 SWITCH_CASES = [
     ("1+0=1",    ["zero_operand", "leading_zeros"]),
-    ("1-1=0",    ["zero_answer", "leading_zeros"]),
     ("1+2=03",   ["leading_zeros"]),
     ("1-4=-3",   ["negative_answer", "expression_rhs"]),
 ]
@@ -244,6 +244,12 @@ for s, k in (("1/2*4=2", "exact_division"), ("1-2+3=2", "nonneg_running")):
         bad("%r should be a settled answer" % s)
     if N.answer_rules(s, len(s), **{k: True}):
         bad("%r should be removed by %s" % (s, k))
+# A2's exception is a switch too, in the other direction: it is ON by default,
+# and withdrawing it must remove exactly the zero-answer case.
+if not N.answer_rules("12-3*4=0", 8):
+    bad("'12-3*4=0' should be a settled answer -- A2 admits a zero ANSWER")
+if N.answer_rules("12-3*4=0", 8, zero_answer=False):
+    bad("'12-3*4=0' should be removed by zero_answer=False")
 # No switch may change an answer that the settled rules already accept.
 for s in ANS_ACCEPT:
     for k in ("zero_operand", "zero_answer", "leading_zeros", "expression_rhs",
@@ -251,7 +257,7 @@ for s in ANS_ACCEPT:
         if not N.answer_rules(s, len(s), **{k: True}):
             bad("loosening %s dropped the settled answer %r" % (k, s))
 print("   ok   %d switch cases, %d loosenings keep every settled answer"
-      % (len(SWITCH_CASES) + 2, len(ANS_ACCEPT) * 6))
+      % (len(SWITCH_CASES) + 3, len(ANS_ACCEPT) * 6))
 
 # -------------------------------------------------------------- 2. evaluator
 print("2. nerdle.evaluate against Python's own parser, every side to length 4")

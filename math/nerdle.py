@@ -43,10 +43,10 @@ that also satisfies:
       This is the rule the live game states ("on the right of `=` is only a
       number") and it is what makes an answer's right side terminal where a
       guess's is not.
-  A2. NO DIGIT RUN BEGINS WITH `0`, which bans a leading zero (`1+2=03`) and,
-      as the user put it, bans the number `0` outright -- so every operand and
-      the answer itself are at least 1.  `10` is unaffected: its zero is not
-      leading.
+  A2. NO DIGIT RUN BEGINS WITH `0`, EXCEPT THAT THE ANSWER MAY BE `0` ITSELF.
+      So a leading zero (`1+2=03`) is out and a bare `0` OPERAND (`1*0+7=7`)
+      is out, but `12-3*4=0` is in.  `10` is unaffected: its zero is not
+      leading.  The exception is not arbitrary -- see below.
   A3. NO UNARY MINUS ANYWHERE, so no negative number is ever written.  Every
       `-` in an answer is a binary subtraction.
   A4. THE LEFT SIDE CONTAINS AT LEAST ONE OPERATOR, so `0012=012` is a guess
@@ -61,8 +61,28 @@ a whole number of at least 1.  Both stricter readings were live until then and
 both shrink the answer set, so a count computed under either is a DIFFERENT
 quantity -- do not quote one as the answer count.
 
+HOW A2's EXCEPTION WAS ESTABLISHED (2026-09-03), because on its own it looks
+arbitrary.  Nerdle publishes two counts in its FAQ: "over 100,000 valid
+solutions", of which it "chose 17,723".  Measured at width 8 against our
+enumerated guesses:
+
+    these rules WITHOUT the exception       17356
+    these rules WITH it                     17723   <- their chosen list, exactly
+    these rules with A2 dropped entirely   112566   <- their "over 100,000"
+    these rules also allowing `0` operands  25489   <- overshoots, ruled out
+
+So one story fits both published numbers: their valid-solution set is ours with
+leading zeros allowed, and the cull to their chosen list drops leading zeros and
+bare `0` operands while KEEPING `0` as an answer.  The hit on 17723 was not
+fitted -- `0` as the answer was picked as the likeliest single explanation
+BEFORE the run, because the 1-digit-answer bucket held 5523 across the values
+1-9, which made a zero bucket of a few hundred the right size for the 367 gap.
+It is still an inference from two counts rather than a rule anyone has read, so
+a past answer of `0`, or the absence of one, would settle it outright.
+
 Where a value could go wrong is worth stating, because it is why those two
-questions had unambiguous answers: A2 and A3 make every operand at least 1, so
+questions had unambiguous answers: A2 and A3 make every operand at least 1 (the
+`0` exception is the ANSWER, never an operand), so
 the only way an answer's left side reaches a negative value is a subtraction in
 its running left-to-right total, and the only way it reaches a fraction is a
 division inside a term.  There is nowhere else to look.
@@ -304,7 +324,7 @@ def lhs_intermediates(lhs):
     return vals
 
 
-def answer_rules(s, width=WIDTH, zero_operand=False, zero_answer=False,
+def answer_rules(s, width=WIDTH, zero_operand=False, zero_answer=True,
                  leading_zeros=False, expression_rhs=False,
                  negative_answer=False, no_operator=False,
                  exact_division=False, nonneg_running=False, check_guess=True):
@@ -317,11 +337,13 @@ def answer_rules(s, width=WIDTH, zero_operand=False, zero_answer=False,
     read.  Do not let a switched count leak into anything as "the answers".
 
     Loosening: `zero_operand` admits a bare `0` as a left-side operand,
-    `zero_answer` admits `0` as the answer, `leading_zeros` drops A2 entirely,
+    `leading_zeros` drops A2 entirely,
     `expression_rhs` drops A1 so the right side may be an expression,
     `negative_answer` allows a single unary minus on the answer, `no_operator`
     drops A4.  Tightening: `exact_division` requires every division to come out
-    whole, `nonneg_running` forbids the running total from going below zero.
+    whole, `nonneg_running` forbids the running total from going below zero,
+    and `zero_answer=False` withdraws A2's exception so the answer may not be
+    `0` -- the rule set that gave 17356, before the exception was established.
     """
     # `check_guess=False` skips re-parsing a line already known to be a valid
     # guess.  A variant sweep tests one line against a dozen rule sets and the
@@ -348,7 +370,12 @@ def answer_rules(s, width=WIDTH, zero_operand=False, zero_answer=False,
         return False
 
     if not leading_zeros:                           # A2
-        answer_run = rhs.lstrip("-") if not expression_rhs else None
+        # The answer is whatever the whole right side spells, sign aside.  Under
+        # `expression_rhs` a `0` inside an expression is an OPERAND and not the
+        # answer, and comparing against the whole side is what tells them apart
+        # -- computing this only when A1 holds made a loosening switch REMOVE a
+        # legal answer, which no loosening may ever do.
+        answer_run = rhs.lstrip("-")
         for start, text in digit_runs(s):
             if text[0] != "0":
                 continue
