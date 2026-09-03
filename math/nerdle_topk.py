@@ -248,7 +248,7 @@ if _HAVE_NUMBA:
                     out[r, j] = _pattern(G, g, A, S[j], width, cnt)
 
     @njit(cache=True)
-    def _pair_scores(rows, npat, buf, out):
+    def _pair_row(rows, i, npat, buf, out, off):
         """Sum of squared JOINT bin sizes for every pair of the given rows.
 
         The joint bin of an answer is the pair of feedbacks the two guesses give
@@ -258,27 +258,33 @@ if _HAVE_NUMBA:
 
         `buf` is a npat*npat counter touched sparsely and cleared by walking the
         same answers again -- never by zeroing 43 million entries per pair.
+
+        ONE ROW AT A TIME -- every pair (i, j) with j > i -- so the caller can
+        drive it from Python.  As with the root scoring, a njit call does not
+        return to the interpreter, so doing every pair in one call swallows
+        Ctrl-C for the whole run, which at --top-n 10000 is 49,995,000 pairs and
+        the better part of an hour.
         """
         n, NA = rows.shape
-        t = 0
-        for i in range(n):
-            for j in range(i + 1, n):
-                for a in range(NA):
-                    p1 = rows[i, a]
-                    p2 = rows[j, a]
-                    if p1 >= 0 and p2 >= 0:
-                        buf[p1 * npat + p2] += 1
-                ss = 0
-                for a in range(NA):
-                    p1 = rows[i, a]
-                    p2 = rows[j, a]
-                    if p1 >= 0 and p2 >= 0:
-                        c = buf[p1 * npat + p2]
-                        if c > 0:
-                            ss += c * c
-                            buf[p1 * npat + p2] = 0
-                out[t] = ss
-                t += 1
+        t = off
+        for j in range(i + 1, n):
+            for a in range(NA):
+                p1 = rows[i, a]
+                p2 = rows[j, a]
+                if p1 >= 0 and p2 >= 0:
+                    buf[np.int64(p1) * npat + p2] += 1
+            ss = 0
+            for a in range(NA):
+                p1 = rows[i, a]
+                p2 = rows[j, a]
+                if p1 >= 0 and p2 >= 0:
+                    q = np.int64(p1) * npat + p2
+                    c = buf[q]
+                    if c > 0:
+                        ss += np.int64(c) * c
+                        buf[q] = 0
+            out[t] = ss
+            t += 1
         return t
 
     @njit(cache=True)
@@ -735,7 +741,7 @@ class NerdleTopK:
         return best_cost, best_g
 
     # ---- pair openers ------------------------------------------------------
-    def pair_scores(self, top_n):
+    def pair_scores(self, top_n, progress=None):
         """Every pair drawn from the top_n single guesses, by joint sum of squares.
 
         Returns (the top_n guess indices, [(score, i, j)] sorted best first),
@@ -757,15 +763,30 @@ class NerdleTopK:
         gs = order[:top_n].copy()
         nk = gs.size
 
-        rows = np.empty((nk, self.NA), dtype=np.int32)
+        # int16 holds every pattern code (6560 at width 8) and the -1 marker, and
+        # halves what is a 354 MB table at --top-n 10000.
+        rows = np.empty((nk, self.NA), dtype=np.int16)
         if self.use_numba:
-            _rows(self.G, gs, self.A, S, self.gclass, self.aclass, self.width,
-                  self._cnt, rows)
-            out = np.zeros(nk * (nk - 1) // 2, dtype=np.int64)
+            import time
+            t0 = time.time()
+            npairs = nk * (nk - 1) // 2
+            for lo in range(0, nk, 256):
+                hi = min(lo + 256, nk)
+                _rows(self.G, gs[lo:hi], self.A, S, self.gclass, self.aclass,
+                      self.width, self._cnt, rows[lo:hi])
+                if progress is not None:
+                    progress(0, npairs, time.time() - t0,
+                             "feedback rows %d/%d" % (hi, nk))
+            out = np.zeros(npairs, dtype=np.int64)
             # npat*npat counters -- 172 MB at width 8.  Allocated once for the
             # whole sweep, not per pair.
             buf = np.zeros(self.NPAT * self.NPAT, dtype=np.int32)
-            _pair_scores(rows, self.NPAT, buf, out)
+            off = 0
+            for i in range(nk):
+                off = _pair_row(rows, i, np.int64(self.NPAT), buf, out, off)
+                if progress is not None:
+                    progress(off, npairs, time.time() - t0,
+                             "first guess %d/%d" % (i + 1, nk))
         else:
             for r, g in enumerate(gs):
                 rows[r] = self._root_codes(int(g), S)

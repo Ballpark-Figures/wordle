@@ -925,6 +925,11 @@ Run it with **`bash solver/run-nerdle-solve.sh [-k K] [--width W] [--rank-only]`
     pair is scored, but `--top-n 10000` is 49995000 of them and writing them all produced
     a **1.67 GB file in the committed tree**. The `.meta` carries `scored`/`written`/
     `complete` like the singletons files, so a capped file cannot be read as a full one.
+  - **THE PAIR LOOP IS CHUNKED BY FIRST GUESS, for the same reason the root scoring is** —
+    a njit call never returns to the interpreter, and at `--top-n 10000` that is 50M pairs
+    and the better part of an hour with Ctrl-C dead and nothing printed. Do not merge it
+    back into one call. The feedback table is int16 (every code plus the -1 marker fits),
+    which halves a 354 MB allocation at that N.
 - **`python3 tools/nerdle_symbols.py [--set answers|guesses|classes]`** reports symbol
   frequencies three ways (occurrences, equations containing, per equation) plus a position
   table. The three sets are different denominators and none is hidden as a default —

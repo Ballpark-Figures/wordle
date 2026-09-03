@@ -229,6 +229,18 @@ else:
         else:
             print("   ok   width %d: %d pairs agree, best %s + %s at %d, hand-counted"
                   % (w, len(sc_f), g1, g2, score))
+        # Progress must not change the answer, and must reach every pair.
+        calls = []
+        gp2 = game(w, 1)
+        _, sc_p = gp2.pair_scores(10, progress=lambda d, t, e, n: calls.append((d, t)))
+        if sc_p != sc_f:
+            bad("width %d: reporting progress changed the pair scores" % w)
+        elif not calls or calls[-1][0] != len(sc_f) or calls[-1][1] != len(sc_f):
+            bad("width %d: pair progress ended at %s, expected %d pairs"
+                % (w, calls[-1] if calls else None, len(sc_f)))
+        elif [d for d, _ in calls] != sorted(d for d, _ in calls):
+            bad("width %d: pair progress went backwards" % w)
+
         # A pair must never split WORSE than its better half alone: adding a
         # second blind guess can only refine the partition.
         og = np.empty(10, dtype=np.int64)
