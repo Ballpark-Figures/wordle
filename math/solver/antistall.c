@@ -119,6 +119,13 @@ static uint64_t BS_ALL[BSW];                   /* every legal guess; NG..MAXG-1 
 
 static int PRUNE = 1;                    /* --no-prune drops both bounds */
 static int LONGEST = 0;                  /* --longest: the max over answers only */
+/* --show-bound prints the letters bound at the START state and exits.
+ *
+ * It exists because a bound that never fires is INDISTINGUISHABLE from a bound
+ * that is silently broken: values, node counts and every gate come out identical
+ * either way. So the implementation has to be checked directly against the
+ * reference rather than inferred from the search agreeing. */
+static int SHOWBOUND = 0;
 static long long MAXNODES = 0;           /* --max-nodes, 0 = unlimited */
 
 /* --------------------------------------------------------------- loading
@@ -944,6 +951,7 @@ static void usage(void) {
         "  --longest        find the LONGEST GAME any answer admits, and stop --\n"
         "                   a different, much cheaper question than the per-answer\n"
         "                   sweep, since only the maximum is computed\n"
+        "  --show-bound     print the letters bound at the start state and exit\n"
         "  --no-prune       disable both bounds -- the exhaustive oracle\n"
         "  --after \"W W\"    words already played, to start from a mid-game state\n"
         "  --guess-list F   word list that may be PLAYED (default guess.txt)\n"
@@ -972,6 +980,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--max-nodes") && i + 1 < argc)   MAXNODES = atoll(argv[++i]);
         else if (!strcmp(argv[i], "--no-prune"))                    PRUNE = 0;
         else if (!strcmp(argv[i], "--longest"))                     LONGEST = 1;
+        else if (!strcmp(argv[i], "--show-bound"))                  SHOWBOUND = 1;
         else if (!strcmp(argv[i], "--guess-list") && i + 1 < argc)  guesslist = argv[++i];
         else if (!strcmp(argv[i], "--data") && i + 1 < argc)        datadir = argv[++i];
         else if (!strcmp(argv[i], "--after") && i + 1 < argc) {
@@ -1115,6 +1124,24 @@ int main(int argc, char **argv) {
     }
 
     Ctx *c = ctx_new();
+
+    if (SHOWBOUND) {
+        for (int k = 0; k < ntodo; k++) {
+            int ai = todo[k];
+            ctx_load_answer(c, ai);
+            uint64_t h0, h1;
+            int pool;
+            uint32_t umask;
+            uint8_t gmk;
+            int nL = start_state(c, ai, after, nafter, &h0, &h1, &pool, &umask, &gmk);
+            printf("%s letters_bound=%d unused=%d nongreen=%d nL=%d pool=%d\n",
+                   AWORD[ai], letters_bound(umask, gmk),
+                   __builtin_popcount(ALPHA_MASK & ~umask),
+                   WORDLEN - __builtin_popcount((uint32_t)gmk), nL, pool);
+        }
+        return 0;
+    }
+
     double t_start = (double)clock() / CLOCKS_PER_SEC;
     if (LONGEST) {
         if (resumed_floor)

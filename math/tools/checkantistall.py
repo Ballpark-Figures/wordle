@@ -54,7 +54,8 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from antiwordle import GuessSpace, StallSearch, cons_none, replay_prefix
+from antiwordle import (GuessSpace, StallSearch, cons_none, letters_bound,
+                        replay_prefix)
 from build_patterns import load_patterns
 from wordle import load_words
 
@@ -127,6 +128,51 @@ def roomiest(space, PAT, answers, rng, cases):
     return [w for _, w in sorted(live, key=lambda t: -t[0])[:cases]]
 
 
+def test_bound_matches_reference(space, PAT, answers, rng, cases):
+    """The C letters bound == the Python one, state for state.
+
+    THIS CHECK EXISTS BECAUSE NOTHING ELSE CAN CATCH ITS BUG. The letters bound is
+    measured to sit ~10 guesses above the truth, so it essentially never prunes —
+    which means a broken one (a `used` mask stuck at zero, a green mask that never
+    accumulates) yields the SAME values, the SAME node counts and the SAME passing
+    gates as a correct one. Agreement of the searches is no evidence at all here;
+    the bound has to be compared directly.
+
+    Walked along REAL optimal lines, one state per depth, so the deep states where
+    the masks have accumulated the most are the ones exercised.
+    """
+    bad, tested = [], 0
+    for answer in roomiest(space, PAT, answers, rng, cases):
+        _, cline, _ = run_c(answer, PREFIX)
+        words = PREFIX.split() + cline.split()[:-1]   # drop the naming move
+        col = np.asarray(PAT[:, answers.index(answer)])
+        for k in range(1, len(words) + 1):
+            try:
+                cons = replay_prefix(space, col, words[:k])
+            except ValueError:
+                break
+            out = subprocess.run(
+                [BINARY, "--show-bound", "--no-out", "--data", "data",
+                 "--answer", answer, "--after", " ".join(words[:k])],
+                cwd=MATH, capture_output=True, text=True)
+            row = [l for l in out.stdout.splitlines() if "letters_bound=" in l]
+            if not row:
+                bad.append(f"{answer}@{k}: no output")
+                break
+            got = {kk: int(v) for kk, v in
+                   (x.split("=") for x in row[0].split()[1:])}
+            want = letters_bound(cons)
+            tested += 1
+            if got["letters_bound"] != want:
+                bad.append(f"{answer}@{k}: C={got['letters_bound']} py={want}")
+                break
+    detail = (f"{tested} states along optimal lines" if not bad
+              else "; ".join(bad[:3]))
+    print(f"  {'PASS' if not bad else 'FAIL'}  C letters bound == Python's   {detail}")
+    if bad:
+        FAILS.append("letters bound: " + "; ".join(bad[:3]))
+
+
 def main():
     argv = sys.argv[1:]
     seed = int(argv[argv.index("--seed") + 1]) if "--seed" in argv else 20260902
@@ -165,6 +211,9 @@ def main():
         elif cline != pline:
             WARNS.append(f"{answer}: lines differ (both length {cv})")
             print(f"        warn: lines differ\n          C  {cline}\n          py {pline}")
+
+    print("\nthe bound, which no other check can see")
+    test_bound_matches_reference(space, PAT, answers, rng, 2 if quick else 4)
 
     print()
     for w in WARNS:
