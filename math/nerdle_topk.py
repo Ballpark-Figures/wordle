@@ -184,6 +184,21 @@ if _HAVE_NUMBA:
         return nk
 
     @njit(cache=True)
+    def _codes(G, g, A, S, gclass, aclass, width, cnt, out):
+        """Feedback code per candidate for guess g; -1 for the ones it WINS.
+
+        Exists so the ROOT can be driven from Python -- see NerdleTopK.solve.
+        The recursion below does the same thing inline; both must agree, which
+        the gate checks by running the two root paths against each other.
+        """
+        gc = gclass[g]
+        for j in range(S.shape[0]):
+            if aclass[S[j]] == gc:
+                out[j] = -1
+            else:
+                out[j] = _pattern(G, g, A, S[j], width, cnt)
+
+    @njit(cache=True)
     def _solve(G, A, S, gclass, aclass, width, k, depth, cnt, bins, touched):
         """(total guesses over the candidates in S, the guess index chosen)."""
         n = S.shape[0]
@@ -284,36 +299,109 @@ class NerdleTopK:
         self._cnt = np.zeros(NSYM, dtype=np.int64)
         self._bins = np.zeros(self.NPAT, dtype=np.int64)
         self._touched = np.zeros(self.NPAT, dtype=np.int64)
+        self._solved = None                  # (total, guess index), filled by solve()
 
     # ---- the objective -----------------------------------------------------
-    def total_guesses(self):
-        """Guesses summed over every answer -- an integer, so exactly comparable."""
-        S = np.arange(self.NA, dtype=np.int64)
-        if self.use_numba:
-            cost, _ = _solve(self.G, self.A, S, self.gclass, self.aclass,
-                             self.width, self.k, 0, self._cnt, self._bins,
-                             self._touched)
-            return int(cost)
-        return int(self._ref_solve(S, 0)[0])
+    def solve(self, progress=None):
+        """(total guesses over every answer, the opening guess).
 
-    def expected_guesses(self):
+        THE RESULT IS CACHED, because the search is minutes long and the total
+        and the opener come out of the same walk.  Asking for them separately
+        used to run it twice.
+
+        THE ROOT IS DRIVEN FROM PYTHON so the run can report progress: the
+        kernel handles each subtree, and this loop sees them completed one at a
+        time.  It reproduces the recursion's root exactly -- same ranking, same
+        bucket order, same running-cost cut -- and the gate checks the two
+        against each other rather than trusting that.
+
+        `progress(done, total, elapsed, note)` is called as buckets finish, with
+        `done` the answers resolved so far out of `total`.  It is a real
+        completion fraction, not a heartbeat, because the answer count is known
+        before the walk starts.
+        """
+        if self._solved is None:
+            self._solved = self._solve_root(progress)
+        return self._solved
+
+    def total_guesses(self, progress=None):
+        """Guesses summed over every answer -- an integer, so exactly comparable."""
+        return self.solve(progress)[0]
+
+    def expected_guesses(self, progress=None):
         """Average guesses over the answer list, taken UNIFORMLY.
 
         Uniform over ANSWERS, not over classes: the hidden equation is drawn
         from the answer list, and two answers sharing a class are two different
         days that happen to be won by the same guess.
         """
-        return self.total_guesses() / self.NA
+        return self.total_guesses(progress) / self.NA
 
-    def opener(self):
+    def opener(self, progress=None):
         """The guess the beam plays first, as a word."""
+        g = self.solve(progress)[1]
+        return self.guess_words[g] if g >= 0 else None
+
+    def _root_codes(self, g, S):
+        """Feedback per candidate for root guess g; -1 where the guess WINS."""
+        out = np.empty(S.shape[0], dtype=np.int64)
+        if self.use_numba:
+            _codes(self.G, g, self.A, S, self.gclass, self.aclass, self.width,
+                   self._cnt, out)
+            return out
+        from wordle import pattern
+        gc = self.gclass[g]
+        for j, a in enumerate(S):
+            out[j] = -1 if self.aclass[a] == gc else pattern(
+                self.guess_words[g], self.answer_words[a])
+        return out
+
+    def _subtree(self, sub):
+        if self.use_numba:
+            c, _ = _solve(self.G, self.A, sub, self.gclass, self.aclass,
+                          self.width, self.k, 1, self._cnt, self._bins,
+                          self._touched)
+            return int(c)
+        return int(self._ref_solve(sub, 1)[0])
+
+    def _solve_root(self, progress=None):
+        import time
+        t0 = time.time()
         S = np.arange(self.NA, dtype=np.int64)
         if self.use_numba:
-            _, g = _solve(self.G, self.A, S, self.gclass, self.aclass, self.width,
-                          self.k, 0, self._cnt, self._bins, self._touched)
+            out_g = np.empty(self.k, dtype=np.int64)
+            out_s = np.empty(self.k, dtype=np.int64)
+            nk = _rank(self.G, self.A, S, self.gclass, self.aclass, self.width,
+                       self.k, self._cnt, self._bins, self._touched, out_g, out_s)
+            order = [int(out_g[i]) for i in range(nk)]
         else:
-            _, g = self._ref_solve(S, 0)
-        return self.guess_words[g] if g >= 0 else None
+            order = [int(g) for g in self._ref_rank(S)]
+
+        best_cost, best_g = 1 << 60, -1
+        for t, g in enumerate(order):
+            codes = self._root_codes(g, S)
+            keep = codes >= 0
+            cost = self.NA                    # every answer pays for this guess
+            done = int((~keep).sum())         # the ones this guess already won
+            vals = np.unique(codes[keep])
+            for i, pv in enumerate(vals):
+                sub = S[codes == pv]
+                cost += self._subtree(sub)
+                done += sub.size
+                if progress is not None:
+                    # Reported across the WHOLE beam, not per root guess: with
+                    # k > 1 a per-guess fraction runs to 100% and starts over,
+                    # which reads as a stall or a restart.  A root guess cut
+                    # short by the running-cost break makes the total jump
+                    # forward, which is honest -- that work really is skipped.
+                    progress(t * self.NA + done, len(order) * self.NA,
+                             time.time() - t0, "root guess %d/%d, bucket %d/%d"
+                             % (t + 1, len(order), i + 1, len(vals)))
+                if cost >= best_cost:
+                    break                     # the same cut the recursion makes
+            if cost < best_cost:
+                best_cost, best_g = int(cost), g
+        return best_cost, best_g
 
     # ---- reference implementation (the oracle; identical rules, plain numpy)
     def _ref_patterns(self, g, S):

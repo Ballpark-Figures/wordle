@@ -97,6 +97,47 @@ else:
                 print("   ok   width %d k=%d: total %d, expected %.4f, opens %s"
                       % (w, k, tf, tf / fast.NA, of))
 
+# ------------------------------------------- 1b. the two root drivers agree
+print("1b. the Python-driven root against the kernel's own recursion")
+if not NT._HAVE_NUMBA:
+    print("   SKIP  numba is not installed")
+else:
+    for w in ([5, 6, 7] if wide else [5, 6]):
+        for k in ([1, 2] if wide else [1, 2]):
+            g = game(w, k)
+            S = np.arange(g.NA, dtype=np.int64)
+            deep_cost, deep_g = NT._solve(g.G, g.A, S, g.gclass, g.aclass, w, k, 0,
+                                          g._cnt, g._bins, g._touched)
+            cost, gi = g.solve()
+            if cost != int(deep_cost) or gi != int(deep_g):
+                bad("width %d k=%d: the Python root gives (%d, %r), the recursion "
+                    "gives (%d, %r)" % (w, k, cost, g.guess_words[gi],
+                                        int(deep_cost), g.guess_words[int(deep_g)]))
+            else:
+                print("   ok   width %d k=%d: both roots give %d, opening %s"
+                      % (w, k, cost, g.guess_words[gi]))
+
+# ------------------------------------------------- 1c. progress is a fraction
+print("1c. progress reports a real completion fraction")
+gp = game(6, 1)
+seen_calls = []
+gp.solve(progress=lambda d, t, e, n: seen_calls.append((d, t)))
+if not seen_calls:
+    bad("solve() reported no progress at all")
+else:
+    dones = [d for d, _ in seen_calls]
+    total = seen_calls[0][1]
+    if total != gp.NA:
+        bad("progress reports %d as the total, the answer list holds %d" % (total, gp.NA))
+    elif dones != sorted(dones):
+        bad("progress went backwards: %s" % dones[:8])
+    elif dones[-1] != gp.NA:
+        bad("progress ended at %d of %d -- it never reached the whole list"
+            % (dones[-1], gp.NA))
+    else:
+        print("   ok   %d reports, monotone, ending at %d of %d"
+              % (len(seen_calls), dones[-1], gp.NA))
+
 # ----------------------------------------------------------- 2. the ranking
 print("2. the top-ranked guess is the argmin of the sum of squared bins")
 g6 = game(6, 1)

@@ -867,6 +867,18 @@ Run it with **`bash solver/run-nerdle-solve.sh [-k K] [--width W] [--rank-only]`
   the guess count times the candidates alive at that level, so every level costs about
   what the root does rather than decaying. `--rank-only` does the root and stops.
   **`-k K` multiplies the work per level by K**, so it compounds with depth.
+- **THE ROOT IS DRIVEN FROM PYTHON so the run reports progress** — the kernel does each
+  subtree, the loop sees them finish. It reproduces the recursion's root exactly (same
+  ranking, bucket order and running-cost cut) and the gate diffs the two rather than
+  trusting it. Progress is a REAL completion fraction (answers resolved out of the answer
+  count, spanning the whole beam at `k > 1`), not a heartbeat.
+- **`solve()` is CACHED, and that was a bug fix**: the total and the opener come out of one
+  walk, and asking for them separately ran the whole search TWICE.
+- **`python3 tools/nerdle_symbols.py [--set answers|guesses|classes]`** reports symbol
+  frequencies three ways (occurrences, equations containing, per equation) plus a position
+  table. The three sets are different denominators and none is hidden as a default —
+  answers is what the game draws from, guesses is what you may type (21x larger and much
+  stranger), classes is one member per commutative class.
 - **`python3 tools/checknerdletopk.py` is the GATE** — the numba kernel against a plain
   numpy reference that recomputes feedback from the STRINGS with `wordle.pattern`
   (identical totals and identical openers at several widths and K), the top-ranked guess
