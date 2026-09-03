@@ -808,6 +808,14 @@ static int run_longest(Ctx *c, FILE *out, int *todo, int ntodo,
             incumbent++;
             witness = ai;
             record = 1;
+            /* Printed HERE, the moment the incumbent rises, not after the answer
+             * finishes: an answer can take half an hour, and a record found in
+             * its first minute is the most interesting thing the run has to say.
+             * The witness is rebuilt now too, while this answer's entries are
+             * still hot in the table. */
+            longest_line(c, ai, incumbent, line, sizeof line);
+            printf("        NEW LONGEST: %d  (%s)  %s\n", incumbent, AWORD[ai], line);
+            fflush(stdout);
         }
         if (c->overflow) {
             fprintf(stderr, "internal: recursion hit MAXD=%d on %s -- raise it\n",
@@ -815,13 +823,11 @@ static int run_longest(Ctx *c, FILE *out, int *todo, int ntodo,
             exit(1);
         }
         double secs = (double)clock() / CLOCKS_PER_SEC - t0;
-        if (record) longest_line(c, ai, incumbent, line, sizeof line);
         const char *verdict = c->budget_blown ? "unknown" : (record ? "record" : "no");
         if (c->budget_blown) unknown++;
         printf("[%d/%d] %s greedy=%d %s  nodes=%lld %.2fs\n",
                nseen + k + 1, nseen + ntodo, AWORD[ai], order[k].bound, verdict,
                c->nodes, secs);
-        if (record) printf("        NEW LONGEST: %d  %s\n", incumbent, line);
         fflush(stdout);
         if (out) {
             /* `value` is filled ONLY on a record -- for every other answer the run
@@ -869,6 +875,11 @@ static void usage(void) {
 }
 
 int main(int argc, char **argv) {
+    /* Line-buffered: the wrapper pipes stdout through `tee`, and block buffering
+     * on a pipe means a multi-hour run shows NOTHING in its log until it ends.
+     * That happened -- a 3h24m run wrote three CSV rows and an empty log. */
+    setvbuf(stdout, NULL, _IOLBF, 0);
+
     const char *outpath = NULL, *datadir = "data", *guesslist = NULL;
     int no_out = 0, ttbits = 26, limit = 0;
     char *only[64]; int nonly = 0;
