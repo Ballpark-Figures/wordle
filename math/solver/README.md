@@ -219,6 +219,81 @@ tree too (`python3 tools/checktrees.py salet`) — the hard-mode legality check 
 skipped there, and the same tree fails ~1450 of 2315 lines if you force it on,
 which is what confirms the check actually fires.
 
+## Mastermind feedback (`mmturns`)
+
+`mmturns` is the third compile-time mode of `optturns.c` (`-DMASTERMIND`,
+alongside `-DHARDMODE`). Same word lists, same objective shape, **different
+feedback**: the codebreaker is told Mastermind's **peg counts** — how many
+letters are right *in place* (blacks) and how many are right *in the wrong
+place* (whites) — and never which positions those were.
+
+> Minimise the **total guesses summed over all 2315 answers**, where the reply
+> to each guess is its **(blacks, whites) peg counts**, subject to resolving
+> every answer within `--depth` guesses.
+
+**Do not put an `mmturns` total in a table with an `optturns` one.** Peg feedback
+is strictly coarser — 20 outcomes against Wordle's 238 — so these are optima of
+two different games, not two difficulty settings of one.
+
+**No new feedback code, and that is the point.** The peg counts are a *function*
+of the stored Wordle pattern: `blacks` is the number of greens and `whites` the
+number of yellows, because Wordle's yellow rule hands out exactly
+`min(guess_c, answer_c) − green_c` copies of each letter and that sums to the
+white-peg count. So `-DMASTERMIND` is one remap of the loaded matrix
+(`mm_remap`) plus a narrowed `NPAT`; every hot loop is untouched, and
+`solver/validate.sh` still reproduces all five totals with identical node counts
+(salet 16672) because `optturns` compiles exactly as before.
+
+**The feedback space is 20 codes at 5 letters**: every `(blacks, whites)` with
+`blacks + whites ≤ 5`, less the single impossible pair `(4, 1)`. With four exact
+matches the two words differ in one position only, so the odd guess letter is
+matched against a different answer letter while every other copy of it is already
+consumed by an exact match — `whites` is forced to 0. `mm_code` enumerates blacks
+ascending, which puts the win `(5, 0)` last, so `ALL_GREEN == NPAT − 1` keeps its
+meaning and nothing that tests `p == ALL_GREEN` changes.
+
+**`--depth` is REQUIRED and it BINDS.** `optturns`' default of 6 is slack because
+238 outcomes branch fast; at 20 they do not, so a depth-7 pass and a depth-9 pass
+are different quantities and get different CSVs. The binary refuses to start
+without an explicit `--depth` rather than inherit a cap nobody chose.
+**The minimum feasible depth is an OPEN QUESTION** — the counting bound only
+gives `≥ 4`, which is not restrictive, so settling it needs a real run.
+`INFEASIBLE` is an expected result here, not a bug.
+
+`MASTERMIND` is in the TT salt **unconditionally**, and that matters more here
+than anywhere else: the word lists are identical, so a colour-feedback table and
+a peg-feedback table would agree on every key while meaning different games. An
+`optturns` `tt.bin` therefore fails verification in `mmturns` instead of
+answering.
+
+Hard mode and Mastermind cannot be combined (`#error`): hard mode's rule is
+stated in per-tile colours, which peg counts do not report.
+
+```sh
+# from math/
+bash solver/run-mm-sweep.sh --depth 8            # the top-k 1 run
+bash solver/run-mm-sweep.sh --depth 8 -k 20
+bash solver/run-mm-sweep.sh --depth 8 --guesses mystery   # answers-only guesses
+```
+
+`--topk K` restricts branching at every branching point **including the root**,
+so `-k 1` examines exactly one opener — the best of the 12972 by root sum of
+squared bin sizes — and the total is an upper bound, the best of the K examined.
+The run prints the measured `BRANCH` and the opener it picked in its first lines.
+`--optimal-only` emits **no trees**, so the winner's tree needs a follow-up
+`./solver/mmturns --opener <winner> --depth <D> --trees <dir>` at the same depth.
+Data lands in `math/data/{shared,local}/mmturns/`, one file set per (depth, K).
+
+**The gate is `python3 tools/checkmastermind.py`** (`--wide` adds the full
+matrix). It checks the encoding against a Python mirror of `mm_code`, the
+blacks/whites identity against peg counts recomputed **from the strings** by the
+textbook rule (exhaustively on small alphabets, and over all 30,030,180 real
+guess × answer pairs under `--wide`), that `(4, 1)` really is the only hole, and
+— the one that exercises the search itself — `mmturns` against a brute-force
+memoised solver on a miniature 24 × 16 data directory, at two depths so both the
+solved and `INFEASIBLE` branches are compared. Run it alongside
+`solver/validate.sh` and `tools/checkpatterns.py`.
+
 ## Answers-only (`--guess-list`)
 
 `--guess-list FILE` restricts the **legal guesses** to the words in `FILE`. The

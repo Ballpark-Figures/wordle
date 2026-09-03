@@ -74,16 +74,66 @@
 #define P3_11 177147
 #define _P3CAT(a, b) a##b
 #define _P3(n) _P3CAT(P3_, n)
-#define NPAT       _P3(WORDLEN)
+/* The base-3 ENCODING space of the stored matrix: always 3**WORDLEN, whatever
+ * feedback the binary then interprets it as.  patterns.npy holds these codes and
+ * its dtype is chosen from this number, so it stays fixed under -DMASTERMIND. */
+#define NPAT_FULL  _P3(WORDLEN)
+
+/* MASTERMIND is a COMPILE-TIME constant, exactly like HARD and WORDLEN:
+ * build.sh emits `mmturns` from this same file with -DMASTERMIND.  The
+ * codebreaker's feedback becomes Mastermind's PEG COUNTS -- (blacks, whites),
+ * i.e. how many letters are right in place and how many are right in the wrong
+ * place -- instead of Wordle's per-tile colouring.
+ *
+ * WHY NO NEW FEEDBACK CODE.  The peg counts are a FUNCTION of the Wordle
+ * pattern: blacks is the number of GREENS, and whites is the number of YELLOWS,
+ * because Wordle's yellow rule hands out exactly min(guess_c, answer_c) - green_c
+ * copies of each letter and that sums to the white-peg count.  So the feedback
+ * is a 3**WORDLEN -> NPAT remap applied ONCE to the loaded matrix (mm_remap),
+ * and every hot loop below is untouched.  tools/checkmastermind.py is the gate
+ * that holds that identity to an independent from-the-strings computation.
+ *
+ * WHY IT IS A DIFFERENT PROBLEM, not a variant.  Peg feedback is far COARSER:
+ * 20 outcomes at 5 letters against Wordle's 238.  Bins are much larger, trees
+ * much deeper, the counting lower bound much weaker.  Do not compare an mmturns
+ * total with an optturns one -- they are optima of different games. */
+#ifdef MASTERMIND
+#if defined(HARDMODE)
+#error "MASTERMIND and HARDMODE are incompatible: hard mode's rule is stated in \
+per-tile colours (repeat greens in place, replay yellows), which peg counts do \
+not report.  Build them as separate binaries."
+#endif
+/* The feedback space: every (blacks, whites) with blacks + whites <= WORDLEN,
+ * LESS the single impossible pair (WORDLEN-1, 1).  With WORDLEN-1 exact matches
+ * the two words differ in one position only, so the guess letter x there is
+ * matched against answer letter y != x; every other copy of x is already
+ * consumed by an exact match, so min(guess_x, answer_x) contributes nothing
+ * extra and whites is forced to 0.  That leaves (L+1)(L+2)/2 - 1 codes: 20 at
+ * WORDLEN 5.  (As with 243-vs-238, some of the rest may be unreachable on a
+ * given word list; they are simply array slots that never fill.) */
+#define NPAT       (((WORDLEN) + 1) * ((WORDLEN) + 2) / 2 - 1)
+/* mm_code() below enumerates blacks ascending, so the win (WORDLEN, 0) -- the
+ * only pair with blacks == WORDLEN -- is LAST and ALL_GREEN keeps its meaning
+ * as NPAT - 1.  Nothing that tests `p == ALL_GREEN` needs to change. */
 #define ALL_GREEN  (NPAT - 1)
-/* One pattern code.  0..242 fits uint8 at WORDLEN 5 -- which is what keeps the
- * existing 12972x2315 patterns.npy, every Zobrist key and every tt.bin
+/* "b3w1" and a NUL; two digits each is room to spare at any supported length. */
+#define PATSTR_BUF 8
+#else
+#define NPAT       NPAT_FULL
+#define ALL_GREEN  (NPAT - 1)
+#define PATSTR_BUF (WORDLEN + 1)
+#endif
+
+/* One pattern code AS STORED.  0..242 fits uint8 at WORDLEN 5 -- which is what
+ * keeps the existing 12972x2315 patterns.npy, every Zobrist key and every tt.bin
  * bit-identical -- while 6..10 need uint16 and 11 needs uint32.
- * build_patterns.py applies the SAME rule and load_npy checks the two agree. */
-#if NPAT <= 256
+ * build_patterns.py applies the SAME rule and load_npy checks the two agree.
+ * Keyed off NPAT_FULL, not NPAT: -DMASTERMIND narrows the codes the solver USES
+ * but reads the very same file, so the on-disk dtype must not move under it. */
+#if NPAT_FULL <= 256
 typedef uint8_t pat_t;
 #define PAT_NPY "u1"
-#elif NPAT <= 65536
+#elif NPAT_FULL <= 65536
 typedef uint16_t pat_t;
 #define PAT_NPY "u2"
 #else
@@ -126,6 +176,14 @@ typedef uint32_t pat_t;
 #define HARD 1
 #else
 #define HARD 0
+#endif
+/* Same shape as HARD, for the same reason: a compile-time 0 in every binary but
+ * `mmturns`, so the salt term below folds away and existing snapshots stay
+ * valid. */
+#ifdef MASTERMIND
+#define MM 1
+#else
+#define MM 0
 #endif
 
 static int      NG, NA;
@@ -312,10 +370,90 @@ static double now_s(void) {
     return ts.tv_sec + 1e-9 * ts.tv_nsec;
 }
 
-static void pat_str(int code, char *out) {   /* base-3, position 0 = MSB */
+/* ------------------------------------------------- Mastermind peg feedback */
+/* Only compiled into `mmturns`.  The whole of -DMASTERMIND is these two
+ * functions plus the NPAT/ALL_GREEN redefinition above: one remap of the loaded
+ * matrix, and a printable name for a code. */
+
+/* The dense code for (blacks, whites), or -1 if the pair cannot occur.
+ * Blacks ascending, whites ascending within it, skipping (WORDLEN-1, 1) -- so
+ * the win (WORDLEN, 0) lands last and equals NPAT - 1.  This is the ONE place
+ * the ordering is defined; mm_remap and pat_str both go through it. */
+#ifdef MASTERMIND
+static int mm_code(int b, int w) {
+    if (b < 0 || w < 0 || b + w > WORDLEN) return -1;
+    if (b == WORDLEN - 1 && w == 1) return -1;
+    int k = 0;
+    for (int bb = 0; bb <= WORDLEN; bb++)
+        for (int ww = 0; ww + bb <= WORDLEN; ww++) {
+            if (bb == WORDLEN - 1 && ww == 1) continue;
+            if (bb == b && ww == w) return k;
+            k++;
+        }
+    return -1;
+}
+
+static void mm_pair(int code, int *b, int *w) {
+    int k = 0;
+    for (int bb = 0; bb <= WORDLEN; bb++)
+        for (int ww = 0; ww + bb <= WORDLEN; ww++) {
+            if (bb == WORDLEN - 1 && ww == 1) continue;
+            if (k++ == code) { *b = bb; *w = ww; return; }
+        }
+    *b = -1; *w = -1;
+}
+#endif
+
+static void pat_str(int code, char *out) {
+#ifdef MASTERMIND
+    int b, w;
+    mm_pair(code, &b, &w);
+    snprintf(out, PATSTR_BUF, "b%dw%d", b, w);
+#else
+    /* base-3, position 0 = MSB */
     for (int i = WORDLEN - 1; i >= 0; i--) { out[i] = "byg"[code % 3]; code /= 3; }
     out[WORDLEN] = 0;
+#endif
 }
+
+#ifdef MASTERMIND
+/* Rewrite the whole NG x NA matrix from base-3 Wordle codes to peg codes, ONCE,
+ * before anything reads it.  blacks = trits equal to 2, whites = trits equal to
+ * 1 -- see the identity argued at the -DMASTERMIND block above.
+ *
+ * A code the base-3 space contains but the peg space cannot (4 greens + 1
+ * yellow, unreachable in Wordle too) would map to -1; it is a hard error rather
+ * than a clamp, because silently folding it into a real bin would corrupt every
+ * partition downstream. */
+static int mm_remap(pat_t *pat, int ng, int na) {
+    int map[NPAT_FULL];
+    for (int p = 0; p < NPAT_FULL; p++) {
+        int b = 0, w = 0, q = p;
+        for (int i = 0; i < WORDLEN; i++, q /= 3) {
+            int t = q % 3;
+            if (t == 2) b++;
+            else if (t == 1) w++;
+        }
+        map[p] = mm_code(b, w);
+    }
+    size_t n = (size_t)ng * (size_t)na;
+    for (size_t i = 0; i < n; i++) {
+        int c = map[pat[i]];
+        if (c < 0) {
+            fprintf(stderr, "mastermind: pattern code %d has no peg code\n", (int)pat[i]);
+            return -1;
+        }
+        pat[i] = (pat_t)c;
+    }
+    if (map[NPAT_FULL - 1] != ALL_GREEN) {
+        fprintf(stderr, "mastermind: the all-green code does not map to ALL_GREEN\n");
+        return -1;
+    }
+    fprintf(stderr, "mastermind: peg feedback, %d outcomes (blacks, whites); "
+            "win is b%dw0 = %d\n", NPAT, WORDLEN, ALL_GREEN);
+    return 0;
+}
+#endif
 
 /* Pattern-INDEXED scratch (NPAT ints per slot, plus one for the start[] sentinel).
  *
@@ -951,7 +1089,7 @@ static int emit_tree(FILE *out, const uint16_t *S, int n, int d,
     }
     for (int p = 0; p < NPAT; p++) {
         if (p == ALL_GREEN || cnt[p] == 0) continue;
-        char ps[WORDLEN + 1];
+        char ps[PATSTR_BUF];
         pat_str(p, ps);
         int add = snprintf(path + plen, 4096 - plen, "%s %s ", gw, ps);
         Cons kid;
@@ -1420,7 +1558,7 @@ static int write_tree(const char *dir, int g, int depth, Ctx *ctx) {
     if (cnt[ALL_GREEN] > 0) fprintf(out, "%s 1 %s\n", GWORD[g], GWORD[g]);
     for (int p = 0; p < NPAT && rc == 0; p++) {
         if (p == ALL_GREEN || cnt[p] == 0) continue;
-        char ps[WORDLEN + 1];
+        char ps[PATSTR_BUF];
         pat_str(p, ps);
         int plen = snprintf(path, sizeof path, "%s %s ", GWORD[g], ps);
         Cons kid;
@@ -1465,6 +1603,7 @@ int main(int argc, char **argv) {
     int optonly = 0, uselength = 0;
     const char *pairlist = NULL, *triplelist = NULL;
     int depth = 6, ttbits = 28, threads = 0, sweep = 0, depthmax = -1;
+    int depth_set = 0;
 
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--opener") && i + 1 < argc) {
@@ -1473,7 +1612,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--sweep")) sweep = 1;
         else if (!strcmp(argv[i], "--out") && i + 1 < argc) outpath = argv[++i];
         else if (!strcmp(argv[i], "--trees") && i + 1 < argc) treedir = argv[++i];
-        else if (!strcmp(argv[i], "--depth") && i + 1 < argc) depth = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--depth") && i + 1 < argc) { depth = atoi(argv[++i]); depth_set = 1; }
         else if (!strcmp(argv[i], "--depth-max") && i + 1 < argc) depthmax = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--tt-bits") && i + 1 < argc) ttbits = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--tt-load") && i + 1 < argc) ttload = argv[++i];
@@ -1516,6 +1655,23 @@ int main(int argc, char **argv) {
         else { fprintf(stderr, "unknown arg: %s\n", argv[i]); return 1; }
     }
 
+#ifdef MASTERMIND
+    /* THE CAP IS PART OF THE OBJECTIVE, AND HERE IT BINDS.  Peg feedback has 20
+     * outcomes where Wordle's colouring has 238, so the branching that makes
+     * `--depth 6` slack for optturns is simply not available: a depth-6 pass and
+     * a depth-8 pass are different quantities, not a fast and a slow route to
+     * one answer.  Inheriting optturns' default 6 would make that choice
+     * silently, so mmturns refuses to run without an explicit --depth and every
+     * depth gets its own CSV. */
+    if (!depth_set) {
+        fprintf(stderr, "mmturns: --depth is required -- the cap IS the objective "
+                "under peg feedback, so each depth is a different quantity\n");
+        return 1;
+    }
+#else
+    (void)depth_set;
+#endif
+
     /* Hard mode escalates by default; normal mode keeps ONE fixed cap, so its
      * behaviour and its results are exactly what they have always been. */
     if (depthmax < 0) depthmax = HARD ? MAXD - 1 : depth;
@@ -1552,6 +1708,11 @@ int main(int argc, char **argv) {
         fprintf(stderr, "pattern matrix %dx%d != words %dx%d\n", r, c, NG, NA);
         return 1;
     }
+#ifdef MASTERMIND
+    /* BEFORE anything reads PAT: --guess-list compaction, measure_branching,
+     * build_lb and every partition loop all see peg codes from here on. */
+    if (mm_remap(PAT, NG, NA) != 0) return 1;
+#endif
     cons_none_init();
 
     /* A list of the wrong length is the likeliest mistake when the binary is
@@ -1631,11 +1792,17 @@ int main(int argc, char **argv) {
      * restricted branching, NOT exact optima. A table from one K read by another
      * K -- or by the exact solver -- would return a confidently wrong value that
      * is merely an upper bound. Each K gets its own key space. */
-    if (guesslist || answerlist || TOPK > 0) {
+    /* MASTERMIND belongs in it MOST of all: the word lists are identical, so a
+     * peg-feedback table and a colour-feedback table would agree on every key
+     * while meaning entirely different games.  Salting it UNCONDITIONALLY is
+     * what makes an optturns tt.bin fail verification in mmturns instead of
+     * answering. */
+    if (guesslist || answerlist || TOPK > 0 || MM) {
         GSALT = 0xCBF29CE484222325ULL
               ^ ((uint64_t)NG * 0xD6E8FEB86659FD93ULL)
               ^ ((uint64_t)NA * 0x9E3779B97F4A7C15ULL)
-              ^ ((uint64_t)(unsigned)TOPK * 0xA24BAED4963EE407ULL);
+              ^ ((uint64_t)(unsigned)TOPK * 0xA24BAED4963EE407ULL)
+              ^ ((uint64_t)MM * 0xF1EA5EED7A9C1B4DULL);
         for (int i = 0; i < NG; i++)
             for (int j = 0; GWORD[i][j]; j++)
                 GSALT = (GSALT ^ (uint8_t)GWORD[i][j]) * 0x100000001B3ULL;

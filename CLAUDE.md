@@ -127,9 +127,60 @@ loading" for the measurements and the full cross-machine history.
   that direction: preferring `shared/` would make this machine silently report on a stale
   snapshot. `WORDLE_TREES=<path>` overrides explicitly. Both tree readers
   (`checktrees.py`, `depths.py`) import the constant, so they follow it.
+## `mmturns` — MASTERMIND PEG FEEDBACK, a DIFFERENT GAME from every other cell
+Same word lists (12972 guesses, 2315 answers), same objective shape, but the reply
+to a guess is Mastermind's **(blacks, whites) PEG COUNTS** — how many letters are
+right in place and how many are right in the wrong place — and NEVER which
+positions those were. `solver/README.md` "Mastermind feedback (`mmturns`)" has the
+detail. Run it with **`bash solver/run-mm-sweep.sh --depth D [-k K]`** (from `math/`).
+- **NEVER put an `mmturns` total in a table with an `optturns` one.** Peg feedback is
+  strictly COARSER — **20 outcomes against Wordle's 238** — so these are optima of two
+  different GAMES, not two difficulty settings of one. Same trap as putting a capped
+  optimum beside an expected-guesses one.
+- **The feedback is a FUNCTION of the stored Wordle pattern, which is why there is no
+  new feedback code**: `blacks` = the number of GREENS, `whites` = the number of
+  YELLOWS. Wordle's yellow rule hands out exactly `min(guess_c, answer_c) − green_c`
+  copies of each letter, and that sums to the white-peg count. So `-DMASTERMIND` is one
+  remap of the loaded matrix (`mm_remap`) plus a narrowed `NPAT` — a THIRD compile-time
+  mode of `optturns.c` beside `-DHARDMODE`, not a program of its own. VERIFIED inert for
+  everything else: `solver/validate.sh` still reproduces all five totals with identical
+  node counts (salet 16672).
+- **20 codes, and the hole is `(4, 1)` — the ONLY impossible pair.** With four exact
+  matches the two words differ in one position only, so the odd guess letter is matched
+  against a different answer letter while every other copy of it is already consumed by
+  an exact match; `whites` is forced to 0. `mm_code` enumerates blacks ascending, which
+  puts the win `(5,0)` LAST, so `ALL_GREEN == NPAT − 1` keeps its meaning and nothing
+  testing `p == ALL_GREEN` changes. **Do not "fix" `NPAT` to 21.**
+- **`--depth` IS REQUIRED AND IT BINDS — the binary refuses to start without it.**
+  optturns' default 6 is slack because 238 outcomes branch fast; at 20 they do not, so a
+  depth-7 pass and a depth-9 pass are DIFFERENT QUANTITIES and get different CSVs.
+  Carrying the inherited default would have made that choice silently. **The minimum
+  feasible depth is an OPEN QUESTION** — the counting bound only gives `>= 4`, which is
+  not restrictive, so settling it needs a real run. `INFEASIBLE` is an expected result.
+- **`MASTERMIND` is in the TT salt UNCONDITIONALLY**, and it matters more here than
+  anywhere else: the word lists are IDENTICAL, so a colour-feedback table and a
+  peg-feedback table would agree on every key while meaning different games. An
+  `optturns` `tt.bin` fails verification in `mmturns` instead of answering.
+- **Hard mode and Mastermind cannot be combined (`#error`)** — hard mode's rule is stated
+  in per-tile colours, which peg counts do not report.
+- `-k 1` restricts the ROOT too, so it examines exactly ONE opener (best of 12972 by root
+  sum of squared bins) and the total is an UPPER BOUND, best of the K examined — the same
+  caveat `strguess`/`strturns` carry. `--optimal-only` emits NO TREES, so the winner's
+  tree needs a follow-up `--opener <winner> --trees <dir>` at the same depth. Data under
+  `math/data/{shared,local}/mmturns/`, one file set per (depth, K).
+- **`python3 tools/checkmastermind.py` is the GATE** (`--wide` adds the full matrix): the
+  encoding against a Python mirror of `mm_code`, the blacks/whites identity against peg
+  counts recomputed FROM THE STRINGS by the textbook rule (exhaustive on small alphabets,
+  and all 30030180 real guess x answer pairs under `--wide`), that `(4,1)` is the only
+  hole, and — the one that exercises the SEARCH — `mmturns` against a brute-force memoised
+  solver on a miniature 24x16 `--data` directory at two depths, so both the solved and
+  `INFEASIBLE` branches are compared. Run it alongside `solver/validate.sh` and
+  `tools/checkpatterns.py`.
+
 ## Hard-mode solver (same sweep, hard-mode rules)
-- **`optturns.c` builds TWO binaries** — `optturns` (normal) and `hardturns`
-  (hard mode), via a compile-time `-DHARDMODE`. One source of truth, no runtime
+- **`optturns.c` builds THREE binaries** — `optturns` (normal), `hardturns`
+  (hard mode) and `mmturns` (Mastermind peg feedback, see above), via compile-time
+  `-DHARDMODE` / `-DMASTERMIND`. One source of truth, no runtime
   branch in either hot loop, and `hardturns` can be built while an `optturns`
   sweep is live (the kernel refuses to overwrite the running one). `sh build.sh`
   makes both.

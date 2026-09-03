@@ -1,7 +1,8 @@
 #!/bin/sh
 # Build the solvers from the single optturns.c.  Run from math/solver/.
 #
-#   sh build.sh           -- optturns (normal Wordle) + hardturns (hard mode)
+#   sh build.sh           -- optturns (normal Wordle), hardturns (hard mode)
+#                            and mmturns (Mastermind peg feedback)
 #   sh build.sh 7         -- optturns7, the 7-letter solver
 #   sh build.sh 4 6 7 8   -- several lengths at once
 #
@@ -40,6 +41,11 @@ BASE="-O3 -march=native -funroll-loops"
 if [ $# -eq 0 ]; then
   gcc $BASE $OMP -o optturns  optturns.c
   gcc $BASE $OMP -DHARDMODE -o hardturns optturns.c
+  # mmturns is the same objective under MASTERMIND's peg-count feedback --
+  # (blacks, whites) instead of Wordle's per-tile colouring -- which is a pure
+  # remap of the SAME pattern matrix, so it is a third compile-time mode of this
+  # one source rather than a program of its own. 20 outcomes, not 238.
+  gcc $BASE $OMP -DMASTERMIND -o mmturns optturns.c
   # pairsplit is the PAIR-OPENER screen: no search, no TT, just the joint-split
   # score for every unordered pair of guesses. Separate program because it shares
   # nothing with the solver but the .npy loader.
@@ -60,7 +66,7 @@ if [ $# -eq 0 ]; then
   # guess's effect precomputes to a bitset and the state reduces to the legal set.
   # Single-threaded, so no OpenMP.
   gcc $BASE -o antistall antistall.c
-  echo "built ./optturns, ./hardturns, ./pairsplit, ./strturns, ./strguess and ./antistall  (5 letters)"
+  echo "built ./optturns, ./hardturns, ./mmturns, ./pairsplit, ./strturns, ./strguess and ./antistall  (5 letters)"
   exit 0
 fi
 
