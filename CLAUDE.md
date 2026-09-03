@@ -867,6 +867,22 @@ Run it with **`bash solver/run-nerdle-solve.sh [-k K] [--width W] [--rank-only]`
   the guess count times the candidates alive at that level, so every level costs about
   what the root does rather than decaying. `--rank-only` does the root and stops.
   **`-k K` multiplies the work per level by K**, so it compounds with depth.
+- **A FIXED OPENING: `--opener W` (repeatable), `--openers "A B"`, `--openers-from FILE`.**
+  Point `--openers-from` at a pairs CSV to run its best pair — it takes the FIRST DATA ROW
+  and keeps every field that is a legal guess, so it reads a pairs file as two words and a
+  rank file as one, with no per-file column list. The opening is played **BLIND in order**,
+  as a multiwordle opening is, and the beam takes over below it. **THE OPENING IS AN INPUT,
+  NEVER A RESULT** — echoed, recorded in the `.meta` with its source, and in the filename
+  (operators transliterate `+ - * / =` to `p m t d e`, since `/` cannot appear in a path).
+  - **A BLIND OPENING CAN COST MORE THAN A FREE RUN, and measuring that is the point.** The
+    second word is played even when the first already narrowed the answer to one class,
+    whereas a free beam adapts after the first reply. **MEASURED at width 6: the best
+    screened pair gives 3.0728 against the free run's 2.5534** — the pair splits better and
+    still loses. Do not assume a better pair score means a better strategy.
+  - A fixed opening never consults the root ranking, so the wrapper does not build one for
+    it.
+  - **The gate's tie: fixing the opening to the beam's OWN choice must reproduce the free
+    run exactly.** That runs the whole blind-accounting path against the original one.
 - **THE ROOT RANKING IS COMPUTED ONCE AND STORED: `bash solver/run-nerdle-rank.sh`**,
   writing `data/shared/nerdle/root_rank_w<W>.csv.gz` (every guess, best first, with its
   score). **RUN IT FIRST** — the solver and the pair screen both start from it and read it

@@ -240,6 +240,46 @@ else:
             bad("width %d: the best pair scores %d, worse than the best single at %d"
                 % (w, score, int(os_[0])))
 
+# ------------------------------------------------ 4b. fixed blind openings
+print("4b. a fixed opening reproduces the free run, and is accounted correctly")
+for w in (5, 6):
+    gf = game(w, 1)
+    total, gi = gf.solve()
+    # The strong tie: FIXING the opening to the one the beam picked must give
+    # the beam's own number.  It exercises the whole new code path against the
+    # old one, and any slip in the blind accounting shows up as a difference.
+    fixed, _ = gf.solve_from([gf.guess_words[gi]])
+    if fixed != total:
+        bad("width %d: fixing the opening to %r gives %d, the free run gives %d"
+            % (w, gf.guess_words[gi], fixed, total))
+    else:
+        print("   ok   width %d: fixing %s reproduces %d exactly"
+              % (w, gf.guess_words[gi], total))
+
+    # An opening that wins everything must cost exactly one guess per answer.
+    _, asub = lists(w)
+    members = [a for a in asub if commutative_key(a) == commutative_key(asub[0])]
+    solo = game(w, 1, answers=members)
+    got, _ = solo.solve_from([members[0]])
+    if got != len(members):
+        bad("width %d: an opening that wins its whole class costs %d, not %d"
+            % (w, got, len(members)))
+
+    # A second blind word can only ADD guesses to a class already won by the
+    # first: nobody is alive to pay for it, so the total must not move.
+    two, _ = solo.solve_from([members[0], gf.guess_words[gi]])
+    if two != len(members):
+        bad("width %d: a second word was charged to answers already finished "
+            "(%d, not %d)" % (w, two, len(members)))
+print("   ok   an opening that wins outright costs one guess each, and a "
+      "further blind word is not charged")
+
+try:
+    game(6, 1).solve_from(["not a guess"])
+    bad("solve_from accepted a word that is not a legal guess")
+except ValueError:
+    print("   ok   an illegal opener is refused")
+
 # --------------------------------------- 5a. the ranking chunks identically
 print("5a. block-scoring the ranking changes nothing")
 ga = game(6, 1)

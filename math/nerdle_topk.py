@@ -429,7 +429,17 @@ def progress_printer(every=10.0):
     return report
 
 
-def attach_ranking(game, note=print, progress=None):
+def safe_name(word):
+    """A filename-safe spelling of an equation, reversibly.
+
+    `/` cannot appear in a path and the rest read badly, so the operators map to
+    letters: + p, - m, * t, / d, = e.  Digits and letters are disjoint, so the
+    mapping is injective and `48-32=16` becomes `48m32e16` with no collisions.
+    """
+    return word.translate(str.maketrans("+-*/=", "pmtde"))
+
+
+def attach_ranking(game, note=print, progress=None, compute=True):
     """Give `game` its root ranking: from disk if usable, else compute and store.
 
     ONE place decides that, so the solver and the pair screen cannot drift on
@@ -443,6 +453,11 @@ def attach_ranking(game, note=print, progress=None):
         game.set_root_ranking(*stored)
         note("root ranking: read %d guesses from %s" % (game.NG, path))
         return path, True
+    if not compute:
+        # A fixed opening never consults the root ranking -- the beam only starts
+        # below it -- so there is no reason to spend 110s building one.
+        note("root ranking: not stored, and not needed for a fixed opening")
+        return path, False
     if os.path.exists(path):
         note("root ranking: %s does not match this guess and answer list "
              "(fingerprint %s) -- recomputing" % (path, game.fingerprint()))
@@ -621,12 +636,70 @@ class NerdleTopK:
         return out
 
     def _subtree(self, sub):
+        return self._subtree_at(sub, 1)
+
+    def solve_from(self, openers, progress=None):
+        """(total guesses, the openers) with the opening FIXED and played BLIND.
+
+        Each opener is played in order whatever the feedback says, exactly as a
+        multiwordle opening is: an answer still alive pays for every opener up to
+        and including the one that WINS it, and the beam takes over below them.
+
+        SO A BLIND OPENING CAN WASTE A GUESS, and measuring that is the point.  A
+        free beam adapts after the first reply; a fixed pair plays its second
+        word even when the first already narrowed the answer to one class.
+        Whether the pair's finer split repays that is exactly what this number
+        answers, and it may well not.
+
+        The openers must be legal guesses.  They need not be answers, and one
+        that is not can never win -- only split.
+        """
+        import time
+        t0 = time.time()
+        gs = []
+        for w in openers:
+            try:
+                gs.append(self.guess_words.index(w))
+            except ValueError:
+                raise ValueError("%r is not a legal guess" % w)
+
+        alive = np.arange(self.NA, dtype=np.int64)
+        keys = {int(a): [] for a in alive}
+        cost = 0
+        for step, g in enumerate(gs):
+            cost += alive.size                # everyone still playing pays for it
+            codes = self._root_codes(g, alive)
+            live = codes >= 0                 # the rest are WON here and stop
+            for a, c in zip(alive[live], codes[live]):
+                keys[int(a)].append(int(c))
+            alive = alive[live]
+            if progress is not None:
+                progress(self.NA - alive.size, self.NA, time.time() - t0,
+                         "opener %d/%d (%s)" % (step + 1, len(gs),
+                                                self.guess_words[g]))
+            if alive.size == 0:
+                break
+
+        groups = {}
+        for a in alive:
+            groups.setdefault(tuple(keys[int(a)]), []).append(int(a))
+        done = self.NA - alive.size
+        for i, members in enumerate(sorted(groups.values())):
+            sub = np.array(members, dtype=np.int64)
+            cost += self._subtree_at(sub, len(gs))
+            done += sub.size
+            if progress is not None:
+                progress(done, self.NA, time.time() - t0,
+                         "bucket %d/%d" % (i + 1, len(groups)))
+        return int(cost), list(openers)
+
+    def _subtree_at(self, sub, depth):
         if self.use_numba:
             c, _ = _solve(self.G, self.A, sub, self.gclass, self.aclass,
-                          self.width, self.k, 1, self._cnt, self._bins,
+                          self.width, self.k, depth, self._cnt, self._bins,
                           self._touched)
             return int(c)
-        return int(self._ref_solve(sub, 1)[0])
+        return int(self._ref_solve(sub, depth)[0])
 
     def _solve_root(self, progress=None):
         import time
