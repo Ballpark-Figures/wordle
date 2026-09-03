@@ -11,6 +11,13 @@
 # word from move one. Exact -- no depth cap (antiwordle has none) and no beam.
 # The count INCLUDES the final forced naming move.
 #
+#     bash solver/run-antistall-sweep.sh --longest      # a DIFFERENT question
+#
+# --longest asks instead for the LONGEST GAME ANY answer admits, and computes no
+# per-answer values at all -- each answer is only asked whether it beats the best
+# found so far. Much cheaper, and a different quantity with different columns, so
+# it gets its own CSV.
+#
 # THIS IS NOT THE GAME'S VALUE. It assumes the answer is known from the start, so
 # it is an UPPER BOUND on what that answer can extract from real play, where the
 # opening is a search against a word you have not identified yet. Never average
@@ -60,6 +67,7 @@ while [ $i -lt ${#ARGS[@]} ]; do
         --guess-list) TAG="$TAG.$(basename "${ARGS[$((i + 1))]}" .txt)" ;;
         --after)      TAG="$TAG.after-$(echo "${ARGS[$((i + 1))]}" | tr ' ' '-')" ;;
         --no-prune)   TAG="$TAG.unpruned" ;;
+        --longest)    TAG="$TAG.longest" ;;
     esac
     i=$((i + 1))
 done
