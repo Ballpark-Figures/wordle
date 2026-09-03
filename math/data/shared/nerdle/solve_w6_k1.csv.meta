@@ -13,5 +13,5 @@ classes=160
 total=526
 expected=2.553398
 opener=28/7=4
-rank_seconds=0.3
-solve_seconds=0.0
+rank_seconds=0.0
+solve_seconds=1.5

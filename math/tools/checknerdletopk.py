@@ -240,6 +240,44 @@ else:
             bad("width %d: the best pair scores %d, worse than the best single at %d"
                 % (w, score, int(os_[0])))
 
+# ------------------------------------------------- 5b. the stored ranking
+print("5b. the stored ranking round-trips, and a foreign one is refused")
+import tempfile  # noqa: E402
+
+g6r = game(6, 1)
+scores, order = g6r.root_ranking()
+with tempfile.TemporaryDirectory() as tmp:
+    path = os.path.join(tmp, "root_rank.csv.gz")
+    NT.save_ranking(path, g6r)
+    back = NT.load_ranking(path, g6r)
+    if back is None:
+        bad("a ranking just written could not be read back")
+    elif not (np.array_equal(back[0], scores) and np.array_equal(back[1], order)):
+        bad("the ranking changed across a save and load")
+    else:
+        print("   ok   %d guesses round-tripped exactly" % g6r.NG)
+
+    # The property that matters: a ranking built for a DIFFERENT answer list must
+    # be refused, not reused.  Every score would be wrong -- confidently, and with
+    # the file looking perfectly valid.
+    gsub, asub = lists(6)
+    other = game(6, 1, answers=asub[:-1])
+    if other.fingerprint() == g6r.fingerprint():
+        bad("dropping an answer left the fingerprint unchanged")
+    elif NT.load_ranking(path, other) is not None:
+        bad("a ranking built for a different answer list was accepted")
+    else:
+        print("   ok   a ranking for %d answers is refused for %d"
+              % (g6r.NA, other.NA))
+
+    # And an injected ranking must actually be USED, not quietly recomputed.
+    fresh = game(6, 1)
+    fresh.set_root_ranking(scores, order)
+    if not np.array_equal(fresh.root_ranking()[1], order):
+        bad("set_root_ranking did not take effect")
+    else:
+        print("   ok   an installed ranking is the one the search uses")
+
 # ------------------------------------------------------------------ coverage
 print("6. the class rule actually fired")
 multi = sum(1 for m in classes.values() if len(m) > 1)

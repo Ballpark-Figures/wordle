@@ -142,6 +142,50 @@ if _HAVE_NUMBA:
                 cnt[A[a, i]] = 0
         return code
 
+    @njit(cache=True, inline="always")
+    def _score(G, g, A, S, gclass, aclass, width, cnt, bins, touched):
+        """Sum of squared bin sizes for guess g over the candidates in S.
+
+        THE scoring rule, defined once.  Both the per-node top-k ranking and the
+        whole-root scoring call this, so "what does the beam rank by" has one
+        answer rather than one per call site -- the same discipline strturns
+        keeps with its single GuessKey comparator.
+
+        Candidates the guess WINS are excluded: they are resolved, not binned.
+        `bins` is scratch, left zeroed on exit by clearing only the patterns
+        actually touched, so a node costs O(n) and never the 6561-wide reset.
+        """
+        gc = gclass[g]
+        nt = 0
+        for j in range(S.shape[0]):
+            a = S[j]
+            if aclass[a] == gc:
+                continue
+            p = _pattern(G, g, A, a, width, cnt)
+            if bins[p] == 0:
+                touched[nt] = p
+                nt += 1
+            bins[p] += 1
+        score = 0
+        for t in range(nt):
+            p = touched[t]
+            score += bins[p] * bins[p]
+            bins[p] = 0
+        return score
+
+    @njit(cache=True)
+    def _scores(G, A, S, gclass, aclass, width, cnt, bins, touched, out):
+        """Score EVERY guess into `out`, for ranking the whole list at once.
+
+        The top-k insertion in _rank is O(k) per guess, which is fine for a beam
+        of a few but quadratic when k is the whole guess list.  Scoring into an
+        array and sorting afterwards is what makes the full root ranking
+        affordable, and it produces the identical order: a stable argsort breaks
+        ties on the lower index, exactly as the insertion does.
+        """
+        for g in range(G.shape[0]):
+            out[g] = _score(G, g, A, S, gclass, aclass, width, cnt, bins, touched)
+
     @njit(cache=True)
     def _rank(G, A, S, gclass, aclass, width, k, cnt, bins, touched, out_g, out_s):
         """Fill out_g/out_s with the k best-scoring guesses, ascending.
@@ -151,25 +195,10 @@ if _HAVE_NUMBA:
         patterns actually touched are cleared, so a node costs O(NG * n) and
         never carries the 6561-wide reset.
         """
-        NG, n = G.shape[0], S.shape[0]
+        NG = G.shape[0]
         nk = 0
         for g in range(NG):
-            gc = gclass[g]
-            nt = 0
-            for j in range(n):
-                a = S[j]
-                if aclass[a] == gc:
-                    continue            # won outright -- not in any bin
-                p = _pattern(G, g, A, a, width, cnt)
-                if bins[p] == 0:
-                    touched[nt] = p
-                    nt += 1
-                bins[p] += 1
-            score = 0
-            for t in range(nt):
-                p = touched[t]
-                score += bins[p] * bins[p]
-                bins[p] = 0
+            score = _score(G, g, A, S, gclass, aclass, width, cnt, bins, touched)
             # insertion into the running top-k; ties keep the lower guess index
             if nk < k or score < out_s[nk - 1]:
                 pos = nk if nk < k else k - 1
@@ -303,6 +332,99 @@ if _HAVE_NUMBA:
         return best_cost, best_g
 
 
+def save_ranking(path, game):
+    """Write the root ranking, best first, with the fingerprint it belongs to.
+
+    One guess per line: rank, guess, score.  The fingerprint sits in the
+    accompanying .meta and covers the width and BOTH word lists, so a ranking
+    cannot be silently reused after the answer list changes -- which would
+    reorder every score while leaving the file looking perfectly valid.
+    """
+    scores, order = game.root_ranking()
+    with gzip.open(path, "wt") if path.endswith(".gz") else open(path, "w") as f:
+        f.write("rank,guess,sum_of_squares\n")
+        for r, g in enumerate(order):
+            f.write("%d,%s,%d\n" % (r + 1, game.guess_words[g], scores[g]))
+    with open(path + ".meta", "w") as m:
+        m.write("kind=root-ranking\n")
+        m.write("width=%d\n" % game.width)
+        m.write("score=ascending-sum-of-squared-bins\n")
+        m.write("ties=lowest-guess-index-in-canonical-symbol-order\n")
+        m.write("guesses=%d\nanswers=%d\nclasses=%d\n"
+                % (game.NG, game.NA, game.nclasses))
+        m.write("fingerprint=%s\n" % game.fingerprint())
+
+
+def load_ranking(path, game):
+    """Read a stored ranking for `game`, or None if it is absent or foreign.
+
+    Returns None rather than raising, so a caller can fall back to computing --
+    but NEVER returns a ranking whose fingerprint disagrees, because a mismatched
+    one is worse than none: every score would be confidently wrong rather than
+    missing.
+    """
+    if not os.path.exists(path) or not os.path.exists(path + ".meta"):
+        return None
+    want = game.fingerprint()
+    got = None
+    with open(path + ".meta") as m:
+        for line in m:
+            if line.startswith("fingerprint="):
+                got = line.split("=", 1)[1].strip()
+    if got != want:
+        return None
+    pos = {w: i for i, w in enumerate(game.guess_words)}
+    scores = np.empty(game.NG, dtype=np.int64)
+    order = np.empty(game.NG, dtype=np.int64)
+    n = 0
+    opener = gzip.open if path.endswith(".gz") else open
+    with opener(path, "rt") as f:
+        for line in f:
+            parts = line.strip().split(",")
+            if len(parts) != 3 or parts[0] == "rank":
+                continue
+            g = pos.get(parts[1])
+            if g is None:
+                return None                  # a guess the list does not hold
+            order[n] = g
+            scores[g] = int(parts[2])
+            n += 1
+    if n != game.NG:
+        return None                          # truncated
+    return scores, order
+
+
+def ranking_path(width, data_dir=None):
+    """The canonical place the root ranking for a width is stored."""
+    return os.path.join(data_dir or _DATA, "root_rank_w%d.csv.gz" % width)
+
+
+def attach_ranking(game, note=print):
+    """Give `game` its root ranking: from disk if usable, else compute and store.
+
+    ONE place decides that, so the solver and the pair screen cannot drift on
+    when a stored ranking is trusted.  A ranking whose fingerprint disagrees is
+    ignored and rebuilt -- never used -- and `note` says which happened, because
+    a silent 110-second recompute looks like a hang.
+    """
+    path = ranking_path(game.width)
+    stored = load_ranking(path, game)
+    if stored is not None:
+        game.set_root_ranking(*stored)
+        note("root ranking: read %d guesses from %s" % (game.NG, path))
+        return path, True
+    if os.path.exists(path):
+        note("root ranking: %s does not match this guess and answer list "
+             "(fingerprint %s) -- recomputing" % (path, game.fingerprint()))
+    else:
+        note("root ranking: %s not found -- computing it now (the slow step)"
+             % path)
+    game.root_ranking()
+    save_ranking(path, game)
+    note("root ranking: wrote %s" % path)
+    return path, False
+
+
 class NerdleTopK:
     """Top-K Nerdle solver over one (guess list, answer list) pair.
 
@@ -313,7 +435,7 @@ class NerdleTopK:
     """
 
     def __init__(self, *, width=WIDTH, k=1, guesses=None, answers=None,
-                 use_numba=True):
+                 use_numba=True, ranking=None):
         if k < 1:
             raise ValueError("k must be at least 1, got %d" % k)
         self.width, self.k = width, k
@@ -346,6 +468,60 @@ class NerdleTopK:
         self._bins = np.zeros(self.NPAT, dtype=np.int64)
         self._touched = np.zeros(self.NPAT, dtype=np.int64)
         self._solved = None                  # (total, guess index), filled by solve()
+        self._root = None                    # (scores, order), filled by root_ranking()
+        if ranking is not None:
+            self.set_root_ranking(*ranking)
+
+    # ---- the root ranking, computed once ------------------------------------
+    def root_ranking(self):
+        """(score per guess, guess indices best first) over the whole answer set.
+
+        MEMOISED, and the single source of the ranking for everything here: the
+        beam's root, the pair screen and the printed table all read it.  It used
+        to be recomputed at each of those, which at width 8 is about 111 seconds
+        a time -- a single solve paid it twice.
+
+        Ties break on the lower guess index, via a STABLE argsort over a list
+        already in canonical symbol order.
+        """
+        if self._root is None:
+            S = np.arange(self.NA, dtype=np.int64)
+            scores = np.empty(self.NG, dtype=np.int64)
+            if self.use_numba:
+                _scores(self.G, self.A, S, self.gclass, self.aclass, self.width,
+                        self._cnt, self._bins, self._touched, scores)
+            else:
+                for g in range(self.NG):
+                    keep = S[self.aclass[S] != self.gclass[g]]
+                    codes = self._ref_patterns(g, keep)
+                    counts = (np.bincount(codes) if codes.size
+                              else np.zeros(0, dtype=np.int64))
+                    scores[g] = int((counts.astype(np.int64) ** 2).sum())
+            order = np.argsort(scores, kind="stable")
+            self._root = (scores, order)
+        return self._root
+
+    def set_root_ranking(self, scores, order):
+        """Install a ranking computed elsewhere -- see load_ranking().
+
+        Only ever pass one built for THIS guess and answer list; the caller is
+        responsible for that, and the disk format carries a fingerprint so the
+        tools can check it rather than trusting a filename.
+        """
+        if len(scores) != self.NG or len(order) != self.NG:
+            raise ValueError("a ranking of %d does not fit %d guesses"
+                             % (len(order), self.NG))
+        self._root = (np.asarray(scores, dtype=np.int64),
+                      np.asarray(order, dtype=np.int64))
+
+    def fingerprint(self):
+        """What a stored ranking must match to be reusable."""
+        import hashlib
+        h = hashlib.sha1()
+        for words in (self.guess_words, self.answer_words):
+            h.update(("\n".join(words) + "\n").encode())
+        return "%d:%d:%d:%d:%s" % (self.width, self.NG, self.NA, self.nclasses,
+                                   h.hexdigest()[:16])
 
     # ---- the objective -----------------------------------------------------
     def solve(self, progress=None):
@@ -414,14 +590,8 @@ class NerdleTopK:
         import time
         t0 = time.time()
         S = np.arange(self.NA, dtype=np.int64)
-        if self.use_numba:
-            out_g = np.empty(self.k, dtype=np.int64)
-            out_s = np.empty(self.k, dtype=np.int64)
-            nk = _rank(self.G, self.A, S, self.gclass, self.aclass, self.width,
-                       self.k, self._cnt, self._bins, self._touched, out_g, out_s)
-            order = [int(out_g[i]) for i in range(nk)]
-        else:
-            order = [int(g) for g in self._ref_rank(S)]
+        _, ranked = self.root_ranking()
+        order = [int(g) for g in ranked[:self.k]]
 
         best_cost, best_g = 1 << 60, -1
         for t, g in enumerate(order):
@@ -468,15 +638,9 @@ class NerdleTopK:
         second -- both simply leave the partition.
         """
         S = np.arange(self.NA, dtype=np.int64)
-        if self.use_numba:
-            out_g = np.empty(top_n, dtype=np.int64)
-            out_s = np.empty(top_n, dtype=np.int64)
-            nk = _rank(self.G, self.A, S, self.gclass, self.aclass, self.width,
-                       top_n, self._cnt, self._bins, self._touched, out_g, out_s)
-            gs = out_g[:nk].copy()
-        else:
-            gs = np.array(self._ref_rank_n(S, top_n), dtype=np.int64)
-            nk = gs.size
+        _, order = self.root_ranking()
+        gs = order[:top_n].copy()
+        nk = gs.size
 
         rows = np.empty((nk, self.NA), dtype=np.int32)
         if self.use_numba:

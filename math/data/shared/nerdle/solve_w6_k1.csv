@@ -1,9 +1,7 @@
 width,k,guesses,answers,classes,opener,total,expected,seconds
-6,1,2958,206,160,28/7=4,526,2.553398,0.0
+6,1,2958,206,160,28/7=4,526,2.553398,1.5
 
 rank,guess,sum_of_squares
 1,28/7=4,969
 2,4*7=28,988
 3,42/7=6,1005
-4,32/8=4,1015
-5,36/9=4,1039

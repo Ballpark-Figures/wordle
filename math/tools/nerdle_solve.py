@@ -88,13 +88,14 @@ def parse_args(argv):
 
 
 def root_ranking(game, top):
-    """The `top` best-scoring guesses at the root, with their scores."""
-    S = np.arange(game.NA, dtype=np.int64)
-    out_g = np.empty(top, dtype=np.int64)
-    out_s = np.empty(top, dtype=np.int64)
-    n = NT._rank(game.G, game.A, S, game.gclass, game.aclass, game.width, top,
-                 game._cnt, game._bins, game._touched, out_g, out_s)
-    return [(game.guess_words[int(out_g[i])], int(out_s[i])) for i in range(n)]
+    """The `top` best-scoring guesses at the root, with their scores.
+
+    Reads the stored ranking -- see nerdle_topk.attach_ranking.  This used to
+    call the kernel itself, and then the solve called it AGAIN, so a single run
+    paid for the slowest step twice.
+    """
+    scores, order = game.root_ranking()
+    return [(game.guess_words[int(g)], int(scores[g])) for g in order[:top]]
 
 
 def main(argv):
@@ -116,6 +117,7 @@ def main(argv):
     sys.stdout.flush()
 
     t1 = time.time()
+    NT.attach_ranking(game)
     ranking = root_ranking(game, top)
     rank_secs = time.time() - t1
     print("\nroot ranking, best %d by sum of squared bins (%.1fs):" % (len(ranking), rank_secs))

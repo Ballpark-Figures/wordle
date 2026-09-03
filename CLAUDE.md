@@ -867,6 +867,22 @@ Run it with **`bash solver/run-nerdle-solve.sh [-k K] [--width W] [--rank-only]`
   the guess count times the candidates alive at that level, so every level costs about
   what the root does rather than decaying. `--rank-only` does the root and stops.
   **`-k K` multiplies the work per level by K**, so it compounds with depth.
+- **THE ROOT RANKING IS COMPUTED ONCE AND STORED: `bash solver/run-nerdle-rank.sh`**,
+  writing `data/shared/nerdle/root_rank_w<W>.csv.gz` (every guess, best first, with its
+  score). **RUN IT FIRST** — the solver and the pair screen both start from it and read it
+  from disk. They used to each recompute it, and a single solve paid the ~110s twice.
+  `nerdle_topk.attach_ranking()` is the ONE place that decides load-or-compute, so the
+  consumers cannot drift.
+  - **The file carries a FINGERPRINT over the width and BOTH word lists, and a mismatch is
+    REFUSED, never used.** Re-enumerating the answers retires it automatically. Silently
+    reusing one would leave every score confidently wrong rather than missing — the same
+    hazard as a foreign `tt.bin`.
+  - **It is a RANKING, NOT A RESULT.** A good first-guess score says nothing about what
+    happens after the reply; quote the solver's number, not this one.
+- **ONE scoring rule, in `_score`**, called by both the per-node top-k ranking and the
+  whole-root scoring — the discipline `strturns` keeps with its single `GuessKey`
+  comparator. The root uses score-then-stable-argsort rather than top-k insertion, which
+  is O(NG) instead of quadratic when k is the whole list and gives the identical order.
 - **THE ROOT IS DRIVEN FROM PYTHON so the run reports progress** — the kernel does each
   subtree, the loop sees them finish. It reproduces the recursion's root exactly (same
   ranking, bucket order and running-cost cut) and the gate diffs the two rather than

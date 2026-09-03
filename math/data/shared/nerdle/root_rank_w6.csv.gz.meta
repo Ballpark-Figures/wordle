@@ -1,0 +1,8 @@
+kind=root-ranking
+width=6
+score=ascending-sum-of-squared-bins
+ties=lowest-guess-index-in-canonical-symbol-order
+guesses=2958
+answers=206
+classes=160
+fingerprint=6:2958:206:160:7a6b10ddb4b2fda6

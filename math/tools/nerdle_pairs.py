@@ -81,18 +81,13 @@ def main(argv):
     print("ranking singles, then scoring %d pairs..." % (top_n * (top_n - 1) // 2))
     sys.stdout.flush()
 
+    NT.attach_ranking(game)
     t1 = time.time()
     gs, scored = game.pair_scores(top_n)
     secs = time.time() - t1
 
-    single_best = None
-    S = __import__("numpy").arange(game.NA, dtype=__import__("numpy").int64)
-    if game.use_numba:
-        import numpy as np
-        og = np.empty(1, dtype=np.int64); os_ = np.empty(1, dtype=np.int64)
-        NT._rank(game.G, game.A, S, game.gclass, game.aclass, width, 1,
-                 game._cnt, game._bins, game._touched, og, os_)
-        single_best = (game.guess_words[int(og[0])], int(os_[0]))
+    scores, order = game.root_ranking()
+    single_best = (game.guess_words[int(order[0])], int(scores[order[0]]))
 
     print("\nscored %d pairs from the top %d singles in %.1fs"
           % (len(scored), len(gs), secs))
