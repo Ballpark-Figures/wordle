@@ -35,15 +35,37 @@ game, and they are DELIBERATELY LOOSER than the rules for an ANSWER:
      arithmetic prohibition is DIVISION BY ZERO, which leaves a side undefined
      rather than merely unequal.
 
-WHAT THIS FILE DOES NOT DECIDE -- THE ANSWER RULES.  The daily answers are a
-strict SUBSET of the guesses and enumerating them is a SEPARATE, LATER pass.
-Settled so far: an answer's right side is a bare NUMBER, no leading zero appears
-anywhere (so `0` is not a legal operand or answer at all), no negative number
-appears, and the left side must contain at least one operator.  STILL OPEN, and
-therefore NOT implemented anywhere here: whether an answer's left side may pass
-through a NEGATIVE intermediate (`1-2+3=2`) or a FRACTIONAL one (`1/2*4=2`).
-Nothing in this file filters answers; do not add such a filter until those two
-are settled, and do not describe this file's output as answers.
+THE ANSWER RULES -- a strict SUBSET of the guesses, settled with the user on
+2026-09-03 and implemented by is_answer() below.  An answer is a valid guess
+that also satisfies:
+
+  A1. THE RIGHT SIDE IS A BARE NUMBER -- digits only, no operator and no minus.
+      This is the rule the live game states ("on the right of `=` is only a
+      number") and it is what makes an answer's right side terminal where a
+      guess's is not.
+  A2. NO DIGIT RUN BEGINS WITH `0`, which bans a leading zero (`1+2=03`) and,
+      as the user put it, bans the number `0` outright -- so every operand and
+      the answer itself are at least 1.  `10` is unaffected: its zero is not
+      leading.
+  A3. NO UNARY MINUS ANYWHERE, so no negative number is ever written.  Every
+      `-` in an answer is a binary subtraction.
+  A4. THE LEFT SIDE CONTAINS AT LEAST ONE OPERATOR, so `0012=012` is a guess
+      but never an answer.
+
+NOTHING CONSTRAINS THE INTERMEDIATE VALUES, and that was a decision rather than
+an oversight: the user settled on 2026-09-03 that an answer's left side MAY pass
+through a NEGATIVE value (`1-2+3=2`, whose running total dips to -1) and MAY
+pass through a FRACTION (`1/2*4=2`, whose first division is a half).  Only the
+number to the right of the `=` is constrained, and A1-A3 already force it to be
+a whole number of at least 1.  Both stricter readings were live until then and
+both shrink the answer set, so a count computed under either is a DIFFERENT
+quantity -- do not quote one as the answer count.
+
+Where a value could go wrong is worth stating, because it is why those two
+questions had unambiguous answers: A2 and A3 make every operand at least 1, so
+the only way an answer's left side reaches a negative value is a subtraction in
+its running left-to-right total, and the only way it reaches a fraction is a
+division inside a term.  There is nowhere else to look.
 
 EXACT RATIONALS, NOT FLOATS.  Every value is an `(numerator, denominator)` pair
 of ints, normalised so the denominator is positive and the fraction is in lowest
@@ -228,6 +250,32 @@ def is_valid_guess(s, width=WIDTH):
     a = evaluate(lhs)
     b = evaluate(rhs)
     return a is not None and b is not None and a == b   # rule 6
+
+
+def is_answer(s, width=WIDTH):
+    """Is this a legal ANSWER -- a guess that also satisfies A1-A4 above?
+
+    A strict subset of is_valid_guess, so it is the natural filter over an
+    enumerated guess list.  Nothing here looks at the intermediate values; see
+    the module docstring for why that is a settled decision and not a gap.
+    """
+    if not is_valid_guess(s, width):
+        return False
+    lhs, rhs = s.split("=")
+    if any(c not in DIGITS for c in rhs):          # A1: only a number
+        return False
+    if not any(c in BINOPS for c in lhs):          # A4: a calculation
+        return False
+    for i, c in enumerate(s):
+        # A3: a `-` is unary exactly when nothing, an operator, or the `=` sits
+        # in front of it.  (A1 already rules one out on the right side.)
+        if c == "-" and (i == 0 or s[i - 1] in BINOPS or s[i - 1] == "="):
+            return False
+        # A2: a digit run may not START with a zero, which covers both a leading
+        # zero and the bare number 0.
+        if c == "0" and (i == 0 or s[i - 1] not in DIGITS):
+            return False
+    return True
 
 
 # --------------------------------------------------------------------------

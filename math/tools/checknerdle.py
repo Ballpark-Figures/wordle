@@ -84,10 +84,49 @@ def ref_valid(s, width):
     return a is not None and b is not None and a == b
 
 
+# The ANSWER rules (A1-A4) as a single regular expression: a number, then at
+# least one operator-and-number, then `=`, then a number, with `(?!0)` in front
+# of every number so no digit run can begin with a zero.  No `-` can be unary
+# because a number never starts with one.  Deliberately one flat pattern rather
+# than the four separate tests the implementation uses.
+ANS_RE = re.compile(r"^(?!0)\d+(?:[-+*/](?!0)\d+)+=(?!0)\d+$")
+
+
+def ref_answer(s, width):
+    if len(s) != width or not ANS_RE.match(s):
+        return False
+    lhs, rhs = s.split("=")
+    a, b = ref_side(lhs), ref_side(rhs)
+    return a is not None and b is not None and a == b
+
+
+def ref_intermediates(lhs):
+    """Every intermediate value of an ANSWER's left side, via prefix eval.
+
+    The running left-to-right totals are the values of the prefixes ending at
+    each `+` or `-`; the term accumulations are the values of each term's
+    prefixes ending at each `*` or `/`.  Both are read off with ref_side, so
+    Python's parser does the arithmetic and nothing is shared with nerdle.py.
+    This is what makes the two settled decisions -- an answer MAY pass through a
+    negative value and MAY pass through a fraction -- independently checkable
+    rather than merely asserted.
+    """
+    vals = []
+    cuts = [i for i, c in enumerate(lhs) if c in "+-"]
+    for pre in [lhs[:i] for i in cuts] + [lhs]:
+        vals.append(ref_side(pre))
+    for term in re.split(r"[-+]", lhs):
+        tcuts = [j for j, c in enumerate(term) if c in "*/"]
+        for pre in [term[:j] for j in tcuts] + [term]:
+            vals.append(ref_side(pre))
+    return [v for v in vals if v is not None]
+
+
 # --------------------------------------------------------------------- coverage
 FEATURES = ("unary minus", "double negative", "leading zero", "division",
             "expression on the right", "no operator", "negative value",
-            "non-integer value")
+            "non-integer value", "answer", "answer through a negative",
+            "answer through a fraction")
 seen = {f: 0 for f in FEATURES}
 
 
@@ -115,6 +154,13 @@ def note_features(s):
             seen["negative value"] += 1
         if v.denominator != 1:
             seen["non-integer value"] += 1
+    if ref_answer(s, len(s)):
+        seen["answer"] += 1
+        mids = ref_intermediates(lhs)
+        if any(m < 0 for m in mids):
+            seen["answer through a negative"] += 1
+        if any(m.denominator != 1 for m in mids):
+            seen["answer through a fraction"] += 1
 
 
 # ------------------------------------------------------------------ 1. named
@@ -140,6 +186,34 @@ for s in REJECT:
     if ref_valid(s, w):
         bad("%r should be rejected, the reference accepts it" % s)
 print("   ok   %d accepts, %d rejects" % (len(ACCEPT), len(REJECT)))
+
+# The answer rules are a strict subset, so every accept below must ALSO be a
+# valid guess -- checked, because a bug that widened the guess rules could
+# otherwise hide behind a passing answer filter.  `1-2+3=2` and `1/2*4=2` are
+# here specifically to pin the two decisions settled on 2026-09-03: an answer
+# may pass through a negative value and through a fraction.
+ANS_ACCEPT = ["12+34=46", "1+1=2", "10-3=7", "9+8-7=10", "1+2*3=7",
+              "8/2*3=12", "9*8/6=12", "1-2+3=2", "1/2*4=2"]
+ANS_REJECT = ["0012=012", "1+9=0+10", "10-20=-10", "1+2=03", "5=000005",
+              "1--2=3", "1+2+3=06", "1+0=1", "1+2=3+0", "12+34=45"]
+
+print("1b. the named ANSWER cases")
+for s in ANS_ACCEPT:
+    w = len(s)
+    if not N.is_answer(s, w):
+        bad("%r should be a valid answer, is_answer says no" % s)
+    if not ref_answer(s, w):
+        bad("%r should be a valid answer, the reference says no" % s)
+    if not N.is_valid_guess(s, w):
+        bad("%r is accepted as an answer but is not even a valid guess" % s)
+    note_features(s)
+for s in ANS_REJECT:
+    w = len(s)
+    if N.is_answer(s, w):
+        bad("%r should be rejected as an answer, is_answer accepts it" % s)
+    if ref_answer(s, w):
+        bad("%r should be rejected as an answer, the reference accepts it" % s)
+print("   ok   %d accepts, %d rejects" % (len(ANS_ACCEPT), len(ANS_REJECT)))
 
 # -------------------------------------------------------------- 2. evaluator
 print("2. nerdle.evaluate against Python's own parser, every side to length 4")
@@ -172,10 +246,15 @@ for w in range(3, 7 if wide else 6):
             extra = sorted(set(got) - ref)[:3]
             bad("width %d %s differs from the reference (missing %s, extra %s)"
                 % (w, method, miss, extra))
+    ref_ans = {s for s in ref if ref_answer(s, w)}
+    mine_ans = {s for s in ref if N.is_answer(s, w)}
+    if mine_ans != ref_ans:
+        bad("width %d: is_answer differs from the reference (missing %s, extra %s)"
+            % (w, sorted(ref_ans - mine_ans)[:3], sorted(mine_ans - ref_ans)[:3]))
     for s in ref:
         note_features(s)
-    print("   ok   width %d: %d guesses out of %d strings, both walkers exact"
-          % (w, len(ref), 15 ** w))
+    print("   ok   width %d: %d guesses out of %d strings, both walkers exact; "
+          "%d answers, is_answer exact" % (w, len(ref), 15 ** w, len(ref_ans)))
 
 # ----------------------------------------------------------- 4. walkers agree
 print("4. the two walkers agree where brute force cannot reach")

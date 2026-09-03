@@ -1,0 +1,15 @@
+kind=guesses
+width=8
+method=dfs
+rules=2026-09-03
+as_written=1
+commutative_collapsed=0
+answers_filtered=0
+count=374246
+seconds=41.5
+eq_at_1=102282
+eq_at_2=41981
+eq_at_3=42860
+eq_at_4=42860
+eq_at_5=41981
+eq_at_6=102282
