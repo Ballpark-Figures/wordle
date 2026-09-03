@@ -737,6 +737,53 @@ numbers carry a standard error and are not comparable with any `optturns`-family
   guess and FAILS if either never happened, so a pass cannot silently mean rule 4 went
   untested. Run it alongside `solver/validate.sh` and `tools/checkpatterns.py`.
 
+## Nerdle (8-symbol equations) — the GUESS enumeration, pass one
+A different game living beside the wordle variants. `math/nerdle.py` states the rules
+and IS the source of truth; read it before quoting any count. Run it with
+**`bash solver/run-nerdle-enumerate.sh [--width W] [--method dfs|split]`** (from `math/`).
+- **THE GUESS RULES, settled with the user 2026-09-03 partly by trying candidates against
+  the live game — and they are much LOOSER than the answer rules.** 15 symbols
+  (`0123456789+-*/=`), exactly one `=`, both sides full expressions with standard
+  precedence. **The RIGHT SIDE IS AN EXPRESSION, not a number** (`1+9=0+10` is legal),
+  **leading zeros are allowed** and **neither side needs an operator at all** (`0012=012`,
+  which the live game accepted), a **unary `-` may precede any number ANYWHERE and may be
+  REPEATED** (`1--2=3`, a double negative), and the two sides are compared as **EXACT
+  RATIONALS** whose shared value need be neither whole (`1/2=2/4`) nor non-negative
+  (`10-20=-10`). The only arithmetic prohibition is division by zero.
+- **THE EXPRESSION RIGHT SIDE IS WHAT MAKES THIS EXPENSIVE, and it invalidated the
+  original design.** The first plan walked to the `=` and counted the digits remaining;
+  with an expression RHS the walk cannot stop there, so `--method dfs` — the specified
+  single-pass descent — bottoms out roughly 188M structurally valid strings.
+  **`--method split`** enumerates each SIDE once with its exact value and joins the sides
+  of each `=` position on it: ~7.6M side evaluations, the SAME set, orders of magnitude
+  cheaper. Both are exact, so the method is deliberately NOT part of the filename.
+- **TWO ANSWER RULES ARE STILL OPEN, so NO answer filter exists and this output must never
+  be called the answer list.** Settled: an answer's right side is a bare NUMBER, no leading
+  zero appears anywhere (so `0` is not a legal operand or answer), no negatives, and the
+  left side must contain an operator. **OPEN: may an answer's left side pass through a
+  NEGATIVE intermediate (`1-2+3=2`) or a FRACTIONAL one (`1/2*4=2`)?** Settle both before
+  writing the filter — the answers are a strict subset of the guesses, so the guess list
+  does not depend on the outcome.
+- **Pass one counts equations AS WRITTEN** — `1+9=0+10` and `9+1=0+10` are two guesses, not
+  one. Collapsing commutative equivalents is PASS TWO and nothing implements it yet.
+- **`python3 tools/checknerdle.py` is the GATE.** Its reference shares no code with
+  `nerdle.py`: a regex screens a side, then every digit run is rewritten as `Fraction(n)`
+  and the string handed to **PYTHON'S OWN PARSER** via `eval`, so precedence, repeated
+  unary minus and exactness come from CPython (and the rewrite is what sidesteps Python
+  rejecting `0012` as a literal). It diffs that against the rules EXHAUSTIVELY at widths
+  3-5 (6 under `--wide`), diffs `evaluate` over every side to length 4 including the
+  malformed ones, diffs the two walkers to width 6 (7 under `--wide`), and ends with a
+  COVERAGE tally that FAILS if any awkward feature — unary minus, double negative, leading
+  zero, division, expression on the right, operator-free side, negative value,
+  non-integer value — never fired. Run it alongside `solver/validate.sh`. **`--width`
+  exists FOR that gate** (so small widths can be brute-forced); the game is 8.
+- Data under `math/data/shared/nerdle/guesses_w<W>.txt.gz` plus a `.meta` recording the
+  rule set, the count and the per-`=`-position breakdown; log under
+  `math/data/local/nerdle/`. The count is exact and integral — no sampling, no seed — so
+  one width means one file and a re-run reproduces it.
+- **Known edge case, RECORDED rather than decided: the unary-minus rule admits `-0`, so
+  `0-0=-0` is counted.** Not checked against the live game.
+
 ## Gameplay layout
 - (Describe this video's on-screen layout and the assets in `animations/assets/`.)
 

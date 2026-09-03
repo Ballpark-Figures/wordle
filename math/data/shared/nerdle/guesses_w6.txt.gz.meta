@@ -1,0 +1,13 @@
+kind=guesses
+width=6
+method=dfs
+rules=2026-09-03
+as_written=1
+commutative_collapsed=0
+answers_filtered=0
+count=2958
+seconds=0.2
+eq_at_1=985
+eq_at_2=494
+eq_at_3=494
+eq_at_4=985
