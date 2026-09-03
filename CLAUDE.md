@@ -518,6 +518,64 @@ its state arithmetic against `strspace.py` over a shared deterministic walk — 
   can be diffed against a brute-force Python solver. Until then treat every total it
   prints as provisional.
 
+## Sea of Greens (`greens`) — the badge, and a LEXICOGRAPHIC objective
+`math/greens.py` states the rule and the value function and IS the source of truth;
+`solver/greens.c` is the solver. Run it with **`bash solver/run-greens.sh [--depth D]
+[--opener W]`** (from `math/`), attached, same tee'd-log rules as the sweeps.
+- **THE BADGE RULE IS UNVERIFIED, and say so with every number.** "Complete a puzzle
+  with NO YELLOW TILE anywhere in the game" was read from player reports via web
+  search (2026-09-03), not from the NYT and not from a badge screen of ours — the
+  same standing as the Absurdle tie-break rules. Two clauses are INFERRED, not
+  observed: that a FAILED game (X/6) with no yellows does not earn it, and that a
+  lucky 1/6 does. **A single real badge would settle both.**
+- **THE OBJECTIVE IS LEXICOGRAPHIC (user's call, 2026-09-03), and it is NOT "maximise
+  P(badge)".** Clause 1 is a HARD CONSTRAINT — the strategy must win every one of the
+  2315 answers within 6. Clause 2 maximises the badge count among strategies that
+  never lose. **Once a yellow appears the badge is gone for that answer and the play
+  is only required to FINISH the game** — "we stop checking". So the number is a
+  maximum SUBJECT TO a 6-guess guarantee; never quote it as an unconstrained one, and
+  never put it in a table beside the multiwordle/foximax/adversarial figures, which
+  are expected guesses OUTRIGHT.
+  - **CLAUSE 1 MEASURABLY BINDS** — `checkgreens.py` computes the unconstrained value
+    too, purely to prove it: on the small case `moobs` at d=3 scores 3 constrained
+    against 4 unconstrained. The constraint is not decoration.
+- **THE CAP IS THE GAME, not an inherited knob.** `--depth 6` IS clause 1. Each depth
+  is still a different quantity and gets its own CSV (`best_opener_d6.csv`).
+- **`if (d > n) d = n` DOES NOT TRANSFER from optturns, and that is the trap.** There,
+  extra budget past `n` cannot help. Here it buys SAFE PROBES — words whose letters
+  are all absent or already green — which can separate candidates that could
+  otherwise only be separated by risking a yellow. So the badge value keeps rising
+  past `d = n` and collapsing the key would silently answer a smaller question. The
+  full porting audit (what transfers from `optturns.c` and what does not) is the
+  header comment of `greens.c`; read it before changing anything there.
+- **`greens` is a SEPARATE BINARY, like `antistall` and unlike `hardturns`.** A
+  compile-time mode of `optturns.c` is for the same objective under different rules;
+  this is a maximum with a hard feasibility side-condition, so it shares the loader,
+  the TT and the arena and none of the search. `sh build.sh` builds it.
+- **The TT salt is UNCONDITIONAL** — `optturns` keys the same states over the same
+  words while meaning a total of guesses rather than a count of badges, so a foreign
+  `tt.bin` must fail verification rather than answer.
+- **The ask was THE BEST OPENER, so `--sweep` is a bounded SCREEN, not a per-opener
+  table.** Openers are visited in descending badge upper bound (the answers landing in
+  a guess's yellow-free buckets are the only ones that can still earn it), and the
+  first whose bound falls below the incumbent proves the whole tail is worse. Ties
+  survive (every cut is strict). A `cut` row is a BOUND, never a number — the CSV's
+  `status` column says which, and `tools/paths.py` deliberately cannot read this file.
+- **`python3 math/tools/checkgreens.py` is the GATE**, ~1s: the yellow predicate
+  against tiles recomputed from the STRINGS by a second implementation; the badge
+  count against `greens.py`'s slow string-based reference, exactly, at several depths
+  and openers; **feasibility against `optturns`**, which answers the identical
+  question and is validated against Bertsimas & Paskov; and the emitted tree replayed
+  from the strings (coverage, the cap per answer, every pattern field, the last guess
+  equal to the answer, ONE next guess per prefix so it is a strategy and not a
+  per-answer fabrication, and the yellow-free line count equal to the reported
+  badges). It ends with a COVERAGE TALLY that FAILS if a yellow, a yellow-free line,
+  an infeasible opener or a binding win-constraint never occurred. Run it alongside
+  `solver/validate.sh` and `tools/checkpatterns.py`.
+- Data under `math/data/{shared,local}/greens/`; trees in `shared/greens/trees/`.
+- **COST IS UNMEASURED as of 2026-09-03.** Price it with one named opener before
+  launching the screen.
+
 ## Absurdle (adversarial Wordle) — OUR word lists, NOT Absurdle's
 - **The host never commits to a word.** It holds a CANDIDATE SET (initially the answer
   list), buckets it by the feedback each remaining candidate would give for your guess,

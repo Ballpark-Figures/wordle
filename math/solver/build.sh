@@ -60,13 +60,20 @@ if [ $# -eq 0 ]; then
   # matrix and no 16-bit index -- patterns are computed inline over 11881376
   # ordinals.
   gcc $BASE $OMP -o strguess strguess.c
+  # greens is the SEA OF GREENS badge: the most answers winnable with no yellow
+  # tile, over strategies that still win every answer within the cap.  Separate
+  # program because the OBJECTIVE differs -- a maximum with a hard feasibility
+  # side-condition, not a minimum of a sum -- so it shares the loader, the table
+  # and the arena with optturns but none of the search.  Same reason antistall
+  # is its own file.
+  gcc $BASE $OMP -o greens greens.c
   # antistall is ANTIWORDLE's stalling endgame -- the reverse objective, so it
   # shares no search code with the solver: no depth cap, a maximum rather than a
   # minimum, and no constraint struct at all, since with the answer fixed each
   # guess's effect precomputes to a bitset and the state reduces to the legal set.
   # Single-threaded, so no OpenMP.
   gcc $BASE -o antistall antistall.c
-  echo "built ./optturns, ./hardturns, ./mmturns, ./pairsplit, ./strturns, ./strguess and ./antistall  (5 letters)"
+  echo "built ./optturns, ./hardturns, ./mmturns, ./pairsplit, ./strturns, ./strguess, ./greens and ./antistall  (5 letters)"
   exit 0
 fi
 

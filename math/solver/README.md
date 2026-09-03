@@ -733,6 +733,51 @@ emitted. Both stages count over the 2315 mystery answers;
 `tools/singletons.py --full` counts over all 12972 words instead, which is a
 different question.
 
+## Sea of Greens (`greens`) — a DIFFERENT objective, not another sweep
+
+`greens.c` is its own binary because the objective is a MAXIMUM with a hard
+feasibility side-condition, not a minimum of a sum. It shares the loader, the
+transposition table and the arena with `optturns` and none of the search. The
+rules and the value function are stated in `math/greens.py`, which is also the
+reference implementation the gate diffs it against.
+
+```sh
+# from math/
+bash solver/run-greens.sh                      # screen every opener, report THE best
+bash solver/run-greens.sh --opener salet       # one named opener, plus its tree
+python3 tools/checkgreens.py                   # the GATE — run it after any change
+```
+
+**The objective, exactly.** Maximise the number of the 2315 answers won with NO
+YELLOW TILE anywhere in the game, SUBJECT TO the strategy still winning every
+one of them within `--depth` guesses. Lexicographic: the win is absolute, the
+badge is maximised among strategies that never lose. Once a yellow appears the
+badge is gone for that answer and the play is only required to finish the game,
+so a yellow bucket is held to feasibility alone — which is much cheaper than the
+badge value, since it early-exits on the first witness guess.
+
+**The cap is the game.** `--depth 6` here is not an inherited tuning knob: it is
+what "do not lose" means. Report the result as an optimum *subject to a 6-guess
+guarantee*, never as an unconstrained maximum. Each depth is a different
+quantity and gets its own CSV, with the depth in the filename.
+
+**The badge rule is UNVERIFIED.** "Complete a puzzle with no yellow tiles" comes
+from player reports read via web search, not from the NYT and not from a badge
+screen of ours. Two clauses are inferred rather than observed: that a failed
+game with no yellows does not earn it, and that a lucky 1/6 does. See the
+provenance note in `math/greens.py`.
+
+**Its `tt.bin` is not interchangeable with anything.** The salt is
+unconditional, because `optturns` keys states the same way over the same words
+while meaning something entirely different — a total of guesses against a count
+of badges. A foreign snapshot fails verification instead of answering.
+
+**The CSV** is `word,badges,prob,depth,status,seconds`, where `status` is
+`exact`, `cut` (bounded below the incumbent, never searched — a bound, not a
+number) or `infeasible`. It is deliberately NOT readable by `tools/paths.py`:
+badges and total guesses are incomparable quantities and must not land in one
+report.
+
 ## Output format
 
 Each tree line is a complete replay of one game:
