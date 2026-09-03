@@ -108,6 +108,11 @@ typedef uint8_t pat_t;
 #define MAXD       12
 #endif
 
+/* How many of the evenest-splitting guesses feas() tries before falling back to
+ * the full sorted scan.  A pure speed knob: the fallback keeps the search
+ * exhaustive, so no value of it can change an answer. */
+#define FEAS_TRY   12
+
 #define INFEAS     (-1)      /* no strategy wins every candidate within the cap */
 #define PRUNED     (-2)      /* provably cannot reach the caller's floor */
 #define CUT        (-3)      /* an opener provably worse than the incumbent */
@@ -393,12 +398,16 @@ static inline void tt_put(uint64_t h0, uint64_t h1, int d, int val, int bestg,
 
 /* ------------------------------------------------------ per-thread arena */
 
+/* Depth slots 0 and 1 are never touched by the search -- solve_badge, feas and
+ * eval_badge all return before reading the arena at d <= 1 -- so root_ub2
+ * borrows slot 0 rather than allocating scratch of its own. */
 typedef struct {
     uint16_t buf[MAXD][MAXA];
     uint16_t tbuf[MAXD][MAXA];      /* separate scratch for tree extraction */
     int      cnt[MAXD][NPAT];       /* invariant: all zero between uses */
     int      kof[MAXD][NPAT];
     int64_t  ord[MAXD][MAXG];
+    int64_t  ord2[MAXD][MAXG];      /* counting-sort destination, see solve_badge */
     long long nodes, probe, hit, fill;
 } Ctx;
 
@@ -431,7 +440,17 @@ static int feas(const uint16_t *S, int n, int d, Ctx *ctx) {
     /* Rank by ascending sum of squared bin sizes -- the evenest split first,
      * the same rule every other solver in this repo ranks guesses by -- with
      * ties on the LOWEST guess index.  Only the ORDER depends on it; the answer
-     * does not, since the loop is exhaustive when nothing works. */
+     * does not, since the loop below is exhaustive when nothing works.
+     *
+     * ONLY THE BEST FEW ARE SELECTED, and that is a speed decision, not a
+     * change of rule.  A witness settles the question, and the evenest splitter
+     * almost always is one -- so sorting all 12972 costs a millisecond per node
+     * to order guesses nobody will look at.  Selecting the top FEAS_TRY by
+     * insertion is O(NG * FEAS_TRY) with an early reject and no sort at all;
+     * if none of them works we fall back to the full sorted scan, so the answer
+     * is identical either way. */
+    int64_t top[FEAS_TRY];
+    int ntop = 0;
     for (int g = 0; g < NG; g++) {
         const pat_t *row = PAT + (size_t)g * NA;
         int bp[NPAT], nb = 0;
@@ -447,13 +466,29 @@ static int feas(const uint16_t *S, int n, int d, Ctx *ctx) {
             if (p != ALL_GREEN && !FEASOK[d - 1][c]) dead = 1;
             cnt[p] = 0;
         }
-        if (!dead) ord[m++] = (ss << 20) | (int64_t)g;
+        if (dead) continue;
+        ord[m++] = (ss << 20) | (int64_t)g;
+        int64_t key = (ss << 20) | (int64_t)g;
+        if (ntop < FEAS_TRY) {
+            int j = ntop++;
+            while (j > 0 && top[j - 1] > key) { top[j] = top[j - 1]; j--; }
+            top[j] = key;
+        } else if (key < top[ntop - 1]) {
+            int j = ntop - 1;
+            while (j > 0 && top[j - 1] > key) { top[j] = top[j - 1]; j--; }
+            top[j] = key;
+        }
     }
-    qsort(ord, m, sizeof(int64_t), cmp_i64);
 
     int ok = 0, witness = -1;
-    for (int i = 0; i < m && !ok; i++) {
-        int g = (int)(ord[i] & 0xFFFFF);
+    int tried = ntop;                    /* the shortlist, then everything */
+    for (int i = 0; i < m + tried && !ok; i++) {
+        int g;
+        if (i < tried) g = (int)(top[i] & 0xFFFFF);
+        else {
+            if (i == tried) qsort(ord, m, sizeof(int64_t), cmp_i64);
+            g = (int)(ord[i - tried] & 0xFFFFF);
+        }
         const pat_t *row = PAT + (size_t)g * NA;
         int bp[NPAT], bcnt[NPAT], bstart[NPAT], bfill[NPAT], nb = 0;
         uint16_t *buf = ctx->buf[d];
@@ -587,11 +622,35 @@ static int solve_badge(const uint16_t *S, int n, int d, Ctx *ctx) {
         }
         if (!dead) ord[m++] = ((int64_t)(NA - ub) << 20) | (int64_t)g;
     }
-    qsort(ord, m, sizeof(int64_t), cmp_i64);
+    /* COUNTING SORT, not qsort: the key is an integer bound in 0..n, and n is
+     * usually tiny while NG is always 12972.  A qsort here was costing ~0.9 ms
+     * of function-pointer comparisons per node against a pass-1 that costs
+     * 0.04 ms at n = 3 -- so the sort, not the search, was the hot loop.  The
+     * ORDER is identical: descending ub, ties on the lowest guess index, which
+     * falls out of scanning ord[] in place order within each bucket. */
+    {
+        int64_t *dst = ctx->ord2[d];
+        int hist[MAXA + 2];
+        memset(hist, 0, (size_t)(n + 2) * sizeof(int));
+        for (int i = 0; i < m; i++) hist[NA - (int)(ord[i] >> 20)]++;
+        int acc = 0;
+        for (int v = n; v >= 0; v--) { int c = hist[v]; hist[v] = acc; acc += c; }
+        for (int i = 0; i < m; i++) dst[hist[NA - (int)(ord[i] >> 20)]++] = ord[i];
+        memcpy(ord, dst, (size_t)m * sizeof(int64_t));
+    }
 
-    int best = INFEAS, bestg = -1;
+    int best = INFEAS, bestg = -1, prev_ub = NA + 1;
     for (int i = 0; i < m; i++) {
         int ub = NA - (int)(ord[i] >> 20);
+        /* The break below is only sound while this list is descending, and a
+         * mis-sort would not fail loudly -- it would quietly cut guesses that
+         * could have won.  One integer compare per guess actually examined. */
+        if (ub > prev_ub) {
+            fprintf(stderr, "greens: guess order is not descending (%d after %d) "
+                            "-- the counting sort is wrong\n", ub, prev_ub);
+            abort();
+        }
+        prev_ub = ub;
         if (ub <= best) break;                   /* sorted: none left can beat it */
         int g = (int)(ord[i] & 0xFFFFF);
         int v = eval_badge(S, n, d, g, best + 1, ctx);
@@ -627,6 +686,78 @@ static int root_ub(int g, int depth) {
         else if (!YEL[p]) ub += UBTAB[depth - 1][cnt[p]];
     }
     return ub;
+}
+
+/* ONE MORE PLY on the opener bound, and it is what makes the screen bite.
+ *
+ * root_ub above counts every answer that survives the opener yellow-free.  That
+ * is loose for an obvious reason: surviving ONE guess is not surviving the game
+ * -- an answer stays alive only while every LATER guess is yellow-free against
+ * it too -- and with a 6-guess cap the counting term is saturated, so ub1
+ * degenerates to exactly "answers in the opener's yellow-free buckets".
+ *
+ * ub2 asks one question deeper: for each of those buckets, how many of it could
+ * the BEST SECOND GUESS keep alive?  Since
+ *
+ *     badge(P, d) = max over h of [ 1 if h in P ] + sum over Q of badge(Q, d-1)
+ *                <= max over h of (answers of P that survive h yellow-free)
+ *
+ * it is still an upper bound, and typically a fraction of |P|.  A guess whose
+ * partition of P is already counting-infeasible is skipped, which tightens it
+ * again -- and if NOTHING can be played in some bucket, the opener cannot win
+ * and is infeasible outright.
+ *
+ * COST: NG times the answers surviving the opener, ~1e7 per opener, against
+ * searches that run far longer.  It is computed for every opener up front and
+ * used BOTH to order the screen and to cut it, so the sorted order still proves
+ * the whole tail is worse.  It is NOT exact -- it ignores everything below the
+ * second guess -- so an opener it does not cut still has to be solved.
+ */
+static int root_ub2(int g, int depth, Ctx *ctx) {
+    if (depth < 3) return root_ub(g, depth);
+    int cnt[NPAT], start[NPAT + 1], fill[NPAT];
+    memset(cnt, 0, sizeof cnt);
+    const pat_t *row = PAT + (size_t)g * NA;
+    for (int a = 0; a < NA; a++) cnt[row[a]]++;
+    int acc = 0;
+    for (int p = 0; p < NPAT; p++) { start[p] = acc; acc += cnt[p]; }
+    start[NPAT] = acc;
+    memcpy(fill, start, sizeof fill);
+    uint16_t *buf = ctx->buf[0];
+    for (int a = 0; a < NA; a++) buf[fill[row[a]]++] = (uint16_t)a;
+
+    int *c2 = ctx->cnt[0];
+    int total = 0;
+    for (int p = 0; p < NPAT; p++) {
+        if (cnt[p] == 0) continue;
+        if (p == ALL_GREEN) { total += 1; continue; }   /* the opener wins outright */
+        if (!FEASOK[depth - 1][cnt[p]]) return INFEAS;  /* clause 1, as in root_ub */
+        if (YEL[p]) continue;                           /* badge already gone here */
+        if (cnt[p] == 1) { total += 1; continue; }      /* name it: green, no yellow */
+
+        const uint16_t *P = buf + start[p];
+        int np = cnt[p], bestp = -1;
+        for (int h = 0; h < NG; h++) {
+            const pat_t *hr = PAT + (size_t)h * NA;
+            int bp[NPAT], nb = 0;
+            for (int i = 0; i < np; i++) {
+                int q = hr[P[i]];
+                if (c2[q]++ == 0) bp[nb++] = q;
+            }
+            int v = 0, dead = (nb == 1);
+            for (int k = 0; k < nb; k++) {
+                int q = bp[k], c = c2[q];
+                if (q == ALL_GREEN) v += 1;
+                else if (!FEASOK[depth - 2][c]) dead = 1;
+                else if (!YEL[q]) v += UBTAB[depth - 2][c];
+                c2[q] = 0;
+            }
+            if (!dead && v > bestp) bestp = v;
+        }
+        if (bestp < 0) return INFEAS;      /* nothing legal to play in this bucket */
+        total += bestp;
+    }
+    return total;
 }
 
 /* Exact badge count for committing to `g` as the opener, CUT if provably below
@@ -978,10 +1109,19 @@ int main(int argc, char **argv) {
      * cut that way get a `cut` row and never a number -- they are bounded, not
      * solved, and the two must never be confused. */
     int *ub = malloc(sizeof(int) * NG);
+    double tscreen = now_s();
 #ifdef _OPENMP
-#pragma omp parallel for schedule(static)
+#pragma omp parallel
 #endif
-    for (int g = 0; g < NG; g++) ub[g] = root_ub(g, depth);
+    {
+        Ctx *sc = calloc(1, sizeof(Ctx));
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic, 16)
+#endif
+        for (int g = 0; g < NG; g++) ub[g] = root_ub2(g, depth, sc);
+        free(sc);
+    }
+    fprintf(stderr, "root screen: %.1fs\n", now_s() - tscreen);
 
     int64_t *ord = malloc(sizeof(int64_t) * NG);
     int nord = 0, noub = 0;
@@ -990,33 +1130,82 @@ int main(int argc, char **argv) {
         ord[nord++] = ((int64_t)(NA - ub[g]) << 20) | (int64_t)g;
     }
     qsort(ord, nord, sizeof(int64_t), cmp_i64);
-    fprintf(stderr, "root UB screen: %d openers ranked (best UB %d), %d rejected outright\n",
-            nord, nord ? NA - (int)(ord[0] >> 20) : 0, noub);
+    fprintf(stderr, "root UB screen: %d openers ranked, %d rejected outright\n",
+            nord, noub);
+    /* The bound's DISTRIBUTION is what says whether the screen can prune at all:
+     * every opener whose bound falls below the eventual winner is cut without
+     * being searched, so the gap between the top of this list and the winner is
+     * the whole pruning budget. */
+    if (nord) {
+        int q[5];
+        for (int i = 0; i < 5; i++) q[i] = NA - (int)(ord[(int64_t)i * (nord - 1) / 4] >> 20);
+        fprintf(stderr, "root UB quartiles: %d %d %d %d %d (of %d answers)\n",
+                q[0], q[1], q[2], q[3], q[4], NA);
+    }
 
-    /* Resume: an existing CSV both marks work done and seeds the incumbent. */
+    /* Resume: an existing CSV marks work done, seeds the incumbent AND rebuilds
+     * the tie list.  Rebuilding it matters -- without it a resumed run reports
+     * only the ties it happened to find after restarting, which reads as a
+     * complete answer and is not one. */
     int incumbent = 0;
     char *done = calloc(NG, 1);
+    int *bestlist = malloc(sizeof(int) * NG);
+    int nbest = 0, searched = 0, cut = 0, infeas = 0;
     int ndone = 0;
     FILE *rf = outpath ? fopen(outpath, "r") : NULL;
     if (rf) {
         char line[256];
         while (fgets(line, sizeof line, rf)) {
             char w[64]; int b;
-            if (sscanf(line, "%63[^,],%d", w, &b) >= 1) {
-                int g = find_word(GWORD, NG, w);
-                if (g >= 0 && !done[g]) { done[g] = 1; ndone++; }
-                if (sscanf(line, "%63[^,],%d", w, &b) == 2 && b > incumbent) incumbent = b;
-            }
+            int nf = sscanf(line, "%63[^,],%d", w, &b);
+            if (nf < 1) continue;
+            int g = find_word(GWORD, NG, w);
+            if (g < 0) continue;                       /* a header, or a stale word */
+            if (!done[g]) { done[g] = 1; ndone++; }
+            if (nf < 2) continue;                      /* a cut or infeasible row */
+            if (b > incumbent) { incumbent = b; nbest = 0; bestlist[nbest++] = g; }
+            else if (b == incumbent) bestlist[nbest++] = g;
         }
         fclose(rf);
-        if (ndone) fprintf(stderr, "resume: %d openers done, incumbent %d\n", ndone, incumbent);
+        if (ndone) fprintf(stderr, "resume: %d openers done, incumbent %d with %d tied\n",
+                           ndone, incumbent, nbest);
     }
 
-    int *bestlist = malloc(sizeof(int) * nord);
-    int nbest = 0, searched = 0, cut = 0, infeas = 0;
     double t0 = now_s();
     printf("sweep: %d openers by descending badge upper bound; reporting THE best\n", nord);
     fflush(stdout);
+
+    /* SOLVE THE TOP-RANKED OPENER FIRST, SERIALLY.  The walk cuts against the
+     * incumbent, and with N threads starting at once the first N openers all run
+     * with no incumbent at all -- so one opener solved up front is worth more
+     * than the thread it costs, and it prices the run in its first line. */
+    for (int i = 0; i < nord && nbest == 0; i++) {
+        int g = (int)(ord[i] & 0xFFFFF);
+        if (done[g]) continue;
+        Ctx *c0 = calloc(1, sizeof(Ctx));
+        double s0 = now_s();
+        int v = solve_opener(g, depth, incumbent, c0);
+        double dt = now_s() - s0;
+        g_probe += c0->probe; g_hit += c0->hit; g_fill += c0->fill;
+        free(c0);
+        done[g] = 1;
+        const char *status = v == INFEAS ? "infeasible" : (v == CUT ? "cut" : "exact");
+        if (v >= 0) {
+            searched++;
+            incumbent = v;
+            bestlist[nbest++] = g;
+            printf("[%7.0fs] %s  badges=%d of %d  prob=%.5f  FIRST  %6.1fs\n",
+                   now_s() - t0, GWORD[g], v, NA, (double)v / NA, dt);
+        } else if (v == INFEAS) infeas++;
+        else cut++;
+        if (out) {
+            if (v >= 0) fprintf(out, "%s,%d,%.5f,%d,%s,%.1f\n", GWORD[g], v,
+                                (double)v / NA, depth, status, dt);
+            else        fprintf(out, "%s,,,%d,%s,%.1f\n", GWORD[g], depth, status, dt);
+            fflush(out);
+        }
+        fflush(stdout);
+    }
 
 #ifdef _OPENMP
 #pragma omp parallel

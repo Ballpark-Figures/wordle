@@ -772,6 +772,29 @@ unconditional, because `optturns` keys states the same way over the same words
 while meaning something entirely different — a total of guesses against a count
 of badges. A foreign snapshot fails verification instead of answering.
 
+**How the screen prunes.** Openers are ordered by an upper bound and the first
+whose bound falls below the incumbent proves the whole tail is worse, so the
+bound's tightness is the entire pruning budget. The obvious bound — count the
+answers that survive the opener yellow-free — is loose, because surviving ONE
+guess is not surviving the game, and at a 6-guess cap the counting term is
+saturated so nothing else tightens it. So the bound carries **one more ply**:
+for each surviving bucket it asks how many of it the best SECOND guess could
+keep alive, which is still sound (`badge(P,d) <= max over h of the answers of P
+surviving h`) and typically a fraction of the first. It costs NG times the
+surviving answers per opener, ~1e7 — a startup minute against searches that run
+far longer — and it is computed for every opener up front, so it both ORDERS and
+CUTS and the tail proof still holds. Watch the `root UB quartiles` line: the gap
+between the top of that list and the first opener's actual badge count is how
+much the screen can throw away.
+
+Two hot loops are shaped by the same concern. `solve_badge` counting-sorts its
+guesses by the integer bound rather than calling `qsort` — at n=3 the sort was
+~0.9 ms against a pass-1 of 0.04 ms, so the sort *was* the search — and `feas`
+tries only the evenest few splitters before falling back to a full sorted scan,
+since a witness settles the question and the fallback keeps it exhaustive.
+Neither can change an answer, and `checkgreens.py` compares against an
+exhaustive scan of every opener to prove it.
+
 **The CSV** is `word,badges,prob,depth,status,seconds`, where `status` is
 `exact`, `cut` (bounded below the incumbent, never searched — a bound, not a
 number) or `infeasible`. It is deliberately NOT readable by `tools/paths.py`:

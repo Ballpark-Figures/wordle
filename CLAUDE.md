@@ -561,7 +561,25 @@ its state arithmetic against `strspace.py` over a shared deterministic walk — 
   first whose bound falls below the incumbent proves the whole tail is worse. Ties
   survive (every cut is strict). A `cut` row is a BOUND, never a number — the CSV's
   `status` column says which, and `tools/paths.py` deliberately cannot read this file.
-- **`python3 math/tools/checkgreens.py` is the GATE**, ~1s: the yellow predicate
+- **THE SCREEN'S BOUND CARRIES TWO PLIES, and that is what makes it prune.** "Answers
+  surviving the opener yellow-free" is loose — surviving one guess is not surviving the
+  game, and at depth 6 the counting term is saturated, so nothing else tightens it. So
+  for each surviving bucket the bound also asks what the best SECOND guess could keep
+  alive (sound: `badge(P,d) <= max over h of the answers of P surviving h`). Computed
+  for EVERY opener up front (~1 startup minute), so it both orders and cuts and the
+  descending order still proves the whole tail is worse. **The `root UB quartiles` line
+  against the first opener's real count is the pruning budget** — read it before
+  deciding whether a run will finish.
+- **The sorts were the search, so both are gone.** `solve_badge` COUNTING-SORTS its
+  guesses by the integer bound (at n=3 a `qsort` of 12972 cost ~0.9 ms against a pass-1
+  of 0.04 ms); `feas` tries only the evenest `FEAS_TRY` splitters before falling back to
+  a full sorted scan, which is sound because a witness settles feasibility and the
+  fallback stays exhaustive. Neither may change an answer — an explicit abort fires if
+  the guess list is ever not descending, since a mis-sort would silently cut winners
+  instead of failing.
+- **A RESUMED run rebuilds the tie list from the CSV**, or it would report only the ties
+  found since restarting and read as a complete answer.
+- **`python3 math/tools/checkgreens.py` is the GATE**, ~2s: the yellow predicate
   against tiles recomputed from the STRINGS by a second implementation; the badge
   count against `greens.py`'s slow string-based reference, exactly, at several depths
   and openers; **feasibility against `optturns`**, which answers the identical
@@ -569,9 +587,13 @@ its state arithmetic against `strspace.py` over a shared deterministic walk — 
   from the strings (coverage, the cap per answer, every pattern field, the last guess
   equal to the answer, ONE next guess per prefix so it is a strategy and not a
   per-answer fabrication, and the yellow-free line count equal to the reported
-  badges). It ends with a COVERAGE TALLY that FAILS if a yellow, a yellow-free line,
-  an infeasible opener or a binding win-constraint never occurred. Run it alongside
-  `solver/validate.sh` and `tools/checkpatterns.py`.
+  badges). **It also scans EVERY opener exhaustively and demands the bounded screen
+  find the same winner AND the same tie list** — the only check that covers the pruning,
+  which is otherwise invisible to the `--opener` path — and it re-runs a sweep from a
+  half-written CSV to pin the resume. It ends with a COVERAGE TALLY that FAILS if a
+  yellow, a yellow-free line, an infeasible opener, a binding win-constraint or a set of
+  tied openers never occurred. Run it alongside `solver/validate.sh` and
+  `tools/checkpatterns.py`.
 - Data under `math/data/{shared,local}/greens/`; trees in `shared/greens/trees/`.
 - **COST IS UNMEASURED as of 2026-09-03.** Price it with one named opener before
   launching the screen.

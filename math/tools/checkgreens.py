@@ -55,7 +55,7 @@ OPTTURNS = os.path.join(MATH, "solver", "optturns")
 
 FAILS = []
 COVER = {"yellow line": 0, "yellow-free line": 0, "infeasible opener": 0,
-         "badge-vs-win conflict": 0}
+         "badge-vs-win conflict": 0, "tied openers": 0}
 
 
 def fail(msg):
@@ -379,6 +379,93 @@ def check_binds(answers, guesses, depths, openers, values):
                       % (depth, w, have, free))
 
 
+# ------------------------------------------------------- 6. the SWEEP itself
+
+_BEST = re.compile(r"^badges = (\d+) of (\d+)")
+
+
+def run_sweep(apath, gpath, ppath, depth, outpath=None):
+    cmd = [SOLVER, "--sweep", "--answer-list", apath, "--guess-list", gpath,
+           "--patterns", ppath, "--depth", str(depth),
+           "--out", outpath] if outpath else [
+           SOLVER, "--sweep", "--answer-list", apath, "--guess-list", gpath,
+           "--patterns", ppath, "--depth", str(depth), "--no-out"]
+    cmd += ["--tt-bits", "20", "--threads", "2"]
+    p = subprocess.run(cmd, capture_output=True, text=True, cwd=MATH)
+    if p.returncode != 0:
+        fail("greens --sweep exited %d: %s" % (p.returncode, p.stderr.strip()[-400:]))
+        return None, []
+    best, ties, collecting = None, [], False
+    for line in p.stdout.splitlines():
+        m = _BEST.match(line)
+        if m:
+            best = int(m.group(1))
+            collecting = True
+        elif collecting:
+            if line.startswith("  ") and line.strip().isalpha():
+                ties.append(line.strip())
+            else:
+                collecting = False
+    return best, ties
+
+
+def check_sweep(tmp, answers, guesses, depth):
+    """The bounded screen must find the same winner an exhaustive scan does.
+
+    This is the check that covers the PRUNING: the root bound, the incumbent, the
+    cut and the tie list are all only exercised here, and a bound that is too
+    tight would silently discard the real winner while every --opener check
+    carried on passing.
+    """
+    print("6. the opener screen, against an exhaustive scan")
+    apath, gpath, ppath = build_case(tmp, answers, guesses, "s")
+    cands = tuple(sorted(answers))
+    gtuple = tuple(guesses)
+    every = {w: greens.solve_opener(w, cands, gtuple, depth) for w in guesses}
+    want = max(every.values())
+    want_ties = sorted(w for w, v in every.items() if v == want)
+    best, ties = run_sweep(apath, gpath, ppath, depth)
+    if len(want_ties) > 1:
+        COVER["tied openers"] += 1
+    if best != want:
+        fail("screen reports %s, an exhaustive scan of %d openers says %s"
+             % (best, len(guesses), want))
+    elif sorted(ties) != want_ties:
+        fail("screen ties %s, exhaustive ties %s" % (sorted(ties), want_ties))
+    else:
+        print("   %d openers scanned: best %d, %d tied, screen agrees exactly"
+              % (len(guesses), want, len(want_ties)))
+
+
+# --------------------------------------------------------------- 7. resume
+
+def check_resume(tmp, answers, guesses, depth):
+    """A long screen WILL be interrupted, so the resume has to give the same
+    answer as an uninterrupted run -- including the tie list, which lives only in
+    memory and has to be rebuilt from the CSV."""
+    print("7. resume, against an uninterrupted run")
+    apath, gpath, ppath = build_case(tmp, answers, guesses, "r")
+    csv = os.path.join(tmp, "resume.csv")
+    if os.path.exists(csv):
+        os.remove(csv)
+    best1, ties1 = run_sweep(apath, gpath, ppath, depth, csv)
+
+    lines = open(csv).read().splitlines()
+    body = lines[1:]
+    open(csv, "w").write("\n".join(lines[:1] + body[: len(body) // 2]) + "\n")
+    best2, ties2 = run_sweep(apath, gpath, ppath, depth, csv)
+    if (best2, sorted(ties2)) != (best1, sorted(ties1)):
+        fail("resume from a half-written CSV gives %s/%s, uninterrupted gives %s/%s"
+             % (best2, sorted(ties2), best1, sorted(ties1)))
+    best3, ties3 = run_sweep(apath, gpath, ppath, depth, csv)
+    if (best3, sorted(ties3)) != (best1, sorted(ties1)):
+        fail("resume from a COMPLETE CSV gives %s/%s, uninterrupted gives %s/%s"
+             % (best3, sorted(ties3), best1, sorted(ties1)))
+    if best2 == best1 == best3:
+        print("   %d rows, halved and re-run: same best %d, same %d tied"
+              % (len(body), best1, len(ties1)))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--answers", type=int, default=18,
@@ -418,6 +505,12 @@ def main():
     check_feasibility(apath, gpath, ppath, depths, openers)
     check_trees(tmp, answers, guesses, max(args.depth), openers)
     check_binds(answers, guesses, depths, openers, values)
+    check_sweep(tmp, answers, guesses, max(depths))
+    # A second, deliberately SMALLER answer set: ties between openers are common
+    # there and rare above, and the tie list is its own code path -- every cut in
+    # the screen is strict precisely so a tie survives it.
+    check_sweep(tmp, answers[: max(6, len(answers) // 2)], guesses, max(depths))
+    check_resume(tmp, answers[: max(6, len(answers) // 2)], guesses, max(depths))
 
     print("\ncoverage: " + ", ".join("%s %d" % (k, v) for k, v in COVER.items()))
     for k, v in COVER.items():
