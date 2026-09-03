@@ -24,6 +24,7 @@ search, so this is the cheap way to see what the beam would open with before
 committing to a whole solve.
 """
 
+import gzip
 import os
 import sys
 import time
@@ -51,7 +52,8 @@ def resolve_openers(spec, from_file, guess_words):
     words = list(spec)
     if from_file:
         legal = set(guess_words)
-        with open(from_file) as f:
+        opener = gzip.open if from_file.endswith(".gz") else open
+        with opener(from_file, "rt") as f:
             rows = [ln for ln in f if ln.strip()]
         picked = []
         for ln in rows[1:]:                    # skip the header

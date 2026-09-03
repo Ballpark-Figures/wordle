@@ -25,6 +25,12 @@
 #   FIRST guess is cheaper than one won by the second.  Run the solver on a
 #   promising pair if you want its real cost.
 #
+#   ONLY THE BEST --write-top PAIRS ARE RECORDED (100000 by default), gzipped.
+#   Every pair is scored, but --top-n 10000 is 49,995,000 of them and writing
+#   them all came to 1.67 GB in a committed tree.  The .meta records `scored`,
+#   `written` and `complete`, so a capped file cannot be mistaken for a full one;
+#   --write-top 0 writes every pair.
+#
 #   Exact and deterministic: no sampling, no seed.  One (width, top-n) means one
 #   file and a re-run reproduces it.  It needs the guess and answer lists for the
 #   width; run the enumerate and answers wrappers first if they are missing.
@@ -40,12 +46,14 @@ MATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WIDTH=8
 TOPN=100
 SHOW=""
+WRITETOP=""
 
 while [ $# -gt 0 ]; do
     case "$1" in
         --width) WIDTH="$2"; shift 2 ;;
         --top-n) TOPN="$2";  shift 2 ;;
         --show)  SHOW="$2";  shift 2 ;;
+        --write-top) WRITETOP="$2"; shift 2 ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
     esac
 done
@@ -63,7 +71,7 @@ PY=../.venv/bin/python
 OUTDIR=data/shared/nerdle
 LOC=data/local/nerdle
 STEM="pairs_w${WIDTH}_n${TOPN}"
-OUT="$OUTDIR/$STEM.csv"
+OUT="$OUTDIR/$STEM.csv.gz"
 mkdir -p "$OUTDIR" "$LOC"
 
 for f in "$OUTDIR/guesses_w${WIDTH}.txt.gz" "$OUTDIR/answers_w${WIDTH}.txt.gz"; do
@@ -81,6 +89,7 @@ guard_output nerdle_pairs.py "$OUT" || exit 1
 
 FLAGS="--width $WIDTH --top-n $TOPN --out $OUT"
 [ -n "$SHOW" ] && FLAGS="$FLAGS --show $SHOW"
+[ -n "$WRITETOP" ] && FLAGS="$FLAGS --write-top $WRITETOP"
 
 # BSD date has no -Is; this form works on both macOS and Linux.
 echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] nerdle pairs $STEM" | tee -a "$LOC/$STEM.log"

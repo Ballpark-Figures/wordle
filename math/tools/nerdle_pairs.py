@@ -26,6 +26,7 @@ the FIRST guess is cheaper than one won by the second, since both simply leave
 the partition.  Feed a promising pair to the solver if you want its real cost.
 """
 
+import gzip
 import os
 import sys
 import time
@@ -38,12 +39,23 @@ from nerdle import WIDTH  # noqa: E402
 RULES = "2026-09-03"
 
 
+# Every pair is scored, but writing every pair does not scale: --top-n 10000 is
+# 49,995,000 of them, which came to 1.67 GB uncompressed in data/shared -- a
+# committed tree.  Only the head is ever read, so the file is capped and gzipped,
+# and the .meta records `scored`, `written` and `complete` the way the singletons
+# files do, so a truncated file can never be mistaken for a full one.
+DEFAULT_WRITE_TOP = 100000
+
+
 def parse_args(argv):
     width, top_n, out, show = WIDTH, 100, None, 20
+    write_top = DEFAULT_WRITE_TOP
     i = 0
     while i < len(argv):
         a = argv[i]
-        if a == "--width":
+        if a == "--write-top":
+            write_top = int(argv[i + 1]); i += 2
+        elif a == "--width":
             width = int(argv[i + 1]); i += 2
         elif a == "--top-n":
             top_n = int(argv[i + 1]); i += 2
@@ -61,11 +73,11 @@ def parse_args(argv):
         raise SystemExit(
             "--out is required (or --no-out to discard results deliberately).\n"
             "Use the wrapper, which sets it: bash solver/run-nerdle-pairs.sh")
-    return width, top_n, out, show
+    return width, top_n, out, show, write_top
 
 
 def main(argv):
-    width, top_n, out, show = parse_args(argv)
+    width, top_n, out, show, write_top = parse_args(argv)
 
     print("nerdle two-equation opener screen: width=%d top-n=%d rules=%s"
           % (width, top_n, RULES))
@@ -100,11 +112,16 @@ def main(argv):
               % (r + 1, game.guess_words[gs[i]], game.guess_words[gs[j]], score))
 
     if out:
-        with open(out, "w") as f:
+        keep = len(scored) if write_top <= 0 else min(write_top, len(scored))
+        opener = gzip.open if out.endswith(".gz") else open
+        with opener(out, "wt") as f:
             f.write("rank,first,second,sum_of_squares\n")
-            for r, (score, i, j) in enumerate(scored):
+            for r, (score, i, j) in enumerate(scored[:keep]):
                 f.write("%d,%s,%s,%d\n"
                         % (r + 1, game.guess_words[gs[i]], game.guess_words[gs[j]], score))
+        if keep < len(scored):
+            print("\nwrote the best %d of %d pairs (--write-top); the rest are"
+                  " scored but not recorded" % (keep, len(scored)))
         with open(out + ".meta", "w") as m:
             m.write("kind=pair-opener-screen\n")
             m.write("width=%d\ntop_n=%d\nrules=%s\n" % (width, top_n, RULES))
@@ -114,7 +131,9 @@ def main(argv):
             m.write("blind=1\n")
             m.write("guesses=%d\nanswers=%d\nclasses=%d\n"
                     % (game.NG, game.NA, game.nclasses))
-            m.write("pairs=%d\n" % len(scored))
+            m.write("scored=%d\n" % len(scored))
+            m.write("written=%d\n" % keep)
+            m.write("complete=%d\n" % int(keep == len(scored)))
             if single_best:
                 m.write("best_single=%s\nbest_single_score=%d\n" % single_best)
             if scored:

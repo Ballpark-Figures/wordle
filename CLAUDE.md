@@ -921,6 +921,10 @@ Run it with **`bash solver/run-nerdle-solve.sh [-k K] [--width W] [--rank-only]`
   quadratically and never makes it exhaustive. **The score is split quality, NOT expected
   guesses** — it does not know an answer won by the FIRST guess is cheaper than one won by
   the second.
+  - **ONLY THE BEST `--write-top` PAIRS ARE RECORDED (100000 default), GZIPPED.** Every
+    pair is scored, but `--top-n 10000` is 49995000 of them and writing them all produced
+    a **1.67 GB file in the committed tree**. The `.meta` carries `scored`/`written`/
+    `complete` like the singletons files, so a capped file cannot be read as a full one.
 - **`python3 tools/nerdle_symbols.py [--set answers|guesses|classes]`** reports symbol
   frequencies three ways (occurrences, equations containing, per equation) plus a position
   table. The three sets are different denominators and none is hidden as a default —
