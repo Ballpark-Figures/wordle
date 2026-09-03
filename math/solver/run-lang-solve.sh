@@ -83,7 +83,9 @@ mkdir -p "$OUTDIR" "$LOC"
 
 # Shared refuse-if-something-else-writes-this-file guard.  Its second check is
 # by process NAME, which is "python" here, so only the output-file half applies.
-. "$(dirname "${BASH_SOURCE[0]}")/_guard.sh"
+# Sourced through $MATH, which is absolute: BASH_SOURCE is the path AS INVOKED,
+# so a relative one stops resolving the moment we cd above.
+. "$MATH/solver/_guard.sh"
 guard_output lang_solve.py "$OUT" || exit 1
 
 FLAGS="-k $K --words $WORDS --out $OUT"
