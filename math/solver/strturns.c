@@ -146,6 +146,11 @@ static int      TOPK = 0;
  * which is what makes this affordable at all. */
 static int      ALL_GUESSES = 0;
 #define MAXREPS 4096
+/* The ROOT's guess classes.  Openers are chosen from these under
+ * --guess-space all, and they outlive any one node, so they are held here rather
+ * than on a stack frame. */
+static uint8_t  ROOTREPS[MAXREPS][L];
+static int      NROOTREPS = 0;
 
 /* A guess, however it was obtained: its letter codes plus its 243 atoms.  The
  * word-list path points at the precomputed tables; the 26**5 path points at a
@@ -886,7 +891,10 @@ static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
          * it because one guess cannot resolve a candidate it cannot name. */
         uint8_t two[2][L];
         if (enum_small(st, two, 2) == 2) {
-            if (WORDIDX[strindex(two[0])] >= 0 || WORDIDX[strindex(two[1])] >= 0) {
+            /* Under --guess-space all every string is a legal guess, so a
+             * candidate is always playable and this is simply 1 + 2. */
+            if (ALL_GUESSES ||
+                WORDIDX[strindex(two[0])] >= 0 || WORDIDX[strindex(two[1])] >= 0) {
                 decide(2, 0); return 3;
             }
             for (int g = 0; g < NG; g++)
@@ -905,6 +913,19 @@ static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
      * so beyond that the budget cannot bind and f(S,d) == f(S,n).  Collapsing
      * the key is what makes small states hit in the table. */
     if ((uint64_t)d > n) d = (int)n;
+
+    /* --guess-space all: one representative per symmetry class of the FULL 26**5
+     * space, enumerated fresh at this node and used by every guess loop below.
+     * Measured at 7 classes at the root, 36 down an all-grey line and 174 once a
+     * green pins a position, so the list is short however deep the search goes. */
+    uint8_t reps[MAXREPS][L];
+    int nreps = 0;
+    if (ALL_GUESSES) {
+        static __thread uint64_t rkeys[MAXREPS];
+        Sym sy; build_sym(st, &sy);
+        nreps = enum_reps(&sy, reps, MAXREPS, rkeys);
+    }
+    int nguess = ALL_GUESSES ? nreps : NG;
 
     long long lb0 = lbound(n, d);
     if (lb0 >= INF) return INF;
@@ -1014,9 +1035,10 @@ static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
             tt_put(h0, h1, d, best2, bg2, 1);
             return best2;
         }
-        for (int g = 0; g < NG; g++) {
-            const State *at = ATOM + (size_t)g * NPAT;
-            const uint8_t *ok = AOK + (size_t)g * NPAT;
+        for (int g = 0; g < nguess; g++) {
+            Guess q; get_guess(g, reps, ctx->atbuf[d], ctx->okbuf[d], &q);
+            const State *at = q.at;
+            const uint8_t *ok = q.ok;
             long long uns = 0, sing = 0;
             for (int p = 0; p < NPAT; p++) {
                 if (!ok[p] || p == ALL_GREEN) continue;
@@ -1051,16 +1073,8 @@ static long long solve(const State *st, uint64_t n, int d, Ctx *ctx) {
      * per symmetry class, taking the lowest index in each so the choice matches
      * what the tie-break would have made anyway. */
     int ncand = 0;
-    /* --guess-space all: one representative per symmetry class of the FULL 26**5
-     * space, enumerated fresh at this node.  Measured at 7 classes at the root,
-     * 36 down an all-grey line and 174 once a green pins a position, so this list
-     * is short however deep the search goes. */
-    uint8_t reps[MAXREPS][L];
     if (ALL_GUESSES) {
-        static __thread uint64_t rkeys[MAXREPS];
-        Sym sy; build_sym(st, &sy);
-        int nr = enum_reps(&sy, reps, MAXREPS, rkeys);
-        for (int i = 0; i < nr; i++) { ord[ncand].key = 0; ord[ncand].g = i; ncand++; }
+        for (int i = 0; i < nreps; i++) { ord[ncand].key = 0; ord[ncand].g = i; ncand++; }
     } else if (BY_CLASS) {
         Sym sy; build_sym(st, &sy);
         for (int g = 0; g < NG; g++) {
@@ -1257,10 +1271,10 @@ static void root_state(State *s) {
     for (int c = 0; c < ALPHA; c++) { s->lo[c] = 0; s->hi[c] = L; }
 }
 
-static long long solve_opener(int g, int depth, Ctx *ctx) {
+static long long solve_opener(const Guess *q, int depth, Ctx *ctx) {
     State root; root_state(&root);
-    const State *at = ATOM + (size_t)g * NPAT;
-    const uint8_t *ok = AOK + (size_t)g * NPAT;
+    const State *at = q->at;
+    const uint8_t *ok = q->ok;
     /* Count the buckets first so the progress line has a denominator from the
      * outset rather than growing one as it goes. */
     int nb = 0;
@@ -1333,10 +1347,10 @@ static long long solve_opener(int g, int depth, Ctx *ctx) {
  * a stopped run would report on the structurally worst openers available: a
  * 4-distinct-letter opener leaves an all-grey bucket of 22**5 = 5153632 against
  * 21**5 = 4084101 for a 5-distinct one, and coverage is the binding constraint. */
-static long long root_lb(int g, int depth) {
+static long long root_lb(const Guess *q, int depth) {
     State root; root_state(&root);
-    const State *at = ATOM + (size_t)g * NPAT;
-    const uint8_t *ok = AOK + (size_t)g * NPAT;
+    const State *at = q->at;
+    const uint8_t *ok = q->ok;
     long long lb = NSTR;
     for (int p = 0; p < NPAT; p++) {
         if (!ok[p] || p == ALL_GREEN) continue;
@@ -1354,10 +1368,10 @@ static long long root_lb(int g, int depth) {
 /* The opener's root sum of squared bin sizes -- the same split-quality score the
  * per-node loop ranks by under --topk, so the sweep and the search agree about
  * what "most promising" means instead of using two different rules. */
-static long long root_ssq(int g) {
+static long long root_ssq(const Guess *q) {
     State root; root_state(&root);
-    const State *at = ATOM + (size_t)g * NPAT;
-    const uint8_t *ok = AOK + (size_t)g * NPAT;
+    const State *at = q->at;
+    const uint8_t *ok = q->ok;
     long long ss = 0;
     for (int p = 0; p < NPAT; p++) {
         if (!ok[p]) continue;
@@ -1383,23 +1397,47 @@ static long long root_ssq(int g) {
  * letting one answer run long to save guesses elsewhere.  So *used is the
  * minimum working DEPTH and the total is optimal SUBJECT TO it -- not an
  * unconstrained minimum. */
+/* Opener `id` as a Guess plus a printable name: a word ordinal normally, an
+ * index into the root's guess classes under --guess-space all. */
+static void opener_guess(int id, State *atb, uint8_t *okb, Guess *q, char *name) {
+    if (ALL_GUESSES) {
+        guess_of_codes(ROOTREPS[id], atb, okb, q);
+        for (int i = 0; i < L; i++) name[i] = (char)('a' + ROOTREPS[id][i]);
+        name[L] = 0;
+    } else {
+        guess_of_index(id, q);
+        memcpy(name, GWORD[id], L + 1);
+    }
+}
+
+/* Printable name for opener `id`, valid in either guess space. */
+static const char *opener_name(int id) {
+    static __thread char buf[L + 1];
+    if (!ALL_GUESSES) return GWORD[id];
+    for (int i = 0; i < L; i++) buf[i] = (char)('a' + ROOTREPS[id][i]);
+    buf[L] = 0;
+    return buf;
+}
+
 static long long solve_escalating(int g, int dmin, int dmax, Ctx *ctx,
                                   int *used, int chatty) {
     long long total = INF;
+    State atb[NPAT]; uint8_t okb[NPAT]; Guess q; char nm[L + 1];
+    opener_guess(g, atb, okb, &q, nm);
     for (int d = dmin; d <= dmax; d++) {
         double t0 = now_s();
         long long nodes0 = ctx->nodes;
-        total = solve_opener(g, d, ctx);
+        total = solve_opener(&q, d, ctx);
         if (total < INF && UNS(total) == 0) { *used = d; return total; }
         if (chatty) {
             if (total < INF)
                 printf("%s  depth %d: %lld unsolved, %lld guesses  (%.1fs, %lld nodes)%s\n",
-                       GWORD[g], d, UNS(total), GUESSES(total), now_s() - t0,
+                       nm, d, UNS(total), GUESSES(total), now_s() - t0,
                        ctx->nodes - nodes0,
                        d < dmax ? " -- escalating" : " -- that was --depth-max");
             else
                 printf("%s  INFEASIBLE at depth %d  (%.1fs, %lld nodes)%s\n",
-                       GWORD[g], d, now_s() - t0, ctx->nodes - nodes0,
+                       nm, d, now_s() - t0, ctx->nodes - nodes0,
                        d < dmax ? " -- escalating" : " -- that was --depth-max");
             fflush(stdout);
         }
@@ -1411,9 +1449,21 @@ static long long solve_escalating(int g, int dmin, int dmax, Ctx *ctx,
 static int measure_branching(void) {
     State root; root_state(&root);
     int best = 1;
-    for (int g = 0; g < NG; g++) {
-        const State *at = ATOM + (size_t)g * NPAT;
-        const uint8_t *ok = AOK + (size_t)g * NPAT;
+    /* Under --guess-space all the guess set is 26**5, but at the ROOT it collapses
+     * to a handful of classes and orbit-mates have isomorphic partitions -- so the
+     * maximum bin count over the classes IS the maximum over all guesses. */
+    static uint8_t rreps[MAXREPS][L];
+    static uint64_t rkeys[MAXREPS];
+    int nall = NG;
+    if (ALL_GUESSES) {
+        Sym sy; build_sym(&root, &sy);
+        nall = enum_reps(&sy, rreps, MAXREPS, rkeys);
+    }
+    State atb[NPAT]; uint8_t okb[NPAT];
+    for (int g = 0; g < nall; g++) {
+        Guess qq; get_guess(g, rreps, atb, okb, &qq);
+        const State *at = qq.at;
+        const uint8_t *ok = qq.ok;
         int k = 0;
         for (int p = 0; p < NPAT; p++) {
             if (!ok[p] || p == ALL_GREEN) continue;
@@ -1542,6 +1592,14 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--sweep")) sweep = 1;
         else if (!strcmp(argv[i], "--allow-unsolved")) ALLOW_UNSOLVED = 1;
         else if (!strcmp(argv[i], "--by-class")) BY_CLASS = 1;
+        else if (!strcmp(argv[i], "--guess-space") && i + 1 < argc) {
+            const char *v = argv[++i];
+            if (!strcmp(v, "all")) ALL_GUESSES = 1;
+            else if (strcmp(v, "words")) {
+                fprintf(stderr, "--guess-space must be words or all\n");
+                return 1;
+            }
+        }
         else if (!strcmp(argv[i], "--dump-reps")) dump_reps_n = 1;
         else if (!strcmp(argv[i], "--small-n") && i + 1 < argc) SMALL_N = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--list-unsolved") && i + 1 < argc)
@@ -1636,6 +1694,15 @@ int main(int argc, char **argv) {
     if (dump_reps_n) { dump_reps(); return 0; }
     if (selftest_n) { selftest(selftest_n); return 0; }
 
+    if (ALL_GUESSES) {
+        static uint64_t rk[MAXREPS];
+        State rt; root_state(&rt);
+        Sym sy; build_sym(&rt, &sy);
+        NROOTREPS = enum_reps(&sy, ROOTREPS, MAXREPS, rk);
+        fprintf(stderr, "guess space: ALL %ld strings, %d classes at the root\n",
+                NSTR, NROOTREPS);
+    }
+
     BRANCH = measure_branching();
     fprintf(stderr, "branching: %d non-winning bins (max over %d guesses)\n", BRANCH, NG);
     {   /* lbound returns a PACKED (unsolved, guesses) under --allow-unsolved, so
@@ -1714,10 +1781,19 @@ int main(int argc, char **argv) {
         Ctx *ctx = calloc(1, sizeof(Ctx));
         for (int i = 0; i < nopen; i++) {
             int g = -1;
+            if (ALL_GUESSES) {
+                /* Any string is legal here, and it need not be one of the root's
+                 * canonical representatives -- so append it and use that slot. */
+                if (strlen(openers[i]) == L && NROOTREPS < MAXREPS) {
+                    for (int j = 0; j < L; j++)
+                        ROOTREPS[NROOTREPS][j] = (uint8_t)(openers[i][j] - 'a');
+                    g = NROOTREPS++;
+                }
+            } else
             for (int k = 0; k < NG; k++) if (!strcmp(GWORD[k], openers[i])) { g = k; break; }
             if (g < 0) { fprintf(stderr, "%s is not a legal guess\n", openers[i]); continue; }
             if (done[g]) {
-                fprintf(stderr, "%s already in %s -- skipping\n", GWORD[g], outpath);
+                fprintf(stderr, "%s already in %s -- skipping\n", opener_name(g), outpath);
                 continue;
             }
             /* Escalate the cap one guess at a time up to --depth-max, so the
@@ -1738,7 +1814,7 @@ int main(int argc, char **argv) {
                  * solved count would attribute their guesses to somebody else. */
                 printf("%s  total=%lld  unsolved=%lld  avg-played=%.5f  d=%d"
                        "  (%.1fs, %lld nodes)\n",
-                       GWORD[g], gs, un, (double)gs / NSTR,
+                       opener_name(g), gs, un, (double)gs / NSTR,
                        used, dt, ctx->nodes);
                 /* The progress counter is supposed to decide every answer
                  * exactly once and agree with the result.  Say so either way,
@@ -1753,16 +1829,22 @@ int main(int argc, char **argv) {
                         printf("  progress accounting balances: %lld solved + %lld "
                                "unsolved = %ld\n", G_SOLVED, G_UNRESOLVED, NSTR);
                 }
-                if (un > 0) {
+                if (un > 0 && !ALL_GUESSES) {
                     State rt; root_state(&rt);
                     report_unsolved(&rt, g, used, total, ctx);
+                } else if (un > 0) {
+                    /* The unsolved WALK still indexes atoms by a word ordinal,
+                     * which a generated representative does not have.  The COUNT
+                     * above is exact either way; only the examples are missing. */
+                    printf("  %lld unsolved (listing not available under "
+                           "--guess-space all)\n", un);
                 }
             }
             fflush(stdout);
             if (out) {
-                if (total >= INF) fprintf(out, "%s,,,,%.1f\n", GWORD[g], dt);
+                if (total >= INF) fprintf(out, "%s,,,,%.1f\n", opener_name(g), dt);
                 else fprintf(out, "%s,%lld,%.5f,%d,%.1f,%lld\n",
-                             GWORD[g], GUESSES(total),
+                             opener_name(g), GUESSES(total),
                              (double)GUESSES(total) / NSTR,
                              used, dt, UNS(total));
                 fflush(out);
@@ -1783,7 +1865,10 @@ int main(int argc, char **argv) {
          * partitions of 5 that any word realises. */
         int *cand = malloc(sizeof(int) * NG);
         int ncand = 0;
-        if (BY_CLASS) {
+        if (ALL_GUESSES) {
+            for (int i = 0; i < NROOTREPS; i++) cand[ncand++] = i;
+            fprintf(stderr, "guess-space all: %d root guess classes\n", ncand);
+        } else if (BY_CLASS) {
             State rt; root_state(&rt);
             Sym sy; build_sym(&rt, &sy);
             GuessKey *tmp = malloc(sizeof(GuessKey) * NG);
@@ -1800,13 +1885,17 @@ int main(int argc, char **argv) {
         } else {
             for (int g = 0; g < NG; g++) cand[ncand++] = g;
         }
-        for (int ci = 0; ci < ncand; ci++) {
-            int g = cand[ci];
-            long long lb = root_lb(g, depth);
-            if (lb >= INF && !ALLOW_UNSOLVED) continue;
-            ord[nord].key = (TOPK > 0) ? root_ssq(g) : lb;
-            ord[nord].g = g;
-            nord++;
+        {
+            State atb[NPAT]; uint8_t okb[NPAT]; Guess q; char nm[L + 1];
+            for (int ci = 0; ci < ncand; ci++) {
+                int g = cand[ci];
+                opener_guess(g, atb, okb, &q, nm);
+                long long lb = root_lb(&q, depth);
+                if (lb >= INF && !ALLOW_UNSOLVED) continue;
+                ord[nord].key = (TOPK > 0) ? root_ssq(&q) : lb;
+                ord[nord].g = g;
+                nord++;
+            }
         }
         free(cand);
         qsort(ord, nord, sizeof(GuessKey), cmp_guesskey);
@@ -1834,7 +1923,7 @@ int main(int argc, char **argv) {
                     " -- completions arrive out of order, %d at a time\n",
                     nord, nord == 1 ? "" : "s",
                     TOPK > 0 ? "root sum of squares" : "root lower bound",
-                    GWORD[ord[0].g], ord[0].key,
+                    opener_name(ord[0].g), ord[0].key,
 #ifdef _OPENMP
                     omp_get_max_threads()
 #else
@@ -1874,19 +1963,19 @@ int main(int argc, char **argv) {
                     double el = now_s() - sw;
                     if (total >= INF)
                         printf("[%7.0fs] %5d/%d  %s  INFEASIBLE d>%d  %7.1fs\n",
-                               el, completed, nord, GWORD[g], depthmax, dt);
+                               el, completed, nord, opener_name(g), depthmax, dt);
                     else {
                         long long un = UNS(total), gs = GUESSES(total);
                         printf("[%7.0fs] %5d/%d  %s  total=%lld  unsolved=%lld"
                                "  avg=%.5f  d=%d  %7.1fs\n",
-                               el, completed, nord, GWORD[g], gs, un,
+                               el, completed, nord, opener_name(g), gs, un,
                                (double)gs / NSTR, used, dt);
                     }
                     fflush(stdout);
                     if (out) {
-                        if (total >= INF) fprintf(out, "%s,,,,%.1f\n", GWORD[g], dt);
+                        if (total >= INF) fprintf(out, "%s,,,,%.1f\n", opener_name(g), dt);
                         else fprintf(out, "%s,%lld,%.5f,%d,%.1f,%lld\n",
-                                     GWORD[g], GUESSES(total),
+                                     opener_name(g), GUESSES(total),
                                      (double)GUESSES(total) / NSTR,
                                      used, dt, UNS(total));
                         fflush(out);
