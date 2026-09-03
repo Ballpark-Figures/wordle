@@ -118,6 +118,7 @@ static uint64_t BS_CNT[26][WORDLEN + 1][BSW];  /* guesses with >= k copies of c 
 static uint64_t BS_ALL[BSW];                   /* every legal guess; NG..MAXG-1 clear */
 
 static int PRUNE = 1;                    /* --no-prune drops both bounds */
+static int LONGEST = 0;                  /* --longest: the max over answers only */
 static long long MAXNODES = 0;           /* --max-nodes, 0 = unlimited */
 
 /* --------------------------------------------------------------- loading
@@ -270,6 +271,7 @@ typedef struct {
     uint64_t  salt;               /* separates one answer's TT entries from another's */
     long long nodes, edges, pruned;
     int       overflow;           /* recursion hit MAXD -- a hard error, not a cap */
+    int       budget_blown;       /* --max-nodes hit; the verdict is UNKNOWN, not "no" */
 } Ctx;
 
 /* One dedup table per THREAD, not per depth: pass 1 at a level finishes entirely
@@ -316,6 +318,7 @@ static void ctx_load_answer(Ctx *c, int ai) {
     c->salt = ((uint64_t)ai + 1) * 0x9E3779B97F4A7C15ULL;
     c->nodes = c->edges = c->pruned = 0;
     c->overflow = 0;
+    c->budget_blown = 0;
 
     const pat_t *col = PAT;
     for (int g = 0; g < NG; g++) {
@@ -381,12 +384,35 @@ static int pool_start(int ai) {
 
 /* --------------------------------------------------------------- the search */
 
+/* Murmur3's 64-bit finalizer: full avalanche, so one changed input bit changes
+ * about half the output bits. */
+static inline uint64_t mix64(uint64_t z) {
+    z ^= z >> 33; z *= 0xFF51AFD7ED558CCDULL;
+    z ^= z >> 33; z *= 0xC4CEB9FE1A85EC53ULL;
+    z ^= z >> 33;
+    return z;
+}
+
 /* Intersect the parent's legal set with DELTA[g], returning the popcount and
- * hashing the result in the same pass.
+ * fingerprinting the result in the same pass.
  *
- * The hash is over the bitset WORDS, not the member indices: that is O(BSW) = 203
- * regardless of how many words are live, where a Zobrist-style fold over members
- * would be O(n) and cost thousands of operations near the top of a game. */
+ * The fingerprint is over the bitset WORDS, not the member indices: that is
+ * O(BSW) = 203 regardless of how many words are live, where a Zobrist-style fold
+ * over members would be O(n) and cost thousands of operations near the top of a
+ * game.
+ *
+ * THE TWO HALVES MUST BE INDEPENDENT, and getting that wrong is not a
+ * performance question -- the fingerprint IS the memo key, since the true key (a
+ * 12972-bit legal set) is far too big to store, so a collision silently returns
+ * another position's value.  The first version of this folded both halves from
+ * the same per-word quantity with near-identical FNV steps, which left them
+ * CORRELATED: nominally 128 bits of key, in practice far fewer, and it collided
+ * on a real 2315-word search (mummy came back 11 against a true 12).  So each
+ * word is avalanched once, then accumulated into the two halves by DIFFERENT
+ * operations, and both are finalized.
+ *
+ * Cost is one mix64 per NON-ZERO word, and the sets are sparse everywhere except
+ * near the root, so it lands where the node counts are smallest. */
 static inline int intersect(const uint64_t *parent, const uint64_t *d,
                             uint64_t *out, uint64_t *h0, uint64_t *h1) {
     uint64_t a = 0x243F6A8885A308D3ULL, b = 0x13198A2E03707344ULL;
@@ -396,11 +422,16 @@ static inline int intersect(const uint64_t *parent, const uint64_t *d,
         out[w] = x;
         if (x) {
             n += __builtin_popcountll(x);
-            a = (a ^ (x + (uint64_t)w * 0x9E3779B97F4A7C15ULL)) * 0x100000001B3ULL;
-            b = (b ^ (x * 0xC2B2AE3D27D4EB4FULL) ^ (uint64_t)w) * 0xD6E8FEB86659FD93ULL;
+            uint64_t m = mix64(x ^ (0x9E3779B97F4A7C15ULL * (uint64_t)(w + 1)));
+            a ^= m;
+            a = a * 0x100000001B3ULL + 0x9E3779B97F4A7C15ULL;
+            b += m;
+            b ^= b >> 29;
+            b *= 0xBF58476D1CE4E5B9ULL;
         }
     }
-    *h0 = a; *h1 = b;
+    *h0 = mix64(a);
+    *h1 = mix64(b ^ 0xC2B2AE3D27D4EB4FULL);
     return n;
 }
 
@@ -476,6 +507,134 @@ static int value(Ctx *c, int depth, int nL, uint64_t h0, uint64_t h1, int pool) 
     return best;
 }
 
+/* ------------------------------------------- the longest game (--longest)
+ *
+ * A DIFFERENT QUESTION from the per-answer sweep, and a far cheaper one: not
+ * "how long does each answer last" but "how long can ANY game last".  Only the
+ * maximum over answers is wanted, so no answer's exact value has to be computed
+ * -- each one only has to be asked whether it BEATS the best found so far, and a
+ * decision problem prunes vastly harder than an optimisation, because a whole
+ * subtree dies the moment it cannot reach the target rather than when it has been
+ * fully measured.
+ *
+ * TWO PHASES.
+ *
+ *   A. A greedy playout per answer -- always move to the child that keeps the most
+ *      words alive.  Cheap, and it does two jobs: it is an achievable LOWER bound,
+ *      so the incumbent starts high instead of at 1, and it gives the sweep a
+ *      DERIVED visit order (best greedy first) rather than word-list order, which
+ *      is what gets the true maximum found early.  Greedy quality affects only
+ *      SPEED: the incumbent is achievable whatever it is, and the exact test below
+ *      is what establishes the answer.
+ *
+ *   B. For each answer in that order, `can_reach(need)` with need = incumbent + 1.
+ *      A pass raises the incumbent (and is re-tested at the new bar until it
+ *      fails); a fail retires that answer for good.
+ *
+ * ONE PASS SUFFICES EVEN THOUGH THE INCUMBENT RISES MID-SWEEP.  can_reach is
+ * monotone in `need`: an answer that cannot reach k cannot reach anything larger,
+ * so an answer retired early against a lower bar stays retired against the final
+ * one.  Nothing has to be revisited.
+ *
+ * THE MEMO KEY CARRIES THE BUDGET, so every entry stays EXACT -- "this set can /
+ * cannot reach b" is a fact about (set, b), not a bound that depends on where the
+ * search happened to be when it was written.  That is deliberate: seeding a
+ * maximising search with a floor instead makes its memoised values upper bounds
+ * rather than values, and storing those as if exact silently corrupts every later
+ * lookup.  Budgeted booleans avoid the whole class of bug.
+ */
+
+/* Longest line greedy play finds, and an achievable lower bound on the answer's
+ * true value.  Ties on the lowest guess index, as everywhere else. */
+static int greedy_len(Ctx *c, int nL, const uint64_t *start) {
+    uint64_t cur[BSW];
+    memcpy(cur, start, sizeof cur);
+    int len = 1;                              /* the forced naming move */
+    for (int step = 0; step < MAXD - 2; step++) {
+        int bestg = -1, bestn = -1;
+        for (int w = 0; w < BSW; w++) {
+            uint64_t bits = cur[w];
+            while (bits) {
+                int g = (w << 6) + __builtin_ctzll(bits);
+                bits &= bits - 1;
+                if (g == c->answer_g) continue;
+                uint64_t d0, d1;
+                int nC = intersect(cur, c->delta + (size_t)g * BSW, c->scratch,
+                                   &d0, &d1);
+                if (nC > bestn) { bestn = nC; bestg = g; }
+            }
+        }
+        if (bestg < 0) return len;            /* only the answer is playable */
+        uint64_t d0, d1;
+        nL = intersect(cur, c->delta + (size_t)bestg * BSW, c->scratch, &d0, &d1);
+        memcpy(cur, c->scratch, sizeof cur);
+        len++;
+    }
+    return len;
+}
+
+/* Is there a line of at least `need` guesses (the naming move included)? */
+static int can_reach(Ctx *c, int depth, int nL, uint64_t h0, uint64_t h1,
+                     int pool, int need) {
+    if (need <= 1) return 1;                  /* the answer is always playable */
+    if (nL < need) return 0;                  /* word bound */
+    if (pool + 1 < need) return 0;            /* resource bound */
+    if (depth + 1 >= MAXD) { c->overflow = 1; return 0; }
+    if (MAXNODES && c->nodes >= MAXNODES) { c->budget_blown = 1; return 0; }
+
+    uint64_t k0 = h0 ^ (uint64_t)need * 0x9E3779B97F4A7C15ULL;
+    uint64_t k1 = h1 ^ (uint64_t)need * 0xC2B2AE3D27D4EB4FULL;
+    int val, bestg;
+    if (tt_get(k0, k1, &val, &bestg)) return val;
+
+    c->nodes++;
+    const uint64_t *L = c->arena[depth];
+    Cand *cand = c->cand + (size_t)depth * NG;
+    int ncand = 0;
+    uint32_t stamp = ++c->stamp;
+    for (int w = 0; w < BSW; w++) {
+        uint64_t bits = L[w];
+        while (bits) {
+            int g = (w << 6) + __builtin_ctzll(bits);
+            bits &= bits - 1;
+            if (g == c->answer_g) continue;
+            uint64_t ch0, ch1;
+            int nC = intersect(L, c->delta + (size_t)g * BSW, c->scratch, &ch0, &ch1);
+            int slot = (int)(ch0 & c->dedup_mask), seen = 0;
+            for (int probe = 0; probe < DEDUP_SIZE; probe++) {
+                if (c->dstamp[slot] != stamp) {
+                    c->dstamp[slot] = stamp; c->dedup[slot] = ch0; break;
+                }
+                if (c->dedup[slot] == ch0) { seen = 1; break; }
+                slot = (slot + 1) & c->dedup_mask;
+            }
+            if (seen) continue;
+            int cpool = pool - c->spent[g];
+            cand[ncand].bound = nC < cpool + 1 ? nC : cpool + 1;
+            cand[ncand].g = g;
+            ncand++;
+        }
+    }
+    qsort(cand, ncand, sizeof(Cand), cand_cmp);
+
+    for (int i = 0; i < ncand; i++) {
+        if (cand[i].bound < need - 1) { c->pruned += ncand - i; break; }
+        int g = cand[i].g;
+        uint64_t ch0, ch1;
+        int nC = intersect(L, c->delta + (size_t)g * BSW, c->arena[depth + 1],
+                           &ch0, &ch1);
+        c->edges++;
+        if (can_reach(c, depth + 1, nC, ch0 ^ c->salt, ch1 ^ c->salt,
+                      pool - c->spent[g], need - 1)) {
+            tt_put(k0, k1, 1, g);
+            return 1;
+        }
+        if (c->budget_blown) return 0;
+    }
+    tt_put(k0, k1, 0, -1);
+    return 0;
+}
+
 /* Replay a prefix of already-played words into the starting state.
  *
  * Not a convenience: it is what makes this program diffable against
@@ -546,6 +705,148 @@ static int solve_one(Ctx *c, int ai, char **after, int nafter,
     return v;
 }
 
+
+/* Rebuild the witness line for an answer that reached `need`.
+ *
+ * Done IMMEDIATELY when a record is set, while that answer's entries are still in
+ * the table -- deferring it to the end of the sweep would mean re-searching from
+ * cold after 2314 other answers had evicted everything. */
+static void longest_line(Ctx *c, int ai, int need, char *out, size_t outsz) {
+    /* The node cap is lifted here, and budget_blown cleared. `need` is already
+     * KNOWN achievable -- can_reach proved it -- so the line exists and refusing
+     * to walk it would report a maximum with no witness. A blown budget during
+     * the search is exactly when this matters, because that is when the flag is
+     * still set and every probe below would return a spurious "no". */
+    long long saved = MAXNODES;
+    int saved_blown = c->budget_blown;
+    MAXNODES = 0;
+    c->budget_blown = 0;
+
+    uint64_t h0, h1;
+    int pool;
+    int nL = start_state(c, ai, NULL, 0, &h0, &h1, &pool);
+    size_t used = 0;
+    int depth = 0, budget = need;
+    while (budget > 1 && depth + 2 < MAXD) {
+        int chosen = -1, chosen_n = 0;
+        uint64_t ch0 = 0, ch1 = 0;
+        const uint64_t *L = c->arena[depth];
+        for (int w = 0; w < BSW && chosen < 0; w++) {
+            uint64_t bits = L[w];
+            while (bits) {
+                int g = (w << 6) + __builtin_ctzll(bits);
+                bits &= bits - 1;
+                if (g == c->answer_g) continue;
+                uint64_t t0, t1;
+                int nC = intersect(L, c->delta + (size_t)g * BSW,
+                                   c->arena[depth + 1], &t0, &t1);
+                if (can_reach(c, depth + 1, nC, t0 ^ c->salt, t1 ^ c->salt,
+                              pool - c->spent[g], budget - 1)) {
+                    chosen = g; chosen_n = nC; ch0 = t0; ch1 = t1;
+                    break;
+                }
+            }
+        }
+        if (chosen < 0) break;
+        used += (size_t)snprintf(out + used, outsz - used, "%s%s",
+                                 used ? " " : "", GWORD[chosen]);
+        intersect(c->arena[depth], c->delta + (size_t)chosen * BSW,
+                  c->arena[depth + 1], &h0, &h1);
+        (void)ch0; (void)ch1;
+        nL = chosen_n;
+        pool -= c->spent[chosen];
+        budget--;
+        depth++;
+    }
+    snprintf(out + used, outsz - used, "%s%s", used ? " " : "", AWORD[ai]);
+    MAXNODES = saved;
+    c->budget_blown = saved_blown;
+}
+
+/* --longest: the longest game any answer admits, over the whole answer list. */
+static int run_longest(Ctx *c, FILE *out, int *todo, int ntodo,
+                       int nseen, int resumed_floor) {
+    /* PHASE A -- greedy lower bound per answer, which is also the visit order. */
+    fprintf(stderr, "phase A: greedy playout for %d answers\n", ntodo);
+    Cand *order = malloc((size_t)ntodo * sizeof(Cand));
+    double ta = (double)clock() / CLOCKS_PER_SEC;
+    for (int k = 0; k < ntodo; k++) {
+        ctx_load_answer(c, todo[k]);
+        uint64_t h0, h1;
+        int nL = intersect(BS_ALL, BS_ALL, c->arena[0], &h0, &h1);
+        order[k].bound = greedy_len(c, nL, c->arena[0]);
+        order[k].g = todo[k];
+    }
+    qsort(order, ntodo, sizeof(Cand), cand_cmp);
+    int incumbent = resumed_floor;
+    int witness = -1;
+    for (int k = 0; k < ntodo; k++)
+        if (order[k].bound > incumbent) { incumbent = order[k].bound; witness = order[k].g; }
+    fprintf(stderr, "phase A done in %.1fs: best greedy %d (%s), worst %d\n",
+            (double)clock() / CLOCKS_PER_SEC - ta, order[0].bound,
+            AWORD[order[0].g], order[ntodo - 1].bound);
+
+    /* PHASE B -- ask each answer only whether it BEATS the incumbent. */
+    fprintf(stderr, "phase B: testing against a rising incumbent, best greedy first\n");
+    char line[4096];
+    line[0] = 0;
+    if (witness >= 0) {
+        ctx_load_answer(c, witness);
+        longest_line(c, witness, incumbent, line, sizeof line);
+    }
+    int unknown = 0;
+    for (int k = 0; k < ntodo; k++) {
+        int ai = order[k].g;
+        double t0 = (double)clock() / CLOCKS_PER_SEC;
+        ctx_load_answer(c, ai);
+        uint64_t h0, h1;
+        int pool;
+        int nL = start_state(c, ai, NULL, 0, &h0, &h1, &pool);
+        int floor_tested = incumbent;
+        int record = 0;
+        while (can_reach(c, 0, nL, h0 ^ c->salt, h1 ^ c->salt, pool, incumbent + 1)) {
+            incumbent++;
+            witness = ai;
+            record = 1;
+        }
+        if (c->overflow) {
+            fprintf(stderr, "internal: recursion hit MAXD=%d on %s -- raise it\n",
+                    MAXD, AWORD[ai]);
+            exit(1);
+        }
+        double secs = (double)clock() / CLOCKS_PER_SEC - t0;
+        if (record) longest_line(c, ai, incumbent, line, sizeof line);
+        const char *verdict = c->budget_blown ? "unknown" : (record ? "record" : "no");
+        if (c->budget_blown) unknown++;
+        printf("[%d/%d] %s greedy=%d %s  nodes=%lld %.2fs\n",
+               nseen + k + 1, nseen + ntodo, AWORD[ai], order[k].bound, verdict,
+               c->nodes, secs);
+        if (record) printf("        NEW LONGEST: %d  %s\n", incumbent, line);
+        fflush(stdout);
+        if (out) {
+            /* `value` is filled ONLY on a record -- for every other answer the run
+             * never computed one, and writing anything there would invent it. The
+             * `floor` column says what bar the answer was actually tested against,
+             * which is what makes a resumed run auditable. */
+            char val[16];
+            if (record) snprintf(val, sizeof val, "%d", incumbent);
+            else        val[0] = 0;
+            fprintf(out, "%s,%d,%s,%s,%d,%lld,%.3f,%s\n", AWORD[ai], order[k].bound,
+                    verdict, val, floor_tested + 1, c->nodes, secs,
+                    record ? line : "");
+            fflush(out);
+        }
+    }
+    free(order);
+    printf("\nLONGEST GAME: %d guesses, answer %s\n  %s\n", incumbent,
+           witness >= 0 ? AWORD[witness] : "(none)", line);
+    if (unknown)
+        printf("  WARNING: %d answer(s) hit --max-nodes; their verdict is UNKNOWN,\n"
+               "           so this is a LOWER BOUND on the longest game, not the maximum.\n",
+               unknown);
+    return 0;
+}
+
 /* -------------------------------------------------------------------- main */
 
 static void usage(void) {
@@ -557,6 +858,9 @@ static void usage(void) {
         "  --limit N        stop after N answers\n"
         "  --tt-bits B      transposition table size, 2^B entries (default 26)\n"
         "  --max-nodes N    abandon an answer past N states, reporting no number\n"
+        "  --longest        find the LONGEST GAME any answer admits, and stop --\n"
+        "                   a different, much cheaper question than the per-answer\n"
+        "                   sweep, since only the maximum is computed\n"
         "  --no-prune       disable both bounds -- the exhaustive oracle\n"
         "  --after \"W W\"    words already played, to start from a mid-game state\n"
         "  --guess-list F   word list that may be PLAYED (default guess.txt)\n"
@@ -579,6 +883,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--tt-bits") && i + 1 < argc)     ttbits = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--max-nodes") && i + 1 < argc)   MAXNODES = atoll(argv[++i]);
         else if (!strcmp(argv[i], "--no-prune"))                    PRUNE = 0;
+        else if (!strcmp(argv[i], "--longest"))                     LONGEST = 1;
         else if (!strcmp(argv[i], "--guess-list") && i + 1 < argc)  guesslist = argv[++i];
         else if (!strcmp(argv[i], "--data") && i + 1 < argc)        datadir = argv[++i];
         else if (!strcmp(argv[i], "--after") && i + 1 < argc) {
@@ -592,6 +897,16 @@ int main(int argc, char **argv) {
         fprintf(stderr, "antistall: give --out FILE, or --no-out to save NOTHING.\n"
                         "  A run with nowhere to put its answer is a run thrown away.\n"
                         "  Prefer the wrapper: bash solver/run-antistall-sweep.sh\n");
+        return 2;
+    }
+
+    if (LONGEST && nafter) {
+        fprintf(stderr, "--longest searches whole games, so --after does not apply\n");
+        return 2;
+    }
+    if (LONGEST && !PRUNE) {
+        fprintf(stderr, "--longest IS the pruned decision search; --no-prune has no\n"
+                        "  meaning here. Use the per-answer mode for the oracle.\n");
         return 2;
     }
 
@@ -646,17 +961,33 @@ int main(int argc, char **argv) {
     build_bitsets();
     tt_init(ttbits);
 
-    /* Which answers to solve, and resume: a row already in the CSV is done. */
+    /* Which answers to solve, and resume: a row already in the CSV is done.
+     *
+     * In --longest mode resume ALSO recovers the incumbent, from the `value`
+     * column of the record rows. Skipping an answer tested against a LOWER bar is
+     * sound because can_reach is monotone in its target: an answer that could not
+     * reach k cannot reach anything above k, so it stays retired. */
     static char done[MAXA];
+    int resumed_floor = 0, nseen = 0;
     if (outpath) {
         FILE *rf = fopen(outpath, "r");
         if (rf) {
-            char lb[512];
+            char lb[4096];
             while (fgets(lb, sizeof lb, rf)) {
-                char *comma = strchr(lb, ',');
-                if (!comma) continue;
-                *comma = 0;
-                for (int a = 0; a < NA; a++) if (!strcmp(lb, AWORD[a])) { done[a] = 1; break; }
+                char *f[8]; int nf = 0;
+                for (char *t = lb; nf < 8; ) {
+                    f[nf++] = t;
+                    char *comma = strchr(t, ',');
+                    if (!comma) break;
+                    *comma = 0; t = comma + 1;
+                }
+                if (nf < 3) continue;
+                for (int a = 0; a < NA; a++)
+                    if (!strcmp(f[0], AWORD[a])) { done[a] = 1; nseen++; break; }
+                if (LONGEST && nf >= 4 && !strcmp(f[2], "record")) {
+                    int v = atoi(f[3]);
+                    if (v > resumed_floor) resumed_floor = v;
+                }
             }
             fclose(rf);
         }
@@ -690,11 +1021,22 @@ int main(int argc, char **argv) {
         if (t) { fresh = fgetc(t) == EOF; fclose(t); }
         out = fopen(outpath, "a");
         if (!out) { fprintf(stderr, "cannot write %s\n", outpath); return 1; }
-        if (fresh) fprintf(out, "answer,status,guesses,nodes,edges,secs,line\n");
+        if (fresh) fprintf(out, LONGEST
+            ? "answer,greedy,verdict,value,floor,nodes,secs,line\n"
+            : "answer,status,guesses,nodes,edges,secs,line\n");
     }
 
     Ctx *c = ctx_new();
     double t_start = (double)clock() / CLOCKS_PER_SEC;
+    if (LONGEST) {
+        if (resumed_floor)
+            fprintf(stderr, "resuming with incumbent %d from %d recorded answers\n",
+                    resumed_floor, nseen);
+        int rc = run_longest(c, out, todo, ntodo, nseen, resumed_floor);
+        printf("done in %.1fs\n", (double)clock() / CLOCKS_PER_SEC - t_start);
+        if (out) fclose(out);
+        return rc;
+    }
     for (int k = 0; k < ntodo; k++) {
         int ai = todo[k];
         char line[4096];

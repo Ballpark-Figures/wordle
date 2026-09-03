@@ -22,6 +22,19 @@ WHAT IS DIFFED, per case:
   pruned and unpruned C values differ and this catches it without needing Python
   to be able to reach the state at all.
 
+  THE LINE'S LENGTH AGAINST THE VALUE.  A reported maximum of N with an N-1 word
+  witness is self-refuting, and this is free to check. It is here because it was
+  the first symptom of a real bug (a memo-key collision, 2026-09-03) and would
+  have caught it instantly, where the value-only comparison passed for days.
+
+  THE ANSWER AGAINST TABLE SIZE.  The transposition table is pure memoisation:
+  every entry is an exact value, so its SIZE can change how long a search takes
+  and must not change what it returns. Running each case with a deliberately tiny
+  table forces heavy eviction and re-search, and a value that moves means keys are
+  colliding. That is precisely the failure that got past the value-only diff --
+  the fingerprint's two halves were correlated, so 128 nominal key bits were worth
+  far fewer, and one position quietly returned another's value.
+
 RUN FROM MID-GAME, always. The Python reference cannot search an empty board —
 that is the entire reason the C port exists — so a shared starting state is the
 only place the two can be compared. The prefix is arbitrary and stated in the
@@ -134,13 +147,21 @@ def main():
         cv, cline, csecs = run_c(answer, PREFIX)
         pv, pline, psecs = run_python(space, PAT, answers, answer, PREFIX)
         uv, _, _ = run_c(answer, PREFIX, ["--no-prune"])
+        tv, _, _ = run_c(answer, PREFIX, ["--tt-bits", "18"])   # forced eviction
+        nline = len(cline.split())
 
-        ok = cv == pv and cv == uv
+        ok = cv == pv and cv == uv and cv == tv and nline == cv
         speed = f"{psecs / csecs:.0f}x" if csecs > 0.005 else "too fast to time"
         print(f"  {'PASS' if ok else 'FAIL'}  {answer}: C={cv} py={pv} "
-              f"C-unpruned={uv}   {csecs:.2f}s vs {psecs:.2f}s ({speed})")
+              f"unpruned={uv} tiny-tt={tv} line={nline}w"
+              f"   {csecs:.2f}s vs {psecs:.2f}s ({speed})")
         if not ok:
-            FAILS.append(f"{answer}: C={cv} py={pv} unpruned={uv}")
+            why = []
+            if cv != pv: why.append(f"py={pv}")
+            if cv != uv: why.append(f"unpruned={uv}")
+            if cv != tv: why.append(f"tiny-tt={tv} (KEY COLLISION)")
+            if nline != cv: why.append(f"line is {nline} words for a value of {cv}")
+            FAILS.append(f"{answer}: C={cv} but " + ", ".join(why))
         elif cline != pline:
             WARNS.append(f"{answer}: lines differ (both length {cv})")
             print(f"        warn: lines differ\n          C  {cline}\n          py {pline}")

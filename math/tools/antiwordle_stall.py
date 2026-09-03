@@ -68,10 +68,22 @@ class LimitedSearch(StallSearch):
         return super().value(cons, pool)
 
 
-def solve_one(space, PAT, answers, answer, after, max_nodes):
+def pattern_column(PAT, rows, ai):
+    """This guess space's patterns against answer `ai`.
+
+    The matrix rows are the FULL 12972-word guess list, so a RESTRICTED guess
+    space has to be mapped back onto them. Indexing the full matrix with a
+    2315-list index instead does not fail -- it silently returns a different
+    word's feedback, and the search then answers a question about a game nobody
+    is playing. (It did exactly that until 2026-09-03.)
+    """
+    return np.asarray(PAT[:, ai])[rows]
+
+
+def solve_one(space, PAT, rows, answers, answer, after, max_nodes):
     """(status, guesses, line, nodes, edges, secs) for one answer word."""
     ai = answers.index(answer)
-    col = np.asarray(PAT[:, ai])
+    col = pattern_column(PAT, rows, ai)
     gi = space.index[answer]
 
     cons = replay_prefix(space, col, after)   # refuses a prefix no game can reach
@@ -124,6 +136,11 @@ def main():
     answers = load_words("mystery")
     space = GuessSpace(load_words(args.guess_list))
     PAT = load_patterns()
+    full = {w: i for i, w in enumerate(load_words("guess"))}
+    missing = [w for w in space.words if w not in full]
+    if missing:
+        raise SystemExit("not in the full guess list: " + " ".join(missing[:5]))
+    rows = np.array([full[w] for w in space.words])
     after = args.after.split()
 
     todo = args.answer or answers
@@ -154,7 +171,7 @@ def main():
     t_start = time.time()
     for k, answer in enumerate(todo, 1):
         status, total, line, nodes, edges, secs = solve_one(
-            space, PAT, answers, answer, after, args.max_nodes)
+            space, PAT, rows, answers, answer, after, args.max_nodes)
         shown = total if status == "ok" else status.upper()
         print(f"[{k}/{len(todo)}] {answer} = {shown}"
               f"  nodes={nodes} edges={edges} {secs:.2f}s"
