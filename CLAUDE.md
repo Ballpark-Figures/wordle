@@ -874,6 +874,15 @@ Run it with **`bash solver/run-nerdle-solve.sh [-k K] [--width W] [--rank-only]`
   count, spanning the whole beam at `k > 1`), not a heartbeat.
 - **`solve()` is CACHED, and that was a bug fix**: the total and the opener come out of one
   walk, and asking for them separately ran the whole search TWICE.
+- **TWO-EQUATION OPENERS: `bash solver/run-nerdle-pairs.sh [--top-n N]`.** Both guesses
+  played BLIND; an answer's joint bin is the PAIR of feedbacks, ranked by ascending sum of
+  squared joint bins, and an answer either guess WINS joins no bin. **IT IS A SCREEN, NOT
+  A SEARCH** — only pairs drawn from the best N SINGLE guesses are examined, so the best
+  pair overall can be missed outright (two poor splitters can cover each other's blind
+  spots). Say "the best pair among the top N", never "the best pair"; `--top-n` widens it
+  quadratically and never makes it exhaustive. **The score is split quality, NOT expected
+  guesses** — it does not know an answer won by the FIRST guess is cheaper than one won by
+  the second.
 - **`python3 tools/nerdle_symbols.py [--set answers|guesses|classes]`** reports symbol
   frequencies three ways (occurrences, equations containing, per equation) plus a position
   table. The three sets are different denominators and none is hidden as a default —

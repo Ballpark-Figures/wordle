@@ -199,6 +199,52 @@ if _HAVE_NUMBA:
                 out[j] = _pattern(G, g, A, S[j], width, cnt)
 
     @njit(cache=True)
+    def _rows(G, gs, A, S, gclass, aclass, width, cnt, out):
+        """Feedback per (chosen guess, candidate); -1 where that guess WINS."""
+        for r in range(gs.shape[0]):
+            g = gs[r]
+            gc = gclass[g]
+            for j in range(S.shape[0]):
+                if aclass[S[j]] == gc:
+                    out[r, j] = -1
+                else:
+                    out[r, j] = _pattern(G, g, A, S[j], width, cnt)
+
+    @njit(cache=True)
+    def _pair_scores(rows, npat, buf, out):
+        """Sum of squared JOINT bin sizes for every pair of the given rows.
+
+        The joint bin of an answer is the pair of feedbacks the two guesses give
+        it, so this is the partition you hold after playing both BLIND.  An
+        answer that either guess WINS is resolved and joins no bin, which is the
+        convention the single-guess ranking already uses.
+
+        `buf` is a npat*npat counter touched sparsely and cleared by walking the
+        same answers again -- never by zeroing 43 million entries per pair.
+        """
+        n, NA = rows.shape
+        t = 0
+        for i in range(n):
+            for j in range(i + 1, n):
+                for a in range(NA):
+                    p1 = rows[i, a]
+                    p2 = rows[j, a]
+                    if p1 >= 0 and p2 >= 0:
+                        buf[p1 * npat + p2] += 1
+                ss = 0
+                for a in range(NA):
+                    p1 = rows[i, a]
+                    p2 = rows[j, a]
+                    if p1 >= 0 and p2 >= 0:
+                        c = buf[p1 * npat + p2]
+                        if c > 0:
+                            ss += c * c
+                            buf[p1 * npat + p2] = 0
+                out[t] = ss
+                t += 1
+        return t
+
+    @njit(cache=True)
     def _solve(G, A, S, gclass, aclass, width, k, depth, cnt, bins, touched):
         """(total guesses over the candidates in S, the guess index chosen)."""
         n = S.shape[0]
@@ -402,6 +448,79 @@ class NerdleTopK:
             if cost < best_cost:
                 best_cost, best_g = int(cost), g
         return best_cost, best_g
+
+    # ---- pair openers ------------------------------------------------------
+    def pair_scores(self, top_n):
+        """Every pair drawn from the top_n single guesses, by joint sum of squares.
+
+        Returns (the top_n guess indices, [(score, i, j)] sorted best first),
+        where i and j index INTO that returned array.
+
+        THIS IS A SCREEN, NOT A SEARCH.  Restricting to the best singles can miss
+        the best pair outright: two guesses that split poorly alone may cover
+        each other's blind spots, and nothing here would ever look at them.  The
+        result is "the best pair among the top_n" -- a weaker claim than "the
+        best pair", and it must be reported that way.
+
+        The score is a heuristic for how well the pair SPLITS, exactly as the
+        single-guess score is.  It is not expected guesses, and it does not know
+        that an answer won by the first guess is cheaper than one won by the
+        second -- both simply leave the partition.
+        """
+        S = np.arange(self.NA, dtype=np.int64)
+        if self.use_numba:
+            out_g = np.empty(top_n, dtype=np.int64)
+            out_s = np.empty(top_n, dtype=np.int64)
+            nk = _rank(self.G, self.A, S, self.gclass, self.aclass, self.width,
+                       top_n, self._cnt, self._bins, self._touched, out_g, out_s)
+            gs = out_g[:nk].copy()
+        else:
+            gs = np.array(self._ref_rank_n(S, top_n), dtype=np.int64)
+            nk = gs.size
+
+        rows = np.empty((nk, self.NA), dtype=np.int32)
+        if self.use_numba:
+            _rows(self.G, gs, self.A, S, self.gclass, self.aclass, self.width,
+                  self._cnt, rows)
+            out = np.zeros(nk * (nk - 1) // 2, dtype=np.int64)
+            # npat*npat counters -- 172 MB at width 8.  Allocated once for the
+            # whole sweep, not per pair.
+            buf = np.zeros(self.NPAT * self.NPAT, dtype=np.int32)
+            _pair_scores(rows, self.NPAT, buf, out)
+        else:
+            for r, g in enumerate(gs):
+                rows[r] = self._root_codes(int(g), S)
+            out = self._ref_pair_scores(rows)
+
+        scored, t = [], 0
+        for i in range(nk):
+            for j in range(i + 1, nk):
+                scored.append((int(out[t]), i, j))
+                t += 1
+        scored.sort()
+        return gs, scored
+
+    def _ref_pair_scores(self, rows):
+        """The pair scores again, from numpy -- the oracle for _pair_scores."""
+        n = rows.shape[0]
+        out = np.zeros(n * (n - 1) // 2, dtype=np.int64)
+        t = 0
+        for i in range(n):
+            for j in range(i + 1, n):
+                keep = (rows[i] >= 0) & (rows[j] >= 0)
+                joint = rows[i][keep].astype(np.int64) * self.NPAT + rows[j][keep]
+                _, counts = np.unique(joint, return_counts=True)
+                out[t] = int((counts.astype(np.int64) ** 2).sum())
+                t += 1
+        return out
+
+    def _ref_rank_n(self, S, n):
+        """The n best-ranked guesses from the numpy path (self.k is the beam)."""
+        keep_k, self.k = self.k, n
+        try:
+            return list(self._ref_rank(S))
+        finally:
+            self.k = keep_k
 
     # ---- reference implementation (the oracle; identical rules, plain numpy)
     def _ref_patterns(self, g, S):

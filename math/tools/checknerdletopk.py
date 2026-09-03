@@ -198,8 +198,50 @@ if leaks:
 else:
     print("   ok   no all-green survivor over %d guesses" % len(range(0, g6.NG, 97)))
 
+# --------------------------------------------------------- 5. the pair screen
+print("5. the pair screen against numpy, and against a hand count")
+if not NT._HAVE_NUMBA:
+    print("   SKIP  numba is not installed")
+else:
+    for w in (5, 6):
+        fast = game(w, 1)
+        slow = game(w, 1, use_numba=False)
+        gs_f, sc_f = fast.pair_scores(10)
+        gs_s, sc_s = slow.pair_scores(10)
+        if list(gs_f) != list(gs_s) or sc_f != sc_s:
+            bad("width %d: the pair screen differs between kernel and reference" % w)
+            continue
+        # An independent count of ONE pair, from the strings: the joint bin of an
+        # answer is the two feedbacks, and an answer either guess wins joins none.
+        score, i, j = sc_f[0]
+        g1, g2 = fast.guess_words[gs_f[i]], fast.guess_words[gs_f[j]]
+        c1, c2 = fast.gclass[gs_f[i]], fast.gclass[gs_f[j]]
+        joint = {}
+        for a, word in enumerate(fast.answer_words):
+            if fast.aclass[a] == c1 or fast.aclass[a] == c2:
+                continue
+            key = (pattern(g1, word), pattern(g2, word))
+            joint[key] = joint.get(key, 0) + 1
+        want = sum(v * v for v in joint.values())
+        if want != score:
+            bad("width %d: %s + %s scores %d, a hand count of the strings says %d"
+                % (w, g1, g2, score, want))
+        else:
+            print("   ok   width %d: %d pairs agree, best %s + %s at %d, hand-counted"
+                  % (w, len(sc_f), g1, g2, score))
+        # A pair must never split WORSE than its better half alone: adding a
+        # second blind guess can only refine the partition.
+        og = np.empty(10, dtype=np.int64)
+        os_ = np.empty(10, dtype=np.int64)
+        S = np.arange(fast.NA, dtype=np.int64)
+        NT._rank(fast.G, fast.A, S, fast.gclass, fast.aclass, w, 10,
+                 fast._cnt, fast._bins, fast._touched, og, os_)
+        if score > int(os_[0]):
+            bad("width %d: the best pair scores %d, worse than the best single at %d"
+                % (w, score, int(os_[0])))
+
 # ------------------------------------------------------------------ coverage
-print("5. the class rule actually fired")
+print("6. the class rule actually fired")
 multi = sum(1 for m in classes.values() if len(m) > 1)
 if not multi:
     bad("no class of more than one member was ever exercised -- the pass is hollow")
