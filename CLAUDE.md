@@ -798,15 +798,26 @@ and IS the source of truth; read it before quoting any count. Run it with
 - **Pass one counts equations AS WRITTEN** — `1+9=0+10` and `9+1=0+10` are two guesses,
   not one.
 - **PASS TWO collapses the ANSWERS into commutative classes: `bash solver/run-nerdle-classes.sh`.**
-  The test is the GAME'S OWN, quoted from its FAQ: "your guess must still have all the same
-  numbers, the same operators and the same answer". Chosen by the user over two narrower
-  algebraic readings. **Two consequences that surprise people:** `-` and `/` EFFECTIVELY
-  MOVE (`9-8+7=8` and `9+7-8=8` are one class — the test is about tokens, not algebra), and
-  it is BROADER THAN ALGEBRAIC COMMUTATIVITY (`2+1*3=5` and `3+2*1=5` are one class though
-  their products differ). A canonicaliser built on commuting operands gives a different,
-  larger answer. **The class count and the answer count are DIFFERENT QUANTITIES** — what
-  the hidden equation may be as written, versus how many distinct puzzles that is — so
-  never quote one as the other.
+  **ONLY `+` AND `*` COMMUTE** (user's call, 2026-09-03): the operator sequence is
+  preserved and operands permute within their `+` slots and within their `*` slots, so a
+  subtracted term and a divisor stay put. `12+34=46`≡`34+12=46`, `1*2+8=10`≡`8+1*2=10`,
+  `9-8+7=8`≡`7-8+9=8` (the two `+` terms swap, `-8` holds its slot); but NOT
+  `9-8+7=8`≡`9+7-8=8`, NOT `12/3/2=2`≡`12/2/3=2`.
+  - **DO NOT re-adopt the FAQ's literal test.** It says a guess "must still have all the
+    same numbers, the same operators and the same answer" — a **NECESSARY** condition,
+    and reading it as SUFFICIENT was an error that put `1*2+8=10` and `1*8+2=10` in one
+    class though their products are `1*2` and `1*8`. The FAQ never addresses `-` or `/`
+    and gives no example beyond `+` and `*`; a web search (2026-09-03) found nothing
+    better. NB commutative answers are a **SETTING, on by default**, so the win condition
+    is setting-dependent.
+  - **The formalisation is a CHOICE**: this preserves the operator sequence and permutes
+    operands within it. The alternative — swap a `+`/`*` node's operands and re-flatten —
+    also moves operators, additionally merging `8/2*3=12` with `3*8/2=12`. Both are "only
+    `+` and `*` commute"; ours is the simpler to state and is what every count was
+    computed under.
+  - **The class count and the answer count are DIFFERENT QUANTITIES** — what the hidden
+    equation may be as written, versus how many distinct puzzles that is — so never quote
+    one as the other.
 - **`python3 tools/checknerdle.py` is the GATE.** Its reference shares no code with
   `nerdle.py`: a regex screens a side, then every digit run is rewritten as `Fraction(n)`
   and the string handed to **PYTHON'S OWN PARSER** via `eval`, so precedence, repeated

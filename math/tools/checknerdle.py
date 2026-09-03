@@ -101,17 +101,46 @@ def ref_answer(s, width):
     return a is not None and b is not None and a == b
 
 
-def ref_key(s):
-    """The FAQ's commutativity test, tokenised by regex rather than by scanning.
+def ref_class(s):
+    """Every answer commutatively equal to s, by ENUMERATION rather than
+    canonicalisation.
 
-    "the same numbers, the same operators and the same answer" -- so the key is
-    the two multisets plus the answer.  Independent of nerdle.commutative_key in
-    how it finds the tokens, which is the only place the two could disagree.
+    nerdle.commutative_key sorts the operands in the commuting slots into one
+    canonical order; this instead generates every permutation of them and
+    returns the whole class as a set.  The two share no code and answer
+    different questions, so they can be diffed three ways: the class of a is the
+    class of b exactly when the keys match, the key must itself lie in the class,
+    and the class must be closed (every member generates the same class).
     """
     lhs, rhs = s.split("=")
-    nums = tuple(sorted(int(n) for n in re.findall(r"\d+", lhs)))
-    ops = tuple(sorted(re.findall(r"[-+*/]", lhs)))
-    return nums, ops, int(rhs)
+    terms = re.split(r"(?=[-+])|(?<=[-+])", lhs)      # keep the operators
+    toks = [t for t in re.split(r"([-+])", lhs) if t]
+    term_ops = [""] + [t for t in toks if t in "+-"]
+    term_vals = [t for t in toks if t not in "+-"]
+
+    def factor_forms(term):
+        ftoks = [t for t in re.split(r"([*/])", term) if t]
+        fops = [""] + [t for t in ftoks if t in "*/"]
+        fvals = [t for t in ftoks if t not in "*/"]
+        slots = [i for i in range(len(fvals)) if fops[i] in ("", "*")]
+        out = set()
+        for perm in itertools.permutations(sorted(fvals[i] for i in slots)):
+            vals = list(fvals)
+            for i, v in zip(slots, perm):
+                vals[i] = v
+            out.add("".join(fops[i] + vals[i] for i in range(len(vals))))
+        return out
+
+    per_term = [sorted(factor_forms(t)) for t in term_vals]
+    slots = [i for i in range(len(term_vals)) if term_ops[i] in ("", "+")]
+    out = set()
+    for perm in itertools.permutations(slots):
+        for combo in itertools.product(*per_term):
+            vals = list(combo)
+            for src_i, dst_i in zip(slots, perm):
+                vals[dst_i] = combo[src_i]
+            out.add("".join(term_ops[i] + vals[i] for i in range(len(vals))) + "=" + rhs)
+    return out
 
 
 def ref_intermediates(lhs):
@@ -141,7 +170,7 @@ FEATURES = ("unary minus", "double negative", "leading zero", "division",
             "expression on the right", "no operator", "negative value",
             "non-integer value", "answer", "answer through a negative",
             "answer through a fraction", "class of more than one",
-            "class where a minus or slash moved")
+            "class with a term that moved")
 seen = {f: 0 for f in FEATURES}
 
 
@@ -280,14 +309,17 @@ print("   ok   %d switch cases, %d loosenings keep every settled answer"
 # commutes, and a canonicaliser built on algebra would split them.
 SAME = [
     ["12+34=46", "34+12=46"],
-    ["9-8+7=8", "9+7-8=8", "7-8+9=8", "7+9-8=8"],
+    ["1*2+8=10", "8+1*2=10"],
     ["1+2*3=7", "3*2+1=7", "1+3*2=7", "2*3+1=7"],
-    ["2+1*3=5", "3+2*1=5"],
+    ["9-8+7=8", "7-8+9=8"],      # the two `+`-signed terms swap, `-8` holds
 ]
 DIFF = [
-    ("1+2*3=7", "1*2+3=5"),      # same numbers and operators, different answer
+    ("1*2+8=10", "1*8+2=10"),    # the case that sank the FAQ's literal test
+    ("2+1*3=5", "3+2*1=5"),      # likewise: the products are 1*3 and 2*1
+    ("9-8+7=8", "9+7-8=8"),      # `-8` would have to move
+    ("12/3/2=2", "12/2/3=2"),    # divisors are pinned
+    ("1+2*3=7", "1*2+3=5"),      # same tokens, different answer
     ("1+2*3=7", "1+6*1=7"),      # same operators and answer, different numbers
-    ("9-8+7=8", "9+8-7=10"),     # same numbers and operators, different answer
 ]
 
 print("1d. the commutative classes")
@@ -295,18 +327,24 @@ for group in SAME:
     for s in group:
         if not N.is_answer(s, len(s)):
             bad("%r is used as a class witness but is not an answer" % s)
-        if N.commutative_key(s) != ref_key(s):
-            bad("commutative_key(%r) disagrees with the reference" % s)
+        if N.commutative_key(s) not in ref_class(s):
+            bad("the key of %r is not itself in its enumerated class" % s)
     keys = {N.commutative_key(s) for s in group}
+    cls = ref_class(group[0])
     if len(keys) != 1:
         bad("%s should be one class, got %d" % (group, len(keys)))
+    elif not set(group) <= cls:
+        bad("%s is one class by key, but %s is missing from the enumeration"
+            % (group, sorted(set(group) - cls)))
     else:
         seen["class of more than one"] += 1
-        if any(c in "-/" for c in group[0].split("=")[0]):
-            seen["class where a minus or slash moved"] += 1
+        if any(c in "-+" for c in group[0].split("=")[0]):
+            seen["class with a term that moved"] += 1
 for a, b in DIFF:
     if N.commutative_key(a) == N.commutative_key(b):
         bad("%r and %r should be different classes" % (a, b))
+    if b in ref_class(a):
+        bad("%r turns up in %r's enumerated class" % (b, a))
 print("   ok   %d classes hold together, %d pairs stay apart" % (len(SAME), len(DIFF)))
 
 print("2. nerdle.evaluate against Python's own parser, every side to length 4")
@@ -346,8 +384,14 @@ for w in range(3, 7 if wide else 6):
             % (w, sorted(ref_ans - mine_ans)[:3], sorted(mine_ans - ref_ans)[:3]))
     groups = {}
     for s in sorted(ref_ans):
-        if N.commutative_key(s) != ref_key(s):
-            bad("width %d: commutative_key(%r) disagrees with the reference" % (w, s))
+        cls = ref_class(s)
+        if N.commutative_key(s) not in cls:
+            bad("width %d: the key of %r is not itself in its class" % (w, s))
+        for t in cls & ref_ans:
+            if N.commutative_key(t) != N.commutative_key(s):
+                bad("width %d: %r and %r are one class but key differently" % (w, s, t))
+            if ref_class(t) != cls:
+                bad("width %d: the class of %r is not closed (%r differs)" % (w, s, t))
         groups.setdefault(N.commutative_key(s), []).append(s)
     if sum(len(g) for g in groups.values()) != len(ref_ans):
         bad("width %d: the classes do not partition the answers" % w)

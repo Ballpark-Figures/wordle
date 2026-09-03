@@ -426,56 +426,97 @@ def is_answer(s, width=WIDTH):
 # --------------------------------------------------------------------------
 # COMMUTATIVE EQUIVALENCE -- pass two.
 #
-# Nerdle accepts a rearrangement of the day's answer as a win, and its FAQ states
-# the test it applies (https://www.nerdlegame.com/faqs.html?faq=commutativity,
-# read 2026-09-03):
+# Nerdle accepts a rearrangement of the day's answer as a win ("if today's
+# answer is 10+20=30, then 20+10=30 will also be accepted"), and it is a SETTING,
+# on by default.  So the classes below are what the game treats as one puzzle.
 #
-#     "To be accepted as commutative, your guess must still have all the same
-#      numbers, the same operators and the same answer as the one we're looking
-#      for."
+# THE RULE: ONLY `+` AND `*` COMMUTE.  The operator sequence is preserved, and
+# within it the operands joined by `+` may permute among themselves and the
+# operands joined by `*` may permute among themselves.  A subtracted term and a
+# divisor stay where they are written.  Settled by the user on 2026-09-03.
 #
-# So an answer's class is keyed by the MULTISET of its left-side numbers, the
-# MULTISET of its left-side operators, and the answer itself.  Chosen by the user
-# on 2026-09-03 over two narrower algebraic readings, because this one is what the
-# game actually accepts.
+# WHY NOT THE FAQ's OWN TEST, which was tried first and withdrawn.  The FAQ says
+# a guess "must still have all the same numbers, the same operators and the same
+# answer".  That is a NECESSARY condition, and reading it as a SUFFICIENT one is
+# a mistake: it puts `1*2+8=10` and `1*8+2=10` in one class, though their
+# products are `1*2` and `1*8` and neither is a rearrangement of the other.  The
+# FAQ never addresses `-` or `/` and never gives an example beyond `+` and `*`,
+# and a web search (2026-09-03) turned up nothing better, so the conservative
+# reading is the one the game's own examples support.  Revisit if evidence turns
+# up; the classes are recomputed from the answer list in seconds.
 #
-# TWO CONSEQUENCES WORTH KNOWING, since both surprise people and both are why the
-# narrower readings were on the table at all:
+# WHAT THE RULE DOES AND DOES NOT MERGE:
 #
-#   * `-` AND `/` EFFECTIVELY MOVE, though neither commutes.  `9-8+7=8` and
-#     `9+7-8=8` have the same numbers, the same operators and the same answer, so
-#     the game takes either.  The FAQ's own examples only ever show `+` and `*`,
-#     which is what makes it look otherwise.
-#   * IT IS BROADER THAN ALGEBRAIC COMMUTATIVITY.  `2+1*3=5` and `3+2*1=5` pass
-#     the test but are not rearrangements of one another in any algebraic sense --
-#     their products are `1*3` and `2*1`.  A canonicaliser built on commuting
-#     operands would keep them apart; this one does not.
+#     12+34=46  =  34+12=46      two `+` operands swap
+#     1*2+8=10  =  8+1*2=10      a `+` operand is a whole term
+#     1*2+8=10 !=  1*8+2=10      the products differ -- the case that sank the
+#                                FAQ's literal test
+#     9-8+7=8   =  7-8+9=8       the two `+`-signed terms swap; `-8` holds its
+#                                slot, so this IS only `+` commuting
+#     9-8+7=8  !=  9+7-8=8       `-8` would have to move
+#     12/3/2=2 != 12/2/3=2       divisors are pinned
+#
+# THE FORMALISATION IS A CHOICE, and worth stating because a different one is
+# defensible.  This preserves the OPERATOR SEQUENCE and permutes operands within
+# it.  The alternative -- swap the operands of a `+` or `*` node and re-flatten --
+# also moves operators, so it would additionally merge `8/2*3=12` with `3*8/2=12`.
+# Both are "only `+` and `*` commute"; this one is the simpler to state and to
+# canonicalise, and it is what the counts below were computed under.
 #
 # The key is only meaningful for ANSWER-shaped strings, where every `-` is binary
 # and no number carries a sign.  Handing it a general guess would read a unary
 # minus as an operator and produce a key that means nothing.
 # --------------------------------------------------------------------------
 
-def commutative_key(s):
-    """The equivalence class of an ANSWER under Nerdle's stated rule.
+def _split_chain(s, joiners, pinners):
+    """Split s into (operator, operand) pairs. The first operator is ''."""
+    parts, ops = [], []
+    start = 0
+    for i, c in enumerate(s):
+        if i > start and (c in joiners or c in pinners):
+            parts.append(s[start:i])
+            ops.append(c)
+            start = i + 1
+    parts.append(s[start:])
+    return ops, parts
 
-    Two answers are commutatively equivalent iff their keys are equal.  Pass only
-    strings accepted by is_answer -- see the note above.
+
+def _canon_chain(s, joiner, pinner):
+    """Sort the operands in `joiner` slots among themselves; leave the rest."""
+    ops, parts = _split_chain(s, joiner, pinner)
+    # Slot i is a joiner slot when the operator IN FRONT of it is the joiner.
+    # Slot 0 has no operator and always counts as one -- it is the head of the
+    # chain, and `a + b` may present either operand there.
+    slots = [i for i in range(len(parts)) if i == 0 or ops[i - 1] == joiner]
+    for i, v in zip(slots, sorted(parts[i] for i in slots)):
+        parts[i] = v
+    out = parts[0]
+    for op, part in zip(ops, parts[1:]):
+        out += op + part
+    return out
+
+
+def commutative_key(s):
+    """The equivalence class of an ANSWER, as its canonical form.
+
+    Two answers are commutatively equivalent iff their keys are equal.  The key
+    is itself a legal equation -- the class's canonical member -- which makes it
+    readable in output and comparable by eye.  Pass only strings accepted by
+    is_answer; see the note above.
+
+    Operands are ordered as STRINGS, which is arbitrary (it puts "10" before
+    "9") but consistent, and only decides which member is canonical.
     """
     lhs, rhs = s.split("=")
-    nums, ops = [], []
-    i = 0
-    while i < len(lhs):
-        if lhs[i] in DIGITS:
-            j = i
-            while j < len(lhs) and lhs[j] in DIGITS:
-                j += 1
-            nums.append(int(lhs[i:j]))
-            i = j
-        else:
-            ops.append(lhs[i])
-            i += 1
-    return tuple(sorted(nums)), tuple(sorted(ops)), int(rhs)
+    ops, terms = _split_chain(lhs, "+", "-")
+    terms = [_canon_chain(t, "*", "/") for t in terms]
+    slots = [i for i in range(len(terms)) if i == 0 or ops[i - 1] == "+"]
+    for i, v in zip(slots, sorted(terms[i] for i in slots)):
+        terms[i] = v
+    out = terms[0]
+    for op, term in zip(ops, terms[1:]):
+        out += op + term
+    return out + "=" + rhs
 
 
 # --------------------------------------------------------------------------
