@@ -1,0 +1,13 @@
+kind=classes
+width=8
+rules=2026-09-03
+equivalence=same-numbers-same-operators-same-answer
+from=data/shared/nerdle/answers_w8.txt.gz
+answers=17723
+count=11765
+seconds=0.1
+size_1=6978
+size_2=4283
+size_3=87
+size_4=292
+size_6=125

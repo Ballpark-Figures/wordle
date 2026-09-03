@@ -5,12 +5,13 @@ Run it through the wrapper, which sets --out and tees a log:
     bash solver/run-nerdle-classes.sh                    # from math/, or anywhere
     bash solver/run-nerdle-classes.sh --width 6
 
-WHAT THIS COMPUTES: Nerdle accepts a rearrangement of the day's answer as a win,
-so the answers fall into classes any member of which wins the same day.  The
-test is the game's own, quoted from its FAQ in math/nerdle.py, which is the
-source of truth: same numbers, same operators, same answer.  Two consequences
-that surprise people are written out there -- `-` and `/` effectively move, and
-the rule is broader than algebraic commutativity.
+WHAT THIS COMPUTES: Nerdle accepts a rearrangement of the day's answer as a win
+(a SETTING, on by default), so the answers fall into classes any member of which
+wins the same day.  ONLY `+` AND `*` COMMUTE: the operator sequence is preserved
+and operands permute within their `+` slots and within their `*` slots, so a
+subtracted term and a divisor stay where they are written.  math/nerdle.py states
+it exactly, and states why the FAQ's own wording is a NECESSARY condition that
+must not be read as a sufficient one.
 
 WHY THE CLASS COUNT IS THE INTERESTING NUMBER: it is how many DISTINCT puzzles
 the answer list really holds.  Pass one counted equations as written, which is
@@ -119,7 +120,7 @@ def main(argv):
             m.write("kind=classes\n")
             m.write("width=%d\n" % width)
             m.write("rules=%s\n" % RULES)
-            m.write("equivalence=same-numbers-same-operators-same-answer\n")
+            m.write("equivalence=plus-and-times-commute-only\n")
             m.write("from=%s\n" % answers)
             m.write("answers=%d\n" % read)
             m.write("count=%d\n" % len(classes))

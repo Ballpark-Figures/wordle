@@ -6,18 +6,22 @@
 #
 # WHAT THIS COMPUTES, precisely:
 #
-#   Nerdle accepts a rearrangement of the day's answer as a win, so the answers
-#   fall into classes any member of which wins the same day.  The test is the
-#   game's own, quoted from its FAQ in math/nerdle.py, which is the source of
-#   truth: "your guess must still have all the same numbers, the same operators
-#   and the same answer as the one we're looking for."
+#   Nerdle accepts a rearrangement of the day's answer as a win -- a SETTING, on
+#   by default -- so the answers fall into classes any member of which wins the
+#   same day.  ONLY `+` AND `*` COMMUTE: the operator sequence is preserved, and
+#   within it the operands joined by `+` permute among themselves and those
+#   joined by `*` permute among themselves, so a subtracted term and a divisor
+#   stay where they are written.  math/nerdle.py states it exactly.
 #
-#   TWO CONSEQUENCES THAT SURPRISE PEOPLE, both written out in math/nerdle.py:
-#   `-` AND `/` EFFECTIVELY MOVE (`9-8+7=8` and `9+7-8=8` are one class, since
-#   the test is about tokens and not algebra), and the rule is BROADER THAN
-#   ALGEBRAIC COMMUTATIVITY (`2+1*3=5` and `3+2*1=5` are one class although
-#   their products differ).  A canonicaliser built on commuting operands would
-#   give a different, larger answer.
+#   `12+34=46` = `34+12=46` and `9-8+7=8` = `7-8+9=8` (the two `+`-signed terms
+#   swap while `-8` holds its slot), but NOT `9-8+7=8` = `9+7-8=8` and NOT
+#   `12/3/2=2` = `12/2/3=2`.
+#
+#   DO NOT re-adopt the FAQ's own wording as the test.  "Your guess must still
+#   have all the same numbers, the same operators and the same answer" is a
+#   NECESSARY condition; read as a SUFFICIENT one it merges `1*2+8=10` with
+#   `1*8+2=10`, whose products are `1*2` and `1*8` and which are not
+#   rearrangements of each other at all.
 #
 #   THE CLASS COUNT AND THE ANSWER COUNT ARE DIFFERENT QUANTITIES.  The answer
 #   count says what the hidden equation may be as written; the class count says

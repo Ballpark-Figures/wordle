@@ -836,6 +836,44 @@ and IS the source of truth; read it before quoting any count. Run it with
 - **Known edge case, RECORDED rather than decided: the unary-minus rule admits `-0`, so
   `0-0=-0` is counted.** Not checked against the live game.
 
+## Nerdle solver — a top-K beam ranked by sum of squares
+`math/nerdle_topk.py` states the objective and the strategy and IS the source of truth.
+Run it with **`bash solver/run-nerdle-solve.sh [-k K] [--width W] [--rank-only]`**
+(from `math/`).
+- **THE OBJECTIVE IS EXPECTED GUESSES OUTRIGHT — NO DEPTH CAP.** Same footing as
+  multiwordle and the adversarial hill-climb, and NOT the footing of any
+  `optturns`/`hardturns`/`ansall` total, which are optima **subject to a guarantee**.
+  Never put the two in one table. `MAXD` (32) is a recursion guard: every answer is a
+  legal guess, so a candidate guess always outranks a non-splitting one and every child
+  is strictly smaller.
+- **IT IS A BEAM, NOT AN OPTIMUM. `-k K` restricts the ROOT too**, so the opener is the
+  best of the K examined, not the best of 374246 — the same caveat `strturns` carries.
+  Each K is a different strategy and gets its own file.
+- **Ranking: ascending SUM OF SQUARED BIN SIZES, ties on the LOWEST GUESS INDEX** — the
+  rule copied from `strturns.c`'s `GuessKey`/`cmp_guesskey`, including the warning never
+  to pack the key beside the index.
+- **A GUESS WINS AGAINST ITS WHOLE COMMUTATIVE CLASS**, so one guess can finish several
+  candidates at once and the winning bin is the CLASS, not the all-green pattern (which
+  is a subset of it). Nothing in the Wordle solvers works this way. The gate tests it
+  sharply: a one-class answer list of size n must cost n, where exact-match scoring gives
+  n+1.
+- **GUESS ORDER IS PART OF THE STRATEGY — the list is sorted into canonical SYMBOL order
+  on construction** (`canonical_order`). Ties break on the lowest index, and the two
+  enumerators emit different orders, so a list taken in file order made width 6 give 526
+  one way and 528 the other. Do not remove the sort; it is what makes the result a
+  function of the guess SET.
+- **NO PATTERN MATRIX — 374246 x 17723 is 13.3 GB**, so feedback is computed inside the
+  numba kernel. **MEASURED: the root ranking is ~105s single-threaded**, and a level costs
+  the guess count times the candidates alive at that level, so every level costs about
+  what the root does rather than decaying. `--rank-only` does the root and stops.
+  **`-k K` multiplies the work per level by K**, so it compounds with depth.
+- **`python3 tools/checknerdletopk.py` is the GATE** — the numba kernel against a plain
+  numpy reference that recomputes feedback from the STRINGS with `wordle.pattern`
+  (identical totals and identical openers at several widths and K), the top-ranked guess
+  against an independent argmin, the class-win rule, and a check that no surviving bin
+  ever carries the all-green code. It enumerates its small word lists IN MEMORY so it runs
+  on a fresh clone. Run it alongside `tools/checknerdle.py`.
+
 ## Gameplay layout
 - (Describe this video's on-screen layout and the assets in `animations/assets/`.)
 
