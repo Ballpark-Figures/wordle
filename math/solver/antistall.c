@@ -279,6 +279,12 @@ typedef struct {
     int       answer_g;           /* the answer's index in the guess list */
     uint64_t  salt;               /* separates one answer's TT entries from another's */
     long long nodes, edges, pruned;
+    /* Heartbeat: a single answer can search for half an hour, and silence for
+     * that long is indistinguishable from a hang. */
+    const char *cur_answer;
+    int         cur_need;
+    double      cur_t0;
+    long long   next_beat;
     int       overflow;           /* recursion hit MAXD -- a hard error, not a cap */
     int       budget_blown;       /* --max-nodes hit; the verdict is UNKNOWN, not "no" */
 } Ctx;
@@ -331,6 +337,8 @@ static void ctx_load_answer(Ctx *c, int ai) {
     c->nodes = c->edges = c->pruned = 0;
     c->overflow = 0;
     c->budget_blown = 0;
+    c->cur_answer = AWORD[ai];
+    c->next_beat = 0;
 
     const pat_t *col = PAT;
     for (int g = 0; g < NG; g++) {
@@ -643,6 +651,18 @@ static int can_reach(Ctx *c, int depth, int nL, uint64_t h0, uint64_t h1,
     if (depth + 1 >= MAXD) { c->overflow = 1; return 0; }
     if (MAXNODES && c->nodes >= MAXNODES) { c->budget_blown = 1; return 0; }
 
+    /* Heartbeat. One answer can search for half an hour, and silence that long is
+     * indistinguishable from a hang. The counter test is a plain compare against a
+     * precomputed threshold, so it costs nothing in the hot path. */
+    if (c->nodes >= c->next_beat) {
+        if (c->next_beat)
+            printf("        ... %s still trying for %d: %lld nodes, %.0fs\n",
+                   c->cur_answer, c->cur_need, c->nodes,
+                   (double)clock() / CLOCKS_PER_SEC - c->cur_t0);
+        c->next_beat = c->nodes + 4000000;
+        fflush(stdout);
+    }
+
     uint64_t k0 = h0 ^ (uint64_t)need * 0x9E3779B97F4A7C15ULL;
     uint64_t k1 = h1 ^ (uint64_t)need * 0xC2B2AE3D27D4EB4FULL;
     int val, bestg;
@@ -874,6 +894,12 @@ static int run_longest(Ctx *c, FILE *out, int *todo, int ntodo,
     if (witness >= 0) {
         ctx_load_answer(c, witness);
         longest_line(c, witness, incumbent, line, sizeof line);
+        /* Print it NOW. Greedy has already found a real, playable sequence; there
+         * is no reason to withhold it until something beats it, which on a long
+         * run can be hours. */
+        printf("        BEST SO FAR (greedy): %d  (%s)  %s\n",
+               incumbent, AWORD[witness], line);
+        fflush(stdout);
     }
     int unknown = 0;
     for (int k = 0; k < ntodo; k++) {
@@ -887,6 +913,11 @@ static int run_longest(Ctx *c, FILE *out, int *todo, int ntodo,
         int nL = start_state(c, ai, NULL, 0, &h0, &h1, &pool, &umask, &gmk);
         int floor_tested = incumbent;
         int record = 0;
+        c->cur_need = incumbent + 1;
+        c->cur_t0 = t0;
+        /* Re-stated each iteration: the incumbent rises inside this loop, so a
+         * target captured once would have the heartbeat reporting a stale bar. */
+        c->cur_need = incumbent + 1;
         while (can_reach(c, 0, nL, h0 ^ c->salt, h1 ^ c->salt, pool,
                          incumbent + 1, umask, gmk)) {
             incumbent++;
@@ -900,6 +931,7 @@ static int run_longest(Ctx *c, FILE *out, int *todo, int ntodo,
             longest_line(c, ai, incumbent, line, sizeof line);
             printf("        NEW LONGEST: %d  (%s)  %s\n", incumbent, AWORD[ai], line);
             fflush(stdout);
+            c->cur_need = incumbent + 1;
         }
         if (c->overflow) {
             fprintf(stderr, "internal: recursion hit MAXD=%d on %s -- raise it\n",
