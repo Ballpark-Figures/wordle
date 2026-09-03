@@ -150,10 +150,11 @@ class TopKGame:
 
     def __init__(self, *, answers: str | list[str] = CUSTOM,
                  guesses: str | list[str] | None = None, k: int = 1,
-                 use_numba: bool = True):
+                 use_numba: bool = True, patterns: np.ndarray | None = None):
         if k < 1:
             raise ValueError(f"k must be at least 1, got {k}")
         self.k = k
+        self._given_P = patterns
         self.use_numba = use_numba and _HAVE_NUMBA
         self.guess_words = (load_words("guess") if guesses is None else
                             guesses if isinstance(guesses, list) else read_words(guesses))
@@ -178,7 +179,17 @@ class TopKGame:
         """[NG, N] uint8 of pattern(guess, candidate), sliced from the committed
         square all-words matrix. That matrix is indexed by the CANONICAL guess.txt
         order on BOTH axes, so rows/columns are looked up there, not in this
-        game's own (possibly narrowed) lists."""
+        game's own (possibly narrowed) lists.
+
+        A caller whose words are NOT in that matrix -- the other-language lists,
+        whose letters need not even be a..z -- supplies its own via
+        ``patterns=``; the English callers pass nothing and are unaffected."""
+        if self._given_P is not None:
+            P = np.ascontiguousarray(self._given_P)
+            if P.shape != (self.NG, self.N):
+                raise ValueError(f"patterns has shape {P.shape}, expected "
+                                 f"{(self.NG, self.N)} (guesses x candidates)")
+            return P
         full = load_patterns(full=True)
         canon = {w: i for i, w in enumerate(load_words("guess"))}
         if full.shape[0] != len(canon):
