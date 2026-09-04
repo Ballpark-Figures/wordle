@@ -9,13 +9,19 @@
 # Same shape as run-sweep.sh: foreground, output tee'd so the log gets every line
 # as well as your terminal.
 #
-# WHAT THIS SOLVES, precisely:
+# WHAT THIS SOLVES, precisely.  TWO OBJECTIVES, and they are DIFFERENT
+# QUANTITIES -- never quote one as the other or put them in one table:
 #
-#   MAXIMISE the number of the 2315 answers won with NO YELLOW TILE anywhere in
-#   the game, SUBJECT TO the strategy still winning every one of them within 6
-#   guesses.  Lexicographic: the win comes first and is absolute; the badge is
-#   maximised among strategies that never lose.  Once a yellow appears the badge
-#   is gone for that answer and the play is only required to finish the game.
+#   DEFAULT -- MAXIMISE the number of the 2315 answers WON WITHIN 6 GUESSES WITH
+#   NO YELLOW TILE.  One event per answer: it counts iff the play both stays
+#   yellow-free AND finishes inside the cap.  An answer that draws a yellow is
+#   simply lost, and the strategy owes it nothing afterwards -- it may abandon
+#   that game.  This is the badge question.
+#
+#   --must-win -- the same maximisation SUBJECT TO the strategy still winning
+#   EVERY answer within 6, yellow ones included.  A strictly smaller strategy
+#   space, so its value is always <= the default's.  It answers "if I refuse to
+#   ever lose a game, how often can I win in 6 with all greens?".
 #
 # -k K BEAMS IT, and that changes what is being claimed.  With --topk the solver
 # recurses into only the K evenest-splitting guesses at every branching point,
@@ -23,16 +29,22 @@
 # best of THOSE, not of all 12972.  Every value is one a real strategy ACHIEVES:
 # a LOWER bound on that opener's true optimum, never a proof of optimality.
 #
-# THE CAP IS THE GAME, NOT A TUNING KNOB.  --depth 6 is what "do not lose" means,
-# so the result is an optimum SUBJECT TO a 6-guess guarantee -- never quote it as
-# an unconstrained maximum.  Each depth is a different quantity, so each gets its
-# own CSV; the depth is in the filename.
+# THE CAP IS THE GAME.  --depth 6 is the six guesses you get, and under the
+# default objective it is part of the event being counted, not a side constraint.
+# Each depth is a different quantity, so each gets its own CSV; the depth, the
+# beam width and the objective are all in the filename.
 #
 # THE BADGE RULE IS UNVERIFIED.  "Complete a puzzle with no yellow tiles" was
 # read from player reports via web search, not from the NYT and not from a badge
 # screen of our own -- see the provenance note in math/greens.py.  Two clauses
 # are inferred rather than observed: that a FAILED game with no yellows does not
 # earn it, and that a lucky 1/6 does.
+#
+# THE TREE differs by objective, and only --opener writes one.  Under the default
+# it is the badge-alive part only: a yellow ends that branch, so the file holds
+# exactly one line per BADGED answer.  Under --must-win it covers every answer,
+# post-yellow play included, because there the strategy really does have to
+# finish those games.
 #
 # Ctrl-C stops it -- openers already finished are in the CSV (flushed per opener)
 # and a resume picks up from there, but the table is lost unless --tt-save ran.
@@ -47,6 +59,7 @@ DEPTH=6
 THREADS=18          # 18 cores here (6 performance + 12 efficiency)
 TTBITS=28           # 8.6 GB of 24 GB
 TOPK=0              # 0 = the exact search; K = beam width at every node
+MUSTWIN=0           # 1 = the other objective, see below
 OPENERS=()
 
 while [ $# -gt 0 ]; do
@@ -56,6 +69,7 @@ while [ $# -gt 0 ]; do
         --tt-bits) TTBITS="$2";  shift 2 ;;
         --opener)  OPENERS+=("$2"); shift 2 ;;
         -k|--topk) TOPK="$2";    shift 2 ;;
+        --must-win) MUSTWIN=1;   shift ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
     esac
 done
@@ -69,6 +83,10 @@ KARGS=()
 if [ "$TOPK" -gt 0 ]; then
     SUF="${SUF}_k$TOPK"
     KARGS+=(--topk "$TOPK")
+fi
+if [ "$MUSTWIN" -eq 1 ]; then
+    SUF="${SUF}_mustwin"
+    KARGS+=(--must-win)
 fi
 
 cd "$MATH" || exit 1

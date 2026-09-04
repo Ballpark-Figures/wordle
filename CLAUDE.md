@@ -623,17 +623,28 @@ its state arithmetic against `strspace.py` over a shared deterministic walk — 
   same standing as the Absurdle tie-break rules. Two clauses are INFERRED, not
   observed: that a FAILED game (X/6) with no yellows does not earn it, and that a
   lucky 1/6 does. **A single real badge would settle both.**
-- **THE OBJECTIVE IS LEXICOGRAPHIC (user's call, 2026-09-03), and it is NOT "maximise
-  P(badge)".** Clause 1 is a HARD CONSTRAINT — the strategy must win every one of the
-  2315 answers within 6. Clause 2 maximises the badge count among strategies that
-  never lose. **Once a yellow appears the badge is gone for that answer and the play
-  is only required to FINISH the game** — "we stop checking". So the number is a
-  maximum SUBJECT TO a 6-guess guarantee; never quote it as an unconstrained one, and
-  never put it in a table beside the multiwordle/foximax/adversarial figures, which
-  are expected guesses OUTRIGHT.
-  - **CLAUSE 1 MEASURABLY BINDS** — `checkgreens.py` computes the unconstrained value
-    too, purely to prove it: on the small case `moobs` at d=3 scores 3 constrained
-    against 4 unconstrained. The constraint is not decoration.
+- **TWO OBJECTIVES, AND THEY ARE DIFFERENT QUANTITIES.** Never quote one as the other
+  or put them in one table.
+  - **DEFAULT (the badge question, user's correction 2026-09-04):** maximise the answers
+    **WON WITHIN 6 WITH NO YELLOW**. ONE EVENT per answer — it counts iff the play both
+    stays yellow-free AND finishes inside the cap. An answer that draws a yellow is
+    simply LOST and **the strategy owes it nothing afterwards; it may abandon that
+    game.** So yellow branches are never searched, no state is ever INFEASIBLE, and
+    this is much the cheaper of the two.
+  - **`--must-win`:** the same maximisation SUBJECT TO still winning EVERY answer within
+    6. A strictly smaller strategy space, so **its value is always <= the default's**.
+  - **THE DISTINCTION IN ONE LINE:** default asks "how often can I win in 6 with all
+    greens?"; must-win asks "if I refuse to ever lose a game, how often can I win in 6
+    with all greens?". **Only the first is the badge question.**
+  - **HOW THIS WAS GOT WRONG, so it is not repeated:** the user's answer was "Max badge,
+    requiring that we win. Once we get a yellow, we stop checking." That was read as
+    "stop checking for badges but keep checking the win", and the win was made a hard
+    constraint on every answer. It meant stop checking, FULL STOP. When an answer
+    describes what happens after a failure, establish whether the failed cases are still
+    CONSTRAINED or simply OUT OF SCOPE — the two give different numbers.
+  - **THEY MEASURABLY DIFFER**, so neither is dead code: on the small case `moobs` at
+    d=3 scores 4 plain against 3 must-win, and at d=2 every opener is plain-positive but
+    must-win INFEASIBLE.
 - **THE CAP IS THE GAME, not an inherited knob.** `--depth 6` IS clause 1. Each depth
   is still a different quantity and gets its own CSV (`best_opener_d6.csv`).
 - **`if (d > n) d = n` DOES NOT TRANSFER from optturns, and that is the trap.** There,
@@ -742,7 +753,18 @@ its state arithmetic against `strspace.py` over a shared deterministic walk — 
   yellow, a yellow-free line, an infeasible opener, a binding win-constraint or a set of
   tied openers never occurred. Run it alongside `solver/validate.sh` and
   `tools/checkpatterns.py`.
+- **THE TREE DIFFERS BY OBJECTIVE, and ONLY `--opener` writes one — a sweep writes NO
+  tree at all** (`write_tree` is called from the single-opener path only, the same gap
+  `optturns --optimal-only` has; the wrapper's `mkdir` still leaves an empty `trees/`,
+  which is misleading). Under the default the tree is the **badge-alive part only**: a
+  yellow ends the branch, so the file holds exactly one line per BADGED answer and its
+  line count equals the reported count. Under `--must-win` it covers EVERY answer,
+  post-yellow play included — which is what lets `checkgreens.py` verify the guarantee
+  independently. Recover the winner's tree with `--opener <winner>` at the same depth,
+  K and objective; the search is deterministic, so it reproduces the value.
 - Data under `math/data/{shared,local}/greens/`; trees in `shared/greens/trees/`.
+  **Depth, K and the objective are all in the filename** — three different quantities
+  must never share a file.
 - **COST IS UNMEASURED as of 2026-09-03.** Price it with one named opener before
   launching the screen.
 

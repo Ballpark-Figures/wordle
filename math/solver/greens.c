@@ -178,6 +178,23 @@ static double   REPORT_EVERY = 60.0;
  * direction from every other bound in this file. */
 static int      TOPK = 0;
 
+/* --must-win: the OTHER objective, and they are different quantities.
+ *
+ *   PLAIN (default) -- maximise the answers WON WITHIN --depth WITH NO YELLOW.
+ *     One event per answer.  An answer that draws a yellow is simply LOST and
+ *     the strategy owes it nothing afterwards; it may abandon that game.  So
+ *     yellow branches are never searched at all, and no state is ever
+ *     INFEASIBLE -- the value is a count and counts start at zero.
+ *
+ *   MUST-WIN -- the same maximisation SUBJECT TO still resolving EVERY answer
+ *     within --depth, yellow ones included.  A strictly smaller strategy space,
+ *     so its value is always <= the plain one.
+ *
+ * Plain asks "how often can I win in 6 with all greens?".  Must-win asks "if I
+ * refuse to ever lose a game, how often can I win in 6 with all greens?".  Only
+ * the first is the badge question. */
+static int      MUSTWIN = 0;
+
 static int      BRANCH = NPAT - 1;   /* measured: non-winning bins, any guess */
 static int      GBRANCH = 31;        /* measured: yellow-free non-green bins */
 
@@ -602,7 +619,7 @@ static int eval_badge(const uint16_t *S, int n, int d, int g, int floor, Ctx *ct
     int badges = 0, rest = 0;
     for (int k = 0; k < nb; k++) {
         if (bp[k] == ALL_GREEN) { badges = 1; continue; }   /* won, yellow-free */
-        if (!FEASOK[d - 1][bcnt[k]]) return INFEAS;
+        if (MUSTWIN && !FEASOK[d - 1][bcnt[k]]) return INFEAS;
         if (!YEL[bp[k]]) rest += UBTAB[d - 1][bcnt[k]];
     }
     if (badges + rest < floor) return PRUNED;
@@ -610,9 +627,13 @@ static int eval_badge(const uint16_t *S, int n, int d, int g, int floor, Ctx *ct
     /* clause 1 proper, on the YELLOW buckets: they score nothing, so this is all
      * that is ever asked of them -- "once we get a yellow, we stop checking". */
     int trace = (TRACE_ROOT && d == ROOT_D), ndone_b = 0, nyel = 0;
-    if (trace)
+    if (trace && MUSTWIN)
         for (int k = 0; k < nb; k++) if (bp[k] != ALL_GREEN && YEL[bp[k]]) nyel++;
-    for (int k = 0; k < nb; k++)
+    /* Under the PLAIN objective this loop does not run at all: a yellow bucket
+     * is worth nothing and is owed nothing, so it is never examined.  That is
+     * the whole difference between the two objectives, and it is also why plain
+     * is much the cheaper -- feas() is never called. */
+    for (int k = 0; MUSTWIN && k < nb; k++)
         if (bp[k] != ALL_GREEN && YEL[bp[k]]) {
             if (!feas(buf + bstart[k], bcnt[k], d - 1, ctx)) return INFEAS;
             if (trace && (++ndone_b % 16 == 0 || ndone_b == nyel)) {
@@ -650,9 +671,15 @@ static int eval_badge(const uint16_t *S, int n, int d, int g, int floor, Ctx *ct
 }
 
 static int solve_badge(const uint16_t *S, int n, int d, Ctx *ctx) {
-    if (n == 1) return d >= 1 ? 1 : INFEAS;
-    if (d <= 1) return INFEAS;                   /* n >= 2 cannot be guaranteed */
-    if (!FEASOK[d][n]) return INFEAS;
+    if (d <= 0) return MUSTWIN ? INFEAS : 0;
+    if (n == 1) return 1;                        /* play it: green, no yellow */
+    if (d == 1) {
+        /* One guess left, more than one candidate.  No guarantee is possible,
+         * so must-win fails; plain plays a candidate and badges it if right. */
+        if (MUSTWIN) return INFEAS;
+        return 1;
+    }
+    if (MUSTWIN && !FEASOK[d][n]) return INFEAS;
     /* NO depth normalisation here -- see the porting audit at the top of the
      * file.  Extra budget buys safe probes, so f(S, d) keeps rising past d = n. */
 
@@ -704,7 +731,7 @@ static int solve_badge(const uint16_t *S, int n, int d, Ctx *ctx) {
             int p = bp[k], c = cnt[p];
             if (TOPK > 0) ss += (int64_t)c * c;
             if (p == ALL_GREEN) ub += 1;
-            else if (!FEASOK[d - 1][c]) hopeless = 1;
+            else if (MUSTWIN && !FEASOK[d - 1][c]) hopeless = 1;
             else if (!YEL[p]) ub += UBTAB[d - 1][c];
             cnt[p] = 0;
         }
@@ -802,7 +829,7 @@ static int root_ub(int g, int depth) {
     for (int p = 0; p < NPAT; p++) {
         if (!cnt[p]) continue;
         if (p == ALL_GREEN) ub += 1;
-        else if (!FEASOK[depth - 1][cnt[p]]) return INFEAS;
+        else if (MUSTWIN && !FEASOK[depth - 1][cnt[p]]) return INFEAS;
         else if (!YEL[p]) ub += UBTAB[depth - 1][cnt[p]];
     }
     return ub;
@@ -851,7 +878,7 @@ static int root_ub2(int g, int depth, Ctx *ctx) {
     for (int p = 0; p < NPAT; p++) {
         if (cnt[p] == 0) continue;
         if (p == ALL_GREEN) { total += 1; continue; }   /* the opener wins outright */
-        if (!FEASOK[depth - 1][cnt[p]]) return INFEAS;  /* clause 1, as in root_ub */
+        if (MUSTWIN && !FEASOK[depth - 1][cnt[p]]) return INFEAS;
         if (YEL[p]) continue;                           /* badge already gone here */
         if (cnt[p] == 1) { total += 1; continue; }      /* name it: green, no yellow */
 
@@ -868,7 +895,7 @@ static int root_ub2(int g, int depth, Ctx *ctx) {
             for (int k = 0; k < nb; k++) {
                 int q = bp[k], c = c2[q];
                 if (q == ALL_GREEN) v += 1;
-                else if (!FEASOK[depth - 2][c]) dead = 1;
+                else if (MUSTWIN && !FEASOK[depth - 2][c]) dead = 1;
                 else if (!YEL[q]) v += UBTAB[depth - 2][c];
                 c2[q] = 0;
             }
@@ -965,10 +992,18 @@ static int feas_move(const uint16_t *S, int n, int d, Ctx *ctx) {
 
 /* One line per answer: "<answer> <nguesses> <g1> <p1> <g2> <p2> ... <answer>",
  * the same format optturns emits, so a line replays end to end and a yellow is
- * literally a 'y' in one of its pattern fields.  The tree covers ALL answers,
- * post-yellow play included -- that is what lets a replay check clause 1. */
+ * literally a 'y' in one of its pattern fields.
+ *
+ * WHAT IT COVERS DIFFERS BY OBJECTIVE, and that is not a knob:
+ *   - PLAIN: the badge-alive subtree only.  A yellow ends that branch -- the
+ *     strategy owes those answers nothing -- so the file holds exactly one line
+ *     per BADGED answer and its line count equals the reported badge count.
+ *   - MUST-WIN: every one of the answers, post-yellow play included, because
+ *     there the strategy really does have to finish those games and a replay
+ *     covering all of them is what lets checkgreens.py verify it independently. */
 static int emit_tree(FILE *out, const uint16_t *S, int n, int d, int alive,
                      char *path, int plen, int ply, Ctx *ctx) {
+    if (d <= 0) return 0;                  /* out of guesses: nothing to record */
     int g = alive ? best_move_badge(S, n, d, ctx) : feas_move(S, n, d, ctx);
     if (g < 0) return -1;
     const char *gw = GWORD[g];
@@ -990,6 +1025,7 @@ static int emit_tree(FILE *out, const uint16_t *S, int n, int d, int alive,
     }
     for (int p = 0; p < NPAT; p++) {
         if (p == ALL_GREEN || cnt[p] == 0) continue;
+        if (!MUSTWIN && YEL[p]) continue;  /* badge lost, and nothing is owed */
         char ps[PATSTR_BUF];
         pat_str(p, ps);
         int add = snprintf(path + plen, 8192 - plen, "%s %s ", gw, ps);
@@ -1024,6 +1060,7 @@ static int write_tree(const char *dir, int g, int depth, Ctx *ctx) {
     if (cnt[ALL_GREEN] > 0) fprintf(out, "%s 1 %s\n", GWORD[g], GWORD[g]);
     for (int p = 0; p < NPAT && rc == 0; p++) {
         if (p == ALL_GREEN || cnt[p] == 0) continue;
+        if (!MUSTWIN && YEL[p]) continue;  /* badge lost, and nothing is owed */
         char ps[PATSTR_BUF];
         pat_str(p, ps);
         int plen = snprintf(path, 8192, "%s %s ", GWORD[g], ps);
@@ -1051,6 +1088,10 @@ static void usage(void) {
       "  --tt-load/--tt-save FILE      warm start / snapshot\n"
       "  --threads N       OpenMP threads for the sweep\n"
       "  --report SECS     heartbeat interval during the walk (default 60, 0 off)\n"
+      "  --must-win        the OTHER objective: maximise the badge SUBJECT TO\n"
+      "                    winning every answer within the cap.  Default is the\n"
+      "                    badge question itself -- answers that draw a yellow\n"
+      "                    are lost and the strategy may abandon them.\n"
       "  --topk K, -k K    beam: recurse into the K evenest splitters at every\n"
       "                    branching point, the ROOT included -- so it examines K\n"
       "                    OPENERS too, and reports the best of THOSE, not of 12972.\n"
@@ -1082,6 +1123,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--report") && i + 1 < argc) REPORT_EVERY = atof(argv[++i]);
         else if ((!strcmp(argv[i], "--topk") || !strcmp(argv[i], "-k")) && i + 1 < argc)
             TOPK = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--must-win")) MUSTWIN = 1;
         else if (!strcmp(argv[i], "--data") && i + 1 < argc) datadir = argv[++i];
         else if (!strcmp(argv[i], "--guess-list") && i + 1 < argc) guesslist = argv[++i];
         else if (!strcmp(argv[i], "--answer-list") && i + 1 < argc) answerlist = argv[++i];
@@ -1171,7 +1213,8 @@ int main(int argc, char **argv) {
     GSALT = 0x5EA0F69EE45ULL
           ^ ((uint64_t)NG * 0xD6E8FEB86659FD93ULL)
           ^ ((uint64_t)NA * 0x9E3779B97F4A7C15ULL)
-          ^ ((uint64_t)(unsigned)TOPK * 0xA24BAED4963EE407ULL);
+          ^ ((uint64_t)(unsigned)TOPK * 0xA24BAED4963EE407ULL)
+          ^ ((uint64_t)(unsigned)MUSTWIN * 0xF1EA5EED7A9C1B4DULL);
     for (int i = 0; i < NG; i++)
         for (int j = 0; GWORD[i][j]; j++)
             GSALT = (GSALT ^ (uint8_t)GWORD[i][j]) * 0x100000001B3ULL;
@@ -1196,8 +1239,13 @@ int main(int argc, char **argv) {
     fprintf(stderr, "branching: %d non-winning bins, %d of them yellow-free "
                     "(measured over %d guesses; %d yellow-free codes of %d)\n",
             BRANCH, GBRANCH, NG, 32, NPAT);
-    fprintf(stderr, "objective: max answers won with NO YELLOW, subject to winning "
-                    "all %d within %d guesses\n", NA, depth);
+    if (MUSTWIN)
+        fprintf(stderr, "objective: MUST-WIN -- max answers won with NO YELLOW, "
+                        "SUBJECT TO winning all %d within %d guesses\n", NA, depth);
+    else
+        fprintf(stderr, "objective: max answers WON WITHIN %d GUESSES WITH NO "
+                        "YELLOW (of %d); an answer that draws a yellow is lost and "
+                        "the strategy may abandon it\n", depth, NA);
     fprintf(stderr, "root badge UB(d=%d, n=%d) = %d\n", depth, NA, UBTAB[depth][NA]);
     tt_init(ttbits, ttload);
     if (treedir) mkdir(treedir, 0755);

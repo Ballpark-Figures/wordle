@@ -17,37 +17,57 @@ INFERRED rather than observed: that a FAILED game (X/6) with no yellows does not
 earn it, and that a lucky 1/6 does.  Check both against a real badge before any
 number ships.
 
-THE OBJECTIVE IS LEXICOGRAPHIC, and it is the user's call (2026-09-03):
+TWO OBJECTIVES LIVE HERE, and they are DIFFERENT QUANTITIES.  Never quote one
+as the other, and never put them in one table.
 
-    1. HARD CONSTRAINT -- the strategy must resolve EVERY one of the 2315
-       answers within `depth` guesses.  Losing a game to chase the badge is not
-       allowed, so this is not "maximise P(badge)": it is the maximum SUBJECT TO
-       a 6-guess guarantee, and the two are different quantities.
-    2. Subject to that, MAXIMISE the number of answers whose play is yellow-free.
+  PLAIN (the default, and the one asked for -- user, 2026-09-04):
 
-    Once a yellow appears the badge is gone for that answer and the strategy is
-    only required to WIN from there -- "once we get a yellow, we stop checking".
+      MAXIMISE the number of answers WON WITHIN `depth` GUESSES WITH NO YELLOW.
+
+      One event per answer, not a constraint plus an objective: an answer counts
+      iff the play both stays yellow-free AND finishes inside the cap.  An answer
+      that draws a yellow is simply LOST and the strategy owes it nothing
+      afterwards -- it may abandon that game entirely.  So yellow branches are
+      never searched, which is also why this is much the cheaper of the two.
+
+  MUST-WIN (`must_win=True`, `--must-win`):
+
+      The same maximisation SUBJECT TO the strategy still resolving EVERY answer
+      within `depth`, yellow ones included.  Lexicographic: the guarantee first,
+      the badge second.  A strictly smaller strategy space, so its value is
+      always <= the plain one.
+
+IN PLAIN WORDS.  Plain asks "how often can I win in 6 with all greens?".
+Must-win asks "if I refuse to ever lose a game, how often can I win in 6 with
+all greens?".  The second is a real question but it is not the badge question --
+the badge does not care about games that were never going to be badged anyway.
 
 THE CAP IS PART OF THE OBJECTIVE and here it is not a tuning knob: `depth` is 6
 because a Wordle game is 6 guesses, and clause 1 is exactly "do not lose".  A
 depth-7 run would answer a question about a game nobody plays.  It stays a flag
 so the gate can check small cases, and every depth still gets its own file.
 
-THE VALUE FUNCTION.  Both clauses ride in ONE integer per state, which is what
-makes the search memoisable:
+THE VALUE FUNCTIONS.
 
-    v(S, d) = -1                       if no strategy resolves all of S within d
-            = max badges over all such strategies, otherwise
+  PLAIN.  Non-negative, always defined, and it never looks at a yellow bucket:
 
-    v(S, d) = max over legal g of
-                  [1 if g in S]                       the all-green bucket wins
-                + sum over yellow-free non-green buckets P of v(P, d-1)
-              subject to  v(P, d-1) >= 0  for EVERY bucket P, yellow ones too
+      w(S, d) = 0                                if d == 0
+              = 1                                if d == 1 (play a candidate)
+              = max over g of  [1 if g in S]
+                             + sum over yellow-free non-green P of w(P, d-1)
 
-A bucket whose pattern contains a yellow contributes 0 badges but STILL has to
-be winnable -- that is clause 1 -- and nothing about it is scored beyond that,
-which is clause 2's "stop checking".  So a yellow bucket only needs
-`feasible(P, d-1)`, the decision version, which is much cheaper than v.
+  MUST-WIN.  Both clauses ride in ONE integer per state, which is what makes it
+  memoisable:
+
+      v(S, d) = -1                    if no strategy resolves all of S within d
+              = max badges over all such strategies, otherwise
+      v(S, d) = max over g of  [1 if g in S]
+                             + sum over yellow-free non-green P of v(P, d-1)
+                subject to v(P, d-1) >= 0 for EVERY bucket P, YELLOW ONES TOO
+
+  A yellow bucket contributes 0 badges either way.  The difference is entirely
+  whether it must still be WINNABLE: under must-win it needs `feasible(P, d-1)`,
+  the decision version; under plain it is not examined at all.
 
 WHAT IS IN HERE.  A deliberately slow, string-based reference: every pattern is
 recomputed with `wordle.pattern` and candidate sets are tuples of words.  It is
@@ -147,18 +167,23 @@ def beam_order(cands, guesses):
     return [g for _, _, g in scored]
 
 
-def solve(cands, guesses, depth, memo=None, fmemo=None, topk=0):
+def solve(cands, guesses, depth, memo=None, fmemo=None, topk=0, must_win=False):
     """(value, best guess) for a state whose badge is still ALIVE.
 
     value is INFEASIBLE (-1) when no strategy wins every candidate within
     `depth`; otherwise it is the maximum number of candidates that can be won
     yellow-free while still winning them all.
 
+    Under the PLAIN objective (the default) the value is never negative: a
+    yellow bucket is worth nothing and is never examined, so nothing can fail.
+    Under `must_win` it is INFEASIBLE (-1) when no strategy wins every candidate
+    within `depth`.
+
     `topk` beams it, exactly as `solver/greens.c` does: recurse into only the
     first `topk` of `beam_order`, EXCEPT that the scan continues past the beam
-    while nothing feasible has been found -- so clause 1 stays exact and only
-    clause 2 is approximated. A beamed value is achievable by a real strategy,
-    hence a LOWER bound on the unbeamed one.
+    while nothing feasible has been found -- so under must_win the guarantee
+    stays exact and only the badge count is approximated. A beamed value is
+    achievable by a real strategy, hence a LOWER bound on the unbeamed one.
     """
     if memo is None:
         memo = {}
@@ -167,14 +192,18 @@ def solve(cands, guesses, depth, memo=None, fmemo=None, topk=0):
     n = len(cands)
     if n == 0:
         return 0, None
+    if depth <= 0:
+        return (INFEASIBLE, None) if must_win else (0, None)
     if n == 1:
-        return (1, cands[0]) if depth >= 1 else (INFEASIBLE, None)
-    if depth <= 1:
-        return INFEASIBLE, None
-    key = (cands, depth)
+        return 1, cands[0]
+    if depth == 1:
+        # One guess left, more than one candidate. No guarantee is possible, so
+        # must_win fails; plain just plays a candidate and badges it if right.
+        return (INFEASIBLE, None) if must_win else (1, cands[0])
+    key = (cands, depth, must_win)
     if key in memo:
         return memo[key]
-    memo[key] = (INFEASIBLE, None)         # guard against self-dependence
+    memo[key] = (INFEASIBLE if must_win else 0, None)   # self-dependence guard
     word_len = len(cands[0])
     ag = all_green(word_len)
 
@@ -191,11 +220,14 @@ def solve(cands, guesses, depth, memo=None, fmemo=None, topk=0):
             if code == ag:
                 val += 1                   # sub is exactly (g,): won, no yellow
             elif has_yellow(code, word_len):
-                if not feasible(sub, guesses, depth - 1, fmemo):
+                # The badge is gone for these answers. Under the plain objective
+                # that is the end of it; under must_win they must still be
+                # winnable, and that is the only thing ever asked of them.
+                if must_win and not feasible(sub, guesses, depth - 1, fmemo):
                     ok = False
-                    break                  # clause 1: must still be winnable
+                    break
             else:
-                v, _ = solve(sub, guesses, depth - 1, memo, fmemo, topk)
+                v, _ = solve(sub, guesses, depth - 1, memo, fmemo, topk, must_win)
                 if v < 0:
                     ok = False
                     break
@@ -214,7 +246,7 @@ def opener_order(answers, guesses):
     return beam_order(tuple(sorted(answers)), guesses)
 
 
-def solve_opener(opener, answers, guesses, depth, topk=0):
+def solve_opener(opener, answers, guesses, depth, topk=0, must_win=False):
     """Value of committing to `opener` as the first guess.
 
     The root is a branching point like any other, so this is just the guess loop
@@ -233,10 +265,10 @@ def solve_opener(opener, answers, guesses, depth, topk=0):
         if code == ag:
             val += 1
         elif has_yellow(code, word_len):
-            if not feasible(sub, guesses, depth - 1, fmemo):
+            if must_win and not feasible(sub, guesses, depth - 1, fmemo):
                 return INFEASIBLE
         else:
-            v, _ = solve(sub, guesses, depth - 1, memo, fmemo, topk)
+            v, _ = solve(sub, guesses, depth - 1, memo, fmemo, topk, must_win)
             if v < 0:
                 return INFEASIBLE
             val += v
