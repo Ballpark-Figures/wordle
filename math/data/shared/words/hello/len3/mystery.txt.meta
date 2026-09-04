@@ -1,0 +1,7 @@
+# length-3 ANSWER list -- OURS, not hello's.  See README.md.
+built: 2026-09-04
+source: hello wordl dictionary.json, length 3, cleaned a-z
+rule: wordfreq zipf_frequency(w, 'en') >= 3.00
+pool: 1015
+kept: 707
+ratio: 69.7%
