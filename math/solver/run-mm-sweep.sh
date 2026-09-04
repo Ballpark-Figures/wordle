@@ -28,6 +28,12 @@
 # best of the K examined.  There is no opener literal anywhere; the ranking picks
 # it.  Each K is a different strategy and gets its own CSV and its own TT salt.
 #
+# EVERY OPENER PRINTS.  The wrapper passes --print-openers, so each of the K
+# openers gets a terminal line as it finishes -- not just the ones that improve
+# on the running best, which is all --optimal-only shows by default.  An opener
+# CUT by the incumbent prints too, since it writes no CSV row and would otherwise
+# be missing from the printout altogether.
+#
 # NO TREES FROM THIS RUN.  --optimal-only never calls write_tree, so the winner's
 # tree needs a follow-up at the SAME depth:
 #     ./solver/mmturns --opener <winner> --depth <D> --trees data/shared/mmturns/trees
@@ -82,7 +88,7 @@ mkdir -p "$OUTDIR" "$LOC"
 . "$(dirname "${BASH_SOURCE[0]}")/_guard.sh"
 guard_output mmturns "$OUT" || exit 1
 
-FLAGS="--sweep --optimal-only --topk $TOPK"
+FLAGS="--sweep --optimal-only --topk $TOPK --print-openers"
 [ "$GUESSES" = mystery ] && FLAGS="$FLAGS --guess-list data/shared/words/mystery.txt"
 WARM=""
 [ -f "$LOC/tt.bin" ] && WARM="--tt-load $LOC/tt.bin"

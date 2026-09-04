@@ -383,6 +383,25 @@ def check_search(depths):
         else:
             print(f"   ok   --topk 1 examines exactly one opener, "
                   f"the evenest splitter ({MINI_GUESSES[want_open]})")
+
+        # --print-openers must account for EVERY opener examined, not only the
+        # ones that improved on the running best. The failure it guards against
+        # is silent: the CSV holds all K while the terminal shows a handful, so
+        # the count is the thing to assert.
+        k = 5
+        out5 = os.path.join(tmp, "topk5.csv")
+        r = run_mmturns(tmp, ["--sweep", "--optimal-only", "--topk", str(k),
+                              "--depth", str(depth), "--print-openers", "--out", out5])
+        if r.returncode != 0:
+            bad(f"--print-openers run exited {r.returncode}\n{r.stderr}")
+            return
+        named = [w for w in MINI_GUESSES
+                 if any(l.startswith("[") and f" {w} " in l for l in r.stdout.splitlines())]
+        if len(named) != k:
+            bad(f"--print-openers named {len(named)} of {k} openers examined "
+                f"({', '.join(named)}) -- some were examined but never printed")
+        else:
+            print(f"   ok   --print-openers gives a line for all {k} openers examined")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

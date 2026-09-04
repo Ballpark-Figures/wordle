@@ -280,6 +280,29 @@ bash solver/run-mm-sweep.sh --depth 8 --guesses mystery   # answers-only guesses
 so `-k 1` examines exactly one opener — the best of the 12972 by root sum of
 squared bin sizes — and the total is an upper bound, the best of the K examined.
 The run prints the measured `BRANCH` and the opener it picked in its first lines.
+
+**Every opener gets a terminal line**, because the wrapper passes
+`--print-openers`. An opener examined by `--optimal-only` ends in one of five
+states, and by default only three of them printed:
+
+| outcome | CSV row | default | with `--print-openers` |
+|---|---|---|---|
+| `NEW BEST` — beat the incumbent | yes | printed | printed |
+| `TIED` — equalled it | yes | printed | printed |
+| solved, but *worse* than the incumbent | **yes** | **silent** | printed |
+| `CUT` — search abandoned, cannot beat the incumbent | no | **silent** | printed |
+| `LB-SKIP` — root bound exceeds the incumbent, never searched | no | **silent** | printed |
+| `INFEASIBLE` — cannot fit the cap | no | printed | printed |
+
+The third row is why a k=10 run wrote 10 CSV rows and showed only a handful in
+the terminal. `LB-SKIP` is the quietest of the lot — no row, no line, and easily
+mistaken for an opener that was never examined at all, when in fact its bound is
+a real result about it: *cannot beat the incumbent, proved without searching*.
+
+`--print-openers` is **off by default** so the `allwords` and `ansall` logs stay
+byte-identical, and it is a no-op (with a note) outside `--optimal-only`, since
+the plain sweep already prints every opener.
+
 `--optimal-only` emits **no trees**, so the winner's tree needs a follow-up
 `./solver/mmturns --opener <winner> --depth <D> --trees <dir>` at the same depth.
 Data lands in `math/data/{shared,local}/mmturns/`, one file set per (depth, K).

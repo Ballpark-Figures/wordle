@@ -168,6 +168,26 @@ detail. Run it with **`bash solver/run-mm-sweep.sh --depth D [-k K]`** (from `ma
   caveat `strguess`/`strturns` carry. `--optimal-only` emits NO TREES, so the winner's
   tree needs a follow-up `--opener <winner> --trees <dir>` at the same depth. Data under
   `math/data/{shared,local}/mmturns/`, one file set per (depth, K).
+- **`--print-openers` prints EVERY opener `--optimal-only` examines, and the wrapper
+  passes it.** An examined opener ends in one of SIX states and by default only three
+  printed: `NEW BEST`, `TIED` and `INFEASIBLE` did; **solved-but-worse-than-incumbent**
+  (writes a CSV row, printed nothing — why the k=10 run wrote 10 rows and showed a
+  handful), **`CUT`** (no row, no line) and **`LB-SKIP`** (no row, no line) did not.
+  `LB-SKIP` is the quietest and the one to know about: it `continue`s before the critical
+  section, so an opener whose root bound exceeds the incumbent looks like one that was
+  never examined, when its bound IS a result about it. **OFF by default**, so the
+  `allwords`/`ansall` logs stay byte-identical; a no-op with a note outside
+  `--optimal-only`, since the plain sweep already prints every opener.
+  - **The gate asserts the COUNT, not the presence of a line** — `checkmastermind.py`
+    runs the mini sweep at `-k 5` and fails unless all 5 openers are named. That is what
+    caught `LB-SKIP`: the first version of the flag printed 1 of 5 and looked fine.
+- **The `attainable` figure in the `branching:` line is MODE-SPECIFIC — do not re-derive
+  it as `NPAT - WORDLEN`.** That subtraction is the base-3 COLOUR fact (5 of 243 codes are
+  unreachable) and does not carry: peg feedback's one impossible pair `(4,1)` is already
+  excluded when the codes are enumerated, so all 20 are attainable. Carrying the formula
+  across made mmturns print "15 attainable of 20" beside a measured branching of 19 — a
+  self-contradiction, and a textbook case of the "copying the shape of an existing
+  program" tell in the shared rules. Diagnostic only; no result was affected.
 - **`python3 tools/checkmastermind.py` is the GATE** (`--wide` adds the full matrix): the
   encoding against a Python mirror of `mm_code`, the blacks/whites identity against peg
   counts recomputed FROM THE STRINGS by the textbook rule (exhaustive on small alphabets,

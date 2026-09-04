@@ -568,6 +568,14 @@ static pat_t *load_npy(const char *path, int *rows, int *cols) {
  * most when the run will be stopped before it finishes. */
 static int ORDER_SSQ = 0;
 
+/* --print-openers: print a line for EVERY opener --optimal-only examines, not
+ * only the ones that improve on the incumbent.  Off by default, so the existing
+ * allwords / ansall logs stay byte-identical -- and because at 12972 openers in
+ * ascending-LB order the improvements ARE the interesting subset, while a small
+ * --topk run wants to see all K.  The CSV has always held every solved opener;
+ * this only closes the gap between the file and the terminal. */
+static int PRINT_OPENERS = 0;
+
 static int BRANCH = NPAT - 1;
 
 static int measure_branching(void) {
@@ -1628,6 +1636,7 @@ int main(int argc, char **argv) {
         /* kept as the N=1 alias so runs already launched with it keep working */
         else if (!strcmp(argv[i], "--pair-early-finish")) PAIR_ADAPT = 1;
         else if (!strcmp(argv[i], "--optimal-only")) optonly = 1;
+        else if (!strcmp(argv[i], "--print-openers")) PRINT_OPENERS = 1;
         else if (!strcmp(argv[i], "--phantom-final")) PHANTOM = 1;
         else if (!strcmp(argv[i], "--order") && i + 1 < argc) {
             const char *o = argv[++i];
@@ -1654,6 +1663,13 @@ int main(int argc, char **argv) {
             TOPK = atoi(argv[++i]);
         else { fprintf(stderr, "unknown arg: %s\n", argv[i]); return 1; }
     }
+
+    /* --print-openers only has anything to add on the --optimal-only path; the
+     * plain --sweep already prints every opener.  Say so rather than accepting
+     * it silently, so a run that asked for more output and got none knows why. */
+    if (PRINT_OPENERS && !optonly)
+        fprintf(stderr, "note: --print-openers only affects --optimal-only; "
+                "the plain sweep already prints every opener\n");
 
 #ifdef MASTERMIND
     /* THE CAP IS PART OF THE OBJECTIVE, AND HERE IT BINDS.  Peg feedback has 20
@@ -1837,9 +1853,16 @@ int main(int argc, char **argv) {
     /* 3**L is the ENCODING space; exactly L of those codes are unreachable --
      * the "L-1 greens plus a yellow" ones, since if every other position is
      * green the remaining letter is either green or absent, never yellow.
-     * So 238 of 243 at 5 letters, 77 of 81 at 4, 2180 of 2187 at 7. */
+     * So 238 of 243 at 5 letters, 77 of 81 at 4, 2180 of 2187 at 7.
+     *
+     * That subtraction is a fact about the BASE-3 COLOUR space and does NOT
+     * carry to peg feedback, whose one impossible pair (L-1, 1) is already
+     * excluded when the codes are enumerated -- so all NPAT of them are
+     * attainable and there is nothing to subtract.  Carrying `NPAT - WORDLEN`
+     * across made mmturns report "15 attainable of 20", which is both wrong and
+     * self-contradictory beside a measured branching of 19. */
     fprintf(stderr, "branching: %d non-winning bins (max over %d guesses; %d attainable of %d)\n",
-            BRANCH, NG, NPAT - WORDLEN, NPAT);
+            BRANCH, NG, MM ? NPAT : NPAT - WORDLEN, NPAT);
     build_lb();
     fprintf(stderr, "root LB(d=%d, n=%d) = %d  (%.5f avg)\n",
             depth, NA, LBTAB[depth][NA], (double)LBTAB[depth][NA] / NA);
@@ -2468,6 +2491,18 @@ int main(int argc, char **argv) {
 #pragma omp atomic
 #endif
                     lbskip++;
+                    /* An LB-skipped opener never reaches the critical section
+                     * below, so it prints nothing AND writes no CSV row -- it is
+                     * the quietest of the four outcomes and the one most likely
+                     * to be mistaken for an opener that was never examined.  Its
+                     * bound is a real result about it ("cannot beat the
+                     * incumbent, proved without searching"), so say so. */
+                    if (PRINT_OPENERS)
+#ifdef _OPENMP
+#pragma omp critical
+#endif
+                        printf("[%7.0fs] %s  LB-SKIP (lb=%d exceeds %d)\n",
+                               now_s() - t0, GWORD[g], mylb, inc);
                     continue;
                 }
                 /* ---- TRY EVERY DEPTH FROM THE FLOOR UP TO THE CURRENT BOUND --
@@ -2516,6 +2551,14 @@ int main(int argc, char **argv) {
                                el, GWORD[g], depth, mylb, dt);
                     } else if (total == CUTOFF) {
                         cut++;
+                        /* A cut opener writes no CSV row -- the search was
+                         * abandoned once it could not beat the incumbent, so it
+                         * HAS no total.  Without this line it would vanish from
+                         * a per-opener printout entirely, which is exactly the
+                         * gap --print-openers exists to close. */
+                        if (PRINT_OPENERS)
+                            printf("[%7.0fs] %s  CUT (cannot beat %d)   lb=%d  %7.1fs\n",
+                                   el, GWORD[g], incumbent, mylb, dt);
                     } else {
                         searched++;
                         if (out) {
@@ -2550,6 +2593,14 @@ int main(int argc, char **argv) {
                         } else if (total == incumbent) {
                             best[nbest++] = g;
                             printf("[%7.0fs] %s  total=%5d  avg=%.5f  TIED      d=%d  lb=%d  %7.1fs  tt %.2f%%/%.2f%%\n",
+                                   el, GWORD[g], total, (double)total / NA, dused, mylb, dt, hit, occ);
+                        } else if (PRINT_OPENERS) {
+                            /* Worse than the incumbent.  It still SOLVED and it
+                             * still wrote a CSV row, so by default it printed
+                             * nothing and the terminal showed fewer openers than
+                             * the file held.  Same columns as the NEW BEST line,
+                             * so the two read down one column. */
+                            printf("[%7.0fs] %s  total=%5d  avg=%.5f            d=%d  lb=%d  %7.1fs  tt %.2f%%/%.2f%%\n",
                                    el, GWORD[g], total, (double)total / NA, dused, mylb, dt, hit, occ);
                         }
                     }
