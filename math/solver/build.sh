@@ -77,7 +77,7 @@ if [ $# -eq 0 ]; then
   # antiexpect maximises EXPECTED turns: a strategy played without knowing the
   # answer, so its state carries BOTH the legal set and the still-possible answers.
   # A different objective from antistall's per-answer maximum, hence its own program.
-  gcc $BASE -o antiexpect antiexpect.c
+  gcc $BASE $OMP -o antiexpect antiexpect.c
   echo "built ./optturns, ./hardturns, ./mmturns, ./pairsplit, ./strturns, ./strguess, ./greens ./antistall and ./antiexpect  (5 letters)"
   exit 0
 fi

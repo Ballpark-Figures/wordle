@@ -61,6 +61,10 @@
 #include <string.h>
 #include <time.h>
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 #define WORDLEN    5
 #define NPAT       243
 #define ALL_GREEN  242
@@ -483,6 +487,17 @@ static double value(Ctx *c, int depth, int nL, const uint16_t *A, int nA,
     return best;
 }
 
+/* Put a context at the ROOT: every word legal, every answer alive. Each thread of
+ * the parallel root loop needs its own, since the arenas live in the context. */
+static void ctx_root(Ctx *c, uint64_t *h0, uint64_t *h1) {
+    memcpy(c->legal[0], BS_ALL, sizeof BS_ALL);
+    for (int w = 0; w < BSW; w++) c->lw[0][w] = (uint16_t)w;
+    c->lnw[0] = BSW;
+    for (int a = 0; a < NA; a++) c->alive[a] = (uint16_t)a;
+    Delta d; d.n_and = d.n_cnt = d.n_not = 0;
+    intersect(BS_ALL, c->lw[0], BSW, &d, c->legal[0], c->lw[0], &c->lnw[0], h0, h1);
+}
+
 /* ---------------------------------------------------------------- the tree
  *
  * A number without the strategy is unusable -- you cannot PLAY an expected-turns
@@ -710,11 +725,82 @@ int main(int argc, char **argv) {
                   &lh0, &lh1);
     }
 
-    fprintf(stderr, "k=%d, %d guesses, %d answers\n", TOPK, NG, NA);
+    int nthreads = 1;
+#ifdef _OPENMP
+    nthreads = omp_get_max_threads();
+#endif
+    fprintf(stderr, "k=%d, %d guesses, %d answers, %d threads\n",
+            TOPK, NG, NA, nthreads);
     double t0 = wall_time();
-    c->t0 = t0;
+
+    /* THE ROOT'S K CANDIDATES RUN IN PARALLEL.
+     *
+     * Easier here than in antistall: an expectimax sums over EVERY feedback branch,
+     * so there is no incumbent cutting branches short and no ordering to race. The
+     * candidates are independent subtrees sharing only the table, whose entries are
+     * self-verifying, so a concurrent writer costs a recompute and never a wrong
+     * value.
+     *
+     * Parallelism is capped at K, and that is the honest limit: at k=5 only five
+     * cores can work. Splitting the FEEDBACK branches instead would scale past it,
+     * at the cost of making every per-depth arena per-thread too. */
+    Cand *root = malloc((size_t)NG * sizeof(Cand));
+    int nroot = 0;
+    for (int k = 0; k < c->lnw[0]; k++) {
+        int wbase = c->lw[0][k] << 6;
+        uint64_t bits = c->legal[0][c->lw[0][k]];
+        while (bits) {
+            int g = wbase + __builtin_ctzll(bits);
+            bits &= bits - 1;
+            root[nroot].score = SCORE[g];
+            root[nroot].g = g;
+            nroot++;
+        }
+    }
+    if (TOPK && nroot > TOPK) {
+        qsort(root, nroot, sizeof(Cand), cand_cmp);
+        nroot = TOPK;
+    }
+    if (nthreads > nroot) nthreads = nroot > 0 ? nroot : 1;
+
+    Ctx **ctxs = malloc((size_t)nthreads * sizeof(Ctx *));
+    for (int t = 0; t < nthreads; t++) {
+        ctxs[t] = (t == 0) ? c : ctx_new();
+        uint64_t ha, hb;
+        ctx_root(ctxs[t], &ha, &hb);
+        ctxs[t]->t0 = t0;
+    }
+
+    double val = -1.0;
     int opener = -1;
-    double val = value(c, 0, NG, A0, NA, lh0, lh1, &opener);
+    int done = 0;
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic, 1) num_threads(nthreads)
+#endif
+    for (int i = 0; i < nroot; i++) {
+        int tid = 0;
+#ifdef _OPENMP
+        tid = omp_get_thread_num();
+#endif
+        Ctx *cc = ctxs[tid];
+        double v = try_guess(cc, 0, root[i].g, cc->alive, NA);
+#ifdef _OPENMP
+#pragma omp critical (antiexpect_best)
+#endif
+        {
+            done++;
+            if (v > val) {
+                val = v;
+                opener = root[i].g;
+                printf("        NEW BEST: %-6s %.6f expected turns"
+                       "  (%d/%d root guesses done, %.0fs)\n",
+                       GWORD[opener], val, done, nroot, wall_time() - t0);
+                fflush(stdout);
+            }
+        }
+    }
+    for (int t = 1; t < nthreads; t++) c->nodes += ctxs[t]->nodes;
+    free(root);
     double secs = wall_time() - t0;
 
     if (c->overflow) {
