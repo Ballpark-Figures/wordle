@@ -1,0 +1,27 @@
+RECOVERED, not regenerated. Provenance, in full, because these rows were typed back
+rather than produced by a run:
+
+  Source        a --longest sweep started 2026-09-03T10:43:18-0400, killed after
+                3h24m having decided 3 of 2315 answers. Its rows were flushed to
+                this path as they landed, exactly as intended -- and then the file
+                was deleted during a "clear everything so I can restart" cleanup,
+                which was asked for and disclosed but discarded the only copy of a
+                3.5-hour result. Nothing had committed it, so git held no history.
+  Restored from that run's captured stdout, kept verbatim beside this file as
+                stall.longest.recovered.log (in data/shared/, so it TRAVELS -- the
+                original log was under data/local/, which is gitignored). Every field here appears
+                in that log; nothing was inferred.
+
+WHAT IS SOUND. The VALUES: bully = 16 exactly (it was tested at 17 and failed);
+burly and furry cannot beat 16 (both tested against a floor of 17 and failed).
+bully's 16-guess line was separately verified against the audited model -- every
+guess legal in sequence, exactly one legal word remaining at the end, and 11 of the
+16 plays guess-only words rather than possible answers.
+
+WHAT IS STALE. The `secs` column. These come from the pre-compaction binary; the
+same searches now run about 3x faster. Node counts are unaffected -- the compaction
+was verified to leave them bit-identical -- so `nodes` still stands.
+
+A resumed sweep will SKIP these three answers and recover the incumbent 16 from the
+bully row, which is correct: can_reach is monotone in its target, so an answer that
+failed against a floor of 17 stays retired against any higher one.

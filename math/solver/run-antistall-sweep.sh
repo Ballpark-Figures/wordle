@@ -33,6 +33,13 @@
 # Resumable: one row per answer, flushed as it lands, and a re-run skips what is
 # already there. Ctrl-C costs at most the answer in flight.
 #
+# COMMIT THE CSV. It lands in data/shared/, which is the committed, synced location
+# by convention -- but writing there does not commit it, and until it is committed a
+# multi-hour result is one `git clean` or one tidy-up away from gone with no history
+# to recover it from. That has already happened once: a 3h24m run's rows were
+# deleted during a cleanup and survived only because the terminal output had been
+# captured elsewhere.
+#
 # The Python implementation (tools/antiwordle_stall.py) is the same search and
 # stays the REFERENCE -- tools/checkantistall.py diffs the two. It is ~90x slower,
 # so use it to check this, not to run sweeps.
