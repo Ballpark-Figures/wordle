@@ -1,0 +1,1015 @@
+# multiwordle, fixed opener then smallest-board greedy (see math/multiwordle.py)
+# boards=1 trials=1000 opener=laten seed=0
+# answers drawn without replacement from the 2315 mystery words; no guess cap
+game,guesses,answers,sequence
+0,6,surer,laten refer dryer corer purer surer
+1,4,aphid,laten amiss acrid aphid
+2,4,spoon,laten scion swoon spoon
+3,4,lumpy,laten lucid lupus lumpy
+4,4,semen,laten sheen seven semen
+5,5,never,laten unfed miner newer never
+6,4,realm,laten agile mealy realm
+7,4,swift,laten stiff shift swift
+8,3,skull,laten quill skull
+9,4,style,laten elect stole style
+10,4,tabby,laten cacti taffy tabby
+11,3,exult,laten slept exult
+12,4,hilly,laten flush child hilly
+13,3,abuse,laten amuse abuse
+14,4,adapt,laten strap adopt adapt
+15,5,purer,laten dried rover surer purer
+16,3,gorge,laten horse gorge
+17,5,spice,laten where guise spike spice
+18,4,vigil,laten oddly slurp vigil
+19,4,rupee,laten fried super rupee
+20,6,buyer,laten power river udder queer buyer
+21,4,gloat,laten bloat float gloat
+22,3,lemur,laten lodge lemur
+23,6,beast,laten tweak heath feast yeast beast
+24,4,occur,laten dross juror occur
+25,4,scent,laten tense spent scent
+26,4,flyer,laten repel flier flyer
+27,4,flesh,laten swell bless flesh
+28,4,debug,laten recur segue debug
+29,3,artsy,laten actor artsy
+30,4,gloss,laten slump floss gloss
+31,3,sneer,laten inner sneer
+32,3,snuff,laten unify snuff
+33,3,bench,laten brine bench
+34,4,realm,laten decal mealy realm
+35,4,cedar,laten shear debar cedar
+36,2,title,laten title
+37,4,sadly,laten carol salad sadly
+38,3,atone,laten enact atone
+39,5,guilt,laten twirl built quilt guilt
+40,3,blast,laten stalk blast
+41,4,orbit,laten truth drift orbit
+42,5,tough,laten stump youth touch tough
+43,5,silly,laten vigil billy filly silly
+44,4,booth,laten sooty tooth booth
+45,4,skirt,laten twist shirt skirt
+46,4,idiot,laten sixth vomit idiot
+47,7,cower,laten mover boxer poker wooer rower cower
+48,3,wrote,laten store wrote
+49,5,agile,laten fella shale apple agile
+50,2,login,laten login
+51,4,hefty,laten route depth hefty
+52,4,snare,laten anime snake snare
+53,3,emcee,laten rupee emcee
+54,4,shook,laten quirk spook shook
+55,3,unfit,laten input unfit
+56,4,bravo,laten arrow croak bravo
+57,3,whale,laten scale whale
+58,4,ratty,laten watch satyr ratty
+59,5,agape,laten amaze aware abase agape
+60,3,steak,laten wheat steak
+61,5,cause,laten maize vague pause cause
+62,3,tiara,laten quart tiara
+63,3,decry,laten issue decry
+64,5,delve,laten welch jelly belie delve
+65,2,twang,laten twang
+66,5,dusty,laten shift rusty gusty dusty
+67,4,cause,laten vague sauce cause
+68,4,apart,laten today start apart
+69,3,pixel,laten idler pixel
+70,4,tying,laten stunt think tying
+71,3,agile,laten alike agile
+72,4,silky,laten civil girly silky
+73,4,umbra,laten briar cobra umbra
+74,4,lobby,laten lurid lowly lobby
+75,5,quail,laten class brawl avail quail
+76,4,teach,laten wheat death teach
+77,4,niece,laten shine genie niece
+78,4,eclat,laten dealt bleat eclat
+79,4,throw,laten girth throb throw
+80,4,brunt,laten front print brunt
+81,3,speck,laten pesky speck
+82,4,swing,laten ninny suing swing
+83,3,spite,laten chute spite
+84,3,jerky,laten every jerky
+85,4,harsh,laten macro rajah harsh
+86,4,stash,laten start stamp stash
+87,4,privy,laten goofy bushy privy
+88,4,delay,laten glare decal delay
+89,4,suite,laten white quite suite
+90,5,staff,laten quota admit trash staff
+91,3,apron,laten drawn apron
+92,5,snort,laten pinto thong snout snort
+93,3,brand,laten aging brand
+94,5,gazer,laten cameo eager gayer gazer
+95,5,quash,laten fraud quack quasi quash
+96,3,ruler,laten older ruler
+97,3,snaky,laten angry snaky
+98,4,ankle,laten renal angle ankle
+99,4,axial,laten flask molar axial
+100,2,hotly,laten hotly
+101,3,ficus,laten jiffy ficus
+102,3,lingo,laten lynch lingo
+103,4,roach,laten shaky coach roach
+104,5,femur,laten whose derby recur femur
+105,4,tabby,laten taffy tasty tabby
+106,3,mafia,laten marry mafia
+107,4,offal,laten voila cloak offal
+108,4,fifth,laten crust booty fifth
+109,3,theft,laten etude theft
+110,4,edify,laten prove geeky edify
+111,4,vomit,laten stock worth vomit
+112,3,shock,laten porch shock
+113,3,yacht,laten habit yacht
+114,4,night,laten grunt ingot night
+115,3,react,laten acute react
+116,4,stair,laten aorta tract stair
+117,3,tipsy,laten tumor tipsy
+118,3,nicer,laten piney nicer
+119,3,onset,laten unmet onset
+120,5,coven,laten widen queen hymen coven
+121,4,mealy,laten clear agile mealy
+122,3,windy,laten bound windy
+123,4,ingot,laten brunt night ingot
+124,2,sling,laten sling
+125,5,wider,laten offer river wiser wider
+126,4,finch,laten spunk conch finch
+127,4,rebel,laten melee bezel rebel
+128,4,quoth,laten stomp trout quoth
+129,4,penne,laten swine prune penne
+130,5,beard,laten freak ready heard beard
+131,4,shelf,laten elbow field shelf
+132,3,repay,laten cream repay
+133,5,baggy,laten parka mambo basic baggy
+134,4,filly,laten flush frill filly
+135,4,teary,laten death react teary
+136,4,peach,laten speak agape peach
+137,2,slain,laten slain
+138,4,trove,laten etude smote trove
+139,3,beefy,laten cress beefy
+140,3,crook,laten spiky crook
+141,5,pride,laten whose guide bride pride
+142,4,chock,laten druid shook chock
+143,4,funny,laten fungi funky funny
+144,4,sassy,laten basic raspy sassy
+145,3,lymph,laten lumpy lymph
+146,3,snort,laten joint snort
+147,3,await,laten stair await
+148,6,dully,laten cluck pupil sully gully dully
+149,6,maybe,laten waive gauge cache masse maybe
+150,3,waltz,laten fault waltz
+151,4,purer,laten miser rover purer
+152,4,idiom,laten ovoid widow idiom
+153,3,quest,laten rebut quest
+154,4,thick,laten crust topic thick
+155,4,stoic,laten digit strip stoic
+156,4,macaw,laten hardy magma macaw
+157,4,write,laten hefty trite write
+158,3,breed,laten modem breed
+159,7,hilly,laten blimp vigil willy dilly silly hilly
+160,3,facet,laten tamer facet
+161,5,spare,laten quake craze share spare
+162,4,sound,laten snoop sonic sound
+163,5,harpy,laten harsh harry hardy harpy
+164,4,hedge,laten mouse pixie hedge
+165,5,twice,laten pesto eject trice twice
+166,4,hunky,laten snuck funky hunky
+167,4,sushi,laten crush bushy sushi
+168,6,graze,laten reach drake grave grape graze
+169,6,winch,laten bring unzip cinch finch winch
+170,5,fence,laten whine ounce pence fence
+171,2,hater,laten hater
+172,5,lucid,laten lupus lurch lucky lucid
+173,4,cough,laten hydro couch cough
+174,2,table,laten table
+175,4,cable,laten salve maple cable
+176,4,elite,laten style flute elite
+177,4,oaken,laten waxen haven oaken
+178,3,great,laten treat great
+179,4,beefy,laten horde geeky beefy
+180,4,again,laten brain chain again
+181,5,hippo,laten focus ovoid rigor hippo
+182,6,broke,laten every serum froze probe broke
+183,6,frock,laten shush mimic rocky crook frock
+184,3,outdo,laten motor outdo
+185,5,brink,laten sniff icing drink brink
+186,8,break,laten shape omega dread creak wreak freak break
+187,4,yeast,laten feast beast yeast
+188,4,spend,laten eking penne spend
+189,4,great,laten teach steam great
+190,4,snipe,laten nerdy scone snipe
+191,4,slimy,laten chili bliss slimy
+192,4,screw,laten cyber scree screw
+193,4,widow,laten crump woozy widow
+194,4,syrup,laten crimp usurp syrup
+195,3,flair,laten flora flair
+196,4,piggy,laten swish vigor piggy
+197,5,biome,laten decoy rouge evoke biome
+198,4,overt,laten edict wrest overt
+199,3,reedy,laten dress reedy
+200,3,gaunt,laten tango gaunt
+201,3,flint,laten glint flint
+202,4,value,laten fable halve value
+203,3,enter,laten inter enter
+204,3,nanny,laten banjo nanny
+205,4,chock,laten pouch shock chock
+206,3,coupe,laten segue coupe
+207,2,natal,laten natal
+208,4,raspy,laten favor rabid raspy
+209,5,heart,laten abate exact yeast heart
+210,4,guppy,laten rigid gypsy guppy
+211,4,pupil,laten scowl krill pupil
+212,5,beefy,laten poise debug beech beefy
+213,3,offal,laten moral offal
+214,4,pouch,laten wordy pooch pouch
+215,4,tweak,laten adept steak tweak
+216,6,fussy,laten myrrh poppy giddy fuzzy fussy
+217,3,cabin,laten baron cabin
+218,4,fever,laten creep sever fever
+219,5,harpy,laten saucy fairy hardy harpy
+220,2,extol,laten extol
+221,5,stove,laten thyme quite store stove
+222,3,lathe,laten latte lathe
+223,3,dried,laten dicey dried
+224,6,prank,laten aging crank frank drank prank
+225,5,corny,laten minor wrong round corny
+226,3,shrew,laten hover shrew
+227,5,knave,laten enema snare inane knave
+228,5,ovary,laten scuba axiom hoard ovary
+229,4,brick,laten risky crick brick
+230,4,evoke,laten fudge seize evoke
+231,4,sting,laten pinto unfit sting
+232,4,flame,laten blade flare flame
+233,3,bylaw,laten apply bylaw
+234,4,sushi,laten birch whisk sushi
+235,3,smear,laten cream smear
+236,3,apron,laten brawn apron
+237,3,stank,laten aunty stank
+238,3,nadir,laten ranch nadir
+239,5,sappy,laten rabid savoy saucy sappy
+240,5,trite,laten smote white quite trite
+241,5,clock,laten hilly plumb gloss clock
+242,5,swoop,laten hippy usurp scoop swoop
+243,4,tryst,laten fruit crypt tryst
+244,4,urban,laten woman avian urban
+245,4,carol,laten badly valor carol
+246,5,flack,laten glass plaza flair flack
+247,4,glaze,laten realm glade glaze
+248,6,clash,laten villa flask glass clasp clash
+249,4,pinky,laten snoop punch pinky
+250,5,willy,laten gulch milky silly willy
+251,4,irony,laten swung crony irony
+252,5,small,laten aloof usual shawl small
+253,5,prank,laten angry drank crank prank
+254,4,woozy,laten dizzy boozy woozy
+255,5,smack,laten award chaos scamp smack
+256,3,omega,laten freak omega
+257,4,miser,laten breed rower miser
+258,3,sissy,laten skiff sissy
+259,4,evict,laten suite edict evict
+260,5,hatch,laten fatty patch match hatch
+261,3,filet,laten sleet filet
+262,4,speck,laten revue sheik speck
+263,3,mason,laten canon mason
+264,4,piper,laten embed poser piper
+265,3,lunch,laten lying lunch
+266,5,snaky,laten nomad aping knack snaky
+267,6,gleam,laten slave bleak plead clear gleam
+268,4,midst,laten dirty timid midst
+269,3,tawny,laten paint tawny
+270,3,smell,laten flume smell
+271,4,scuba,laten bravo abyss scuba
+272,3,chasm,laten croak chasm
+273,5,smite,laten trice quite white smite
+274,3,giant,laten grant giant
+275,2,olden,laten olden
+276,3,ozone,laten opine ozone
+277,5,banjo,laten sandy panic manga banjo
+278,3,occur,laten crock occur
+279,4,prime,laten spike prize prime
+280,3,avert,laten adept avert
+281,4,shall,laten awful modal shall
+282,4,axiom,laten shard affix axiom
+283,3,phone,laten penne phone
+284,4,grunt,laten front print grunt
+285,6,catty,laten ratty patty batty fatty catty
+286,3,nasty,laten saint nasty
+287,4,audio,laten awash armor audio
+288,3,sheen,laten vixen sheen
+289,5,stake,laten terra ovate stage stake
+290,3,event,laten inert event
+291,4,scour,laten gipsy sword scour
+292,4,ombre,laten prose horde ombre
+293,4,south,laten pivot story south
+294,4,prize,laten sperm probe prize
+295,4,needy,laten borne ennui needy
+296,4,fetus,laten petty fetid fetus
+297,5,lorry,laten loopy lousy lobby lorry
+298,4,mound,laten wrung pound mound
+299,4,pinch,laten unzip pinky pinch
+300,5,hippy,laten mummy picky wispy hippy
+301,3,close,laten fleck close
+302,4,strut,laten stick stomp strut
+303,5,tempo,laten quest write teddy tempo
+304,4,druid,laten mucky bough druid
+305,3,leech,laten leery leech
+306,4,cluck,laten swill pulpy cluck
+307,4,tonic,laten print tunic tonic
+308,3,aptly,laten total aptly
+309,3,mange,laten range mange
+310,4,stilt,laten clout split stilt
+311,4,chunk,laten drink skunk chunk
+312,3,unlit,laten glint unlit
+313,4,ideal,laten blade medal ideal
+314,2,panel,laten panel
+315,5,queer,laten cried surer buyer queer
+316,3,leach,laten leash leach
+317,4,clear,laten ample fecal clear
+318,3,afoul,laten moral afoul
+319,4,humus,laten dowdy shrug humus
+320,6,flash,laten mural apply class flask flash
+321,3,scant,laten stand scant
+322,3,legal,laten leafy legal
+323,4,zesty,laten truce pesto zesty
+324,4,ester,laten utter meter ester
+325,5,drone,laten shone crone prone drone
+326,3,crass,laten amiss crass
+327,4,infer,laten never diner infer
+328,4,cover,laten cheer crier cover
+329,3,tango,laten gaunt tango
+330,2,flunk,laten flunk
+331,4,gazer,laten parer gayer gazer
+332,4,worth,laten first throb worth
+333,3,embed,laten cyber embed
+334,3,serif,laten reuse serif
+335,2,novel,laten novel
+336,3,torso,laten worth torso
+337,5,musty,laten roost sixth dusty musty
+338,4,delay,laten ample ideal delay
+339,3,model,laten elder model
+340,6,fanny,laten ranch banjo manga nanny fanny
+341,3,rebut,laten spite rebut
+342,4,sloop,laten mogul floss sloop
+343,3,toast,laten tiara toast
+344,5,civic,laten widow ficus mimic civic
+345,4,broad,laten wharf arbor broad
+346,4,three,laten steer egret three
+347,4,chose,laten cress copse chose
+348,4,diver,laten breed rider diver
+349,4,glide,laten flesh elude glide
+350,3,barge,laten cause barge
+351,4,fully,laten frill folly fully
+352,4,speak,laten bread cheap speak
+353,5,twixt,laten youth stiff trick twixt
+354,3,graft,laten draft graft
+355,2,prose,laten prose
+356,3,smelt,laten stole smelt
+357,6,billy,laten folly hilly willy silly billy
+358,4,sooth,laten study skirt sooth
+359,6,sweet,laten covet quiet beget tweet sweet
+360,6,flack,laten royal slash plaid clack flack
+361,3,today,laten adopt today
+362,4,jumbo,laten fizzy scrub jumbo
+363,2,lemon,laten lemon
+364,5,jaunt,laten tango haunt daunt jaunt
+365,4,tiara,laten stack await tiara
+366,5,pluck,laten billy fluff slump pluck
+367,4,waltz,laten vault salty waltz
+368,3,quill,laten pupil quill
+369,4,right,laten fight sight right
+370,5,bravo,laten wharf drama grass bravo
+371,4,heady,laten awake rearm heady
+372,5,raise,laten gauge waive maize raise
+373,5,bulky,laten frill pluck sulky bulky
+374,2,talon,laten talon
+375,4,gloss,laten vigil golly gloss
+376,4,deity,laten theft empty deity
+377,4,shone,laten ensue since shone
+378,3,niche,laten neigh niche
+379,4,jerky,laten crime ferry jerky
+380,4,golem,laten rebel plied golem
+381,4,choir,laten crump chord choir
+382,5,dread,laten crave wreak dream dread
+383,4,tweed,laten timer tepee tweed
+384,4,prawn,laten urban drain prawn
+385,3,allow,laten psalm allow
+386,4,theta,laten exact stead theta
+387,4,setup,laten detox petty setup
+388,3,wheel,laten hovel wheel
+389,4,exalt,laten cleat dealt exalt
+390,4,sieve,laten revue evoke sieve
+391,4,pansy,laten fanny handy pansy
+392,3,stash,laten shaft stash
+393,3,tense,laten twine tense
+394,4,penal,laten ankle renal penal
+395,4,grill,laten cloud willy grill
+396,4,ripen,laten queen woven ripen
+397,3,nutty,laten notch nutty
+398,3,thigh,laten touch thigh
+399,4,moist,laten forty joust moist
+400,3,white,laten trope white
+401,3,beget,laten sheet beget
+402,4,basic,laten hairy magic basic
+403,3,gruff,laten gummy gruff
+404,3,young,laten briny young
+405,4,freed,laten sewer creek freed
+406,4,manic,laten canny panic manic
+407,3,geeky,laten gripe geeky
+408,4,abide,laten beard adobe abide
+409,4,every,laten worse femur every
+410,5,gauge,laten waive cache gauze gauge
+411,3,spiky,laten which spiky
+412,3,amber,laten aider amber
+413,3,basal,laten gaily basal
+414,4,endow,laten phone venom endow
+415,5,gusty,laten stoic trust musty gusty
+416,6,floor,laten hilly cluck blood sloop floor
+417,2,latch,laten latch
+418,3,maker,laten cameo maker
+419,3,bison,laten brown bison
+420,3,shalt,laten float shalt
+421,5,state,laten tread agate skate state
+422,4,voila,laten amply viola voila
+423,4,death,laten grate heath death
+424,3,liver,laten lover liver
+425,4,quail,laten flaky drawl quail
+426,4,shyly,laten floss skull shyly
+427,4,exert,laten wrote rebut exert
+428,4,horse,laten spice whose horse
+429,5,again,laten spawn drain chain again
+430,3,grout,laten girth grout
+431,3,loser,laten level loser
+432,3,sauna,laten sandy sauna
+433,3,emcee,laten cyber emcee
+434,3,taste,laten paste taste
+435,4,patsy,laten ratio tatty patsy
+436,5,birth,laten sight width mirth birth
+437,3,strap,laten staff strap
+438,3,vocal,laten villa vocal
+439,5,scaly,laten flair small scald scaly
+440,3,sedan,laten vegan sedan
+441,4,broil,laten bully blimp broil
+442,4,vixen,laten sheen woven vixen
+443,2,easel,laten easel
+444,7,grace,laten rearm brave grape graze grade grace
+445,4,swear,laten zebra arose swear
+446,4,manic,laten ranch canny manic
+447,3,snort,laten grunt snort
+448,3,kitty,laten pitch kitty
+449,3,array,laten gravy array
+450,3,bison,laten union bison
+451,3,mania,laten mango mania
+452,3,world,laten scowl world
+453,3,seedy,laten decry seedy
+454,4,smith,laten torus sight smith
+455,2,loamy,laten loamy
+456,4,sweet,laten three steed sweet
+457,6,crate,laten skate abate irate grate crate
+458,5,paper,laten safer gazer caper paper
+459,5,grain,laten prawn drain brain grain
+460,4,slate,laten dealt elate slate
+461,4,feast,laten teary heath feast
+462,4,spied,laten cower shied spied
+463,4,shirt,laten truss sport shirt
+464,3,flare,laten fecal flare
+465,5,chasm,laten soapy quasi brash chasm
+466,4,torch,laten foist mouth torch
+467,3,wrath,laten stamp wrath
+468,5,lobby,laten logic loopy lowly lobby
+469,3,bland,laten gland bland
+470,4,tripe,laten erupt trope tripe
+471,3,rhino,laten dingo rhino
+472,6,rover,laten ember purer riser roger rover
+473,3,rumor,laten roomy rumor
+474,4,craft,laten stamp chart craft
+475,5,cried,laten upper greed fried cried
+476,3,brush,laten chord brush
+477,3,floss,laten cliff floss
+478,4,frown,laten scorn brown frown
+479,5,uncut,laten trunk input snout uncut
+480,3,earth,laten waste earth
+481,3,gloat,laten aloft gloat
+482,5,snuff,laten grind nymph knock snuff
+483,6,agile,laten bleak fella whale ample agile
+484,2,canoe,laten canoe
+485,3,pecan,laten sedan pecan
+486,3,scaly,laten amply scaly
+487,4,gland,laten flank bland gland
+488,5,recur,laten gripe reedy rebus recur
+489,6,dusty,laten youth rusty musty gusty dusty
+490,4,plier,laten cruel filer plier
+491,3,spire,laten purse spire
+492,4,sinew,laten honey diner sinew
+493,4,macaw,laten havoc caddy macaw
+494,5,flask,laten brawl koala flaky flask
+495,3,alibi,laten avail alibi
+496,4,geeky,laten imbue reedy geeky
+497,4,wreak,laten above cedar wreak
+498,5,given,laten women queen vixen given
+499,4,gulch,laten blush mulch gulch
+500,5,cider,laten homer dryer wider cider
+501,5,gamer,laten parer baker gazer gamer
+502,5,drama,laten arrow grasp fraud drama
+503,4,pulpy,laten golly filmy pulpy
+504,4,bully,laten gloom burly bully
+505,4,caulk,laten salvo daily caulk
+506,2,guide,laten guide
+507,2,stain,laten stain
+508,5,toast,laten chart adapt boast toast
+509,3,among,laten aging among
+510,4,cloth,laten flout sloth cloth
+511,4,ghost,laten boost frost ghost
+512,5,ninth,laten brunt minty pinto ninth
+513,5,slang,laten inlay clank bland slang
+514,5,mucky,laten scoff civic duchy mucky
+515,5,joint,laten stung front point joint
+516,4,spite,laten chute wrote spite
+517,4,showy,laten furor howdy showy
+518,5,shard,laten soapy smash shack shard
+519,4,mossy,laten proud bossy mossy
+520,5,slash,laten rural claim flash slash
+521,6,swell,laten reply bible quell smell swell
+522,3,facet,laten taper facet
+523,3,fluid,laten dilly fluid
+524,4,gooey,laten defer covey gooey
+525,4,polka,laten scald bylaw polka
+526,4,jumbo,laten crumb gumbo jumbo
+527,4,those,laten teeth thyme those
+528,3,mania,laten manic mania
+529,4,borax,laten scamp friar borax
+530,3,irony,laten noisy irony
+531,3,spear,laten cheap spear
+532,8,foyer,laten sever riper cower homer boxer joker foyer
+533,4,quite,laten brute quote quite
+534,4,swill,laten spool skull swill
+535,2,swoon,laten swoon
+536,4,minim,laten condo hunky minim
+537,3,ramen,laten raven ramen
+538,3,zesty,laten terse zesty
+539,3,resin,laten reign resin
+540,4,strip,laten youth swift strip
+541,5,decal,laten flame relay pedal decal
+542,3,wench,laten swine wench
+543,4,genie,laten spend venom genie
+544,2,lunge,laten lunge
+545,5,posse,laten choke dodge poise posse
+546,4,pence,laten fiend venom pence
+547,4,alarm,laten shawl flack alarm
+548,4,ozone,laten niche borne ozone
+549,3,ought,laten thigh ought
+550,3,slept,laten elite slept
+551,2,stare,laten stare
+552,3,heath,laten treat heath
+553,2,flunk,laten flunk
+554,4,skulk,laten jolly guild skulk
+555,4,gourd,laten mucus druid gourd
+556,4,class,laten flair clash class
+557,3,essay,laten swear essay
+558,5,wedge,laten curve posse midge wedge
+559,5,whale,laten bleak mealy shale whale
+560,3,midge,laten oxide midge
+561,5,fudge,laten epoxy guess judge fudge
+562,4,slide,laten belie glide slide
+563,5,foggy,laten birch dodgy soggy foggy
+564,4,ledge,laten lemur leech ledge
+565,4,stalk,laten allot trial stalk
+566,6,disco,laten pygmy squib whisk visor disco
+567,4,raise,laten gauge farce raise
+568,3,sport,laten fritz sport
+569,6,edict,laten terse piety ethic evict edict
+570,4,idiom,laten spook rigor idiom
+571,5,solid,laten blimp vigil folio solid
+572,5,forth,laten might truth worth forth
+573,3,churn,laten shorn churn
+574,4,elder,laten plied older elder
+575,3,slate,laten stale slate
+576,3,beret,laten three beret
+577,4,tumor,laten trout turbo tumor
+578,4,funny,laten pinch funky funny
+579,2,bathe,laten bathe
+580,3,lumpy,laten lowly lumpy
+581,3,droll,laten broil droll
+582,3,slept,laten stole slept
+583,4,brood,laten swoop crook brood
+584,3,guava,laten vodka guava
+585,2,lithe,laten lithe
+586,4,acute,laten steam trade acute
+587,3,given,laten woken given
+588,3,baton,laten satin baton
+589,4,flood,laten guild blood flood
+590,5,sheep,laten freer speed sweep sheep
+591,4,stage,laten wheat stake stage
+592,5,broke,laten every prose froze broke
+593,4,clank,laten annul plank clank
+594,4,reply,laten elbow spell reply
+595,5,plump,laten mogul slump clump plump
+596,3,roast,laten staid roast
+597,4,slime,laten delve slice slime
+598,4,spice,laten fresh scope spice
+599,3,queue,laten eerie queue
+600,6,billy,laten plush folly dilly willy billy
+601,4,tribe,laten depot truce tribe
+602,5,sweat,laten teary acute steak sweat
+603,5,essay,laten afire omega heady essay
+604,3,eight,laten theft eight
+605,4,annul,laten inlay snarl annul
+606,4,spare,laten heavy grape spare
+607,5,condo,laten going bonus donor condo
+608,4,relic,laten belie helix relic
+609,3,night,laten sting night
+610,3,shady,laten aphid shady
+611,4,blink,laten fling blind blink
+612,5,chord,laten druid fjord sword chord
+613,4,afoot,laten stack today afoot
+614,4,lodge,laten leery loose lodge
+615,2,noble,laten noble
+616,7,viper,laten sower refer cyber udder giver viper
+617,3,kitty,laten botch kitty
+618,5,dusty,laten stuck burst gusto dusty
+619,4,coupe,laten obese drove coupe
+620,3,shire,laten chime shire
+621,4,burly,laten surly curly burly
+622,3,cause,laten raise cause
+623,5,jumpy,laten widow husky mummy jumpy
+624,3,trick,laten thrum trick
+625,4,ninja,laten among knack ninja
+626,3,stack,laten track stack
+627,5,stove,laten pesto store stoke stove
+628,3,stung,laten grunt stung
+629,4,tough,laten droit pouty tough
+630,3,adept,laten stare adept
+631,4,march,laten daisy major march
+632,5,macaw,laten sappy major magic macaw
+633,6,girth,laten quoth sixth fifth birth girth
+634,4,mossy,laten muddy missy mossy
+635,6,sooth,laten fifty photo tooth booth sooth
+636,3,civil,laten cloud civil
+637,3,blare,laten glare blare
+638,3,newer,laten owner newer
+639,7,sound,laten owing mound pound found hound sound
+640,3,boule,laten bloke boule
+641,3,exalt,laten elate exalt
+642,3,mafia,laten parka mafia
+643,3,dream,laten beard dream
+644,4,ramen,laten waxen raven ramen
+645,4,humph,laten scoop pygmy humph
+646,3,penny,laten eying penny
+647,3,bused,laten usher bused
+648,3,pinch,laten cinch pinch
+649,5,sleep,laten idler bevel sleek sleep
+650,3,deuce,laten guide deuce
+651,4,tarot,laten party carat tarot
+652,4,tepid,laten white befit tepid
+653,3,uncle,laten clone uncle
+654,5,spasm,laten award khaki scamp spasm
+655,4,swine,laten wench endow swine
+656,4,naval,laten banal nasal naval
+657,3,sushi,laten whisk sushi
+658,3,crony,laten condo crony
+659,4,molar,laten shoal polar molar
+660,5,marry,laten kappa maxim mayor marry
+661,5,dwell,laten helix close quell dwell
+662,5,suite,laten ethos swept smite suite
+663,2,cater,laten cater
+664,4,gecko,laten fudge geeky gecko
+665,4,scalp,laten flask scald scalp
+666,4,brisk,laten furry crock brisk
+667,3,stark,laten trait stark
+668,4,jelly,laten devil welsh jelly
+669,3,fetus,laten retry fetus
+670,5,grime,laten every crime prime grime
+671,3,inept,laten event inept
+672,3,bulky,laten slick bulky
+673,4,drone,laten ozone shone drone
+674,5,fjord,laten dough idiom sword fjord
+675,4,boozy,laten shrub booby boozy
+676,4,there,laten debit wrote there
+677,2,canal,laten canal
+678,4,speak,laten heard abuse speak
+679,3,bacon,laten canon bacon
+680,4,pence,laten wench fence pence
+681,5,chili,laten bluff coyly chill chili
+682,4,grope,laten drive prose grope
+683,2,least,laten least
+684,3,leaky,laten leafy leaky
+685,4,chill,laten build chili chill
+686,4,claim,laten offal clasp claim
+687,7,furry,laten dummy puppy juicy fuzzy fussy furry
+688,3,nadir,laten panic nadir
+689,3,grand,laten aging grand
+690,2,shunt,laten shunt
+691,4,rinse,laten hence singe rinse
+692,5,waver,laten rarer wafer wager waver
+693,4,moose,laten creme smoke moose
+694,3,squat,laten stack squat
+695,6,foyer,laten poker rover wooer sober foyer
+696,4,ruder,laten video udder ruder
+697,4,poise,laten berry chide poise
+698,4,boozy,laten chirp woozy boozy
+699,6,taunt,laten jaunt vaunt haunt daunt taunt
+700,6,bushy,laten fuzzy pudgy musky hussy bushy
+701,4,facet,laten taper cadet facet
+702,4,sieve,laten purse siege sieve
+703,4,drive,laten mouse dirge drive
+704,4,admit,laten swath today admit
+705,3,debit,laten merit debit
+706,4,booze,laten verge mouse booze
+707,3,march,laten harsh march
+708,3,moron,laten robin moron
+709,4,aging,laten snack agony aging
+710,4,usual,laten grail focal usual
+711,7,found,laten bunch wrung skunk pound mound found
+712,3,finch,laten found finch
+713,6,quite,laten remit piety white suite quite
+714,4,rumba,laten swash armor rumba
+715,2,valet,laten valet
+716,3,weave,laten heavy weave
+717,5,force,laten prime verge curse force
+718,4,itchy,laten drift topic itchy
+719,4,missy,laten usurp shock missy
+720,3,towel,laten steel towel
+721,4,sperm,laten revue dress sperm
+722,4,delay,laten scale relax delay
+723,6,champ,laten avoid crazy chaff chasm champ
+724,4,tweak,laten teary theta tweak
+725,2,askew,laten askew
+726,3,dying,laten suing dying
+727,5,smell,laten solve swell shell smell
+728,4,tiara,laten stamp draft tiara
+729,2,toxin,laten toxin
+730,4,allot,laten trial shalt allot
+731,3,whole,laten guile whole
+732,4,dairy,laten cargo rajah dairy
+733,4,squat,laten chart about squat
+734,3,pilot,laten troll pilot
+735,3,speed,laten cried speed
+736,3,leapt,laten least leapt
+737,3,bunny,laten irony bunny
+738,3,donut,laten ninth donut
+739,4,blank,laten plank flank blank
+740,2,ramen,laten ramen
+741,3,petty,laten retch petty
+742,3,snaky,laten knack snaky
+743,4,evade,laten speak above evade
+744,4,plush,laten curly blush plush
+745,3,month,laten tunic month
+746,4,queen,laten sheen preen queen
+747,4,phony,laten owing bound phony
+748,3,loopy,laten lurid loopy
+749,6,musty,laten photo gusty rusty dusty musty
+750,3,chock,laten shock chock
+751,3,black,laten flask black
+752,3,filet,laten sleet filet
+753,4,gayly,laten caulk gaily gayly
+754,3,safer,laten maker safer
+755,4,worse,laten guide scope worse
+756,4,graft,laten craft draft graft
+757,4,plunk,laten nobly flunk plunk
+758,4,beach,laten frame beady beach
+759,3,angst,laten scant angst
+760,3,chose,laten where chose
+761,4,smote,laten terse spite smote
+762,3,filet,laten fleet filet
+763,4,dunce,laten eying snore dunce
+764,4,zonal,laten gland anvil zonal
+765,3,hitch,laten optic hitch
+766,3,sneer,laten newer sneer
+767,5,adorn,laten brain apron acorn adorn
+768,3,exile,laten belle exile
+769,4,clout,laten twirl moult clout
+770,5,water,laten cater hater eater water
+771,3,penal,laten alone penal
+772,3,sonar,laten spank sonar
+773,4,chain,laten urban again chain
+774,3,ascot,laten abbot ascot
+775,3,unfed,laten kneed unfed
+776,4,basis,laten raspy basic basis
+777,4,wagon,laten rayon mason wagon
+778,3,dross,laten spicy dross
+779,3,dairy,laten radii dairy
+780,5,admit,laten straw tibia audit admit
+781,5,shade,laten grave awake shame shade
+782,5,gauze,laten waive cache pause gauze
+783,4,niece,laten being since niece
+784,4,smote,laten chute forte smote
+785,4,dress,laten poise cress dress
+786,5,party,laten taffy hasty warty party
+787,3,papal,laten basil papal
+788,4,jumbo,laten moody rumor jumbo
+789,4,ready,laten reach rearm ready
+790,5,cress,laten where press dress cress
+791,3,fleet,laten filet fleet
+792,3,outer,laten utter outer
+793,4,bobby,laten rugby hobby bobby
+794,5,chess,laten prize decoy check chess
+795,5,usual,laten koala album pupal usual
+796,2,elfin,laten elfin
+797,5,sorry,laten wimpy foggy bobby sorry
+798,5,candy,laten rainy mangy fancy candy
+799,4,slope,laten belly slide slope
+800,4,cramp,laten spasm champ cramp
+801,4,siren,laten hymen preen siren
+802,4,other,laten quiet tower other
+803,3,limit,laten light limit
+804,3,tulip,laten blurt tulip
+805,3,outgo,laten motif outgo
+806,3,ferry,laten fiery ferry
+807,5,abode,laten weave amuse afire abode
+808,2,truly,laten truly
+809,2,lefty,laten lefty
+810,3,flown,laten blown flown
+811,3,lunch,laten lying lunch
+812,3,dolly,laten dryly dolly
+813,2,knelt,laten knelt
+814,3,plume,laten elope plume
+815,4,polyp,laten curly glyph polyp
+816,3,black,laten scald black
+817,3,arrow,laten borax arrow
+818,4,rocky,laten buxom wordy rocky
+819,4,cello,laten slope below cello
+820,4,glaze,laten regal agile glaze
+821,5,about,laten await abbot abort about
+822,4,would,laten milky droll would
+823,3,aphid,laten axiom aphid
+824,4,rebut,laten smite crept rebut
+825,3,grasp,laten scuba grasp
+826,3,blast,laten trial blast
+827,3,groin,laten sworn groin
+828,3,glint,laten flint glint
+829,5,mammy,laten baggy fairy paddy mammy
+830,3,snuff,laten hound snuff
+831,4,reign,laten begin deign reign
+832,4,cacti,laten warty pasta cacti
+833,6,floor,laten willy flush flock flood floor
+834,4,block,laten hilly scowl block
+835,3,freer,laten defer freer
+836,4,salsa,laten gaily cabal salsa
+837,2,meant,laten meant
+838,4,brunt,laten front grunt brunt
+839,4,caulk,laten salad gaily caulk
+840,5,safer,laten harem gazer caper safer
+841,3,paddy,laten radio paddy
+842,5,dryly,laten spoil bulky wryly dryly
+843,4,welsh,laten jelly welch welsh
+844,3,harem,laten wafer harem
+845,4,ralph,laten gayly salad ralph
+846,5,chard,laten scrap roach charm chard
+847,3,irony,laten wring irony
+848,3,etude,laten brute etude
+849,5,coupe,laten serve booze dodge coupe
+850,4,jiffy,laten proud skiff jiffy
+851,4,torus,laten swift gusty torus
+852,4,wring,laten sunny bring wring
+853,4,ascot,laten adopt abbot ascot
+854,2,learn,laten learn
+855,2,lemon,laten lemon
+856,4,scene,laten endow spine scene
+857,5,badly,laten salsa cavil madly badly
+858,6,cabby,laten kayak harpy daisy baggy cabby
+859,3,paint,laten tangy paint
+860,3,putty,laten tutor putty
+861,6,candy,laten manor nanny sandy handy candy
+862,2,alley,laten alley
+863,5,tardy,laten yacht tasty tabby tardy
+864,2,salon,laten salon
+865,4,wacky,laten saucy carry wacky
+866,3,tithe,laten metro tithe
+867,3,spawn,laten arson spawn
+868,4,ought,laten roost idiot ought
+869,3,lyric,laten lurid lyric
+870,5,wench,laten enemy neigh bench wench
+871,2,racer,laten racer
+872,4,singe,laten shine since singe
+873,4,fluff,laten solid bluff fluff
+874,3,lupus,laten lurch lupus
+875,5,build,laten spoil child guild build
+876,3,churn,laten cumin churn
+877,4,enemy,laten snipe enjoy enemy
+878,3,syrup,laten bough syrup
+879,4,scold,laten oddly droll scold
+880,5,giant,laten junta stand thank giant
+881,4,strip,laten youth trick strip
+882,4,stair,laten craft stark stair
+883,3,truth,laten dusty truth
+884,6,spell,laten elegy shelf swell smell spell
+885,5,flake,laten medal blare place flake
+886,6,gawky,laten paddy savvy cabby harry gawky
+887,3,coupe,laten probe coupe
+888,3,weird,laten shire weird
+889,4,balmy,laten salsa valid balmy
+890,4,decor,laten smoke error decor
+891,2,abhor,laten abhor
+892,5,allay,laten awful apply alloy allay
+893,5,stove,laten spite store stoke stove
+894,3,rabid,laten baggy rabid
+895,3,habit,laten taboo habit
+896,4,hunch,laten windy honor hunch
+897,6,spout,laten swift stout scout shout spout
+898,5,filmy,laten broil chili milky filmy
+899,3,yacht,laten tardy yacht
+900,4,hippy,laten showy hurry hippy
+901,4,bloom,laten droll gloom bloom
+902,3,canny,laten manga canny
+903,4,caper,laten baker paper caper
+904,3,rigor,laten prior rigor
+905,4,would,laten burly could would
+906,3,belle,laten bugle belle
+907,4,spear,laten omega shear spear
+908,5,verse,laten weigh femur reedy verse
+909,4,feign,laten deign reign feign
+910,4,sperm,laten siege speck sperm
+911,2,hatch,laten hatch
+912,3,verge,laten probe verge
+913,4,troll,laten blitz truly troll
+914,4,nasty,laten faint tangy nasty
+915,4,taboo,laten tapir taffy taboo
+916,4,grasp,laten diary roach grasp
+917,4,truce,laten quest chute truce
+918,3,avian,laten woman avian
+919,3,cadet,laten taper cadet
+920,4,payee,laten waver cagey payee
+921,4,whine,laten opine swine whine
+922,3,plant,laten slant plant
+923,5,spoke,laten where mouse scope spoke
+924,6,crazy,laten quark roach cramp crass crazy
+925,3,clone,laten noble clone
+926,2,still,laten still
+927,3,tidal,laten trial tidal
+928,4,paper,laten rarer caper paper
+929,4,grant,laten chant giant grant
+930,3,lingo,laten lying lingo
+931,3,scuba,laten abhor scuba
+932,3,exult,laten cleft exult
+933,5,gamma,laten basic vapor kayak gamma
+934,5,sneer,laten nicer goner under sneer
+935,3,final,laten annul final
+936,4,acrid,laten sumac aback acrid
+937,6,puppy,laten pygmy privy puffy pushy puppy
+938,3,sloth,laten still sloth
+939,2,pixel,laten pixel
+940,3,error,laten recur error
+941,4,brass,laten graph crass brass
+942,2,knelt,laten knelt
+943,3,payee,laten waver payee
+944,5,occur,laten giddy humor scour occur
+945,3,blend,laten uncle blend
+946,4,could,laten glory would could
+947,8,wacky,laten vapid mamma baggy jazzy carry saucy wacky
+948,4,remit,laten twice debit remit
+949,2,rally,laten rally
+950,4,crock,laten visor frock crock
+951,4,major,laten hardy savor major
+952,4,dingy,laten sound windy dingy
+953,3,farce,laten gaffe farce
+954,5,trout,laten birth frost grout trout
+955,3,title,laten extol title
+956,3,chant,laten angst chant
+957,3,exalt,laten cleat exalt
+958,3,lever,laten leper lever
+959,3,basal,laten salsa basal
+960,3,sauna,laten dandy sauna
+961,6,marry,laten radio parry harry carry marry
+962,4,ultra,laten octal aptly ultra
+963,3,lyric,laten lorry lyric
+964,6,quart,laten staid graft apart chart quart
+965,4,among,laten snaky gonad among
+966,3,adage,laten abode adage
+967,3,wince,laten whine wince
+968,3,cavil,laten valid cavil
+969,3,deity,laten white deity
+970,4,serve,laten eerie verse serve
+971,3,track,laten stack track
+972,5,rivet,laten beget upset comet rivet
+973,2,honey,laten honey
+974,6,viper,laten super hyper riper piper viper
+975,3,slash,laten slack slash
+976,3,trail,laten stalk trail
+977,3,witty,laten witch witty
+978,3,vixen,laten siren vixen
+979,3,pesto,laten forte pesto
+980,2,irate,laten irate
+981,4,iliac,laten album flack iliac
+982,4,adept,laten feast cheat adept
+983,4,cobra,laten crack cigar cobra
+984,3,drunk,laten sonic drunk
+985,4,amber,laten askew aider amber
+986,3,octal,laten total octal
+987,4,flume,laten elegy slime flume
+988,4,lever,laten lower liver lever
+989,4,elide,laten bugle solve elide
+990,6,carry,laten mafia daddy saucy wacky carry
+991,3,skull,laten grill skull
+992,3,flesh,laten belch flesh
+993,3,unity,laten snout unity
+994,5,swoop,laten goofy droop scoop swoop
+995,5,peach,laten chase reach beach peach
+996,4,salad,laten cavil dally salad
+997,4,kiosk,laten opium vigor kiosk
+998,5,pique,laten moose hedge juice pique
+999,5,amuse,laten recap usage abuse amuse
+# trials 1000, boards 1, opener laten, seed 0
+# mean total guesses 3.8530  +/- 0.0314 (standard error)
+# sd 0.9942   min 2   median 4.0   max 8
+# mean guesses per board 3.8530
+#    2 guesses      56    5.60%
+#    3 guesses     323   32.30%
+#    4 guesses     404   40.40%
+#    5 guesses     159   15.90%
+#    6 guesses      48    4.80%
+#    7 guesses       7    0.70%
+#    8 guesses       3    0.30%

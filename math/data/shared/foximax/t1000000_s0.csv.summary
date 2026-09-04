@@ -1,0 +1,20 @@
+# DIGEST of t1000000_s0.csv (0.1 GB), which is gitignored: over GitHub's file-size limit.
+# The lines below are copied verbatim from that file's own summary block.
+# foximax, greedy most-likely-to-hit letter (see math/foximax.py)
+# words=mystery (2315 words, 5 letters) trials=1000000 seed=0
+# hidden words drawn without replacement; no word cap, so no game is a loss; score is the WORD COUNT
+# hits: 1 per letter that appeared in a word then in play, 0 for a miss (each 0 added a word)
+# trials 1000000, words mystery (2315), seed 0
+# mean words 4.0107  +/- 0.0013 (standard error)
+# sd 1.3190   min 1   median 4.0   max 10
+# mean letters guessed 13.9206
+#    1 words   34796    3.48%
+#    2 words   83624    8.36%
+#    3 words  217050   21.70%
+#    4 words  316268   31.63%
+#    5 words  228903   22.89%
+#    6 words   92096    9.21%
+#    7 words   23190    2.32%
+#    8 words    3673    0.37%
+#    9 words     374    0.04%
+#   10 words      26    0.00%

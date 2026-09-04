@@ -1,0 +1,114 @@
+{
+ "openers": "answers",
+ "tough": 600,
+ "size_limit": 0,
+ "verdict": "unique",
+ "solutions": [
+  [
+   "catty",
+   "frond",
+   "rumba",
+   "spill",
+   "verge",
+   "whack"
+  ]
+ ],
+ "singletons": [
+  2315
+ ],
+ "answers": 2315,
+ "rounds": [
+  {
+   "round": 1,
+   "constraints": 600,
+   "words": [
+    "chill",
+    "crowd",
+    "fatty",
+    "rumba",
+    "speck",
+    "verge"
+   ],
+   "uncovered": 20,
+   "seconds": 1.1,
+   "status": 0
+  },
+  {
+   "round": 2,
+   "constraints": 620,
+   "words": [
+    "catty",
+    "frond",
+    "rumba",
+    "spill",
+    "verge",
+    "whack"
+   ],
+   "uncovered": 0,
+   "seconds": 2.4,
+   "status": 0
+  },
+  {
+   "round": 3,
+   "constraints": 620,
+   "words": [
+    "catty",
+    "frond",
+    "rumba",
+    "spell",
+    "verge",
+    "whack"
+   ],
+   "uncovered": 11,
+   "seconds": 3.7,
+   "status": 0
+  },
+  {
+   "round": 4,
+   "constraints": 631,
+   "words": [
+    "aback",
+    "ditty",
+    "flown",
+    "humph",
+    "razor",
+    "vigil"
+   ],
+   "uncovered": 49,
+   "seconds": 21.7,
+   "status": 0
+  },
+  {
+   "round": 5,
+   "constraints": 680,
+   "words": [
+    "child",
+    "fatty",
+    "prowl",
+    "rumba",
+    "snack",
+    "verge"
+   ],
+   "uncovered": 1,
+   "seconds": 52.4,
+   "status": 0
+  },
+  {
+   "round": 6,
+   "constraints": 681,
+   "words": [
+    "flown",
+    "furor",
+    "livid",
+    "motto",
+    "rugby",
+    "speck",
+    "thigh"
+   ],
+   "uncovered": 18,
+   "seconds": 126.4,
+   "status": 0
+  }
+ ],
+ "all_rounds_proven_optimal": true
+}

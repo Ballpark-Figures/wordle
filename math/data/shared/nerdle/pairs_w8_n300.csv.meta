@@ -1,0 +1,17 @@
+kind=pair-opener-screen
+width=8
+top_n=300
+rules=2026-09-03
+exhaustive=0
+scope=pairs-drawn-from-the-top-n-singles
+score=ascending-sum-of-squared-joint-bins
+blind=1
+guesses=374246
+answers=17723
+classes=11765
+pairs=44850
+best_single=48-32=16
+best_single_score=551362
+best_pair=95-21=74 36+12=48
+best_pair_score=55820
+seconds=4.5

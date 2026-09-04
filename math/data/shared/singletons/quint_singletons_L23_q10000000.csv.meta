@@ -1,0 +1,11 @@
+mode=quint
+metric=singles
+disjoint=0
+min_letters=23
+guesslist=
+openers=12972
+scored=23522300
+written=23522300
+complete=1
+parents_complete=0
+minparent_meaning=best-of-sub-openers

@@ -1,0 +1,1017 @@
+# foximax, greedy most-likely-to-hit letter (see math/foximax.py)
+# words=mystery (2315 words, 5 letters) trials=1000 seed=0
+# hidden words drawn without replacement; no word cap, so no game is a loss; score is the WORD COUNT
+# hits: 1 per letter that appeared in a word then in play, 0 for a miss (each 0 added a word)
+game,words,guesses,letters,hits,answers
+0,4,15,erposuiacmnglvy,110011111101111,surer privy magic eagle
+1,4,13,eadirlfnbgthp,1101011011111,fella aphid beget aging
+2,5,17,eartlcygmpsofiknu,11011101111101011,cleat spoon pygmy trite lumpy
+3,4,12,easrnohpcfwm,100111110111,phone wharf semen preen
+4,3,11,ernvlothmsu,10111110111,motel never unset
+5,4,15,etcjlamrsugibdp,111010111011111,elect sprig realm abide
+6,5,18,eaoiuyhlmprstfwcgk,100101111111111011,grime swift myrrh amply skull
+7,1,3,esn,111,sense
+8,5,14,easioltcfybdnm,10100111111011,style cleft blame tabby alien
+9,4,14,eariotbhlsuxgm,10101111111101,moose berth exult lease
+10,6,18,eaohlipuysbcrdgkmt,000111111110111011,hilly guide alpha abuse broom adapt
+11,3,11,eatrmcdiuyp,11011011111,ready media purer
+12,5,17,eaoislrktjpzfnudg,01011111101101111,drill pizza skirt gorge junto
+13,3,12,eatlsinpmwyc,111011011111,yeast spice wimpy
+14,4,14,eaoiulhmqvgdyr,00110111111111,godly rhyme vigil quail
+15,3,10,earopugits,0011111111,stout rigor rupee
+16,5,16,eyhrctafbusgoipn,0011011011111111,grasp teeth buyer opine scoop
+17,6,19,eaisdmoultfrygkcnbh,0111110111011110101,stunk media gloat ferry hinge lemur
+18,1,4,ecns,1111,scene
+19,3,13,eartilhsmnuyb,1001111111111,thyme beast unlit
+20,5,17,eaoiucrbytsghfldm,00011111111111011,might furry rebus occur dread
+21,5,16,easprlichntyudfz,0011101111111011,fizzy scent parse lunch flyer
+22,3,11,eartglsfhiy,01111011111,sissy great flesh
+23,6,21,ealritoubdgysvmchfknp,010111011111110110111,tiara duchy debug savoy plunk artsy
+24,4,12,eaoirtslugbf,001101111111,bigot gloss stilt gruff
+25,3,11,ershnliydtf,11101011111,sneer fifty diner
+26,7,18,earnichsoflmuwbdtg,000101110111111011,snuff tense bench awful realm flung odder
+27,4,13,ealrdcstinopw,1101111011101,cedar swoon ionic title
+28,3,11,eaysldoginr,01111110111,sorry sadly deign
+29,2,7,easlnot,0111111,slant atone
+30,4,14,eatriluonybkgc,00111111110111,nylon guilt yearn crank
+31,5,17,earslcfbiopknmtuv,10011001111111111,venom blast plunk orbit topic
+32,6,17,etrloxabcidghukys,11011101010111011,extol tough rebar tibia crass silly
+33,4,14,eastrylguvmipz,11011101110111,vague artsy gazer prism
+34,5,17,ealrospiyghkmdntb,01001111011111111,booth madam posse skirt tying
+35,3,12,easlvhoidmpt,110111111011,halve idiot lapse
+36,2,10,eraoivstwc,0111111111,vista cower
+37,3,12,eaoliyrdbhsu,011111011111,lousy aside hobby
+38,5,16,eatunlrifdvbowcp,0111011111101101,vault pleat fried wrote peril
+39,5,19,esanlrgivoctuympdjk,1010111110111111011,verve agile jumpy stoic silky
+40,3,13,eaoiutnglshfy,0011111111111,gusto login hefty
+41,3,11,ervtdmagins,11011101111,meter deign snare
+42,3,12,esragcmlbith,101101111111,belie hater emcee
+43,6,17,eastnicwhrulfkdoy,01101101101011111,shady shook satin tweet unfit coast
+44,4,15,easrtwibuzdhlov,011110111101111,bravo burst seize whale
+45,5,15,eayngitbhwcsfpr,011111101101011,tying ratty weigh taste agape
+46,5,17,eridfablctvnzmksw,11101111010110111,brief table bezel wince steak
+47,3,10,eamguorvsc,1011110111,vogue gamma cause
+48,3,11,eirhtgnwcam,01110111111,manic where genre
+49,6,17,ealsritkofcdybgnp,01011111101110101,tiara gorge stalk decry leapt flask
+50,4,15,esralidvtckpgmy,101011111111011,delve timer speck cagey
+51,4,16,easruyhcfowgntmd,0101111011111111,twang wharf dusty homer
+52,5,16,earsluitogmbdnqc,0001111111101111,moist quilt image cause undue
+53,3,11,ernoitvapsu,11001111111,rivet apart spout
+54,4,14,earoiulpmsctxy,10001111111111,setup clump pixel loyal
+55,5,17,eaohlpicnsgydrtbf,01011111111101101,alpha tying scene ferry agile
+56,4,14,earslikybdcvmz,11011111101101,blaze silky cavil maker
+57,4,15,eaolsrbmntudpwz,011001111111111,topaz umbra dwell baron
+58,3,12,eaorstywpilb,011111101111,lobby strap poise
+59,4,15,earstdbilqufmoc,010101111111111,basic quail forum debar
+60,6,17,eartchnomsubilwxy,10011101111010111,house teach weary cameo niece sixty
+61,3,10,etacliordy,0111101111,droll eclat dirty
+62,5,16,eaoiurhtdwsnckvb,0010111111011111,crock throw curve death brunt
+63,3,14,easthnmroipqub,01111011111111,broth smart equip
+64,4,17,easltuoipyngvwmck,10100111111111111,speck ovine swing musty
+65,5,18,eaoiurnstklwbcmpjy,001110111111110111,skulk spite bacon newer jerky
+66,4,15,etsachiryfpdlqu,100111111011111,equip itchy harsh lipid
+67,4,12,ealrsuqyopht,010011111111,squat stash polyp sappy
+68,5,19,eaoiyunrlhbtcsgpmvz,0011110111101111111,vouch privy gipsy bezel mushy
+69,5,16,ealrdycohiptuqsv,1110110101111011,delay parry alloy suite vapid
+70,5,17,earstcolnypdfiugm,01111111010011111,carol staff gummy apnea triad
+71,2,10,eaoirnplut,1011111111,utile apron
+72,5,16,easmkprotndhuflw,0110111111011011,parka stall snort haute swoon
+73,3,11,erstdpabino,10111111011,steep brand adobe
+74,6,17,erasdohbtgluwmyqz,01101111011110011,board gazer bough below droll quash
+75,3,13,eathmyodfirvg,1110110111111,meaty edify vigor
+76,6,18,eridoaluvcstykbfnp,110101111010111011,ruler pried value snaky buddy ankle
+77,5,15,eayoiunlxtchsdg,011011011111101,tacit gusty axial lathe golly
+78,3,14,erlaoythvisucf,10101111111111,hovel hotly ficus
+79,3,11,erlnaigkohw,10110111111,liken lingo whole
+80,3,13,easrchoiugdnl,0111111011111,roach slung adage
+81,6,18,earumiydglfptbknow,101111101110100111,femur witty eagle madam tabby prong
+82,3,12,echtsriakmof,101101111111,there choke mafia
+83,3,12,eaoltfuirmnp,001111111111,print forum offal
+84,4,15,easrtwiohfkylbm,101111011101111,wrote shall fifth balmy
+85,5,14,ertaifholsupck,01110110111011,cluck eater theft easel spook
+86,6,18,etyaodfinlmbvcsprw,101101111110101011,edify ratty melon vomit noose twirl
+87,6,18,eayrionstcdghkwlpu,010101110111111011,wagon shock poser sword yacht donut
+88,7,19,eralctomyighwbfsnpv,0010111111110101101,night cameo booby react arrow savvy stair
+89,5,16,erlpaitgsyochknu,0111010111011111,chunk repel gripe tipsy trial
+90,5,16,eahorgmidytncslp,1101111101011101,omega nicer sappy onset shine
+91,4,14,erltnaosicdhmv,10011011111111,coven smith medic shove
+92,3,11,eatlmyrsbfd,11011101111,mealy feast blade
+93,1,5,eadim,11111,media
+94,5,16,eaobsiylgnrtkdcw,0101111011110111,windy angry obese ingot acorn
+95,4,14,erlasonwdihmtg,10101110111111,motel sling shear wider
+96,5,17,ealdrpfmtnhcikswx,11101101110110111,metal paler waxen finch spade
+97,4,16,eaytrlnoicmpudgb,0110110111111111,comic gaudy rebel opium
+98,5,16,erlnoitcquabhmpv,1001111111011011,covet quoth onion tuber penne
+99,6,20,easuirnbdogylhkctmvw,01001111110111111011,think waive bison beard lucky lousy
+100,3,12,eastlfhidrny,011011111111,nadir shelf fiery
+101,4,15,ealbmcinprydgtu,011111101110111,climb repay grape uncut
+102,5,16,eaytrslovwcdnibg,0110111111100111,baggy salvo screw easel bitty
+103,5,14,easrlywtidgnbf,00011111111101,filly grind wield teary deity
+104,3,11,eratyhcpigl,11100111111,lager peach tripe
+105,3,14,eraslnioubyctw,11011110111111,buyer slain twice
+106,4,14,eartbdgluioypv,10110111101111,trove elder budge parry
+107,2,8,eydlkbfu,11011111,beefy bulky
+108,3,12,eaytoprbckng,011110111111,batty crook tangy
+109,5,17,earitubsoypdgflmw,10110111111101101,rebus pride woody lofty aorta
+110,5,16,ealorpchktdyuifn,0001111110111111,chock droop recap funny filly
+111,4,15,eartnylsdubimjp,011001111111111,braid sassy alley jumpy
+112,4,15,easliyhcmptnorf,101101101111111,shell lymph rifle snort
+113,4,14,ersltbiaopdnuw,00011111111111,daunt bleed await opera
+114,5,17,easrntfhpliydcouv,01010111111111011,dully craft shaft spilt vista
+115,4,15,eralnuikoshwbmy,101110111101111,liken maybe worse lunar
+116,2,7,eriducl,1011111,clued dried
+117,4,13,eaotyrlpksuwz,0101101111111,waltz aptly speak purer
+118,5,17,eatshloruidmngkpy,11011101011110111,leash stink spore idiom penny
+119,4,14,eatsrumilkpgoq,00111111111011,skimp quest lemur troop
+120,4,15,easouilctkgrbhm,010111011111111,thick barge mouse stoic
+121,2,9,eariongbl,101111111,bilge goner
+122,4,15,ealcmwnkbritofg,011111110101111,macaw flank roger write
+123,5,17,eaytrdsnmikuwgfbl,01101110111111011,gawky smirk breed lemur abuse
+124,4,15,eratlfyibpdchnw,011111110101111,hilly after tepee wench
+125,4,16,eaoiytschlqunbfr,0101111111110111,birch squat salty facet
+126,5,17,eayrsitwopchldfjn,01011111110101111,snoop waist spare roach fjord
+127,4,15,earshpiyunldotv,110111011101111,phase sound savvy dealt
+128,5,13,eatrndohpyucg,0101011111101,harpy gauge rodeo heard hedge
+129,3,12,eaosigmpurnb,101110111111,moose opium brain
+130,6,20,eaoiusrylcbfkhntwmpg,10011001111111111011,twice guppy cleft aback hunky shell
+131,7,19,etclxaorynihsudgpvz,1101110100111111001,exalt sushi crate caddy graze rupee exult
+132,2,7,eatsril,0111111,stair alert
+133,5,17,eayritsnduchfbopw,01111011111101101,winch array study abode hippy
+134,5,16,esatrluidhwncfgq,1001011111111101,fence wield quest while hater
+135,3,13,eaoiurslcdnhb,0101111111111,lunar lucid shrub
+136,4,14,eayotprnlmcghu,01011110111111,macho troop cough later
+137,3,11,easlbtconrd,01011111111,donor table cable
+138,4,12,eriouldtcknv,110010111111,ruder trick event elite
+139,4,16,earstlynocikmghp,1101110111110111,slate panic oaken thing
+140,2,9,eaticsdbl,101111111,bless edict
+141,3,13,eardktgbuyfmp,1110011111111,great trump beefy
+142,3,12,eratschiylgn,011101111111,itchy later again
+143,3,11,eaouyshrbip,10111111011,horse pushy hippo
+144,3,13,eamuniodpvwyf,0101111111111,fauna ovoid wimpy
+145,4,15,eaiotnruypbcklx,100111111011111,broke entry unity excel
+146,4,13,esaruontdkcfv,1101110101111,reuse frock stank overt
+147,4,15,eaolirtnpcudmkz,011111111011011,tonal prize outdo liken
+148,3,12,eairptkbcsny,011111110111,apart brink satyr
+149,5,15,eaoiurspcntdkyb,101011110110111,prose nurse break state sorry
+150,5,18,easritnowpylmkuvbd,010110111111111101,milky drawn spoon mauve yeast
+151,4,16,etoailmspkdnrbcf,1001111111111011,email frisk spend clack
+152,4,17,eartgluscybinhwfz,01111011111101111,fizzy great scrub shrew
+153,3,10,eaoicngspz,1001111111,snipe icing pizza
+154,4,15,eaysiphlmrdugbf,011111011011111,paddy slimy budge filly
+155,2,8,erhsacwk,11011111,screw creak
+156,3,10,eldiutowrc,1110101111,elude widow corer
+157,3,13,easohcmygnpru,0011111111111,young syrup chasm
+158,3,11,easrilfgobn,10011111111,noble flair legal
+159,4,16,eaoliudntpyzcbgm,0110111111110111,piggy topaz undue biome
+160,4,14,easturofhlmyck,00110111111111,clock roomy crest flesh
+161,4,16,easlctfrovngpdwy,1001111111110111,overt cleft wrong reedy
+162,5,17,eayioutrbdlmnpgfs,10000111111111111,debut gaunt purse flint plumb
+163,4,13,easlvutrncogk,1101110101111,value gecko crass enter
+164,6,20,easlygcitbpuokrdhnmz,11001011011111011111,maize nanny allay pubic chock pound
+165,5,16,eaosriluhcgptbmn,0011110111111011,thigh coupe snore amuse natal
+166,3,10,eaytrispmd,0110111111,raspy dairy smite
+167,4,17,eralydhtifxbmounv,10110011111111111,navel heart affix buxom
+168,3,10,eampsnugyc,0101111111,sauna guppy scamp
+169,3,13,eratlipugswfh,1110111101111,wafer pupil shear
+170,4,13,etygindkpchbf,0011110111111,pinky eying beefy pitch
+171,5,17,eaolytfipkrbcndgm,00111011111101111,dolly brink offal pilot grime
+172,5,18,eartiykoudhwcpfsbl,011011111011110111,pouch wreak silly tweak basis
+173,4,16,easyrlhcbpoufgni,0111011101111111,chain fussy paler rogue
+174,4,13,easromytilcbn,0101111110111,roomy train cabin claim
+175,1,4,ervf,1111,fever
+176,3,11,easrtuchypl,10101111111,chute scalp harpy
+177,4,13,ernmoagthlxcf,1011110101111,totem enema force extol
+178,5,15,eartsolcidmynvx,000111111111011,dimly stove stale exact ovate
+179,3,10,eadrthblow,1101110111,terra lathe towel
+180,1,4,erid,1111,dried
+181,1,5,eathd,11111,death
+182,5,16,eatlrsnkfgobcidp,1110111101110101,beast prank agora clink optic
+183,2,10,eraoindlyc,1101111111,idler corny
+184,5,18,eayoihtcrwfkslbxmj,010111111101101111,major whisk witch borax shrew
+185,4,15,earsiulokntvmyg,100111011111111,issue knave grimy stony
+186,4,14,esardclvoykthn,10111011110111,delve ovary shone hater
+187,4,14,eaoiurwscfkpyb,00011111111111,puffy brick screw farce
+188,4,15,ealuorkvitbfnps,101011111111011,bible evoke frost pulse
+189,4,13,eayrionlsmhtg,0101111011111,mason sting homer three
+190,5,18,earlnoidhpwymgbfvc,010111111101110111,aphid flame coven goody vapor
+191,5,17,eaoichnuyblwmstdg,01011111111101101,bylaw china gusty sushi adage
+192,6,19,earshcnoptmdklgvuyz,0111001111101110111,stalk smear graze apron kneed ruddy
+193,4,14,ersuchlpntadik,01101111111011,stank cheer repel nadir
+194,4,14,eaysligmontcwp,01110111111011,stony sappy sigma sweat
+195,6,16,eaoirlvptsynbmcg,0101111011110101,rival grime trite nasty stall bobby
+196,4,13,eaorsilvckuhm,0010111111111,clock mouse shock villa
+197,5,18,eaostipychnbrvglmw,001111101101111111,birch swoop hoist vigil groom
+198,4,16,eartskdcmngbfouy,0111100111111111,tryst cream forgo urban
+199,3,13,eaolnmwigcrbd,0111111101111,woman blind carol
+200,4,18,ealrnstoubcfkdgimv,110011111111101111,above unset flack midge
+201,7,21,eraosniulyptmdvzbghcw,100111011101111101101,woven store dummy glaze stern loath clash
+202,3,13,eraiodvucplst,1101111101111,utter ovoid slurp
+203,3,14,easoitmvykpcnl,00111111111111,vomit pinky scaly
+204,5,16,eaoitrydnfmchslw,0011011011111111,swirl willy mocha offer rayon
+205,5,17,eaorsinthcydglpmw,00111111111011011,witch irony stony elegy small
+206,1,5,earcb,11111,brace
+207,5,17,easrtohmuinkfcdgp,00111111111110011,thrum foist prank cameo fungi
+208,5,17,eaoyitrmlnbdsfgwz,00111111101110111,bliss merit woozy debit dying
+209,5,17,eastoychikprvnlgm,01101011111111011,smack conch civic crypt omega
+210,5,14,eroaflnuidbgms,01011111101011,lunar miser aloof rebar fiber
+211,6,18,eaoisyrtcgblunkpdv,001111011011111101,sissy stink boule evict poise clear
+212,4,16,eayoitchplvrdksf,0101111111110111,hatch frill pivot sheik
+213,3,10,eraobtvifl,0101111111,robot filet overt
+214,5,17,earswvtimnfolcgkp,10110101111101111,speck sever sniff mason organ
+215,6,20,eralonykivdumbgcjfhp,01101111110111011011,kayak piper envoy jumbo decoy lunch
+216,4,15,erioaswugkyhlnc,110111011110111,roger snaky rogue clean
+217,5,17,erlanthwdocuvybgm,10110011111111011,covey gleam wheel aloud realm
+218,4,15,etcrnvihoadmsbp,110011110111111,event midst birth strap
+219,4,13,erlvshatcynwm,0011101111111,tawny level smell latch
+220,5,19,eaoiubcsyrphmtdljvf,0101111111011011111,scuba drive filly chasm jelly
+221,4,13,eaoiuyrstmkcf,0101111111011,satyr smite stuff corer
+222,2,6,ealrxy,111101,relay early
+223,3,12,easroldnthgi,010111111111,giant girth olden
+224,2,7,eaoniyz,1011111,ozone ninny
+225,5,18,eayoiunhstgbjrdcpz,010111111011110111,banjo unzip sushi grant occur
+226,4,15,eaoritshcdlnupm,001111011111111,chord prime tenth ultra
+227,3,11,eatildrnosv,10111011111,title avert arson
+228,3,11,easrtclhndo,01110111111,shall crane condo
+229,2,8,eaoripxm,01111111,prior axiom
+230,4,14,eaosrlnhptckuy,00110111111111,snoop clock phone pouty
+231,3,12,eaoirutnbgch,001111111111,couch grunt briar
+232,5,18,eaoruidlyspmwtbchk,000111111111110111,wimpy lurid catty spree shark
+233,2,9,eaoiclruf,011111111,curio focal
+234,3,12,ealrnstbgyum,110011111111,begat nasty mummy
+235,2,9,eaodiuhcg,011111111,audio cough
+236,3,12,eaytrnshbikj,101011111111,jerky basin sheen
+237,5,14,eratsnlikpmgou,01101110110111,sloop saner stake speak grout
+238,3,8,eratcinv,11010111,inter event civic
+239,3,12,ertaoucgmdls,110011111111,elder scour gamut
+240,3,11,eatrobmlynd,11011110111,yearn ombre randy
+241,7,18,esnaroiufghtvmdpcz,100011111111010101,merge south fugue piper prize taint refit
+242,2,9,easpruydn,111101111,pause needy
+243,4,17,eatrlvnkdfbgsopuy,11110110110111111,avert grand fetus poesy
+244,4,14,ealnoytihbpsrf,01101111101111,fifth papal lorry foist
+245,3,12,eayngidlcfmu,011111011111,lying fancy cumin
+246,6,18,earoiflnudspthcwbm,001110111111101101,mound worse piper plait pinch these
+247,5,16,eaoyldsinbrwfgph,0011011110111111,goofy hippy noisy needy wooer
+248,2,9,eaoshdrcl,101111111,close horde
+249,6,18,eaoiursybtlhckndmp,001011111110111011,crony strut musky betel cobra tempo
+250,5,17,earslntougidbkmhv,11001001111111111,image vague bleak druid mouth
+251,7,20,eartycdhilfxgpkouwvz,01100111111110101101,affix graze leech dicey cluck twixt wheel
+252,4,15,eraioctplnskwvy,110111101101111,lover tonic leper wacky
+253,3,9,eaoilprty,010111111,aptly peril apple
+254,5,15,easluritgchbmnq,110001111110111,mange thigh stilt cruel quash
+255,5,17,eaoriunythcgkbdlm,00101111111110111,chunk dough honey unlit realm
+256,4,13,earsctpldimno,1100111111011,ideal crept sloop panel
+257,5,16,erasuqolvwpcmdtx,1100111101111011,lower queer clump troop exalt
+258,3,9,eatrlchof,110011111,leach offal clear
+259,5,18,eamtrlvuncfoghkpsy,010011111111011111,canon larva afoul pesky humus
+260,5,18,erasoikthyldmbcfpv,010101111111101111,dimly skier flash pivot crock
+261,3,13,earsltfcnyopk,1100111111111,flake polyp scant
+262,5,18,ealgosrnwiytzbdpcv,101110110111101111,prove legal drain zesty trice
+263,3,10,ertainsukl,0110111111,slunk ester stein
+264,4,14,eahorpvikmsncd,11011101111101,opera drone smirk chair
+265,4,16,easrcinylmohpubf,0111110101111111,opium crass beefy human
+266,4,16,eralintbfsyomzcv,1100110111111111,infer maize abyss cover
+267,4,14,erlbstahnvgzom,10111011101111,bezel smell ashen tango
+268,6,20,eaoiutlrpcdyhfngkmsz,10011111011111101011,crude fifth flunk lyric gazer parse
+269,6,19,eaosiuyprghltwcdbfm,0011001111111110111,glyph score worth cater brief embed
+270,3,10,eatrscdofi,1001111111,credo serif scree
+271,3,10,erastownlv,1001111111,novel wrest torso
+272,6,18,eaoilnyuchpfmtswdg,010111111100111101,winch inlay musty gummy empty feast
+273,3,12,ealrdystkchi,101011111111,sheik delay caste
+274,6,19,earsloiukqydmtncfhp,1100110111111010111,quake model dummy fanny synod aphid
+275,1,5,etahr,11111,earth
+276,2,10,eartigunhb,1011111111,neigh rebut
+277,6,14,eraospldytivhn,00011111101101,oddly novel sloop poser posit toast
+278,4,12,eaoidyncvsrw,100111111101,since civic weedy cease
+279,4,16,ealroncbdgiuwyvp,0101110111111111,vapor broad windy begun
+280,4,13,erpaoishtynmc,1100110111111,three minor ninny chose
+281,5,18,eaoiuynglprscbjkdv,000111111111011111,burly spiky diver align jerky
+282,3,12,eaoirnysdglk,101111101111,glide irony lanky
+283,5,18,easlgrbiouycmndfhp,110011110111110111,barge cumin eagle fully hippo
+284,5,16,eatcmrlidkswxyhp,0101100111111111,daisy speak emcee hyper twixt
+285,4,12,eatrlhdiyfgn,100111111011,yield heady grant graft
+286,4,15,earoiufgnpybhls,100111111110111,fugue piney prose ralph
+287,4,13,eastpglmyidbr,1011011101111,smelt rabid eagle billy
+288,3,10,eraohydptu,0111110111,harpy otter truer
+289,5,16,easthoydkirqupfl,0110111011011111,shaky filly sooth queue paddy
+290,4,16,erstlhwcnidupvyb,1011011111110111,sweet bunch livid biddy
+291,1,5,earsh,11111,shear
+292,7,19,easrlnikcouptdbfhwy,0110111110101101011,flack slink udder sweet lance plied today
+293,6,18,easlhudtryobmvwgjn,010011111011111011,bravo jumbo etude shush world lemon
+294,4,15,eatunlvhsrdgfij,011111101110111,jaunt salve dread filer
+295,4,16,ealrigntyouhcksd,0101111110111111,chuck tiara lying dusky
+296,4,14,eaoiunrckgyslp,01101111111011,pluck acorn geeky scone
+297,4,15,ealrpbhosiqtuwz,011101101111111,waltz rehab brush quill
+298,4,15,earsogbcdhiltvy,110101011111111,scale right cagey ovoid
+299,7,19,easrcgiynobvzltdkhw,0111011101111010011,grass bravo witty razor story acrid heady
+300,5,18,ernaioucdlhxbsgpty,101110111111010111,clued train helix raise glyph
+301,5,15,eaoiunytrmbdhlk,000111111011111,unity bride bulky honey outer
+302,6,19,eayornicushltvfgbdp,0101011111111101011,plush talon gloss vicar salve odder
+303,4,14,eartylwshdipcn,10011011111111,deity sheen caper aware
+304,5,14,eaosityrnchbld,10111110101011,shone ditty rayon niche hotel
+305,4,14,eaytrcbinkpfjl,10101111110111,jerky cabin fatty rally
+306,4,14,eraosnchiuvlgm,10011101111111,golem shore venue choir
+307,3,10,ernoyaicpd,0111101111,corny ripen dread
+308,7,18,eridaouyptvwsncfhl,011101110111000111,fully tried trove tweed shout arson edify
+309,4,12,ealroibnuwdp,010101111111,prawn urban drill allow
+310,3,12,easotrbchdwy,011111011111,rowdy coast theta
+311,4,13,eaoiuyrscdptb,0011110111111,disco buddy setup crept
+312,1,3,elm,111,melee
+313,4,15,erslhwtxaigdkoy,101111011101111,wheel kiosk exalt daisy
+314,4,16,eisgvarcklodhmyb,0110110111111111,loamy sieve shack breed
+315,3,12,eaytigspuodn,011101111111,pansy donut geese
+316,4,16,erloainpshymbdtu,1010111111101111,spiel stash irony doubt
+317,5,13,esarndlpthmow,1101101110011,tense swear penal heart snore
+318,7,20,eaoirvgyldpnsbcfhmtw,00111111100100111111,grill comfy vigor fifty ripen glory where
+319,4,13,easrloyhtgiun,0101111111011,loath nutty lager thigh
+320,5,16,eastoikhflcjmruy,0111110101101111,stall moist clash focal surly
+321,5,17,eaoiuysrhtbgmpwck,10011100111111111,white thump wacky beget heist
+322,4,14,eaoyindmthsbcp,01001111111111,admin basic ethos opine
+323,4,14,earsuyognflhtw,00111011111111,gruff gusto whale young
+324,2,9,eatrdhcbf,110111111,beach freed
+325,5,17,eaytoilsnckrmdbgu,01101111011111011,smirk gaudy lasso manic bulky
+326,4,15,eydraohinstbgkl,010111111110111,intro geeky harsh golly
+327,7,19,ealosrchiyvdbgtfnuw,1100011111111010011,abide ditty roach every worth hefty gauge
+328,5,17,eartuigcjnlskpvwy,01110101101111111,waist crate juice spiky vigil
+329,3,12,eratinbmulcd,011011111111,undid amber lucid
+330,4,14,ealnotdusbifwh,01101111111011,basal hoist aloud endow
+331,4,14,easlrgnotuydbc,11001110111111,range study cyber gusty
+332,4,14,eaoinylvshrtdw,10110011111111,olive slide sooth wryly
+333,5,14,eroflwctnsadgm,01111100101111,floor mower dogma acorn scree
+334,4,17,eayortchlumkpdijv,01101111111110111,jumpy latch maker cavil
+335,2,9,eaoiubcsn,011111111,scuba bison
+336,3,12,earsbinlthgo,010111111111,basis shalt going
+337,4,11,earsoibtpcw,01011111101,swoop state tibia cower
+338,4,15,ealiovrschtnmdp,011111001111111,madam voila chant stomp
+339,1,5,eathd,11111,death
+340,5,17,etcirlxunvadhsgjp,11001111111011011,exult jaunt liver sushi strap
+341,3,11,easicnorlqu,01011111111,quail ionic eerie
+342,1,5,etahr,11111,earth
+343,3,9,egsaylhku,011011111,shyly geese husky
+344,4,16,etcrxlaoiysguhpw,1101100111111111,exert wispy guise horse
+345,2,7,eaytsod,0111111,tasty stood
+346,4,15,eaiourtgncbhsfk,011011111011111,brush again taker scarf
+347,3,12,eaoiuytcnprg,001111111111,tunic grout crypt
+348,3,11,eraslonhcmi,11011101111,loser claim crash
+349,4,11,eamcnlufsrt,01011110111,sauna uncle emcee crate
+350,1,4,east,1111,taste
+351,3,14,earcnhidlmytps,10111110111111,niche realm patsy
+352,1,5,earsc,11111,scare
+353,5,15,earsthnkigldbuw,001111111101101,swing birth kneed stale steer
+354,6,19,ealrstmnwiocfpuvbdy,0101111101110111011,strap meant drain vocal upset scaly
+355,4,15,eridaltncfvyush,011101101111111,hussy tried fecal valet
+356,3,10,ealrsdntpc,1100111111,sedan speed scent
+357,3,11,ernoybahilt,01111101111,broil boney broth
+358,4,15,erlnoaiustydpvx,101101101111111,vixen plaid tryst easel
+359,4,13,eartocimpsbgl,0110111111011,micro grace scoop class
+360,3,10,eranoskcim,0101111111,smock skier ramen
+361,6,18,earshctobdumiynfpw,111100111110110101,swear youth bused stiff manic stony
+362,3,13,eayoirsbntdgc,0101111111111,grind basic snort
+363,4,15,eayorilctbdfsuk,011111111001111,carol kitty sauce serif
+364,3,12,ealryoinbdms,010111111111,array nomad bison
+365,3,11,eramifndgwh,11011011111,wider mania hedge
+366,2,10,ealrgudovw,0111111111,guava world
+367,8,22,earsldythukpncowmivbfg,1101011111001111011001,shave haute seedy cluck grown smith spine eater
+368,4,15,easrtlmoinyhpuw,011011111110111,loamy noisy sweet pupil
+369,7,24,eartyicsdmnglvxfkquobpwz,011101100111111011110111,maxim crate liver angel quark woozy paper
+370,6,18,eaoisruqdpbtmkglnc,010111111010111011,squad grime brook grain suite price
+371,3,13,earstkliudnov,1011101111111,drive slate donut
+372,6,19,erlnatsiokgmvdyzbfu,1011011110110111011,dozen sling feast sigma zesty stunt
+373,5,17,erlniasbcdfmhpkgt,10011111110111011,spied cabin miner shirt thigh
+374,2,9,ealkoiucb,011111111,koala cubic
+375,4,14,earslobgfhcmvd,11101100111111,flare hover shade chasm
+376,5,18,eaorshydfjtcwngimu,001111011111111011,stung whose fjord torch charm
+377,4,12,erniowatchum,100011111111,comet wrath owner truth
+378,3,10,elordyankb,0111110111,lobby erode drank
+379,4,14,earslntcouipbd,01011110111111,spout bleat bland pinto
+380,4,15,earniducosthlbp,101011111111101,tripe deuce sloth rhino
+381,8,23,erioatcknxydsmgwvhlubfp,01011111011011101011011,crack rover exact mangy paste cleat fully rumor
+382,5,15,earstfhdgcbpkil,110111100111011,shale craft paper brass cried
+383,2,11,eraioutpldn,11011111111,under pilot
+384,2,8,eratiwfs,01111111,twist after
+385,4,13,earctoihblsuf,0111010111111,brush brace floss chili
+386,4,15,eaorinwtcglbdfu,001111111110111,ingot frown relic adult
+387,3,12,easoidmwucnt,001111111111,idiom uncut swami
+388,2,8,eraindkc,11011111,diner crank
+389,1,5,etahr,11111,earth
+390,2,7,eaoltgn,0111111,tonga gloat
+391,4,14,eaoiuprbmsxnfd,00101111111111,buxom usurp snuff frond
+392,8,20,eraiolgutxdnwhmvbyfp,01011111011101010101,pound hover agile extol hound whole mammy gayly
+393,5,17,easlrncopitydbhqu,11000111111111011,canoe biddy pecan quite polar
+394,4,14,earslchtndbgmy,01011111110111,scaly catch gland manly
+395,7,18,eaytblrciuowgnsdfh,001011111110111001,cross recur hairy table icing dusty wrung
+396,3,13,eaoyilwsgnmch,0011111111111,wooly swing macho
+397,5,17,erailpcshotukdgyz,11011110011101111,plier crazy court spire rigid
+398,3,11,earosinwlck,10011111111,loose sinew clock
+399,4,14,erltbsgdocyamw,10011011111111,beget macaw godly decor
+400,4,16,earsltdignhmpfky,0101101111111111,flask deign nymph ideal
+401,7,21,eaorslhibkgquycdtpfnw,010011011111111011011,quasi alibi clout geeky koala spoon wreak
+402,2,7,ealgnkt,1110111,ankle agent
+403,3,11,earltinswvg,10011111111,stein given trawl
+404,6,20,eaoiuychrsbnflwmdgpt,00111011011111101111,flown spite gulch basil taper cider
+405,5,18,eraiouyhptcfwdlngm,110100111111011111,hyper ditch thief gamer olden
+406,2,8,eayritch,01111111,array hitch
+407,3,10,ealrdmyciv,0101111111,civic drama caddy
+408,5,18,earsoibtuymnlcdkpw,010101111101111111,stand tibia pulpy lucky crowd
+409,4,15,eaouysgrtcnbijl,101110011111111,noble bully juice brunt
+410,4,15,eatryiolckugdjs,011100111111111,caulk treat joust guide
+411,3,11,eastiohlunc,01111011111,hunch stain leash
+412,3,11,etiradblmos,01101111111,toast email debar
+413,3,13,erdicalobghmn,1101110111111,crier among abhor
+414,4,14,eaoithrsglcfkn,00111101111111,cloth filth slink ghost
+415,2,7,eagptuv,1110111,agate guava
+416,4,15,eaoithdrfcnxyvp,010111011111111,ninth affix corny viper
+417,3,11,earsidklnyg,01111101111,slang radii leaky
+418,4,15,eayoiutdmkscflv,011011111111011,datum mucky skill evade
+419,3,13,eaoidtmysnpjr,0011111111111,idiom joint raspy
+420,5,14,ealoirspcnvkmt,11001111011011,arise prime spite avian tramp
+421,5,17,eariolscutywfhjpd,10001111111111011,petty showy floss locus shard
+422,4,14,easvcponydbmtu,01101110111111,study peace abode mossy
+423,2,8,easrgnbm,11011111,range ember
+424,3,11,eashtlkfpum,01110111111,slash slump flask
+425,4,16,etyrlmnspihabckw,1010111111011111,enemy swell riper aback
+426,1,4,elag,1111,eagle
+427,4,16,erdnptlucafbghos,1101101111101111,preen plush facet tough
+428,4,14,easyogiptudflr,00101111111111,posit fluid draft gooey
+429,4,14,ernltogmspacku,01010111111111,crock golem polka snout
+430,4,15,eaoiutbmcfwygjl,001110111111111,logic jumbo comfy macaw
+431,3,11,eaoshytdnir,10111110111,those rainy theta
+432,2,8,eaminucs,01111111,mania mucus
+433,4,13,ealrsoybintwx,0101110111111,borax saint tower irony
+434,3,11,earsupcnofg,10111101111,nurse spear forge
+435,6,19,eraiousntklmhcdbwfy,0101111111101010111,stint foyer skulk slosh ditto renew
+436,5,17,erlayiuosngchmqtw,10111011101011111,alley showy quite anger harem
+437,6,15,eaoistylhpnwdgm,000111111011011,swill tithe gaily swoon theme minim
+438,4,13,earnobtuslfgm,0011111111011,burnt gloss ramen sauna
+439,4,13,eayrtszundcip,1010111111011,zesty sandy purse resin
+440,4,14,eaoiurgmshptyz,00011111111111,shush strip zesty omega
+441,1,5,ealdc,11111,decal
+442,5,16,eastfhyrcinmbuwg,0101111011110111,mangy theft manic wench thumb
+443,5,16,eartipsbgnwohmuy,0011111011011111,strip genie taper stray humor
+444,5,14,eaoiurgbspdlnt,10101011110111,lunge posse binge abase input
+445,4,11,esrtncfhimp,10111100111,pence ester terse merit
+446,3,9,eardsomlw,011011111,alarm swarm loose
+447,2,7,eaonzcl,1011111,clone ozone
+448,4,12,eaoritcghslu,011001111111,lasso ascot ought roach
+449,4,14,eatsplriucmdno,10111101101111,slept demon utile stare
+450,3,11,eathculgmor,01111110111,mulch heath tumor
+451,4,14,eaoinrtulcsfgk,00111111111101,intro flunk locus skulk
+452,6,20,eaytpshoiudncrgkbflm,01111101111011110101,patsy skirt gourd munch freer class
+453,4,16,easyurtpmokdhigl,0111110111101111,husky grail tempo essay
+454,5,16,eanrltpchsufdgvw,0100111111101111,vault wedge cheap pulse scent
+455,5,17,eardktclhxsomnpwy,11100101110111111,treat whale exalt nymph horse
+456,6,21,earoinlsyudgmbkfvtwpj,100111011111101101111,midge nosey power fudge drunk joint
+457,4,12,easvcphliutd,100011111111,utile peace slide alpha
+458,4,15,eraioublsydckfg,110011111101111,bluer foggy abuse aback
+459,5,14,earsldgnktiopw,00001111111111,owing ledge kneed piano stalk
+460,3,12,ersigvlbdcop,101101111111,bleep sieve disco
+461,5,15,earowdysltnucip,001111110111011,rowdy spent wooer stout raise
+462,5,18,eariydsotfgnhklpbc,011110111111011101,grant fairy sport clink elder
+463,4,15,etcaindfsolmruw,111011101011111,edict saint wrist moult
+464,3,10,erpadiothm,1100111111,three idiom tepid
+465,3,12,erlodisfaqtu,101111101111,quiet solid afoot
+466,5,14,echtriolanvfms,10110110111101,these china forth event stove
+467,6,18,erlbpaodichntufsgm,111010011111110101,repel churn saint elder moose slate
+468,2,7,erbtoch,0111111,torch beret
+469,3,13,easoyhiqurtbm,0111101111111,quasi booty tumor
+470,6,18,ertlnypiosgaubfvhw,100011111111101101,sweep vegan funny pinto novel bathe
+471,4,13,easoiuyblmprd,0101011111111,lumpy maybe polyp droll
+472,3,11,eayrlhcbpst,10101111111,belch allay slept
+473,4,12,eaytriodbnus,011011111011,sassy brood trait rerun
+474,4,15,ealrguvtfinhswc,010111111101111,craft guava waist lithe
+475,6,18,ealrmostcubinvghpw,110110111101111001,acute rearm waste given stung armor
+476,5,18,eayorbmntchpdfilvw,010101111110111111,baton watch flood maybe drive
+477,4,15,ersltoadimgnphy,101011011111111,sheep gnome midst tying
+478,4,16,earsliotdmybnhwg,1101011101111111,stage whine nobly amity
+479,5,17,eaiournpvdjyltkbc,10011111001111111,broke enjoy prune tulle clank
+480,1,5,earcb,11111,brace
+481,3,11,ealntsbpryd,01111101111,stand papal reply
+482,4,16,easuginrcklbfmop,0111111011101111,flack using plump posse
+483,3,10,eatsldorck,0111111011,stock dealt roast
+484,3,12,ealnyiduscmt,011101111111,natal lucid slime
+485,1,4,etcj,1111,eject
+486,1,5,easuc,11111,sauce
+487,4,16,eaoirsftcglpqudn,1011111011011111,spice forge diner queue
+488,4,16,eaoitunyhglbcrdv,0011111111110111,dough untie billy revue
+489,3,10,eragnifsty,1101110111,inter genre nasty
+490,4,13,eaoitsyrcbdhk,1001111111011,tribe carry steak heart
+491,5,17,eartlhswugimobcyz,11010011011111111,sweat sigma boozy cycle essay
+492,4,13,eaorighntsmub,0010111111111,bingo snout masse eight
+493,4,14,erydstolanhubf,10101011111111,sheen beefy annul retro
+494,5,15,earstyniodcpuhw,011101001111111,showy spare paddy prude condo
+495,5,16,eaytnrvlciudobgf,0110111011111011,found caddy nerve relic algae
+496,5,18,easrldnokptghiwbyc,010011111111111011,clank night olden swept shady
+497,4,13,esaonglbidkch,1001111110111,belle blink goose beech
+498,6,17,eaorstfycdghimnpw,00110010111111111,chord drown going sheep afoot mania
+499,2,8,eartshol,11011111,steal sloth
+500,5,18,easyriuolbdgncfhkp,100100111111111111,lodge flank hussy noble pence
+501,3,11,eraiouynsvp,11010111111,viper sunny sense
+502,5,17,ertalnsdfwmpiybhk,11101011110111011,ester petal dwarf kitty ashen
+503,2,9,easyutldw,101111111,dwelt dusty
+504,4,13,erpaulnobsydw,1110110111011,purer basal endow apnea
+505,5,18,eaouysthlrpcgdinbm,101111010111111101,coupe mushy druid clung shire
+506,2,10,eartibfluy,1011111111,befit burly
+507,5,18,eatrdiwusckployfbn,001111111101111011,truly weird cause spoon blind
+508,6,20,easrlkoipmyudhjcfwbt,01011110111101111101,jumpy wharf koala raspy trick screw
+509,5,16,erlayoignbjdtsck,1011101011101111,alley ninja briny batty stack
+510,5,15,eaorstphwkdlgnv,011111011010111,straw stove heart horde green
+511,4,16,eaoiusblndrwyhtg,0100111111111111,stung bylaw tough brand
+512,6,20,eayotirugdpbhmflxjnc,01101101111011111011,filmy maxim adept nudge abhor march
+513,4,14,ealopthcigmnuw,00101111111111,clung pitch macaw tepee
+514,4,16,easliychtuorgmnv,1101001111111111,mauve lunch girth gnome
+515,4,13,eariocdlyufps,1011101110111,posse drier delay fecal
+516,4,14,eaoiylchtwnsbm,00111111111101,mossy newly itchy sooth
+517,5,18,ealidynorubcghpstv,011111011111011011,cabal idyll route aphid civil
+518,3,12,eaoytiprmclb,011011111111,comma tapir blare
+519,4,14,eamrousflptnvw,01011111111101,pasta flour newer revel
+520,4,15,eralsnphiuckqdo,001111101111111,sound panel quack radio
+521,3,13,eaytclvrdkmuj,0111011111111,datum jerky valet
+522,3,11,eartcdlxbuo,10011111111,boule cadet exalt
+523,3,12,eamnfigorpuy,011111101111,mangy mafia rupee
+524,4,13,eartidmnvlcgo,0110111011111,logic dream diver ramen
+525,4,15,eraostnwkmpuyhl,011111110111011,start women humph slate
+526,7,19,eaoiuvrlbdcghnpsykt,0000110011111111111,stunk penny dunce bused vague pinch brace
+527,4,11,erlsoapgmhz,10110110111,hazel sleep loser alarm
+528,4,12,eldtopahrycu,110011011111,elope deuce hydro tarot
+529,4,13,eaoiunytdfplr,0001111111111,fully frill tepid unify
+530,1,4,eagl,1111,algae
+531,4,14,eaoiuclnshmpdr,10101111101111,uncle drone spasm comma
+532,4,11,earosinghlw,01110111011,groan inane swine welsh
+533,4,16,eralnovwiutbdgkj,1101111001111111,joker naval brute badge
+534,6,20,eraoiunhstblwkpycdmv,00011111101111111011,sushi vowel spunk crony bylaw molar
+535,1,5,eratk,11111,taker
+536,4,13,eaoiytrdhcksm,1001111110111,trite marry heard sheik
+537,4,14,easrlwdinchftu,01011111111011,trail dwell niche crust
+538,6,16,eragloipsncdtymu,1001101110111101,spiel suite eagle pearl decry cater
+539,6,18,eaotlircgknwsypdfz,011001111111110011,angry gecko froze swirl scalp knock
+540,4,14,eaoiuylsrfnckb,00011111111111,curry flunk brisk folly
+541,4,15,eraostknhlvbjwy,101111101110111,hovel stark throw jelly
+542,2,8,ethcorsv,11101111,ethos verso
+543,5,15,eaoiurtlsfkygvm,010011111111011,ultra fetus sulky sieve grime
+544,4,14,ertaniylcpsgob,11101101011111,enter bingo slate inept
+545,3,11,ealngoybcku,01111110111,agony canal bulky
+546,3,12,eraoipskydln,100111111111,spiel drone pesky
+547,3,13,eanyscrtdofjh,0111011111111,tardy hence fjord
+548,4,14,eydrlotugipsbz,01111010111111,digit leery spilt boozy
+549,5,18,eairhtolspgbzmndwy,001111111101101111,spilt noose there blitz wordy
+550,4,16,ealncotrkpsdfmuy,0111110111101111,canal forum speak nylon
+551,4,15,eraoinwtksbcmvd,110111011011111,diver token bacon metro
+552,5,17,esratnclghiwfdopu,10011110111101111,pence weigh caste chili audio
+553,4,14,eastniubmdorgp,00111101111111,bosom stein midst grope
+554,4,12,ealrdytnpfhs,111011100111,delay taffy least shelf
+555,6,17,eatrhylcifknubmvz,11010111101011101,leaky craze chill billy album claim
+556,6,18,easrozlthinuycfgpv,010111111101101011,privy loath razor furry early still
+557,4,12,eaoriyndkswt,001011111111,synod known tatty nadir
+558,3,11,ealdsrbgnow,01111101111,salad grand aglow
+559,6,20,erlpvoiahmuydgnstbwf,01101010111111111011,shunt lever rinse fudge rhyme waver
+560,4,13,eastrincgoulm,1011110011111,slime start grout moose
+561,3,13,eaoirutmpqsbd,1011111101111,bride tumor squat
+562,4,13,erayflodgimnv,0111111001111,manly foyer navel river
+563,4,15,eaorlitdfnusyhw,001111011111111,whiny worse final ruder
+564,3,11,eraionbvpst,11011101111,voter train poise
+565,5,16,eaoftrbmdypzcikl,0111110011110111,afoot ardor peril boozy bloke
+566,7,19,eaytirgnulszcfdvhkq,1011001111110101011,zesty taunt flask vying natal angel quest
+567,4,17,eridasuythpobfwlz,01110111110111111,bushy fried stilt woozy
+568,2,8,earlfcit,10111111,rifle facet
+569,5,16,eaitgnchsvfypkrw,0110111111010111,winch again sieve risky parse
+570,4,13,eaolripthdmvy,1011110101111,drive molar dirty admit
+571,3,12,ervfsaiodtbm,111010111111,sever smote debit
+572,6,18,eaoiudnsbrzfgmchpt,101011101110110111,gorge undue booze troop mourn march
+573,5,14,eaormntylugijp,00111111101101,girly moron petty along aging
+574,3,13,eaorstdchklun,1011111110111,stone chord usual
+575,7,20,elagipykdmonubtvrszf,01110110111110001111,moldy eagle piggy found bezel unlit prism
+576,3,13,ealrsupcthinf,0111111011111,usual strap finch
+577,7,18,etarmyonijlvsdhbqu,100011111011010111,envoy quite matey batty trail modal rumba
+578,3,13,erntsimucaklv,1011011111111,unmet crick valet
+579,6,20,esavyiouhcfrtlwmbpdg,10110011111110101111,weave patch force pudgy stare blurb
+580,3,12,eaoythcisbnr,001111111111,itchy booth snort
+581,6,19,earlvoitpuwydsmkchn,0001111111110111101,missy tulip level towel snuck sperm
+582,4,16,esgrizaldykcbftp,1100111111110111,seize flack delay tripe
+583,4,16,easriolchtumpdng,0100111111111111,touch champ cling droop
+584,6,19,eaoiuytldkcwsmghfbp,0110111101111011011,atoll puppy tweak shock budge askew
+585,5,16,erlntmoaiygdckps,1001111011110111,totem dying spike giddy smell
+586,5,15,earlisngobtcudv,011001111111101,sugar tense abbot evict tiara
+587,4,15,eamsrlkpinoftux,010011111111111,parka fluff toxin plain
+588,2,8,eaoiuntl,01111111,allot until
+589,1,4,erps,1111,spree
+590,4,17,easliohwgbcmturdv,11010111110111111,badge whole moult viral
+591,5,17,eaytosriudbglpkmq,01101011111111011,dairy broom rugby bleep squat
+592,3,11,etcrxlyiopd,11011110111,exert dolly pilot
+593,4,14,erstlpdnowcibm,00101111111111,swoon speed climb sleet
+594,2,7,eatlnpr,1111011,leapt preen
+595,4,15,eayorviugnbldft,011110111111011,bunny labor feign donut
+596,3,10,earslngokb,1100111111,glean blank roger
+597,4,14,erioanuymhgtlf,11001110111111,ruler fight ramen metro
+598,5,17,earislnkmoqutyjcp,10001111111111011,petty qualm rayon snaky pence
+599,3,11,elardvipgtw,10111111011,evade tripe await
+600,6,18,eatsruchldinovbmfp,001101111111110101,plush devil chest mound month tepee
+601,5,18,ersamilhkonqugdpty,100111011111101111,queen quirk mania phony outdo
+602,3,13,earlsimyopkqu,0101111111111,amiss quake loopy
+603,5,19,eaytnosurcdklbfgimp,0111011111111010111,tardy flock musty freak peril
+604,6,17,eaiorlftchknsbupv,01010110111111101,vouch fella chock sonic black knoll
+605,3,11,eraslmifptu,00111111111,fault filet psalm
+606,2,5,elagy,01111,gayly eagle
+607,4,13,erasnflmoykjg,0111010111111,foamy safer jerky roger
+608,4,14,earoiusyhpcltw,10110011111111,worse hyper pearl stoic
+609,7,21,easrihfjltycbopkmnudg,010110111110011111101,graft flair jiffy plunk paste money comma
+610,4,16,eatryhcinlbgdfsu,1101011111101111,beach liner fraud angst
+611,2,9,eaoishcjn,011111111,ninja chose
+612,3,12,eaoisptwhcml,101111111011,white sloop smote
+613,4,13,easnucrlifoty,0111100111111,sauna lease filet coyly
+614,5,17,eagloritdcnpuyzfs,10110100111111111,dunce eagle safer apply zonal
+615,4,13,eraoithncvdpg,1101111011011,other giver hitch perch
+616,5,18,ersnltoquagihfcdzm,011101111111100111,quota sneer might adorn hazel
+617,5,19,eaolixrstdhpcfnkmuy,0011111101110111111,smoky frond exile aphid clout
+618,5,16,earlotbywiudnpsg,0000111111111111,wispy sound beget water allow
+619,6,17,ealoiuyrnptcsdbfm,00100111111110111,nutty crust penal cabby femme sonar
+620,6,17,earsilchnotgfwypv,01001011111111101,wagon chain trove foggy ascot afoot
+621,3,11,erahjoiudnf,01111011111,rajah unfed fried
+622,4,14,eayoiursbhfckt,01101111111011,fishy basis strut kiosk
+623,4,15,earlsdnbgowtkcf,010111101111111,wagon stalk sedan scarf
+624,5,16,eratopihlkmncsyd,0111101110101111,dross tamer lithe dairy smock
+625,5,17,eaoidmntuchygslkr,01111101111101011,admit rouse yacht steak shade
+626,4,18,easrolhikcqumptfgn,010110111111111111,motor champ quirk flung
+627,3,14,easlirwhgfuozc,11011111101111,gauze whirl couch
+628,3,11,eaiosucnrvg,00111111111,virus rouge niece
+629,3,12,ealorsinbdtm,110111101111,abide store smote
+630,3,12,eaortciglsvd,011111101111,avail actor dress
+631,3,13,easrlniptyufg,0101111111111,plain flung party
+632,5,17,easoyhtbgncdilpqu,01110111110011111,quash booth tonga papal build
+633,5,16,eaoiutbmnrslkygj,0011101111111101,silky jumbo miser unity rebus
+634,3,11,eatlvhsrdyk,11011011111,ready salve sleek
+635,3,12,easrciytwdhx,101111011111,cress width twixt
+636,5,16,erslbftacmdoupky,0011111111011011,scaly fleet amble outer stack
+637,4,12,eaoychtrsugb,001111111101,bobby shrub yacht chess
+638,3,11,ealsmcwqukp,10101111111,quell macaw kappa
+639,3,12,ealryondmusb,011011111111,usual nomad berry
+640,5,17,etoilfngabdcyshrw,00111111101011111,along elfin dingo sorry whiny
+641,4,17,erbtgsaoyikldnchp,01110110111111111,krill beset sharp candy
+642,5,17,eraotcyudnsplbfkw,00011111111110111,sound octet fully slope awake
+643,8,20,easrnotchimpuwdgkbfj,01110101011111001011,swamp cramp swore jaunt siren denim freak wreak
+644,3,12,eraslopfknth,110011111111,other flake spoon
+645,2,9,eaytidclm,011111111,limit caddy
+646,5,16,erlbtaipudgofsyj,0011101111110111,tulip betel outgo judge palsy
+647,5,17,earyslnckbfwhdiom,10110101111111011,ferry flack abode wharf manic
+648,4,15,earslytnoucfghi,010111111101111,talon glass truly thief
+649,4,14,eariytfloksnwb,10011111101111,lefty flown bitty raise
+650,5,16,eraiotluxychnbvd,0000111111111111,lunch novel dolly exult nobly
+651,6,18,easiotulypmdcknfgh,100011111110111011,knelt plume ghost polyp dicey gamut
+652,3,12,easrlontuckb,011011111111,black snout atone
+653,3,12,eaoyrwspcdik,011111101111,arrow daisy rocky
+654,3,12,erlocidabkpv,100111111111,bicep vodka cello
+655,5,20,ernaoiwthdlpsybfgkuz,10101111011111101111,spiel brown dirty glaze stunk
+656,2,10,eaytidgspr,0111111111,digit raspy
+657,4,15,eaotbuydwlgivpm,011111110101111,about dolly ample devil
+658,5,17,erailoudgycsvwfhp,01011111110111011,would plier dodgy sieve aphid
+659,4,16,eariotucbklpsmyz,0110111111110111,crazy polka rebut mural
+660,4,12,eaorlsgnhptw,010101111111,angst grasp shown sewer
+661,4,16,erasoiludgncktbp,0111011101111111,blast upper prick groin
+662,8,20,eayrotiuflgndhpjvcsm,01010111111100101011,vaunt glint flyer mammy adore depot heady class
+663,5,17,easrtoignuhpcbflm,01110101111101111,snuff graph mouse reign blast
+664,1,4,eagp,1111,agape
+665,3,11,eayoiutcrks,01101111111,risky cacti trust
+666,3,13,easrtiflopndb,0111110111111,spilt brand floor
+667,4,14,eratykdnoxgivw,11101011110111,waver nerdy detox avian
+668,5,17,earlotsncdfbkpmuy,00011110111111111,block mummy steep aloud freer
+669,1,5,eridc,11111,cried
+670,5,16,ealsoyinrvmtkwpc,0111011110110111,salsa inlay cower meant spear
+671,5,17,easrioutngbcdjklm,01011011101111111,brunt brand juice caulk smelt
+672,3,9,earpiosfh,101101111,prose safer horse
+673,7,17,eaoiysrldgcpnkthw,00111001110111101,giddy dilly lodge paddy spank sweet dryly
+674,5,18,eayrcinshlwtmouvbp,010111101111111101,thump cairn ovate welsh pansy
+675,1,5,eatch,11111,teach
+676,1,5,erham,11111,harem
+677,3,10,esactylrhp,1110101111,tease ralph latte
+678,4,15,eaoipxulrshcngd,100111011111111,pixie angle chard sheer
+679,6,16,eaorstuncwfdgivy,0011111101010111,sworn snout irony waver etude angry
+680,4,13,eaospcuftbkln,1011111011011,coupe spool beset flunk
+681,6,18,eraiylpdtosufjcnmz,011110101111110101,jiffy rarer prize torus resin drain
+682,5,16,eaoilntfgsrcpybw,0111111110101101,aloft wring spray annoy ascot
+683,4,13,earcgldnbkmov,1110110110111,brave algae learn lemon
+684,1,4,ecns,1111,scene
+685,5,17,eaoisrguwtylmbcdk,00011111111101111,click twist badly sugar kitty
+686,5,18,earslhwidytmnbcoug,110011111101011111,whale cabby idyll myrrh gumbo
+687,5,15,eayilrkstnufpdv,010111111110101,altar paint skull river putty
+688,5,15,erayilonbpdcmtw,110101110111011,tower candy papal renal trail
+689,6,18,earlynhvcbwutdigos,100111111010111011,welch haven alley slide tardy young
+690,6,16,earocsulnbwfkygt,0011111101101101,scour below water salon wacky tower
+691,2,8,easrihtd,01111111,shard tithe
+692,2,9,eaytirmnw,101111111,merit tawny
+693,4,17,eltodighuarbmnpsw,01011111110111111,spawn elide ought gumbo
+694,4,15,eldtaiocrysphnw,110101111110111,elite lyric swoon wench
+695,4,14,easrhugtcndowy,01111100111111,crash dunce downy racer
+696,6,17,earsthincgdyulbpf,11010111110011011,shale singe caste fluff tardy apple
+697,4,16,easumlptockfvbdi,0111011111101111,lupus stack vocal build
+698,5,19,easrvgioucdhlmntbwy,1001110011111111111,thyme brawl verge churn clued
+699,3,11,etsynmagoci,10111101111,enemy stoic mange
+700,4,15,eaoiurgnvypscld,010011111111111,syrup angry venue scold
+701,4,15,easoruigmnptyfh,000111111111111,pygmy furor giant horse
+702,5,17,earsuiptchknygfow,00010111111111111,owing skiff cheek strip yacht
+703,3,11,earignostpc,10111111011,reign scope stair
+704,4,14,erdcaiouybthgf,01100111111111,foggy freed truth bride
+705,5,16,easlyvucforhtmnp,0111101111101011,saucy spell flour frost uncle
+706,4,14,erasovlcnbhifk,10101111101111,coven flake savor finch
+707,5,17,ealrntyosdmbpukwg,11001011111011111,sedan amass gawky royal trump
+708,3,10,eaorsbmity,0011111111,bosom missy artsy
+709,4,16,eaouyignlkqrcdpw,1011011111101111,coupe quick lying weird
+710,5,18,earstylbmgkhcdinuv,110111111010011111,stake balmy suave siren debut
+711,3,10,earmostcdw,1010111111,decor sweat swore
+712,5,18,eaoityrbhldfnxwcgv,011101111101110111,abhor affix allay coven wrong
+713,4,14,earotdlinshwkv,00111111111101,whirl stove olden hoist
+714,3,11,eayotiubdrl,01101111111,burly rabid about
+715,4,16,ealoyiuhbtrmcnsv,0110011111111111,vital habit marsh hunch
+716,4,14,eaoriulpstyncm,01001111111111,usual mince spout reply
+717,3,12,ersuachofltd,101011111111,steed chaos flout
+718,4,15,eaodiuyhctbrflm,001111110111111,filmy berth audio freed
+719,4,13,earstuhckmpiy,0101101111111,yacht shack hippy spasm
+720,4,15,earitlcunsobdmp,101101111111011,relic bloom ensue opine
+721,6,16,eaygltsrcopudbmn,0111100111110011,canny gayly court caper agate groom
+722,4,14,eaoiucbrgvlpdw,00111011111111,rigor pupil would bravo
+723,4,12,earnskvbchlo,110001111111,bleak belle chore knave
+724,3,12,earshownpilm,111101101111,spear prowl prism
+725,3,11,easrldwtchv,10111110111,dwell verse welch
+726,2,9,eayglhmnp,011111111,gayly nymph
+727,4,17,earotngidfhyjbmuv,10110111111101111,horde feign envoy umbra
+728,3,11,eastlporicm,10110111111,sperm strip comic
+729,3,12,eaynrtchvgio,010111111111,hatch going verge
+730,3,12,eaorslthimqu,001111111111,quoth smith troll
+731,2,9,ealikovsp,111101111,alive spool
+732,3,12,eaystnoguilb,011111011111,nasty billy usage
+733,5,17,eayobtdlsrcgkpuhn,01111100111111101,taboo rocky snuck grasp label
+734,5,16,eaoiuyrlmpsntchk,0001111111111101,sunny musky truce impel elate
+735,4,13,eainvsrwhdctf,0111101110111,avian whine finer cadet
+736,3,10,eamgopyitr,1011011111,trite gamma payee
+737,4,17,eaosrliugvdnwhcbm,10100111111111111,vogue blood whine munch
+738,4,13,easrimonlvkpt,0100111111111,mania plant olive spoke
+739,5,19,earslpdithoucyzfmqw,1010101111111110111,wield other adult crazy qualm
+740,3,12,eastclxkhwri,010111111111,whack chair exalt
+741,5,15,earscholinkdgpt,101110111101101,clone scree still rigid tidal
+742,4,15,erasltngwpudbik,011001111111111,twang paper skunk bride
+743,6,17,easnoryukigdqtbcl,01011111011011011,grant curry arson lingo quiet scuba
+744,3,9,etiacudlx,010111111,adult exult attic
+745,5,15,eamgolivkrtcdwy,011101101111011,gamma alike weary octet crawl
+746,3,11,ershtnyakpb,11100111111,sneer parka batty
+747,3,11,eridptablfn,11101011111,riper final bread
+748,5,18,eaoidrcshglbmnptuy,101111101101110111,gnome acrid torch basin puppy
+749,6,16,eaiscglutndobhfr,0010111111110101,round guilt liege tunic sloth rifle
+750,4,13,erlvopbaixsuc,1010111011111,pixel rebel error sauce
+751,4,14,ealrmonijktusb,01111100111111,brass moral junto knelt
+752,4,15,erahpytwlckousm,101111010111111,payee where smack occur
+753,4,17,eartsoibdlmkcfnug,00111101111111111,frock gumbo steak blend
+754,4,15,ealriwotchsbkdu,001111101111111,swirl could kebab witch
+755,5,18,eaytrionslbdgwckqu,011001110111111111,wacky wagon quite abide loser
+756,4,12,esarlbtcifmu,101011111011,belle class remit tubal
+757,5,15,earyvnsluowcmkp,001110111111011,curry serve rally power crock
+758,4,14,eaorilmgfntuyj,00111011111111,unity groom major flare
+759,3,13,erstlydpaigno,1011111101111,steep dolly dingy
+760,4,16,eaoiusfgnlcdprmv,0001111111111111,slump vivid farce fungi
+761,5,17,eaorlfuptymnchdij,01111110101111011,trout afoul conch jumpy title
+762,4,13,eaorltxyncbfh,0110011111111,abbot chant beefy exalt
+763,6,17,eaoltckyibrdwpvns,01111111101010101,cloak witty lever array basal stoop
+764,4,15,eamorylivsnhcku,010101111111111,sauna chock voila marry
+765,4,16,eastirynmopvwbdk,0111101111111011,spawn vomit kitty bride
+766,2,9,eaorutlgy,011111111,ultra glory
+767,6,19,ealmicgrysdohquktfn,0111110110111110101,llama lyric hoard quart natal flung
+768,1,4,ervf,1111,fever
+769,5,16,eaotrlngmhsuipbd,0110101111111101,dough among trash print adage
+770,4,14,eairtsmnvclwdo,01100111111111,amass wince widow cavil
+771,2,9,erltiadvy,101111111,valet deity
+772,4,13,ervnsdufowbgh,1011111011011,unwed serve dough shrew
+773,6,18,eratlivpgkcbmsdwyz,011101101110101111,track maker rivet algae waltz daisy
+774,4,16,eraoinymbhldtpvc,1001111101111111,honey crime viper tilde
+775,3,11,easluinvcjo,11001111111,canoe juice anvil
+776,7,20,earlytcinkshopufbgdw,01111101011101110101,slash teary trail pluck grief witty tweak
+777,4,14,erlnvixbopfmst,10111110110111,vixen repel melon pesto
+778,5,16,earcgdiltushbpfy,0110101111110111,flush irate greet iliac aptly
+779,4,13,eartpdslibmfk,1101110110111,flake adept elide limit
+780,2,9,eaonmlbcr,101111111,lemon cobra
+781,5,18,eraoiutngdksvhbfly,000111111111101111,gusto given drunk slave beefy
+782,5,19,eratinbmkylchfowjps,1110101111011111011,amber whiff perky octal miser
+783,4,14,eaoiurflstkgmy,10101111110111,flume floor stout geeky
+784,3,11,ervfnslatco,11100111111,lever trace stole
+785,1,4,eldi,1111,elide
+786,4,13,eaoyrscdhilmw,0011101111111,chord whirl carry march
+787,4,17,earsyktlniopucbdw,10111001111111111,derby snail swoop recut
+788,4,14,eamgostfhirlku,01110101111111,skull magma flesh afire
+789,7,19,eranyoigustpbhmflcw,0001111111110011101,unity money swoop genie grape filmy peach
+790,4,15,eaolrdgsuvncfmw,011001111111111,focus woman guava salad
+791,1,5,ethci,11111,ethic
+792,3,12,easritpckmoy,011110111111,cramp kiosk payee
+793,4,17,erayintlosvcmgpqu,01101011111111111,salvo tiger pique mimic
+794,5,17,easruldbmnkoiftwh,11001110111011111,ladle kneel amuse shift wield
+795,6,16,eartnlocipysdfju,1010010111101111,jelly fraud price jiffy actor prune
+796,6,17,eirnlstkoaguypfwh,01100101011111111,skiff eerie wafer guppy stung shear
+797,3,11,earoiulpnst,00111111111,spurn pinto lapel
+798,5,16,easrtonhiclwdypk,0111011101110111,prawn shake store lilac slyly
+799,3,14,etrloxankdpmyb,01111111011111,brand extol amply
+800,8,21,erfaysmdtokilnbhjzpwx,011110101101110011011,jazzy freer smear stone flint krill swear boxer
+801,2,8,eatrlpmy,11011111,pearl amply
+802,1,4,eagd,1111,adage
+803,3,12,esydnrwghoum,101101111111,merge weedy dough
+804,4,16,eathrolcdquyngxp,0011110111111111,quoth prong ready exact
+805,1,4,erdo,1111,order
+806,4,17,eraloimpnctdghuyz,10110111110111111,impel gauze canal duchy
+807,7,18,eaoiugdymsknbtlfjr,000011111011111011,gully blunt nudge judge midge eking board
+808,4,14,eaoisprtvnbglw,10111010111111,binge swoon broil savor
+809,3,11,eatpmolrucs,10111101111,tempo cause ulcer
+810,4,15,eastorubhdlcknp,001111110111111,bound burst clasp cheek
+811,3,10,eaytdgonch,0110111111,handy candy dodge
+812,3,13,earuoitbcdsgl,1010111111111,glide decor boost
+813,4,13,easrinopchdfb,0101111111011,porch piano brief chief
+814,6,17,eariouptcdlhbmvwz,10101111110101011,crude mower trope hello briar amaze
+815,5,16,eaythoirdlsfkmnb,0111101110101111,daisy ninth tread baste smirk
+816,5,20,eraoiuyhltcndbgsmfpw,00101111111110111111,madly inlet fluff wench grasp
+817,7,21,erasoyindluhgcbfkmjpt,011101101111100110111,flask idler parry dough creed taker juicy
+818,4,16,eatyorwibnxlcdgs,0001111111111111,inbox dodgy weary scold
+819,4,15,erltnhdoscaimvx,100011111111111,vixen coach amend those
+820,2,8,eaolitns,01111111,stilt tonal
+821,4,15,etnrhadioblpksw,100011111111111,elbow sleek aphid thorn
+822,3,11,eralvfsowgu,11010111111,wooer false gauge
+823,3,11,eaoiuyrtlsw,01101111111,atoll lusty trawl
+824,4,12,eraobmwtckls,110111011011,loser ombre tract arbor
+825,5,19,eaoyiuclprfsnbmxdgk,0011110111111011111,goody slunk pupil fixer mayor
+826,3,13,eaolivusntmwg,0111111110111,viola swung woman
+827,4,14,eaytrlshwnbcip,01100111111111,basic penny whale trash
+828,5,18,eaoiuydrgstlfhnpck,001111011110111111,picky funny arose egret shelf
+829,3,10,eadripsgnh,1100111111,sepia deign neigh
+830,5,17,earlosthdciykfmwp,11011111011101011,shape allot dicey fresh twist
+831,3,11,erlbtdfmuap,00111111111,adapt betel femur
+832,3,11,ealtousinkc,01110111111,usual knelt click
+833,5,15,eaytmoripcsdbgu,011010111111011,gaudy prism meaty crept amass
+834,2,6,earlvi,011111,rival verve
+835,3,14,ernopiswabdlck,10110111111111,sinew crook abled
+836,4,13,eigthboascplm,0111011110111,bigot siege phase maple
+837,2,8,eatrmlif,11011111,realm mafia
+838,3,13,eaoixnmutcrfs,0111101111111,first axiom truce
+839,5,16,earsldhcbntygjpu,1010111110111011,petty chard rebel clang under
+840,4,14,easrtniwopuydb,01111101011111,study brawn input berry
+841,2,7,esnrval,1011111,nerve snarl
+842,3,12,earstlyumdgo,110111111011,slate gummy lasso
+843,4,16,earslufwoibtpynd,1100111101111111,plate tibia awful dandy
+844,4,14,eaointbdlcmsuv,00111011111111,bonus limbo abled civic
+845,4,12,ernlothciydp,000111111111,itchy dicey hotel pitch
+846,4,14,easniclfohdgpy,01111110101111,slain pence soggy gonad
+847,3,13,eaotyidmnrslp,0101111111111,palsy admin tread
+848,2,9,erntsailb,101111111,inlet brass
+849,1,4,elag,1111,eagle
+850,4,16,eatdmnisoprglquw,1101110011111111,amend wrung qualm opera
+851,4,15,eaoythcnrbildvw,001111111011111,howdy thorn hatch rival
+852,5,17,eratlgysndfibmozv,11101011011110111,safer blaze daisy linen mover
+853,4,16,eraodivhtglwfcnm,1001111111110111,video twirl might finch
+854,4,14,ealnctrdskiupf,01111001111111,canal pedal skiff plunk
+855,4,15,easuoctrnlvhmyd,011110110111111,small torus shady solve
+856,3,10,eriouacpsd,1100111111,racer spied surer
+857,4,14,eaoiurlfmpshtd,10101110111111,plume house prude foist
+858,3,13,eaolingtrydcm,0110111111111,angry today mimic
+859,4,17,easrhlwnitfgdbcop,01011111111101111,bingo craft welsh spade
+860,3,13,eaoltcknwbfhy,0111011111111,cloak hobby flown
+861,4,18,eastionulprcdgkmwb,011101110111111111,taunt speck dogma brown
+862,5,17,esarlcgtvyobnidpu,11011010111110111,verse glass bacon putty tepid
+863,6,21,ealotrmbsfkdcghnvyipu,011111101100111111011,float rearm stung reach every sloop
+864,6,21,eratlpouifychgnsdbmvw,111011001101111101111,paler cinch frost vowel bough mucus
+865,4,14,etoilfnacukdps,10111110111011,elfin clone spunk false
+866,6,19,eraoiudlmntghpbwvfy,0001110111111110111,fight lumen foyer agape thumb rivet
+867,3,11,earioudltcy,10101111111,truce outer oddly
+868,5,18,eaoiutsycdhnfrpwlb,001111111111010111,winch bound study drone sleep
+869,5,15,earctoslnfgmiuv,011101101111011,snuff crave gnome grass ulcer
+870,6,18,eatrlgdywiomnzpqsu,110101011011110111,weary gnome agree woozy slain queue
+871,3,13,eltdirasyphfj,0101111111111,jiffy elide sharp
+872,3,10,eaoirsuhmp,1011111011,mouse spire spasm
+873,3,11,eatrmiunobd,11011011111,rearm doubt untie
+874,2,9,elaoriktv,101111111,evoke trial
+875,5,17,erloaitygzhubpdsk,10101111111101011,hazel kitty gauze prior usher
+876,3,12,ealruobndwpc,110111011111,anode purer crown
+877,3,12,eratougnmvpl,111011011111,paler route venom
+878,4,13,ealrgunvshtid,1010111110111,lunge guava stave rider
+879,5,17,eaoilrcgpumsvfbnt,01110111110110111,visor cigar puree stint pubic
+880,4,14,earsctlfhginym,10111011101111,flesh scree layer manic
+881,5,16,eanrdghtcslbfopu,0100111111101111,aloof hedge catch shard spout
+882,5,17,eraislptuomcfhkvb,10011111010111111,spiel refit choke above slave
+883,3,14,earslhtkcngmop,11010111111111,skate mange pooch
+884,5,15,ervsltfhnoyabdu,101100111110111,honey verse fresh under lobby
+885,5,20,esarolnctkmdfgiuyhbx,10011011011111111111,hence murky boxer fluid hedge
+886,5,14,eaytrodlbpsgmu,01101101011111,gassy groom paler lousy tarot
+887,4,16,erlotihmswbacfpd,1011111111010111,dowel smith flash apart
+888,4,13,ealysbmrtnohw,0111011101111,balmy relay shown tamer
+889,4,14,eldotuaiywcprg,11011101101111,elite could reply grape
+890,3,15,etonsarblwypdgu,101011111111111,elbow gaudy strap
+891,1,4,eagp,1111,agape
+892,5,15,easltoidgbmrkcn,001110111111101,digit smelt brink amber smirk
+893,5,16,ealsbcpdytmohnru,1011010111111011,shell decay motto clear sauna
+894,2,10,erlonakdis,1011111111,oaken solid
+895,4,14,erloayiuhcndgb,10101101111111,bagel hunch needy belly
+896,8,20,erpagctliowfhnysubdv,11011011011011101001,agree trawl horny vowel haute weary binge sinew
+897,4,13,erlbaoginwtyv,1011101111011,bevel align owner gaily
+898,3,11,earnbotvsgu,01101111111,abort usage serve
+899,3,14,easrlckoginbft,01011111111111,flack giant borne
+900,3,11,erdiyaovtlh,11101011111,dryer hotel villa
+901,5,16,eralindmoftgychp,1101110110110111,tiger alien lemon pooch erode
+902,5,17,eargostydlnfcbkhv,01111101100111111,agora shack goody cabal fever
+903,1,5,easpl,11111,lapse
+904,3,11,earyonbhkms,10111110111,berry money smoky
+905,3,12,eaoiuchrldnp,001111111111,lipid occur punch
+906,4,14,esrlbiohtcaquw,10011111101111,belie betel whose equal
+907,4,14,erlothumabcinw,10110110111111,bowel hunch lithe amber
+908,5,16,erlynoaftubgicsw,1011110111011011,often gully surly lingo tweet
+909,6,20,easloyrxiunckfdmpthw,10110111010111111101,swell dumpy relax flack front mayor
+910,3,11,ealdsrguhco,01111011111,coach salad argue
+911,5,18,eaoiuylcdhkmrsftbg,000111111111111011,humid flick erase baggy aorta
+912,5,17,easrlckquyohdimtz,10011111100111111,clerk humid quake chute crazy
+913,5,18,eratlosbczikuydgnm,110011011101111111,under gleam booze actor sulky
+914,6,18,eaoistrlnkbcdpvmyz,100111100011111111,tripe spicy stove maize blind blitz
+915,3,11,erlbspvadio,11101110111,revel spore lipid
+916,1,5,ealrx,11111,relax
+917,3,11,earsticgklo,11011110111,stale tacit cloak
+918,5,18,easorhclwyupivmnfk,011110111110110111,crawl close funky visor shape
+919,5,16,eaoiulrcpvyfhnsm,0101101111101111,crimp vicar hurry slush churn
+920,4,13,easrlpfmthciy,0111101110111,scary flame meter flirt
+921,1,4,east,1111,taste
+922,4,14,eralntsohpfmbd,00111111110111,photo onset metal blade
+923,6,20,eaoclgdkvstipfhqubrw,01101011111110111011,vodka waste spilt quail sheik croak
+924,4,15,erdltfmuyancgix,100101111111111,excel femur fancy grind
+925,6,17,eaodrtvylfingchju,01111011101101011,jolly adore evade intro colon untie
+926,4,14,easrinugmovtck,01010111111111,crack vogue gnome inter
+927,5,18,eaoiutlcdryhnkgpsf,001111101111101111,flung toddy utile hoard pesto
+928,3,12,eayoirctpldm,011011111111,dimly tapir corer
+929,4,14,eaoidtcnsrhlmb,00111111101111,bloom disco antic cache
+930,5,17,earhnylugiostdcmz,01011110111110111,stint glaze hyena groan mulch
+931,5,16,etaclirdbhomsufg,0111111001111101,grill eclat amuse humor chili
+932,5,16,ertxnhoacwibdsmu,1011010111011111,bused exert wrath octet mucus
+933,5,17,erslaodmuytchkwbn,10011101110111111,cheek bloom allow surly stone
+934,5,15,eriompudnbtfhck,010111111010111,hound ruder primo idiot check
+935,2,8,eairpdtg,01111111,adapt gripe
+936,1,5,ealdc,11111,decal
+937,4,14,easrioyctglmnp,00111111011111,loopy cress login micro
+938,2,8,earstigh,11011111,stage tight
+939,3,11,eaotnrcsulf,01101111111,locus acorn false
+940,5,17,earsdiflwtnybguhk,10101011101111111,debug dwarf shaky fella newly
+941,5,17,eratukypmlgbcidov,11101011111001111,lager trump dully olive amble
+942,4,13,easrmpfntuboc,0111001111111,fauna crass brute onset
+943,2,7,esarnth,1101111,tense earth
+944,3,12,etopchlfdirx,101111110111,epoch floor helix
+945,3,14,eartnlpkcsiodb,01110111111111,droit speak block
+946,4,12,easorlcthgud,001101111111,cough cloth tease dread
+947,4,16,eaytsroilghnukmd,0101111111111011,laugh storm grain daddy
+948,7,21,eartsochpnudbygvkiwlm,011110110110111101101,churn steam grave sheet cabby whine arson
+949,4,16,easrugdclpzbhnov,0011111011111111,shrub nudge bravo plaza
+950,5,19,eaoislurtdbgkcmnphy,0101111111011011111,usual guild stray shank imply
+951,5,15,eaoiulynthmbpfs,000111011111111,blimp humph fetus amble stain
+952,5,18,eayoiutnslrhdkmvbc,011001111110111111,curly vaunt savvy smoky bound
+953,3,12,easronclthmw,010111111111,color wrath month
+954,2,7,eaolbit,0111111,alibi bloat
+955,3,12,erdckitlxawb,011110111111,wrack breed exalt
+956,4,14,eaoiurdjntlmby,01001111111111,buddy junta order moult
+957,3,12,eardosthngik,110111011111,shake erode doing
+958,5,14,earlbisyctpnvd,10110011110111,cycle revel assay leant stand
+959,3,13,eatrdcysilhpw,1001111111111,decry whelp spied
+960,5,18,eayoiuhsvctrnbpwdl,010101111111110111,brunt ranch swoon suave scold
+961,5,16,eraosnwvkpbgtchi,1001111011111011,woken shore probe grant patio
+962,3,10,eagticsrwx,1101101111,aware exist riser
+963,4,14,easyrintwodlqu,10101111110111,inert waist lowly quote
+964,4,14,eardutlnochmgs,10011101111111,gouge dense truer mocha
+965,4,14,eayoitcnrskbdw,01011011111111,cairn brisk crowd scare
+966,3,12,ealrguvsbfoy,010111111111,guava rebus foray
+967,3,12,erasndilptfb,110011111111,infer bland adept
+968,5,17,eaoixuyhmnlpstvbr,01111011111101101,nymph axion naval reset trash
+969,2,7,ernvitf,1101111,rivet fever
+970,3,13,eralnoftdciju,1001111111111,often juice decal
+971,3,11,ealiorhjdpt,01011111111,tapir rajah droll
+972,3,13,eaoythmnucprb,0110111111111,booth human porch
+973,5,17,eahocngprybfuwtdm,11011101110110111,opera ocean moody fugue butch
+974,4,16,eaoiusrygnpcmlvz,0101111111111011,curvy aping scram plaza
+975,4,13,etalkochynbdu,0001111111111,cloud ebony check koala
+976,4,13,ealysrcdptuib,1011110011111,press allay racer built
+977,4,15,ealrstodknbicup,010111111110111,board strap drunk trick
+978,3,12,eaoldrmnwbpt,011101111111,bloom woman troop
+979,3,10,earshdptbo,0110111111,board adapt stash
+980,6,20,earthfizywcklbdnomsu,00111111101110110111,fritz ditty cheat cluck kneel small
+981,4,13,easyguoirlndt,0100111111111,trait ditto salon usage
+982,4,13,eratlfuncodmg,1110100111111,gamer older comet talon
+983,5,17,eaytrihcnldjmbofs,01101011111110111,sadly ranch moral eject scoff
+984,4,13,eanrslhmobvcg,0111110110111,small arena glove clash
+985,4,16,eaoinpychrbkmsdf,1011110110111111,opine finch bosom kneed
+986,5,13,eayslrkncditu,0110001111111,canny nutty sandy niece lanky
+987,3,13,eaytrlmohndps,0110111111111,morph palsy nomad
+988,5,15,eatunlodirbhckf,010101111101111,crook heard fault elide click
+989,5,18,easlbmprdohyfcnwzk,110101111101011111,maple corny broad woozy shook
+990,6,18,eroasiuvlnbtywkchm,100111110111100111,abbey virus homer aunty stunt smock
+991,3,13,eaointyuplfdk,1001111111111,fluke dandy inept
+992,5,18,ethosaiuylpmnfkgrw,011110011111110111,flung ethos amply snare welsh
+993,3,10,eicnalrftg,0111111011,grail niece inter
+994,2,8,erlbtidn,10111111,betel diner
+995,5,16,eraohyisdtcpwxfm,1100111110011111,fixer hardy whose proxy axiom
+996,4,14,eaoiuylprtfkns,00111101111111,sniff trunk forty elope
+997,2,6,eagsbl,110111,abase belle
+998,5,15,eaoisnpucryldht,001110111110111,occur poise ditto toddy shied
+999,1,3,egs,111,geese
+# trials 1000, words mystery (2315), seed 0
+# mean words 4.0130  +/- 0.0418 (standard error)
+# sd 1.3231   min 1   median 4.0   max 8
+# mean letters guessed 13.9280
+#    1 words      40    4.00%
+#    2 words      67    6.70%
+#    3 words     228   22.80%
+#    4 words     323   32.30%
+#    5 words     228   22.80%
+#    6 words      82    8.20%
+#    7 words      25    2.50%
+#    8 words       7    0.70%

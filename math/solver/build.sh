@@ -1,7 +1,8 @@
 #!/bin/sh
 # Build the solvers from the single optturns.c.  Run from math/solver/.
 #
-#   sh build.sh           -- optturns (normal Wordle) + hardturns (hard mode)
+#   sh build.sh           -- optturns (normal Wordle), hardturns (hard mode)
+#                            and mmturns (Mastermind peg feedback)
 #   sh build.sh 7         -- optturns7, the 7-letter solver
 #   sh build.sh 4 6 7 8   -- several lengths at once
 #
@@ -40,11 +41,40 @@ BASE="-O3 -march=native -funroll-loops"
 if [ $# -eq 0 ]; then
   gcc $BASE $OMP -o optturns  optturns.c
   gcc $BASE $OMP -DHARDMODE -o hardturns optturns.c
+  # mmturns is the same objective under MASTERMIND's peg-count feedback --
+  # (blacks, whites) instead of Wordle's per-tile colouring -- which is a pure
+  # remap of the SAME pattern matrix, so it is a third compile-time mode of this
+  # one source rather than a program of its own. 20 outcomes, not 238.
+  gcc $BASE $OMP -DMASTERMIND -o mmturns optturns.c
   # pairsplit is the PAIR-OPENER screen: no search, no TT, just the joint-split
   # score for every unordered pair of guesses. Separate program because it shares
   # nothing with the solver but the .npy loader.
   gcc $BASE $OMP -o pairsplit pairsplit.c
-  echo "built ./optturns, ./hardturns and ./pairsplit  (5 letters, Wordle lists)"
+  # strturns is the W -> S cell: the same objective over ALL 26**5 strings as
+  # answers. Separate program because it shares no data structure with the
+  # solver -- no pattern matrix and no candidate list, since neither survives
+  # 11,881,376 answers; the candidate set is carried as CONSTRAINTS instead.
+  gcc $BASE $OMP -o strturns strturns.c
+  # strguess is the S -> A and S -> W cells: EVERY 26**5 string is a legal guess,
+  # the answers are a word list.  Separate again because the guess side has no
+  # matrix and no 16-bit index -- patterns are computed inline over 11881376
+  # ordinals.
+  gcc $BASE $OMP -o strguess strguess.c
+  # greens is the SEA OF GREENS badge: the most answers winnable with no yellow
+  # tile, over strategies that still win every answer within the cap.  Separate
+  # program because the OBJECTIVE differs -- a maximum with a hard feasibility
+  # side-condition, not a minimum of a sum -- so it shares the loader, the table
+  # and the arena with optturns but none of the search.  Same reason antistall
+  # is its own file.
+  gcc $BASE $OMP -o greens greens.c
+  # antistall is ANTIWORDLE's stalling endgame -- the reverse objective, so it
+  # shares no search code with the solver: no depth cap, a maximum rather than a
+  # minimum, and no constraint struct at all, since with the answer fixed each
+  # guess's effect precomputes to a bitset and the state reduces to the legal set.
+  # --longest parallelises over ANSWERS, which are independent searches sharing
+  # only the incumbent and the (self-verifying) table, so it wants OpenMP.
+  gcc $BASE $OMP -o antistall antistall.c
+  echo "built ./optturns, ./hardturns, ./mmturns, ./pairsplit, ./strturns, ./strguess, ./greens and ./antistall  (5 letters)"
   exit 0
 fi
 

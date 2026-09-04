@@ -1,0 +1,11 @@
+mode=sextet
+metric=singles
+disjoint=0
+min_letters=24
+guesslist=data/shared/words/mystery.txt
+openers=2315
+scored=4181700
+written=4181700
+complete=1
+parents_complete=0
+minparent_meaning=best-of-sub-openers

@@ -1,0 +1,1015 @@
+# multiwordle, fixed opener then smallest-board greedy (see math/multiwordle.py)
+# boards=2 trials=1000 opener=laten seed=0
+# answers drawn without replacement from the 2315 mystery words; no guess cap
+game,guesses,answers,sequence
+0,5,super privy,laten dryer grimy privy super
+1,7,aging beget,laten shank among aping aging greet beget
+2,6,phase wharf,laten media grace sharp phase wharf
+3,4,unmet elect,laten unmet cleft elect
+4,7,grime swift,laten booty trick swift prize drive grime
+5,5,tabby blame,laten taboo tabby blade blame
+6,5,hilly lease,laten leach leafy lease hilly
+7,4,react media,laten exact react media
+8,6,gorge skirt,laten youth posse swift skirt gorge
+9,4,godly rhyme,laten oddly godly rhyme
+10,5,story rigor,laten right rigor forty story
+11,6,opera scoop,laten grade rehab opera poppy scoop
+12,4,lemur scene,laten ledge lemur scene
+13,5,midst furry,laten stoic midst fuzzy furry
+14,5,scene parse,laten gaffe raise parse scene
+15,7,tiara flesh,laten audit vista tiara smell bless flesh
+16,4,bigot gloss,laten flush gloss bigot
+17,5,fifty diner,laten under diner fifth fifty
+18,6,realm awful,laten glade email realm offal awful
+19,5,title sorry,laten extol title rowdy sorry
+20,5,nylon atone,laten meant atone colon nylon
+21,4,vegan blast,laten sedan blast vegan
+22,5,extol tough,laten title extol torch tough
+23,6,vague silky,laten gaffe barge vague click silky
+24,5,posit skirt,laten rusty posit shirt skirt
+25,7,cower visor,laten bused mossy visor wooer power cower
+26,6,wrong peril,laten belie devil peril wrung wrong
+27,5,gusto sigma,laten cramp sigma ghost gusto
+28,7,belie snaky,laten brand snack snaky boule bilge belie
+29,5,unfit tweed,laten comet burnt unfit tweed
+30,4,tying ratty,laten satyr ratty tying
+31,7,agape brief,laten adore awake amaze agape fiber brief
+32,5,cause manic,laten gaffe sauce cause manic
+33,6,decry stale,laten delta decor decry steal stale
+34,5,spear cagey,laten waver cagey shear spear
+35,5,image quill,laten suave gully quill image
+36,3,apart spout,laten apart spout
+37,4,loyal pivot,laten loyal stoop pivot
+38,7,agile feral,laten pedal fecal feral blame aisle agile
+39,5,dwell ultra,laten octal ultra smell dwell
+40,6,quail basic,laten gamma harry vapid quail basic
+41,7,sixty niece,laten eying fifty dirty sixty wince niece
+42,5,death curse,laten beast teach death curse
+43,5,ovine swing,laten shine swing brine ovine
+44,6,equip jerky,laten gripe equip ferry mercy jerky
+45,6,polka sappy,laten marry gassy sappy plaza polka
+46,4,parry delay,laten regal delay parry
+47,7,staff carol,laten balmy papal cavil carol shaft staff
+48,8,parka stall,laten gloat trawl stall rabid carry karma parka
+49,6,gazer board,laten cagey gamer gazer hoard board
+50,6,meant edify,laten enact meant error equip edify
+51,6,buddy snake,laten snare snake goody biddy buddy
+52,5,golly later,laten later ghoul godly golly
+53,5,liken lingo,laten lumen linen liken lingo
+54,7,adage femur,laten brave phase quake amaze adage femur
+55,5,theme choke,laten swept their theme choke
+56,6,oddly wrote,laten exist brute wrote dolly oddly
+57,7,theft eater,laten water cater hater eater those theft
+58,5,voila noose,laten wench prune noose voila
+59,4,wryly donut,laten grunt donut wryly
+60,8,arrow savvy,laten dairy sassy saucy savvy graph aroma arrow
+61,5,sappy onset,laten onset saucy savvy sappy
+62,7,mealy shout,laten alike medal mealy worth ghost shout
+63,8,infer acorn,laten organ apron adorn acorn never inner infer
+64,6,waver finch,laten caper icing winch finch waver
+65,6,opium covet,laten sweet rivet duvet opium covet
+66,7,waive thing,laten barge stung maize waive tying thing
+67,5,fiery sheik,laten purge chess sheik fiery
+68,4,uncle baggy,laten noble uncle baggy
+69,6,filly bitty,laten witty kitty bitty filmy filly
+70,5,tripe peach,laten theme rehab peach tripe
+71,5,parry budge,laten cargo budge harry parry
+72,6,rebel pride,laten idler cruel rebel drive pride
+73,7,funny recap,laten cinch scare recap bongo funky funny
+74,5,shelf lymph,laten lurch lymph hello shelf
+75,4,opera await,laten apart opera await
+76,5,shady spilt,laten pilot spilt shark shady
+77,4,lunar worry,laten lunar crook worry
+78,5,apron speak,laten chain urban apron speak
+79,5,idiom penny,laten phone penny gumbo idiom
+80,5,thick troll,laten sloth troll tight thick
+81,5,bilge goner,laten inner owner goner bilge
+82,8,wrist gawky,laten caddy jazzy baggy gassy gawky twist wrist
+83,5,wench tenth,laten trend tenth bench wench
+84,6,snoop waist,laten tapir cacti waist spunk snoop
+85,7,savvy sorry,laten kappa gaudy marry sorry sassy savvy
+86,5,opium moody,laten vigor comic opium moody
+87,5,aback hunky,laten found punch hunky aback
+88,8,caddy graze,laten happy saucy cabby carry caddy frame graze
+89,6,hippy abode,laten wreak media spade abode hippy
+90,4,lumpy lucid,laten lowly lumpy lucid
+91,4,latch donor,laten latch dingo donor
+92,5,trick ruddy,laten joust third trick ruddy
+93,5,panic oaken,laten haven oaken mangy panic
+94,7,beefy trump,laten sixth court trump geeky weedy beefy
+95,6,hippo fauna,laten sauna fauna broom dowdy hippo
+96,6,unite excel,laten spent unite hovel rebel excel
+97,7,outdo prize,laten bitty dutch outdo serif prime prize
+98,8,nudge break,laten since ozone nerve nudge wreak freak break
+99,5,email yearn,laten vegan yearn blame email
+100,7,fixer great,laten teary great sower purer fiber fixer
+101,7,slimy ozone,laten genie scone drone ozone swill slimy
+102,4,corer young,laten corny corer young
+103,6,flair noble,laten noble slack plaza flail flair
+104,6,roomy clock,laten flick cluck clock broom roomy
+105,7,reedy write,laten hefty suite trite write mercy reedy
+106,4,gecko valor,laten caulk gecko valor
+107,4,nanny maize,laten maybe maize nanny
+108,6,thief coupe,laten beret thief mouse gouge coupe
+109,6,dairy smite,laten karma empty smite hairy dairy
+110,8,scaly wafer,laten racer payer scaly gamer baker waver wafer
+111,7,dolly brink,laten pinch grind briny brink oddly dolly
+112,6,tweak silky,laten begat steak tweak skull silky
+113,5,roger roomy,laten cower forum roomy roger
+114,6,scalp chute,laten trove etude chute iliac scalp
+115,9,dilly stove,laten evict trove stove pupil filly willy billy dilly
+116,8,prank beast,laten annoy grand frank crank prank state beast
+117,5,witch whirl,laten pithy hitch whirl witch
+118,5,knack grimy,laten aping grimy snack knack
+119,8,shock hater,laten cater water eater hater duchy pooch shock
+120,6,frost pulse,laten smile close pulse roost frost
+121,9,flame apart,laten email realm blame flame chart quart start apart
+122,5,adage stalk,laten gloat stalk agape adage
+123,4,stank royal,laten stank iliac royal
+124,5,saner sigma,laten saner squad smack sigma
+125,4,tripe nasty,laten faint nasty tripe
+126,4,villa shoal,laten shoal clack villa
+127,6,tryst groom,laten ought gross groom wrist tryst
+128,6,carol blind,laten slunk blond blind valor carol
+129,7,store wound,laten heist stove stoke store bound wound
+130,6,ovine slurp,laten pence spill slurp whine ovine
+131,6,mocha offer,laten wiser comma mocha order offer
+132,5,small elect,laten tulle shall small elect
+133,5,fungi cameo,laten paper cameo funny fungi
+134,5,smack dying,laten crony dying shack smack
+135,5,miser lumpy,laten lumpy emcee mower miser
+136,7,boule sting,laten stint sting delve cycle whole boule
+137,7,robot sheet,laten tepee steer sweet sheet orbit robot
+138,4,organ mason,laten mason adorn organ
+139,5,juicy decoy,laten query pesky decoy juicy
+140,7,clean roger,laten clean wiser boxer poker homer roger
+141,6,birth strap,laten squat stray strap throw birth
+142,5,chasm filly,laten scarf chasm fully filly
+143,5,early relax,laten fable early regal relax
+144,6,ninny ozone,laten venom shone funny ninny ozone
+145,7,chord prime,laten verso ridge bribe chord prize prime
+146,5,crane condo,laten amend inane crane condo
+147,8,clock phone,laten enemy nudge brine shone phone flock clock
+148,6,catty spree,laten catty modem fewer rupee spree
+149,5,audio mummy,laten croak audio mushy mummy
+150,4,slink saner,laten saner slunk slink
+151,6,inter group,laten enter inter curvy rough group
+152,4,gamut yearn,laten sedan yearn gamut
+153,6,sound fugue,laten prong wound guise sound fugue
+154,6,needy patty,laten hatch patio patty enemy needy
+155,6,lorry pansy,laten lowly loopy pansy lobby lorry
+156,5,moult worse,laten spilt moult horse worse
+157,7,goofy these,laten smote these woozy booby goody goofy
+158,5,crony strut,laten bunch corny crony strut
+159,5,teeth image,laten crest piety teeth image
+160,6,graze affix,laten beard craze graze axiom affix
+161,6,wheat lover,laten libel lower loser lover wheat
+162,5,apple mange,laten range mange alive apple
+163,5,chunk quart,laten roast trait quart chunk
+164,5,ideal crept,laten glare fella ideal crept
+165,4,exalt troll,laten exalt still troll
+166,4,larva canoe,laten lasso canoe larva
+167,6,skier dimly,laten purer defer dilly skier dimly
+168,7,polka scant,laten junta koala polka twang stand scant
+169,6,slung ester,laten outer deter ester slunk slung
+170,6,opium chair,laten amiss idiom opium circa chair
+171,5,abyss maize,laten barge scuba abyss maize
+172,4,crude tamer,laten facet tamer crude
+173,6,parse glyph,laten waive barge farce parse glyph
+174,5,email credo,laten pearl email gorge credo
+175,6,wreck torso,laten short torus torso grime wreck
+176,7,empty feast,laten death beast yeast feast piety empty
+177,6,dummy fanny,laten banjo fanny murky gummy dummy
+178,5,odder novel,laten novel offer order odder
+179,6,silly civic,laten civil civic willy billy silly
+180,5,begun three,laten heron three begin begun
+181,7,diver spike,laten hyper pixie spice spike giver diver
+182,6,eagle cumin,laten false cable maple eagle cumin
+183,6,emcee hyper,laten wooer dicey emcee buyer hyper
+184,5,grade fugue,laten omega guide grade fugue
+185,7,rabid smell,laten bible rabid shelf spell swell smell
+186,8,shake filly,laten opera heave shame shade shake fluff filly
+187,8,shear biddy,laten repay wreak smear shear dodgy buddy biddy
+188,4,bravo toast,laten chart toast bravo
+189,6,lemon wordy,laten lemon pouch dodgy rowdy wordy
+190,5,chuck tiara,laten boast tramp tiara chuck
+191,5,gecko scone,laten prone decoy gecko scone
+192,7,quill scale,laten ample shale scale folly drill quill
+193,8,witch razor,laten bitty hitch ditch witch magma savor razor
+194,5,unity glyph,laten grunt tunic unity glyph
+195,5,outer plush,laten octet outer slush plush
+196,6,odder deity,laten depot deity modem order odder
+197,5,ditto rayon,laten cairn baron rayon ditto
+198,8,rally fatty,laten ratio ralph rally batty catty tatty fatty
+199,6,drawn fully,laten urban prawn drawn skull fully
+200,6,edify prawn,laten arson brain prawn chime edify
+201,6,disco these,laten theft their these wispy disco
+202,6,exalt kinky,laten elate exalt sonic pinky kinky
+203,7,pansy break,laten manga ranch pansy brave bread break
+204,4,tenor swear,laten stone tenor swear
+205,6,grill comfy,laten filly puffy comfy swill grill
+206,4,nurse lager,laten layer lager nurse
+207,6,clash focal,laten vocal focal scaly class clash
+208,6,admin hefty,laten avian admin stoke erupt hefty
+209,6,young whack,laten going young spark aback whack
+210,5,manic lasso,laten larva lasso fanny manic
+211,5,abide ditty,laten dutch ditty aside abide
+212,5,waist gauge,laten gauze gauge tasty waist
+213,5,undid video,laten minim undid rider video
+214,4,aloud endow,laten snore endow aloud
+215,6,gusty olive,laten slime olive dusty rusty gusty
+216,6,dogma acorn,laten brawn adorn acorn vodka dogma
+217,5,scuba cavil,laten balmy cavil aback scuba
+218,8,swoon state,laten cumin shorn swoon stage stave stake state
+219,8,jaunt exult,laten taunt exult vaunt haunt gaunt daunt jaunt
+220,4,shyly earth,laten haste earth shyly
+221,6,wispy excel,laten golem sleep wispy bevel excel
+222,4,again taker,laten taper taker again
+223,6,claim lorry,laten lumpy lowly alarm claim lorry
+224,5,crass taste,laten saute paste taste crass
+225,6,birth kneed,laten sneer kneed trump girth birth
+226,5,draft vocal,laten stray iliac vocal draft
+227,5,vague sedan,laten vegan vague pecan sedan
+228,5,boney broth,laten nosey money boney broth
+229,5,scoop grace,laten scare scoop craze grace
+230,5,young bused,laten minus usher bused young
+231,6,grind basic,laten carry macaw havoc basic grind
+232,6,nomad array,laten spank gonad nomad briar array
+233,5,guard world,laten cramp swirl world guard
+234,8,cluck grown,laten spoon crown drown frown grown click cluck
+235,5,crate maxim,laten acute crate mamma maxim
+236,6,wooly paper,laten gazer caper paper fluid wooly
+237,5,press drive,laten eerie dress drive press
+238,6,feast sigma,laten trace meaty beast feast sigma
+239,5,miner shirt,laten money miner fritz shirt
+240,6,shade hovel,laten sleek suave hovel share shade
+241,5,comet wrath,laten tweed straw wrath comet
+242,6,spout drank,laten among frank prank spout drank
+243,7,revue crack,laten chair crass cramp crack forge revue
+244,6,shale rumor,laten glare scale shale druid rumor
+245,6,twist piggy,laten fifth idiot twist picky piggy
+246,5,ingot frown,laten bison ingot drown frown
+247,6,diner sushi,laten infer nicer diner opium sushi
+248,4,snuck frond,laten inbox snuck frond
+249,3,hotly whole,laten hotly whole
+250,6,canoe gayly,laten naive mange gayly dance canoe
+251,4,catch scaly,laten patch catch scaly
+252,4,table hairy,laten table hardy hairy
+253,5,wrote wooly,laten refit trove wrote wooly
+254,5,crazy court,laten roach court crass crazy
+255,5,clock beget,laten reset beget could clock
+256,6,flask deign,laten demon deign plaza black flask
+257,6,geeky clout,laten stool flout clout bribe geeky
+258,5,stein given,laten stein widen ripen given
+259,6,cider tangy,laten haunt tangy fixer riser cider
+260,7,civic hitch,laten ditch witch pitch hitch micro civic
+261,5,lucid crowd,laten livid lucid chord crowd
+262,5,treat caulk,laten dally caulk heath treat
+263,7,toast lease,laten leafy leach lease boast roast toast
+264,6,slink filmy,laten blind fling slink filly filmy
+265,7,corny viper,laten rhino frond corny miser piper viper
+266,5,evade skiff,laten erase evade smock skiff
+267,5,spite pried,laten truce stoke spite pried
+268,5,flora locus,laten lurid lousy flora locus
+269,7,abode mossy,laten bread adobe abode pouch foggy mossy
+270,5,enema swell,laten amend enema fleck swell
+271,7,plunk facet,laten tamer cadet facet nobly sling plunk
+272,5,crock golem,laten revel golem dross crock
+273,5,lyric those,laten lurid lyric teeth those
+274,5,mucky borax,laten sumac mucky briar borax
+275,6,spear nudge,laten snipe speak spear ozone nudge
+276,4,renew ditto,laten renew motto ditto
+277,4,anger harem,laten apnea anger harem
+278,6,gaily swoon,laten onion daily gaily spoon swoon
+279,4,ralph sauna,laten panic ralph sauna
+280,6,reset shush,laten upset reset focus squib shush
+281,5,thank manic,laten tonga thank randy manic
+282,4,stray tangy,laten saint tangy stray
+283,7,abase binge,laten ozone hence singe binge abuse abase
+284,4,swarm alarm,laten avail alarm swarm
+285,5,larva ascot,laten lasso ascot laugh larva
+286,6,demon utile,laten feign elite utile heron demon
+287,5,flunk inter,laten inter nobly slung flunk
+288,6,freer mummy,laten homer gummy mummy fewer freer
+289,5,wedge vapor,laten marsh radio vapor wedge
+290,4,nymph exalt,laten elate exalt nymph
+291,6,fudge pouty,laten shout turbo pouty judge fudge
+292,6,alpha slick,laten class slick album allay alpha
+293,4,ledge ovoid,laten liege ledge ovoid
+294,5,sieve bleep,laten plied sleep bleep sieve
+295,6,raise story,laten farce raise storm stork story
+296,5,elder edict,laten wheel melee elder edict
+297,5,those idiom,laten teddy trove those idiom
+298,6,these afoot,laten draft afoot quite thyme these
+299,5,repay churn,laten frown spurn churn repay
+300,8,moody slate,laten bleat plate elate slate which murky moody
+301,9,vaunt funny,laten saint daunt funny jaunt taunt gaunt haunt vaunt
+302,6,allay slept,laten dwelt slept flack album allay
+303,4,lithe wagon,laten lithe pagan wagon
+304,4,warty given,laten coven given warty
+305,6,maybe flood,laten pause carve maize maybe flood
+306,5,twixt stage,laten stare stage doubt twixt
+307,6,enjoy prune,laten eking endow envoy enjoy prune
+308,7,repel flack,laten older repel iliac clack slack flack
+309,5,slime lucid,laten lumpy smile slime lucid
+310,6,queue dimly,laten swirl billy dimly gecko queue
+311,5,input genre,laten tying genre unfit input
+312,5,heard sweat,laten avert cheat heard sweat
+313,6,erupt bingo,laten remit crest erupt owing bingo
+314,6,annul retro,laten retry retro flank anvil annul
+315,6,found condo,laten ninny honor bongo condo found
+316,5,niece olden,laten olden shine binge niece
+317,6,goose blink,laten blond blink froze moose goose
+318,6,sheen afoot,laten widen seven sheen craft afoot
+319,6,flank hussy,laten gland plank flank scrub hussy
+320,6,dwarf petal,laten fetal metal petal chaff dwarf
+321,6,basal puree,laten badly basal offer creep puree
+322,6,befit shiny,laten truce zesty befit spiny shiny
+323,6,blind jumpy,laten flung clink blind rumor jumpy
+324,5,ninja alley,laten abled alley snack ninja
+325,4,stove straw,laten roast straw stove
+326,6,tough bylaw,laten clash mouth tough apply bylaw
+327,6,nudge abhor,laten endow nudge axiom arbor abhor
+328,5,tenth mauve,laten spent tenth maize mauve
+329,6,delay fecal,laten glade ideal delay feral fecal
+330,4,cabal idyll,laten badly cabal idyll
+331,6,civil comma,laten arbor mocha comma click civil
+332,5,never revel,laten nicer newer never revel
+333,6,datum radio,laten watch datum paddy radar radio
+334,5,rupee mafia,laten gaudy purer rupee mafia
+335,5,women stark,laten vixen woken women stark
+336,4,dunce bused,laten pence dunce bused
+337,4,loser sleek,laten lever loser sleek
+338,6,fully tardy,laten waist tardy bulky pulpy fully
+339,6,comma spark,laten crazy comma wharf quark spark
+340,5,brute natal,laten natal tripe wrote brute
+341,5,crony sprig,laten munch icing sprig crony
+342,7,marry tripe,laten rabbi write trice tripe major marry
+343,6,suite spied,laten store smite spite suite spied
+344,4,gecko angry,laten snack gecko angry
+345,7,curry knife,laten drone hinge knife syrup curvy curry
+346,5,jelly ethos,laten whelp eight ethos jelly
+347,5,grime siege,laten choke seize siege grime
+348,5,canal bulky,laten canal jolly sulky bulky
+349,5,fjord hello,laten flume frisk fjord hello
+350,6,there noose,laten wince ensue theme there noose
+351,4,nylon spawn,laten nylon admin spawn
+352,5,weigh penal,laten alone penal berry weigh
+353,6,grope midst,laten truck grime grove grope midst
+354,5,craze leafy,laten leach crave craze leafy
+355,4,prism loath,laten loath grimy prism
+356,5,early still,laten false early stilt still
+357,5,salad myrrh,laten badly valid salad myrrh
+358,4,rinse lever,laten loser rinse lever
+359,6,stark grout,laten adopt trout grout stray stark
+360,5,foyer navel,laten panel navel wooer foyer
+361,5,ruddy voter,laten outer voter curry ruddy
+362,7,boozy peril,laten yield slime helix peril woozy boozy
+363,3,natal angel,laten natal angel
+364,5,bushy fried,laten wiser grief fried bushy
+365,6,wince again,laten groan again snide niche wince
+366,4,dirty admit,laten toast admit dirty
+367,6,undid booze,laten munch spunk undid forge booze
+368,4,along petal,laten petal bland along
+369,7,moldy using,laten pinch going dolly moldy wring using
+370,7,strap using,laten chart stray straw strap bonus using
+371,5,trade modal,laten tweak teary trade modal
+372,6,patch weary,laten patsy patio patch beady weary
+373,5,itchy booth,laten spout tooth itchy booth
+374,5,leper towel,laten steel towel lever leper
+375,7,flack delay,laten relay delay avail clack black flack
+376,6,pupil tweak,laten beast acute tweak fully pupil
+377,5,spiel giddy,laten sleek spiel vigor giddy
+378,8,abbot evict,laten stamp afoot abbot recut eject edict evict
+379,4,spree untie,laten untie scree spree
+380,6,dairy viper,laten parka creep viper hairy dairy
+381,4,pilot swoon,laten cloth pilot swoon
+382,4,preen leant,laten leant ripen preen
+383,6,donut feign,laten begin reign feign month donut
+384,4,ralph metro,laten retch ralph metro
+385,6,raven snaky,laten oaken waxen haven raven snaky
+386,6,devil chest,laten guile relic devil eject chest
+387,6,quilt mania,laten sloth built quilt manic mania
+388,5,tardy flock,laten party tardy gloss flock
+389,6,feign chock,laten begin feign humph chord chock
+390,5,gayly psalm,laten daily sally gayly psalm
+391,7,jelly roger,laten flesh delve relic roger belly jelly
+392,6,jewel plunk,laten knoll clink flunk plunk jewel
+393,5,ninja angst,laten twang angst nomad ninja
+394,5,sauna smoky,laten handy fauna sauna smoky
+395,5,safer eagle,laten valve fable safer eagle
+396,7,perch quota,laten staff abbot today quota verge perch
+397,7,exile frond,laten bulge whole smile exile crony frond
+398,9,watch allow,laten catty patch batch hatch watch drawl aglow allow
+399,5,foggy trout,laten birth trout soggy foggy
+400,5,fishy friar,laten soapy husky fishy friar
+401,5,wager stalk,laten stall stalk gamer wager
+402,6,lipid dairy,laten limbo livid lipid daisy dairy
+403,5,steak shade,laten begat tread steak shade
+404,8,whiny couch,laten skunk druid going whiny vouch pouch couch
+405,6,actor avail,laten artsy actor alpha axial avail
+406,6,quart booth,laten stamp chart quart width booth
+407,7,miser unity,laten stung riser wiser miser input unity
+408,5,widow twixt,laten musty bigot widow twixt
+409,6,stack outdo,laten pithy tutor stack outgo outdo
+410,5,lyric kappa,laten lucid logic lyric kappa
+411,6,elfin dingo,laten melon elfin going bingo dingo
+412,8,shark candy,laten manor fancy canny candy brash sharp shark
+413,5,swore cramp,laten shack cramp serve swore
+414,6,other wrath,laten tried graft wrath ether other
+415,4,tuber betel,laten hotel betel tuber
+416,7,ferry paler,laten bagel paler worse mercy jerky ferry
+417,5,glass truly,laten pilot truly class glass
+418,9,bitty raise,laten masse cause parse raise ditty kitty witty bitty
+419,9,polyp genre,laten hence dense venue genie genre bloom folly polyp
+420,5,robot bicep,laten creed bicep turbo robot
+421,6,dirty brown,laten spurn crown frown brown dirty
+422,6,ample devil,laten glaze aisle apple ample devil
+423,6,crazy polka,laten iliac afoul koala polka crazy
+424,6,sever blast,laten stalk blast sheer sewer sever
+425,5,glint flyer,laten blunt flint glint flyer
+426,7,hazel class,laten camel gavel hazel clack clasp class
+427,6,riser cacti,laten tarot cacti fried wiser riser
+428,5,avian detox,laten metro detox spawn avian
+429,6,freer aloud,laten pupal album aloud crier freer
+430,7,spear meant,laten agent meant freak shear swear spear
+431,6,safer proof,laten gazer maker racer safer proof
+432,5,sweep dryly,laten cower sweep frill dryly
+433,7,welch pansy,laten mango randy nanny fancy pansy welch
+434,6,angle chard,laten renal plane angle wrack chard
+435,5,angry coupe,laten agony angry mouse coupe
+436,6,jiffy rarer,laten wager racer rarer fishy jiffy
+437,6,aloft wring,laten adult allot aloft briny wring
+438,4,learn algae,laten learn equal algae
+439,4,twirl badly,laten pilot twirl badly
+440,5,myrrh idyll,laten block pupil myrrh idyll
+441,5,skulk river,laten surer skulk riper river
+442,5,welch trade,laten acute relic trade welch
+443,6,scorn below,laten shorn sworn scorn elbow below
+444,6,shard tithe,laten setup tithe smash shady shard
+445,5,gumbo ought,laten sooty tumor ought gumbo
+446,6,crash welsh,laten clove crack crass crash welsh
+447,5,zonal singe,laten clang zonal binge singe
+448,5,vocal squib,laten slash scour squib vocal
+449,4,clued churn,laten spurn clued churn
+450,5,syrup manga,laten sandy syrup mania manga
+451,5,furor pygmy,laten hippy puffy furor pygmy
+452,5,skier cheek,laten wooer sheep cheek skier
+453,5,stair scope,laten draft tiara stair scope
+454,7,spell sauce,laten gaffe waive cause sauce shell spell
+455,8,sedan finch,laten pecan vegan sedan munch cinch winch finch
+456,5,artsy coupe,laten artsy wedge pixie coupe
+457,7,balmy suave,laten carol daily palsy balmy usage suave
+458,5,affix abhor,laten awash aphid affix abhor
+459,6,whiny stove,laten piety briny whiny etude stove
+460,4,marsh habit,laten warty habit marsh
+461,6,steed repel,laten quiet steep steed expel repel
+462,5,freed yacht,laten pasty yacht roger freed
+463,6,bloom ensue,laten dunce prune ensue filmy bloom
+464,7,agate groom,laten steak trade abate agate grimy groom
+465,5,chore belle,laten slope erode chore belle
+466,6,dwell verse,laten elope shelf reuse verse dwell
+467,4,entry umbra,laten untie entry umbra
+468,6,hatch comfy,laten watch match patch hatch comfy
+469,6,nasty spook,laten vaunt tangy nasty smock spook
+470,6,graph label,laten lapel label spray cramp graph
+471,3,eking avian,laten avian eking
+472,6,tripe gamma,laten vapid piety tripe mamma gamma
+473,4,munch mania,laten manor munch mania
+474,6,adult organ,laten stalk adult woman groan organ
+475,4,exalt clone,laten uncle clone exalt
+476,4,tibia twang,laten thank twang tibia
+477,8,curry grant,laten junta stand thank giant grant curvy curry
+478,4,gamma attic,laten attic mamma gamma
+479,5,crawl sneer,laten diner sneer coral crawl
+480,5,gnome bread,laten undue gnome dread bread
+481,5,guilt round,laten tulip quilt guilt round
+482,5,rebar error,laten amaze opera error rebar
+483,4,kneel payee,laten novel kneel payee
+484,5,frock gumbo,laten chirp scrum frock gumbo
+485,7,wispy wacky,laten maxim baggy juicy caddy wacky wispy
+486,8,class remit,laten erect refit remit scald clasp clash class
+487,7,unite groom,laten scent unite dowry brook proof groom
+488,5,farce vital,laten vital badge cause farce
+489,5,title jumbo,laten extol title bough jumbo
+490,4,exact cloak,laten skate cloak exact
+491,4,sauna stool,laten twirl stool sauna
+492,5,vomit spasm,laten aroma vomit smack spasm
+493,4,lyric livid,laten lucky lyric livid
+494,5,fever flung,laten blind slunk flung fever
+495,7,amass wince,laten ebony wench wince fraud spasm amass
+496,5,serum dough,laten surge serum cough dough
+497,6,waltz algae,laten tally waltz blare alive algae
+498,5,canoe tight,laten canoe timid tipsy tight
+499,6,pluck trail,laten tubal trawl trail slush pluck
+500,4,pesto melon,laten felon melon pesto
+501,5,iliac greet,laten quiet alibi iliac greet
+502,3,lemon limbo,laten lemon limbo
+503,5,given gusto,laten vixen given ghost gusto
+504,6,amber whiff,laten aider amber spiky which whiff
+505,8,stout floor,laten glyph fluff floss scout stout flood floor
+506,7,whiny carry,laten gamma sappy jazzy hairy whiny carry
+507,6,magma skulk,laten baggy magma plush skull skulk
+508,7,grape genie,laten ozone hinge genie grave grade grape
+509,5,cramp ethic,laten store ethic crazy cramp
+510,6,mimic piper,laten joker cheer pubic mimic piper
+511,7,jelly width,laten plume hello belly jelly thick width
+512,6,wafer eerie,laten safer wafer probe verge eerie
+513,4,pinto lapel,laten lapel print pinto
+514,5,slyly liken,laten liken bluff glyph slyly
+515,4,freed smear,laten fewer freed smear
+516,5,swath boxer,laten abort boxer stamp swath
+517,5,wedge dough,laten pride dummy dough wedge
+518,7,order exact,laten heath exact gooey offer odder order
+519,6,novel judge,laten kneel novel chime budge judge
+520,6,broil savor,laten carry vapor favor savor broil
+521,6,cheek clasp,laten alpha clamp clasp cheer cheek
+522,5,decor boost,laten storm boost credo decor
+523,5,crown mower,laten known cower crown mower
+524,5,daisy ninth,laten count ninth maxim daisy
+525,8,wench fluff,laten genre penny venom bench wench fluid fluff
+526,5,juicy taken,laten taken dowry spicy juicy
+527,7,vixen scoff,laten coven vixen smock scour scoop scoff
+528,5,sleek elbow,laten sleep sleek olive elbow
+529,6,gauge faith,laten maize waist faith carve gauge
+530,5,arbor track,laten tibia arbor tramp track
+531,6,maybe viola,laten waive avail viola sauce maybe
+532,7,funny picky,laten dying phony picky sunny bunny funny
+533,8,shape neigh,laten ensue fiend neigh shave shake shame shape
+534,5,knelt using,laten knelt funny swung using
+535,5,crept meant,laten enact meant crest crept
+536,7,crook since,laten crone croup cross since crowd crook
+537,6,mafia ready,laten bayou weary ready magma mafia
+538,6,rebel chard,laten ulcer revel rebel crash chard
+539,5,nerve snarl,laten clank snail snarl nerve
+540,5,awful tiara,laten adopt allay awful tiara
+541,4,civic abled,laten abled micro civic
+542,4,pitch slain,laten slain ditty pitch
+543,5,tread admin,laten adorn admin trade tread
+544,5,amend wrung,laten inane arena amend wrung
+545,6,hasty rival,laten carat polar rival tabby hasty
+546,6,mover video,laten offer dopey video cover mover
+547,4,skier plunk,laten slunk skier plunk
+548,7,solid racer,laten wafer paper gayer racer build solid
+549,4,angry today,laten among angry today
+550,8,craft welsh,laten aorta stair flesh welsh graft draft craft
+551,4,dogma brown,laten grown dogma brown
+552,5,tepid pushy,laten teeth tepid whoop pushy
+553,6,every sloop,laten climb flush slyly sloop every
+554,5,elfin mucus,laten melon elfin muddy mucus
+555,8,lumen fight,laten liken lumen visit tight wight right fight
+556,5,winch oddly,laten swung winch moldy oddly
+557,6,crave snuck,laten hound snuff snuck recap crave
+558,6,agree woozy,laten amber agree pooch woody woozy
+559,6,shark mouse,laten shark obese goose posse mouse
+560,6,trial evoke,laten plait tidal trial house evoke
+561,4,usage anode,laten anode phase usage
+562,3,lunge vegan,laten lunge vegan
+563,4,visor rhyme,laten prime rhyme visor
+564,6,pubic flesh,laten flume flesh buddy cubic pubic
+565,9,caste shard,laten taste paste baste caste sugar swarm shark shard
+566,6,polyp honey,laten kneed sinew goner honey polyp
+567,8,boxer mural,laten flail mural hover roger poser wooer boxer
+568,6,flash smite,laten chute slash flash spite smite
+569,4,elite talon,laten talon smelt elite
+570,5,elbow gaudy,laten belch elbow radii gaudy
+571,5,brink amber,laten amber bring briny brink
+572,6,clean sauna,laten glean clean banjo nadir sauna
+573,7,belly agree,laten aider agree whelp cello jelly belly
+574,5,sinew binge,laten boney binge finer sinew
+575,6,abort usage,laten craft abort phase suave usage
+576,6,dryer hotel,laten motel hotel breed drier dryer
+577,6,erode polyp,laten scold drove erode folio polyp
+578,4,lapse fever,laten lapse queer fever
+579,5,punch occur,laten bunch punch focus occur
+580,6,hunch bowel,laten gruel bonus bowel hunky hunch
+581,5,surly gully,laten swill surly dully gully
+582,5,flack front,laten input front flash flack
+583,5,flick humid,laten blurb click flick humid
+584,4,chute quail,laten twice chute quail
+585,6,booze gleam,laten regal gleam spoke diode booze
+586,7,maize stout,laten barge pause waive maize scout stout
+587,5,tacit stake,laten gamut habit tacit stake
+588,9,shape visit,laten usage shade share shake shave visit shame shape
+589,5,metal flirt,laten metal pilot guilt flirt
+590,5,blade vodka,laten plead glade blade vodka
+591,5,excel croak,laten expel excel cobra croak
+592,7,adore joker,laten dream adore sober cower rover joker
+593,4,inter flung,laten inter flunk flung
+594,5,pesto dimly,laten eject depth pesto dimly
+595,4,antic cache,laten antic carve cache
+596,6,mulch groan,laten arson groan dimly clump mulch
+597,6,bused exert,laten spite usher bused erect exert
+598,5,bloom allow,laten shall allow floor bloom
+599,7,check idiom,laten gouge derby ovoid idiom chess check
+600,5,metro stage,laten jetty detox metro stage
+601,4,shaky dwarf,laten grass shaky dwarf
+602,6,olive dully,laten dwell dilly dolly olive dully
+603,5,tense onion,laten scent tense groin onion
+604,5,speak droit,laten aware decay speak droit
+605,7,drawn laugh,laten larva lasso laugh brain prawn drawn
+606,5,sheet grate,laten upset sheet terra grate
+607,6,bravo plaza,laten flack slash plaza diary bravo
+608,5,humph blimp,laten block blush humph blimp
+609,8,curly vaunt,laten tangy daunt haunt vaunt fully burly curly
+610,6,breed woven,laten given seven woven ember breed
+611,7,erode shake,laten beach shape shade erode shave shake
+612,5,spied wheel,laten pixel spied vowel wheel
+613,4,style scold,laten style skull scold
+614,4,patio grant,laten giant grant patio
+615,4,risen inert,laten tenor inert risen
+616,5,gorge dense,laten nurse dense force gorge
+617,5,scare crowd,laten peach craze scare crowd
+618,4,bland adept,laten along adept bland
+619,4,reset trash,laten other trash reset
+620,7,juice decal,laten ideal decal chime price voice juice
+621,4,onset ocean,laten tenet ocean onset
+622,5,curvy butch,laten pitch dutch butch curvy
+623,5,check koala,laten aglow royal koala check
+624,5,stove drunk,laten debit drunk thyme stove
+625,5,board adapt,laten draft adapt chard board
+626,4,cluck kneel,laten novel kneel cluck
+627,5,usage sally,laten palsy sally aside usage
+628,4,tally sadly,laten tally daily sadly
+629,4,arena smack,laten anode arena smack
+630,5,bosom finch,laten condo goofy bosom finch
+631,6,niece salvo,laten palsy salvo knife genie niece
+632,4,fault heard,laten fault grave heard
+633,6,brisk woozy,laten biddy brisk guppy comfy woozy
+634,5,smock stunk,laten joint stunk shook smock
+635,6,ethos amply,laten write eject ethos flaky amply
+636,5,diner betel,laten hotel betel unwed diner
+637,4,prowl axiom,laten swamp prowl axiom
+638,5,abase elite,laten spelt flute elite abase
+639,4,shied today,laten start shied today
+640,5,avert drunk,laten great avert drink drunk
+641,5,basin teary,laten rayon teary cabin basin
+642,7,prime chuck,laten reuse vouch chuck prize pride prime
+643,7,elite spike,laten slept flute elite spire spice spike
+644,5,stump trout,laten digit joust trout stump
+645,7,bloat theta,laten tidal float gloat bloat trace theta
+646,7,heath sight,laten trace meaty death heath shoot sight
+647,5,arose bloom,laten agape arise arose bloom
+648,5,sugar zebra,laten drape zebra cigar sugar
+649,6,minus venom,laten genre bench denim minus venom
+650,5,crane sewer,laten crane wooer fewer sewer
+651,7,offal creek,laten crawl creed creek pupal axial offal
+652,5,leggy leach,laten leafy leggy leave leach
+653,8,butch purge,laten rotor witty hutch dutch butch purse purge
+654,6,guide bugle,laten belle bible boule bugle guide
+655,7,fresh pygmy,laten verve cress fresh dowdy jumpy pygmy
+656,6,chime zesty,laten smote testy zesty crime chime
+657,6,grind wrong,laten corny rhino prong grind wrong
+658,5,crass tangy,laten nasty tangy spark crass
+659,5,query logic,laten lyric logic rhyme query
+660,6,ardor tatty,laten hatch batty tatty award ardor
+661,6,allay comet,laten timer comet flask alpha allay
+662,5,print lupus,laten limbo lurch print lupus
+663,6,moose waxen,laten waxen juice dodge horse moose
+664,6,druid payee,laten waver cameo payee frisk druid
+665,5,scrum nobly,laten fling knoll nobly scrum
+666,8,pause story,laten gauze cause pause stood storm stork story
+667,5,crush booty,laten grout brush crush booty
+668,5,stoop amend,laten crane amend tough stoop
+669,5,mossy buxom,laten chump jumbo buxom mossy
+670,6,lurch inner,laten livid infer inner lorry lurch
+671,4,saner spunk,laten saner spiny spunk
+672,9,jazzy email,laten clear mealy email gawky daddy happy savvy jazzy
+673,4,utter greet,laten outer utter greet
+674,4,cleft spiel,laten slept spiel cleft
+675,6,query staid,laten coast stair staid where query
+676,4,botch built,laten sloth botch built
+677,5,oddly clump,laten dryly oddly slick clump
+678,6,lowly plush,laten lipid lucky lowly slurp plush
+679,5,mural imply,laten modal mural filmy imply
+680,7,corer index,laten nicer index cheer cover cower corer
+681,6,pecan photo,laten began sedan pecan pouty photo
+682,5,bleed naval,laten canal naval sleep bleed
+683,5,smack troll,laten truly troll aback smack
+684,5,whoop stone,laten trend stone booby whoop
+685,5,rabid glove,laten bilge glove rabbi rabid
+686,7,joist booty,laten stuff torso booty moist hoist joist
+687,4,assay swarm,laten chasm swarm assay
+688,8,angry wight,laten gonad aping angry fight might sight wight
+689,5,growl known,laten bison frown known growl
+690,5,newly exalt,laten blend newly stale exalt
+691,5,junta toddy,laten stand tonga junta toddy
+692,5,amber rapid,laten aider amber dairy rapid
+693,6,retch cough,laten setup detox retry retch cough
+694,7,gooey spurt,laten poser strip spurt modem covey gooey
+695,6,argue wiser,laten chase adore argue riser wiser
+696,3,chute laugh,laten laugh chute
+697,6,deuce slosh,laten oddly prude deuce floss slosh
+698,6,hyper youth,laten power super riper hyper youth
+699,6,timer crier,laten sweet thief tiger timer crier
+700,7,scoff teeth,laten white berth depth teeth mummy scoff
+701,5,spilt befit,laten flirt befit quilt spilt
+702,5,weigh mammy,laten kayak mammy gouge weigh
+703,5,ficus mulch,laten pulpy mulch scour ficus
+704,6,ample chide,laten shale apple ample choke chide
+705,7,rural swish,laten molar rival rural skiff spicy swish
+706,6,write adage,laten trice write shake amaze adage
+707,7,couch lever,laten leper lever whiff hobby dough couch
+708,7,basil crook,laten gaily valid basil occur frock crook
+709,5,filet kayak,laten filet savvy bayou kayak
+710,7,craft gloat,laten shalt allot float bloat gloat craft
+711,6,wreak grail,laten flack speak break wreak grail
+712,6,fleck pygmy,laten slice fleck woody jumpy pygmy
+713,5,preen adorn,laten ripen preen acorn adorn
+714,7,daunt smock,laten tangy saint daunt spoof shock smock
+715,5,broke stoic,laten stood stork broke stoic
+716,6,sword ideal,laten agile ideal muddy brood sword
+717,5,aside beast,laten irate abide aside beast
+718,7,chart fuzzy,laten trash chart guppy buddy mummy fuzzy
+719,4,shown sumac,laten scorn shown sumac
+720,6,woman essay,laten groan woman cheap kebab essay
+721,5,smoky skill,laten blood kiosk smoky skill
+722,6,drape funky,laten corny funky smear grave drape
+723,4,nomad salad,laten sonar nomad salad
+724,5,blimp merge,laten could vigil blimp merge
+725,8,amble dairy,laten glare apple amble carry fairy hairy dairy
+726,5,blurb avert,laten state avert whirl blurb
+727,5,noose ghost,laten fence shine ghost noose
+728,6,aware heist,laten evict heist opera azure aware
+729,6,privy scoff,laten gummy hobby wispy privy scoff
+730,5,rigid mummy,laten picky rigid bushy mummy
+731,6,gulch wispy,laten flour mulch gulch spiky wispy
+732,5,bused juicy,laten poker dicey juicy bused
+733,4,sauna troll,laten stool troll sauna
+734,6,stiff bylaw,laten scald axial polar bylaw stiff
+735,7,raspy choir,laten mammy gassy raspy crook chord choir
+736,7,honor sound,laten round honor pound mound wound sound
+737,7,polka gauze,laten raise gaffe gauge gauze bylaw polka
+738,6,quite scram,laten befit tripe quite chard scram
+739,8,steam maxim,laten irate basis sweat steak stead steam maxim
+740,5,musty belch,laten slime musty below belch
+741,8,talon catch,laten talon ratty hatch match watch batch catch
+742,6,assay humph,laten pizza whoop humph gravy assay
+743,5,champ loyal,laten lilac loyal crass champ
+744,6,trade fifth,laten adept trade itchy sixth fifth
+745,4,brick close,laten bible brick close
+746,5,cabal chill,laten caulk carol chill cabal
+747,5,willy shark,laten cramp quark shark willy
+748,6,arson white,laten brain organ arson quite white
+749,7,bevel phone,laten jewel bezel bevel rinse undue phone
+750,5,trust track,laten staff adapt track trust
+751,4,funky witch,laten witch spunk funky
+752,5,crane tawny,laten knave crane taint tawny
+753,8,stare ahead,laten tease stave stake stage state stare ahead
+754,5,trash tower,laten greet triad trash tower
+755,4,enjoy essay,laten ensue essay enjoy
+756,4,there wooer,laten white wooer there
+757,5,frock prude,laten spire prude crock frock
+758,4,yearn cedar,laten yearn debar cedar
+759,5,cagey scram,laten caper cameo cagey scram
+760,5,stink crick,laten night tunic stink crick
+761,5,begun month,laten deign begun north month
+762,6,bison groan,laten axion bison woman organ groan
+763,5,elate tithe,laten stale elate cutie tithe
+764,5,shalt trade,laten allot shalt teary trade
+765,4,mangy manly,laten nasal manly mangy
+766,6,carol silky,laten basil papal carol slimy silky
+767,5,venue lurid,laten lowly livid venue lurid
+768,6,major manic,laten randy banjo major manga manic
+769,6,drake angel,laten angel peach erase brave drake
+770,7,scaly match,laten hatch catch match scalp scald scaly
+771,6,scene false,laten fable false shone swine scene
+772,4,level reuse,laten loser level reuse
+773,6,after midge,laten after choke pixie sieve midge
+774,6,phase imbue,laten quake gouge imbue scare phase
+775,5,seize while,laten smile exile seize while
+776,4,meant tepee,laten agent meant tepee
+777,5,mammy rainy,laten ranch rainy gawky mammy
+778,4,jumpy pixel,laten excel pixel jumpy
+779,7,close elite,laten utile elite glove bloke slope close
+780,6,steed growl,laten ether steep steed grill growl
+781,6,video cliff,laten shied diver video flick cliff
+782,7,gypsy swill,laten flock idyll quill pygmy gypsy swill
+783,6,admit growl,laten audit admit slyly color growl
+784,6,thing aware,laten tonic thing spade quake aware
+785,5,sniff skimp,laten pinch sprig sniff skimp
+786,7,carry viral,laten madam solar rival viral harpy carry
+787,8,usual drape,laten alarm villa usual reach brake grape drape
+788,4,titan synod,laten titan found synod
+789,6,jiffy title,laten title rigid picky fizzy jiffy
+790,7,theme fluid,laten swept their theme vigil folio fluid
+791,6,nurse cameo,laten wafer cagey cameo rinse nurse
+792,6,brawl carve,laten cause carve royal grail brawl
+793,4,plane riper,laten alone plane riper
+794,5,blimp terra,laten heath terra spill blimp
+795,9,alpha batch,laten satyr patch alpha hatch match watch catch batch
+796,6,eater melon,laten melon hater water cater eater
+797,6,vapor gouge,laten mafia cabby savor vapor gouge
+798,6,forth again,laten urban spawn chain forth again
+799,9,wager awash,laten rarer caper maker gayer eager wager swash awash
+800,6,blurb ranch,laten rainy ranch flour slurp blurb
+801,7,banal those,laten canal banal trite thyme these those
+802,5,mirth humus,laten stuck virus humus mirth
+803,5,twixt pagan,laten wagon pagan twist twixt
+804,6,handy tabby,laten party tabby dandy candy handy
+805,4,aider minor,laten agree aider minor
+806,5,noose dowel,laten hovel noose model dowel
+807,5,deign price,laten begin deign voice price
+808,6,bacon privy,laten mason canon bacon hurry privy
+809,5,level block,laten loser level flock block
+810,6,manic large,laten ladle large fanny mania manic
+811,5,papal point,laten ralph papal pinto point
+812,7,gaunt bathe,laten bathe jaunt taunt daunt vaunt gaunt
+813,5,savor vowel,laten ruler vapor vowel savor
+814,5,budge cease,laten adobe bride budge cease
+815,4,plume halve,laten halve elude plume
+816,5,crane grace,laten inane crane brace grace
+817,6,brown tying,laten onion think tying crown brown
+818,4,spasm groom,laten roach spasm groom
+819,7,clank agate,laten inlay clank death ovate grate agate
+820,7,folio brine,laten sense nudge ovine broil folio brine
+821,6,hussy augur,laten soapy bushy augur husky hussy
+822,6,eying fjord,laten whine eking eying broom fjord
+823,7,winch focal,laten slash hunch vocal focal pinch winch
+824,5,embed revue,laten drier bused embed revue
+825,5,focal clank,laten along clank vocal focal
+826,6,mushy taper,laten cadet taper hobby fishy mushy
+827,4,tripe notch,laten notch tepid tripe
+828,5,welsh sassy,laten belch welsh gassy sassy
+829,6,husky zonal,laten plank inlay zonal dusky husky
+830,4,newer toxin,laten toxin under newer
+831,8,leaky mower,laten leave leafy leaky shrew cower rower mower
+832,4,folly intro,laten intro jolly folly
+833,5,agape print,laten north grunt print agape
+834,8,order elide,laten peril field slide glide elide ruder order
+835,8,train graze,laten stain train brace grape grade grave graze
+836,6,quasi bathe,laten bathe array pizza swami quasi
+837,5,spoof hello,laten bloke hello woody spoof
+838,6,liken ghoul,laten lumen linen liken blush ghoul
+839,6,froth edify,laten smith worth broth froth edify
+840,4,inlay youth,laten snail inlay youth
+841,6,stack grain,laten admin brain grain shaft stack
+842,6,chock chest,laten testy store pooch chock chest
+843,4,chain knack,laten drawn chain knack
+844,4,ocean civil,laten pecan ocean civil
+845,7,ideal silly,laten ample relax ideal filly hilly silly
+846,5,abbey edict,laten amber abbey tepid edict
+847,7,brine tying,laten pinto think tying swine urine brine
+848,5,aging stray,laten gnash agony aging stray
+849,6,mushy pouty,laten stout tumor youth mushy pouty
+850,5,again stain,laten train stain chain again
+851,6,lying breed,laten lynch lying power freed breed
+852,6,piano shore,laten drank piano worse score shore
+853,6,climb sooth,laten sloop sooth click cliff climb
+854,7,pence solve,laten jelly bulge solve hence fence pence
+855,6,round chess,laten condo crime round check chess
+856,7,forth scram,laten assay sugar scrap scram birth forth
+857,5,miser aback,laten fever rider miser aback
+858,5,aloud groan,laten grain groan aloof aloud
+859,4,nasal cutie,laten banal nasal cutie
+860,5,trait dream,laten shaft quart trait dream
+861,4,hutch farce,laten cause farce hutch
+862,5,gusto ensue,laten noise scene gusto ensue
+863,7,roach bloat,laten allot gloat float bloat comma roach
+864,5,pinky teary,laten stake kinky pinky teary
+865,5,orbit torso,laten sixth topic orbit torso
+866,6,pedal bench,laten blaze being bench fella pedal
+867,6,topic stone,laten tense stone turbo toxic topic
+868,5,coven above,laten dozen woken coven above
+869,6,rabbi viper,laten mafia daisy rabbi giver viper
+870,5,gusto goody,laten timid droop goody gusto
+871,5,wrack cheat,laten abate tweak wrack cheat
+872,5,arbor snarl,laten inlay snarl abhor arbor
+873,4,knead suing,laten knead hunch suing
+874,6,sally algae,laten cabal algae ralph dally sally
+875,5,debar pride,laten drape debar prude pride
+876,5,moldy bleep,laten spiel bleep dully moldy
+877,6,small liken,laten lumen linen liken alarm small
+878,4,obese satin,laten satin poesy obese
+879,4,album tonal,laten tonal black album
+880,5,teddy floor,laten empty teddy flick floor
+881,7,geeky stoic,laten idiot toxic stoic merry beefy geeky
+882,8,rover loath,laten loath foyer sober wooer cover mover rover
+883,7,pound smash,laten minus smash found bound wound pound
+884,8,sober eager,laten waver baker cyber ember eager fiber sober
+885,4,assay eaten,laten eaten soapy assay
+886,6,agile dwell,laten mealy agile quell spell dwell
+887,6,balmy gaffe,laten mauve balmy cache parse gaffe
+888,5,flora sprig,laten plaza flora crump sprig
+889,7,stake reuse,laten meaty exact stage reuse stave stake
+890,5,clock eking,laten endow eying eking clock
+891,7,steal humus,laten delta cleat steal fishy brush humus
+892,7,every patio,laten hatch tatty patio ferry query every
+893,4,bunch berth,laten pesto berth bunch
+894,5,truce apart,laten audit chute truce apart
+895,4,sieve antic,laten antic poise sieve
+896,6,peace trice,laten smote etude heave peace trice
+897,5,buyer budge,laten chief ember buyer budge
+898,5,sonic colon,laten flown colon ionic sonic
+899,5,downy fecal,laten flame feral fecal downy
+900,4,night slunk,laten flung night slunk
+901,6,motel tight,laten betel motel crust twixt tight
+902,5,labor swing,laten labor punch sniff swing
+903,7,creak aider,laten amber aider erase wreak freak creak
+904,6,facet sully,laten cadet facet slosh swill sully
+905,6,gross first,laten stomp dross cross gross first
+906,8,taboo froze,laten tacky tarot taboo shore drove grope froze
+907,6,rouse which,laten mouse rouse vivid chick which
+908,8,mummy grate,laten feast trace irate grate booby jumpy mummy
+909,5,smirk court,laten worst court shirk smirk
+910,7,papal allot,laten trial cabal papal adult aloft allot
+911,6,stall sleek,laten aloft trawl stall sleep sleek
+912,5,onset award,laten onset circa guard award
+913,5,graph gravy,laten chasm hoard graph gravy
+914,5,creek rusty,laten homer screw creek rusty
+915,6,comma whine,laten nurse knife opine whine comma
+916,6,plumb coupe,laten droll mouse gouge coupe plumb
+917,6,venue wreck,laten knife pesky check wreck venue
+918,6,teary badge,laten parse react teary gauze badge
+919,5,choir syrup,laten dowry syrup broom choir
+920,5,clove cabal,laten palsy carol clove cabal
+921,4,minus latte,laten latte undid minus
+922,6,shine using,laten ebony fiend whine shine using
+923,6,ninny snoop,laten cinch kinky ninny snuff snoop
+924,5,tonga smote,laten scant junta tonga smote
+925,7,shift butte,laten setup cutie butte sight shirt shift
+926,5,stony brand,laten grand brand joint stony
+927,4,rayon prime,laten rayon drive prime
+928,5,cargo heath,laten death heath savor cargo
+929,6,angry swami,laten crank sonar angry swash swami
+930,5,great piano,laten snaky grand great piano
+931,7,draft spike,laten tract graft draft mouse sieve spike
+932,4,retch smelt,laten retry retch smelt
+933,5,tutor cacti,laten yacht cacti rotor tutor
+934,6,quart round,laten strap wrath tiara quart round
+935,5,great bluff,laten theta great filly bluff
+936,6,fishy wreak,laten brave dream wreak fussy fishy
+937,6,elite rogue,laten slept elite rhyme rouge rogue
+938,7,scalp tryst,laten chalk scald scalp foist burst tryst
+939,6,putty graft,laten ditty putty boast craft graft
+940,6,dirge pivot,laten stick biome pivot ridge dirge
+941,6,ninja revue,laten agony knack ninja demur revue
+942,6,force below,laten glove below mouse horde force
+943,5,movie scrum,laten segue scour movie scrum
+944,6,lousy paper,laten livid locus lousy parer paper
+945,7,cabby ultra,laten ultra paddy jazzy gawky savvy cabby
+946,6,aware sumac,laten shame scram sumac grade aware
+947,6,tryst gonad,laten prank nomad gonad fritz tryst
+948,6,lusty grown,laten lusty crown drown frown grown
+949,6,sassy genre,laten marsh daisy sassy prune genre
+950,8,batch lemur,laten leech lemur watch catch patch hatch batch
+951,5,pride fluke,laten yield medic pride fluke
+952,5,sheik viper,laten covey viper guise sheik
+953,6,dowdy smack,laten agora quack shack smack dowdy
+954,5,thrum choke,laten torch thrum chose choke
+955,7,stall clasp,laten adult stalk stall clash class clasp
+956,5,realm ideal,laten algae realm equal ideal
+957,5,poise annul,laten clank annul fresh poise
+958,4,pouch anger,laten apnea anger pouch
+959,6,dally conch,laten madly daily dally skunk conch
+960,6,croak wrist,laten guava axiom foray croak wrist
+961,5,annoy ivory,laten frank nomad annoy ivory
+962,5,crone fanny,laten handy fancy fanny crone
+963,7,pique dowel,laten excel vowel bowel dowel prime pique
+964,5,width carve,laten raise carve fifth width
+965,5,slope alert,laten pleat alert elope slope
+966,8,wager gorge,laten caper baker gayer eager wager grime gorge
+967,6,canoe corer,laten mange canoe covey cower corer
+968,5,elude fresh,laten whole fresh elide elude
+969,5,ocean breed,laten vegan ocean freer breed
+970,4,repel jelly,laten repel belly jelly
+971,6,dream locus,laten lowly logic locus beard dream
+972,8,sever purge,laten hyper probe purse purge skier sewer sever
+973,4,chest salve,laten salve guest chest
+974,6,ingot block,laten uncut snort ingot clock block
+975,4,human labor,laten larva labor human
+976,6,debar gaffe,laten carve gaffe weary rehab debar
+977,5,cliff cruel,laten repel cruel coyly cliff
+978,5,barge trump,laten pause trump farce barge
+979,4,fetid bleed,laten cutie fetid bleed
+980,6,slick oxide,laten gloss slump slyly slick oxide
+981,7,flyer gloat,laten stalk bloat float gloat flier flyer
+982,4,brave gruff,laten freak gruff brave
+983,5,alibi grail,laten aglow glass grail alibi
+984,5,sinew drawl,laten nicer sinew brawl drawl
+985,6,offal sport,laten flaky afoul offal photo sport
+986,5,daddy carol,laten valor carol baggy daddy
+987,5,blurt stale,laten alert blurt delta stale
+988,4,epoch poesy,laten worse poesy epoch
+989,5,wrack stain,laten stain aback whack wrack
+990,7,pedal jerky,laten scale equal ideal medal pedal jerky
+991,5,crimp minus,laten nymph mound minus crimp
+992,5,stray speed,laten quart straw stray speed
+993,6,chunk moult,laten guilt moult skunk drunk chunk
+994,5,butch widen,laten ripen widen outgo butch
+995,6,pulse drawn,laten adorn drain drawn belle pulse
+996,7,scald caste,laten paste waste caste slack scaly scald
+997,4,photo tulip,laten troll tulip photo
+998,5,waltz blend,laten fault salty waltz blend
+999,6,emcee gruel,laten flier repel cruel emcee gruel
+# trials 1000, boards 2, opener laten, seed 0
+# mean total guesses 5.5840  +/- 0.0356 (standard error)
+# sd 1.1244   min 3   median 5.0   max 9
+# mean guesses per board 2.7920
+#    3 guesses       7    0.70%
+#    4 guesses     149   14.90%
+#    5 guesses     355   35.50%
+#    6 guesses     302   30.20%
+#    7 guesses     127   12.70%
+#    8 guesses      49    4.90%
+#    9 guesses      11    1.10%

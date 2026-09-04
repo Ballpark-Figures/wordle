@@ -1,0 +1,12 @@
+kind=lang-topk-solve
+k=10
+length=5
+languages=13
+objective=expected-guesses-outright
+depth_cap=none
+strategy=topk-beam-ranked-by-expected-candidates-alive
+root_restricted_by_k=1
+optimum=0
+weights=uniform
+wordlists=build_lang_wordlists.py
+comparable_with_optturns=0

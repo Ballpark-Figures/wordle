@@ -219,6 +219,104 @@ tree too (`python3 tools/checktrees.py salet`) — the hard-mode legality check 
 skipped there, and the same tree fails ~1450 of 2315 lines if you force it on,
 which is what confirms the check actually fires.
 
+## Mastermind feedback (`mmturns`)
+
+`mmturns` is the third compile-time mode of `optturns.c` (`-DMASTERMIND`,
+alongside `-DHARDMODE`). Same word lists, same objective shape, **different
+feedback**: the codebreaker is told Mastermind's **peg counts** — how many
+letters are right *in place* (blacks) and how many are right *in the wrong
+place* (whites) — and never which positions those were.
+
+> Minimise the **total guesses summed over all 2315 answers**, where the reply
+> to each guess is its **(blacks, whites) peg counts**, subject to resolving
+> every answer within `--depth` guesses.
+
+**Do not put an `mmturns` total in a table with an `optturns` one.** Peg feedback
+is strictly coarser — 20 outcomes against Wordle's 238 — so these are optima of
+two different games, not two difficulty settings of one.
+
+**No new feedback code, and that is the point.** The peg counts are a *function*
+of the stored Wordle pattern: `blacks` is the number of greens and `whites` the
+number of yellows, because Wordle's yellow rule hands out exactly
+`min(guess_c, answer_c) − green_c` copies of each letter and that sums to the
+white-peg count. So `-DMASTERMIND` is one remap of the loaded matrix
+(`mm_remap`) plus a narrowed `NPAT`; every hot loop is untouched, and
+`solver/validate.sh` still reproduces all five totals with identical node counts
+(salet 16672) because `optturns` compiles exactly as before.
+
+**The feedback space is 20 codes at 5 letters**: every `(blacks, whites)` with
+`blacks + whites ≤ 5`, less the single impossible pair `(4, 1)`. With four exact
+matches the two words differ in one position only, so the odd guess letter is
+matched against a different answer letter while every other copy of it is already
+consumed by an exact match — `whites` is forced to 0. `mm_code` enumerates blacks
+ascending, which puts the win `(5, 0)` last, so `ALL_GREEN == NPAT − 1` keeps its
+meaning and nothing that tests `p == ALL_GREEN` changes.
+
+**`--depth` is REQUIRED and it BINDS.** `optturns`' default of 6 is slack because
+238 outcomes branch fast; at 20 they do not, so a depth-7 pass and a depth-9 pass
+are different quantities and get different CSVs. The binary refuses to start
+without an explicit `--depth` rather than inherit a cap nobody chose.
+**The minimum feasible depth is an OPEN QUESTION** — the counting bound only
+gives `≥ 4`, which is not restrictive, so settling it needs a real run.
+`INFEASIBLE` is an expected result here, not a bug.
+
+`MASTERMIND` is in the TT salt **unconditionally**, and that matters more here
+than anywhere else: the word lists are identical, so a colour-feedback table and
+a peg-feedback table would agree on every key while meaning different games. An
+`optturns` `tt.bin` therefore fails verification in `mmturns` instead of
+answering.
+
+Hard mode and Mastermind cannot be combined (`#error`): hard mode's rule is
+stated in per-tile colours, which peg counts do not report.
+
+```sh
+# from math/
+bash solver/run-mm-sweep.sh --depth 8            # the top-k 1 run
+bash solver/run-mm-sweep.sh --depth 8 -k 20
+bash solver/run-mm-sweep.sh --depth 8 --guesses mystery   # answers-only guesses
+```
+
+`--topk K` restricts branching at every branching point **including the root**,
+so `-k 1` examines exactly one opener — the best of the 12972 by root sum of
+squared bin sizes — and the total is an upper bound, the best of the K examined.
+The run prints the measured `BRANCH` and the opener it picked in its first lines.
+
+**Every opener gets a terminal line**, because the wrapper passes
+`--print-openers`. An opener examined by `--optimal-only` ends in one of five
+states, and by default only three of them printed:
+
+| outcome | CSV row | default | with `--print-openers` |
+|---|---|---|---|
+| `NEW BEST` — beat the incumbent | yes | printed | printed |
+| `TIED` — equalled it | yes | printed | printed |
+| solved, but *worse* than the incumbent | **yes** | **silent** | printed |
+| `CUT` — search abandoned, cannot beat the incumbent | no | **silent** | printed |
+| `LB-SKIP` — root bound exceeds the incumbent, never searched | no | **silent** | printed |
+| `INFEASIBLE` — cannot fit the cap | no | printed | printed |
+
+The third row is why a k=10 run wrote 10 CSV rows and showed only a handful in
+the terminal. `LB-SKIP` is the quietest of the lot — no row, no line, and easily
+mistaken for an opener that was never examined at all, when in fact its bound is
+a real result about it: *cannot beat the incumbent, proved without searching*.
+
+`--print-openers` is **off by default** so the `allwords` and `ansall` logs stay
+byte-identical, and it is a no-op (with a note) outside `--optimal-only`, since
+the plain sweep already prints every opener.
+
+`--optimal-only` emits **no trees**, so the winner's tree needs a follow-up
+`./solver/mmturns --opener <winner> --depth <D> --trees <dir>` at the same depth.
+Data lands in `math/data/{shared,local}/mmturns/`, one file set per (depth, K).
+
+**The gate is `python3 tools/checkmastermind.py`** (`--wide` adds the full
+matrix). It checks the encoding against a Python mirror of `mm_code`, the
+blacks/whites identity against peg counts recomputed **from the strings** by the
+textbook rule (exhaustively on small alphabets, and over all 30,030,180 real
+guess × answer pairs under `--wide`), that `(4, 1)` really is the only hole, and
+— the one that exercises the search itself — `mmturns` against a brute-force
+memoised solver on a miniature 24 × 16 data directory, at two depths so both the
+solved and `INFEASIBLE` branches are compared. Run it alongside
+`solver/validate.sh` and `tools/checkpatterns.py`.
+
 ## Answers-only (`--guess-list`)
 
 `--guess-list FILE` restricts the **legal guesses** to the words in `FILE`. The
@@ -349,6 +447,60 @@ feasibility for the **2315-answer** problem only — it says nothing about this
 one. If no opener solves all 12972 words within 6, the run says so explicitly
 rather than returning a number. Report any result as optimal **subject to a
 6-guess guarantee**.
+
+## Unguessable answers (`--phantom-final`) — the `ansall` cell
+
+    bash solver/run-ansall-sweep.sh --depth 7                  # from math/
+    bash solver/run-ansall-sweep.sh --depth 7 --optimal-only -k 50
+
+The mirror image of the answers-only sweep: the **2315 answers are the only legal
+guesses**, and **all 12972 words are possible answers**. It is the one
+configuration where the answer set is the LARGER of the two, so 10657 answers can
+never be played.
+
+**The scoring rule.** An answer outside the guess list is charged *narrow the
+candidate set down to that one word, then add one* — a PHANTOM final guess
+standing in for the naming move. An answer inside the guess list is charged
+normally: it must actually be played to be won. The two coincide arithmetically
+at a singleton (`solve` returns 1 for `n == 1` either way), so the recursion needs
+no new accounting. What needed guarding is the handful of shortcuts that assumed
+`ANS2G[a] >= 0`:
+
+* `n == 2` returns 3 ("guess one: 1 + 2") only while at least one of the pair is
+  playable. When **neither** is, the pair has to be SPLIT and each half then costs
+  its own phantom move: **4**. No guess can do better — one guess cannot resolve
+  either candidate when neither can be named — so the first separating guess
+  proves the value and there is nothing to search.
+* The candidate-first guess orderings (the `d == 2` closed form, `--topk`'s
+  below-cutoff top-up, `best_move`'s rescan) skip unplayable candidates.
+* `best_move` takes whichever of a pair IS legal; at `n == 1` with none legal it
+  returns -1 and `emit_tree` writes the phantom line itself.
+* Depth normalisation (`d = min(d, n)`) still holds: any splitting guess drops the
+  largest bucket to `n-1`, so `f(n) <= 1 + f(n-1) = n`, and a state with no
+  splitting guess at all is INF at every depth.
+
+**`--phantom-final` is opt-in and inert when answers ⊆ guesses.** It relaxes the
+`answer %s not a legal guess` check — the guard that catches a mistyped
+`--answer-list` — so it has to be asked for. It is deliberately **not** in the TT
+salt, because it provably changes nothing when every answer is playable. Verified
+both ways: `solver/validate.sh` still reproduces all five totals with identical
+node counts, and the answers-only cell run WITH the flag still returns
+`slate 7973`, the committed `ansturns` value.
+
+**The cap binds and is part of the objective**, so `--depth` is required and every
+depth gets its own CSV. Depth 7 is confirmed feasible (`slate` 54892 / 4.23158
+under `--topk 30`, an upper bound); whether 6 is feasible is unresolved — the
+counting bound does not rule it out, so only a real search settles it.
+
+**Prerequisite: the SQUARE matrix** (`python3 build_patterns.py --full`). The
+answer set is `guess.txt`, so the matrix must be 12972x12972 before
+`--guess-list` compacts its rows down to the 2315.
+
+**Trees carry the phantom.** `emit_tree` writes the answer itself as the final,
+unplayable naming move, which keeps every line a complete replay ending
+all-green. `tools/checktrees.py` now checks guess LEGALITY against the sweep's
+guess list and exempts exactly that case — last move of the line, equal to the
+answer, answer not in the guess list.
 
 ## `--topk K`: trade exactness for tractability
 
@@ -514,6 +666,163 @@ heuristic order". Record it that way; `LENGTHS.md` marks such rows PROVISIONAL.
 single-opener and plain `--sweep` paths, so `--trees` under `--optimal-only`
 creates an empty directory. Getting the winner's tree currently means a follow-up
 `--opener <winner> --trees <dir>` run at the same depth.
+
+## Singleton rankings (`pairsplit --metric singles`, `run-singles.sh`)
+
+A different question from everything above, and it does **not** run the solver: a
+feedback pattern is a **singleton** when exactly one answer produces it, so seeing
+it names the answer outright. This ranks openers by how many they have.
+
+```sh
+# from math/
+bash solver/run-singles.sh              # words + pairs
+bash solver/run-singles.sh words        # 12972 single words   (~0.1s)
+bash solver/run-singles.sh pairs        # 84129906 blind pairs (~22s)
+bash solver/run-singles.sh triples      # extend the top pairs (~11 min)
+bash solver/run-singles.sh all          # all three
+bash solver/run-singles.sh triples --pairs-top 20000
+
+bash solver/run-singles.sh all --answers                  # answer words only
+bash solver/run-singles.sh pairs   --answers --exhaustive # ~1s
+bash solver/run-singles.sh triples --answers --exhaustive # ~40-45 min
+```
+
+**`--answers` restricts which words may OPEN** to the 2315 answers — the same
+restriction `--guess-list mystery.txt` applies to the solver — and writes to its
+own `*_answers.csv` files, never over the unrestricted ones. The answer set is
+unchanged, so the counts mean the same thing; there are just
+C(2315, 2) = 2,678,455 pairs instead of 84M, which the pair stage clears in about
+a second.
+
+**`--disjoint`** keeps only openers whose words share no letter and repeat none —
+10 distinct letters for a pair, 15 for a triple. 8322 of the 12972 guesses
+qualify, forming 5,020,842 disjoint pairs (6% of 84M) and roughly 139M disjoint
+triples against 3.6e11 unrestricted, which is what makes an exhaustive triple
+sweep over the *full* guess list feasible at all. The result is the best
+*15-distinct-letter* triple — a smaller claim than the best triple, since nothing
+shows the unrestricted optimum is disjoint. Composes with `--answers`.
+
+**Every parent width gets its own triple file**, the same rule the all-words
+sweep applies to its `-k` values and for the same reason: the width decides which
+triples were reachable, so two widths are different searches. A 1000-parent run
+writes `triple_singletons_p1000.csv`, an exhaustive one writes
+`triple_singletons_exhaustive.csv`. A narrow rerun therefore cannot quietly
+replace a wide result with a weaker one that looks identical from the outside.
+
+**Every run writes a `<out>.meta` sidecar** recording candidates scored, rows
+written, and whether the two match. That cannot be recomputed from the inputs —
+`--disjoint` and the canonical-parent filter drop candidates by a rule, not a
+count — so without it a truncated ranking is indistinguishable from a complete
+one. `--exhaustive` reads it and refuses a truncated parent file.
+
+**`--answers --exhaustive` makes the triple stage a PROOF, not a screen.** It
+feeds *every* answer pair to the extension, so all
+C(2315, 3) = 2,067,969,935 answer triples are reached and the head of
+`triple_singletons_answers.csv` is the true maximum. This is the one
+configuration here where the greedy caveat does not apply. The full parent list
+is ~70 MB, so it goes to `data/local/`; only the triple ranking is committed.
+
+Writes `guess_singletons.csv`, `pair_singletons.csv` and
+`triple_singletons.csv` under `data/shared/singletons/`, log in
+`data/local/singletons/`. The word stage is `tools/singletons.py` (numpy); the
+pair and triple stages are `pairsplit` with `--metric singles`, which counts
+joint buckets of size 1 in the same pass that computes `ssq` — the flag picks the
+sort key and the output columns, nothing else.
+
+**Words and pairs are EXHAUSTIVE, unlike the ssq screen.** Every word and every
+unordered pair is evaluated, so the head of those two files is the exact top of
+the ranking, not a heuristic shortlist feeding a later exact stage. The `--top N`
+cut only bounds what is written.
+
+**Triples are NOT, and cannot be.** C(12972, 3) is 3.6e11, so the triple stage
+extends only the top `--pairs-top` pairs by every third word — the same greedy
+construction as the ssq triple screen, and it carries the same caveat: a triple
+is reachable only if one of its three word *pairs* ranks inside the cut, so a
+strong triple built from three individually mediocre pairs cannot be found at any
+width. Report its head as "best of the triples screened". `minparent` is the best
+rank among the triple's parent pairs in this ranking, so filtering one wide run
+to `minparent <= N` reconstructs exactly what an N-pair run would have produced.
+
+**It is not a claim about guesses-to-solve.** An opener can lead this ranking and
+lose badly on total guesses — singling out many answers says nothing about how
+the rest of the field splits. `clint`+`soare` tops the pair ranking at 642
+singletons, which is a fact about singletons and nothing else.
+
+**Two counts per row.** A word that is itself an answer always produces an
+all-green bucket of size one — a singleton that tells you nothing you did not know
+by winning. `singles` counts every size-1 bucket, `singles_nowin` excludes the
+all-green ones; which is the right denominator is a modelling choice, so both are
+emitted. Both stages count over the 2315 mystery answers;
+`tools/singletons.py --full` counts over all 12972 words instead, which is a
+different question.
+
+## Sea of Greens (`greens`) — a DIFFERENT objective, not another sweep
+
+`greens.c` is its own binary because the objective is a MAXIMUM with a hard
+feasibility side-condition, not a minimum of a sum. It shares the loader, the
+transposition table and the arena with `optturns` and none of the search. The
+rules and the value function are stated in `math/greens.py`, which is also the
+reference implementation the gate diffs it against.
+
+```sh
+# from math/
+bash solver/run-greens.sh                      # screen every opener, report THE best
+bash solver/run-greens.sh --opener salet       # one named opener, plus its tree
+python3 tools/checkgreens.py                   # the GATE — run it after any change
+```
+
+**The objective, exactly.** Maximise the number of the 2315 answers won with NO
+YELLOW TILE anywhere in the game, SUBJECT TO the strategy still winning every
+one of them within `--depth` guesses. Lexicographic: the win is absolute, the
+badge is maximised among strategies that never lose. Once a yellow appears the
+badge is gone for that answer and the play is only required to finish the game,
+so a yellow bucket is held to feasibility alone — which is much cheaper than the
+badge value, since it early-exits on the first witness guess.
+
+**The cap is the game.** `--depth 6` here is not an inherited tuning knob: it is
+what "do not lose" means. Report the result as an optimum *subject to a 6-guess
+guarantee*, never as an unconstrained maximum. Each depth is a different
+quantity and gets its own CSV, with the depth in the filename.
+
+**The badge rule is UNVERIFIED.** "Complete a puzzle with no yellow tiles" comes
+from player reports read via web search, not from the NYT and not from a badge
+screen of ours. Two clauses are inferred rather than observed: that a failed
+game with no yellows does not earn it, and that a lucky 1/6 does. See the
+provenance note in `math/greens.py`.
+
+**Its `tt.bin` is not interchangeable with anything.** The salt is
+unconditional, because `optturns` keys states the same way over the same words
+while meaning something entirely different — a total of guesses against a count
+of badges. A foreign snapshot fails verification instead of answering.
+
+**How the screen prunes.** Openers are ordered by an upper bound and the first
+whose bound falls below the incumbent proves the whole tail is worse, so the
+bound's tightness is the entire pruning budget. The obvious bound — count the
+answers that survive the opener yellow-free — is loose, because surviving ONE
+guess is not surviving the game, and at a 6-guess cap the counting term is
+saturated so nothing else tightens it. So the bound carries **one more ply**:
+for each surviving bucket it asks how many of it the best SECOND guess could
+keep alive, which is still sound (`badge(P,d) <= max over h of the answers of P
+surviving h`) and typically a fraction of the first. It costs NG times the
+surviving answers per opener, ~1e7 — a startup minute against searches that run
+far longer — and it is computed for every opener up front, so it both ORDERS and
+CUTS and the tail proof still holds. Watch the `root UB quartiles` line: the gap
+between the top of that list and the first opener's actual badge count is how
+much the screen can throw away.
+
+Two hot loops are shaped by the same concern. `solve_badge` counting-sorts its
+guesses by the integer bound rather than calling `qsort` — at n=3 the sort was
+~0.9 ms against a pass-1 of 0.04 ms, so the sort *was* the search — and `feas`
+tries only the evenest few splitters before falling back to a full sorted scan,
+since a witness settles the question and the fallback keeps it exhaustive.
+Neither can change an answer, and `checkgreens.py` compares against an
+exhaustive scan of every opener to prove it.
+
+**The CSV** is `word,badges,prob,depth,status,seconds`, where `status` is
+`exact`, `cut` (bounded below the incumbent, never searched — a bound, not a
+number) or `infeasible`. It is deliberately NOT readable by `tools/paths.py`:
+badges and total guesses are incomparable quantities and must not land in one
+report.
 
 ## Output format
 

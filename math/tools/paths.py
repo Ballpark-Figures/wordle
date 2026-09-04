@@ -23,20 +23,35 @@ so the tt* tools cannot find it by process name. Reading its results works
 normally; snapshotting its table does not.
 
     WORDLE_SOLVER=ansturns python3 tools/report.py   # the answers-only sweep
+
+`ansall` is the mirror image of that and the one sweep whose ANSWER set is the
+LARGER of the two: the 2315 answers are the only legal guesses, but all 12972
+words are possible answers (`optturns --guess-list mystery.txt --answer-list
+guess.txt --phantom-final`). The 10657 answers that are not legal guesses are
+scored as narrow-to-one plus one. Like `ansturns` it is not a binary, and unlike
+any of the others its cap lives in the CSV FILENAME -- see `WORDLE_CSV` below.
 """
 import csv
 import glob
 import os
 
 SOLVER = os.environ.get("WORDLE_SOLVER", "optturns")
-if SOLVER not in ("optturns", "hardturns", "ansturns"):
-    raise SystemExit("WORDLE_SOLVER must be optturns, hardturns or ansturns, not %r" % SOLVER)
+if SOLVER not in ("optturns", "hardturns", "ansturns", "ansall"):
+    raise SystemExit("WORDLE_SOLVER must be optturns, hardturns, ansturns or "
+                     "ansall, not %r" % SOLVER)
 
 MATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHARED = os.path.join(MATH, "data", "shared", SOLVER)
 LOCAL = os.path.join(MATH, "data", "local", SOLVER)
 
-CSV_PATH = os.path.join(SHARED, "opener_totals.csv")
+# `ansall` (2315 guesses, all 12972 words as answers) pins its CAP in the
+# FILENAME, because the cap is part of the objective there and a depth-7 pass and
+# a depth-8 pass are different quantities that must never share a file. So it has
+# no single canonical CSV and the reader has to be told which one:
+#     WORDLE_SOLVER=ansall WORDLE_CSV=data/shared/ansall/opener_totals_d7.csv ...
+# The override is general, and unset everywhere else, so the other three sweeps
+# read exactly the file they always did.
+CSV_PATH = os.environ.get("WORDLE_CSV") or os.path.join(SHARED, "opener_totals.csv")
 ARCHIVE = os.path.join(LOCAL, "archive")
 SHARED_TREES = os.path.join(SHARED, "trees")
 LOCAL_TREES = os.path.join(LOCAL, "trees")
@@ -73,18 +88,24 @@ TT_BIN = os.path.join(LOCAL, "tt.bin")
 # pattern row for a word from a restricted set must map it through
 # FULL_GUESS_WORDS first; the two differ exactly when a --guess-list is in play.
 FULL_GUESS_WORDS = os.path.join(MATH, "data", "shared", "words", "guess.txt")
-ANSWER_WORDS = os.path.join(MATH, "data", "shared", "words", "mystery.txt")
-GUESS_WORDS = ANSWER_WORDS if SOLVER == "ansturns" else FULL_GUESS_WORDS
-PATTERNS = os.path.join(MATH, "data", "local", "patterns", "patterns.npy")
+MYSTERY_WORDS = os.path.join(MATH, "data", "shared", "words", "mystery.txt")
 
-N_ANSWERS = 2315
+# ansall INVERTS the usual containment: its guesses are the 2315 and its ANSWERS
+# are all 12972 words, so it is the one sweep whose answer set is the bigger of
+# the two and whose pattern matrix is the SQUARE one.
+ANSWER_WORDS = FULL_GUESS_WORDS if SOLVER == "ansall" else MYSTERY_WORDS
+GUESS_WORDS = MYSTERY_WORDS if SOLVER in ("ansturns", "ansall") else FULL_GUESS_WORDS
+PATTERNS = os.path.join(MATH, "data", "local", "patterns",
+                        "patterns_full.npy" if SOLVER == "ansall" else "patterns.npy")
+
+N_ANSWERS = 12972 if SOLVER == "ansall" else 2315
 
 # How many openers a sweep covers -- the DENOMINATOR for every progress figure.
 # It is the size of the sweep's GUESS SET, because --sweep enumerates exactly the
 # legal guesses. The answers-only sweep restricts that set to the answers, so it
 # has 2315 openers to get through, not 12972; using the wrong one here understates
 # its progress by 5.6x.
-N_GUESSES = N_ANSWERS if SOLVER == "ansturns" else 12972
+N_GUESSES = 2315 if SOLVER in ("ansturns", "ansall") else 12972
 
 
 # The results CSV is APPENDED TO by a live solver, and its schema gained a

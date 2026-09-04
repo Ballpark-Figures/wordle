@@ -98,12 +98,24 @@ def load_words(which, length=None):
         return [line.strip() for line in f if line.strip()]
 
 
-def to_codes(words, word_len=None):
-    """Pack a word list into an (n, L) uint8 array of 0..25 letter codes."""
+def to_codes(words, word_len=None, alphabet=None):
+    """Pack a word list into an (n, L) uint8 array of letter codes.
+
+    ``alphabet`` is for the OTHER-LANGUAGE lists only (build_lang_wordlists.py):
+    pass the sorted letters and each is coded by its index there, so a list
+    carrying accents or a letter outside a..z still packs. Omit it and the
+    original ASCII path runs unchanged -- every existing caller is a..z.
+    """
     if word_len is None:
         word_len = len(words[0]) if words else WORD_LEN
-    arr = np.frombuffer("".join(words).encode("ascii"), dtype=np.uint8)
-    return (arr - ord("a")).reshape(len(words), word_len)
+    if alphabet is None:
+        arr = np.frombuffer("".join(words).encode("ascii"), dtype=np.uint8)
+        return (arr - ord("a")).reshape(len(words), word_len)
+    if not words:
+        return np.empty((0, word_len), dtype=np.uint8)
+    idx = {c: i for i, c in enumerate(alphabet)}
+    return np.array([[idx[c] for c in w] for w in words],
+                    dtype=np.uint8).reshape(len(words), word_len)
 
 
 # --- feedback (the old `compare`, encoded) --------------------------------
@@ -135,16 +147,24 @@ def pattern(guess, answer):
     return code
 
 
-def pattern_row(guess, answer_codes):
+def pattern_row(guess, answer_codes, alphabet=None):
     """Encoded feedback of one ``guess`` vs every answer at once.
 
     ``guess`` is an L-char string; ``answer_codes`` is the (n, L) uint8 array
     from ``to_codes``, which is what fixes L. Returns an (n,) array in
     ``pattern_dtype(L)``. This is the vectorized core the pattern matrix and
     candidate filtering are built on.
+
+    ``alphabet`` must be the SAME one ``answer_codes`` was packed with -- the
+    comparison below is between codes, so a guess coded against a different
+    alphabet silently compares the wrong letters.
     """
     word_len = answer_codes.shape[1]
-    g = np.frombuffer(guess.encode("ascii"), dtype=np.uint8) - ord("a")
+    if alphabet is None:
+        g = np.frombuffer(guess.encode("ascii"), dtype=np.uint8) - ord("a")
+    else:
+        idx = {c: i for i, c in enumerate(alphabet)}
+        g = np.array([idx[c] for c in guess], dtype=np.uint8)
     n = answer_codes.shape[0]
     tiles = np.zeros((n, word_len), dtype=np.uint8)
     ans_used = np.zeros((n, word_len), dtype=bool)

@@ -1,0 +1,6 @@
+width,k,guesses,answers,classes,opener,total,expected,seconds
+6,2,2958,206,160,4*7=28,525,2.548544,0.0
+
+rank,guess,sum_of_squares
+1,28/7=4,969
+2,4*7=28,988

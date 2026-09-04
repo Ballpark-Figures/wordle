@@ -1,0 +1,78 @@
+#!/bin/bash
+# Start the ADVERSARIAL WEIGHT SEARCH attached, with live output in this terminal.
+#
+#     bash solver/run-freq-search.sh              # topk 1, the default guesser
+#     bash solver/run-freq-search.sh -k 2
+#
+# WHAT THIS COMPUTES, precisely:
+#
+#   A per-(letter, position-pattern) MULTIPLIER for every pattern occurring in
+#   the candidate list (data/shared/words/custom.txt).  A word's weight is the
+#   PRODUCT of its patterns' multipliers, and the search hill-climbs those
+#   multipliers to MAXIMISE the weight-averaged number of guesses a topk-K
+#   guesser spends -- a word-setter playing against a guesser that sees the
+#   weights.  Ported phase for phase from the hangman video's freq_search.py.
+#
+#   THERE IS NO DEPTH CAP.  This is expected guesses outright, NOT the "expected
+#   guesses subject to a 6-guess guarantee" that every optturns/hardturns number
+#   in this repo reports.  The two are not comparable.
+#
+# USE THIS RATHER THAN CALLING math/freq_search.py DIRECTLY.  It sets --out, so
+# the run's accepted changes land in a CSV that outlives the terminal, and tees
+# a log.  freq_search.py refuses to start without --out for the same reason.
+#
+# Each K is a DIFFERENT GUESSER and so a different objective; each gets its own
+# CSV and log.  Re-running overwrites that K's CSV -- the search always restarts
+# from all-ones, there is no resume.
+#
+# Output is tee'd, so search.log gets every line as well as your terminal.
+
+set -u
+
+MATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+TOPK=1
+ANSWERS=""
+MAXLOOPS=""
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -k|--topk)    TOPK="$2";     shift 2 ;;
+        --answers)    ANSWERS="$2";  shift 2 ;;
+        --max-loops)  MAXLOOPS="$2"; shift 2 ;;
+        *) echo "unknown arg: $1" >&2; exit 1 ;;
+    esac
+done
+
+case "$TOPK" in
+    ''|*[!0-9]*|0) echo "-k must be a positive number (the guesser's beam width)" >&2; exit 1 ;;
+esac
+
+cd "$MATH" || exit 1
+
+PY=../.venv/bin/python
+[ -x "$PY" ] || { echo "no venv python at $PY" >&2; exit 1; }
+[ -f data/shared/words/custom.txt ] || {
+    echo "no custom.txt -- run '$PY build_freq_wordlist.py' first" >&2; exit 1; }
+[ -f data/local/patterns/patterns_full.npy ] || {
+    echo "no patterns_full.npy -- run '$PY build_patterns.py --full' first" >&2; exit 1; }
+
+if pgrep -f "freq_search.py" >/dev/null; then
+    echo "freq_search.py is already running (pid $(pgrep -f freq_search.py | tr '\n' ' '))." >&2
+    exit 1
+fi
+
+OUTDIR=data/shared/freqsearch
+LOC=data/local/freqsearch
+OUT=$OUTDIR/topk$TOPK.csv
+mkdir -p "$OUTDIR" "$LOC"
+
+FLAGS="-k $TOPK --out $OUT"
+[ -n "$ANSWERS" ] && FLAGS="$FLAGS --answers $ANSWERS"
+[ -n "$MAXLOOPS" ] && FLAGS="$FLAGS --max-loops $MAXLOOPS"
+
+# BSD date has no -Is; this form works on both macOS and Linux.
+echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] adversarial weight search (topk $TOPK)" \
+    | tee -a "$LOC/search_topk$TOPK.log"
+
+"$PY" -u freq_search.py $FLAGS 2>&1 | tee -a "$LOC/search_topk$TOPK.log"

@@ -1,0 +1,12 @@
+kind=answers
+width=6
+rules=2026-09-03
+as_written=1
+commutative_collapsed=0
+intermediates_constrained=0
+from=data/shared/nerdle/guesses_w6.txt.gz
+guesses_read=2958
+count=206
+seconds=0.0
+eq_at_3=103
+eq_at_4=103

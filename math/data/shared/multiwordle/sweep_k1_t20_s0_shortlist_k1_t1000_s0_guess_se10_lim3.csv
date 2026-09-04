@@ -1,0 +1,7 @@
+# multiwordle opener sweep: 20 trials per word at k=1, seed 0
+# strategy in math/multiwordle.py; every word faces the SAME 20 answer draws
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/multiwordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,seconds
+plant,20,3.800000,0.224781,1.005249,2,4.0,6,0.018
+slate,20,3.800000,0.155597,0.695852,3,4.0,5,0.001
+least,20,3.700000,0.230560,1.031095,2,3.0,6,0.000

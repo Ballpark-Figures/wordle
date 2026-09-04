@@ -1,0 +1,21 @@
+kind=topk-solve
+width=8
+k=1
+rules=2026-09-03
+objective=expected-guesses-no-cap
+ranking=ascending-sum-of-squared-bins
+win=commutative-class
+optimum=0
+rank_only=0
+opening_fixed=1
+opening=35+11=46 8*02-7=9
+opening_blind=1
+opening_from=data/shared/nerdle/pairs_w8_n10000.csv
+guesses=374246
+answers=17723
+classes=11765
+total=58051
+expected=3.275461
+opener=35+11=46 8*02-7=9
+rank_seconds=0.2
+solve_seconds=40.3

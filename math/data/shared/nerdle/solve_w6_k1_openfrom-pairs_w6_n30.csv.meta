@@ -1,0 +1,21 @@
+kind=topk-solve
+width=6
+k=1
+rules=2026-09-03
+objective=expected-guesses-no-cap
+ranking=ascending-sum-of-squared-bins
+win=commutative-class
+optimum=0
+rank_only=0
+opening_fixed=1
+opening=4*9=36 72/9=8
+opening_blind=1
+opening_from=data/shared/nerdle/pairs_w6_n30.csv
+guesses=2958
+answers=206
+classes=160
+total=633
+expected=3.072816
+opener=4*9=36 72/9=8
+rank_seconds=0.0
+solve_seconds=0.1

@@ -1,0 +1,21 @@
+# DIGEST of k4_laten_t1000000_s0.csv (0.1 GB), which is gitignored: over GitHub's file-size limit.
+# The lines below are copied verbatim from that file's own summary block.
+# multiwordle, fixed opener then smallest-board greedy (see math/multiwordle.py)
+# boards=4 trials=1000000 opener=laten seed=0
+# answers drawn without replacement from the 2315 mystery words; no guess cap
+# trials 1000000, boards 4, opener laten, seed 0
+# mean total guesses 7.8905  +/- 0.0012 (standard error)
+# sd 1.1954   min 5   median 8.0   max 16
+# mean guesses per board 1.9726
+#    5 guesses    6095    0.61%
+#    6 guesses   96066    9.61%
+#    7 guesses  295203   29.52%
+#    8 guesses  325955   32.60%
+#    9 guesses  186134   18.61%
+#   10 guesses   67460    6.75%
+#   11 guesses   18259    1.83%
+#   12 guesses    3979    0.40%
+#   13 guesses     733    0.07%
+#   14 guesses     101    0.01%
+#   15 guesses      14    0.00%
+#   16 guesses       1    0.00%

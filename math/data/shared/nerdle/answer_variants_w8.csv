@@ -1,0 +1,13 @@
+rule_set,answers,delta_vs_settled
+settled rules A1-A4,17356,+0
++ bare 0 as an operand,25489,+8133
++ 0 as the answer,17723,+367
++ both zeros,67346,+49990
++ negative answer,19988,+2632
++ operator-free left side,17356,+0
++ leading zeros anywhere,112566,+95210
++ expression right side,32057,+14701
+- fractional intermediates,17080,-276
+- negative intermediates,17116,-240
+- both intermediate kinds,16840,-516
+everything loosened,323641,+306285

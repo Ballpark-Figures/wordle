@@ -1,0 +1,16 @@
+# DIGEST of k24_canst-horde-blimp_t1000000_s0.csv (0.3 GB), which is gitignored: over GitHub's file-size limit.
+# The lines below are copied verbatim from that file's own summary block.
+# multiwordle, fixed opening then smallest-board greedy (see math/multiwordle.py)
+# boards=24 trials=1000000 opening=canst horde blimp seed=0
+# opening taken from the first data row of data/shared/singletons/triple_singletons.csv
+# answers drawn without replacement from the 2315 mystery words; no guess cap
+# trials 1000000, boards 24, opening canst horde blimp, seed 0
+# mean total guesses 27.0326  +/- 0.0003 (standard error)
+# sd 0.2713   min 25   median 27.0   max 30
+# mean guesses per board 1.1264
+#   25 guesses      88    0.01%
+#   26 guesses   19236    1.92%
+#   27 guesses  930219   93.02%
+#   28 guesses   48952    4.90%
+#   29 guesses    1479    0.15%
+#   30 guesses      26    0.00%

@@ -1,0 +1,11 @@
+# One SHORTEST winning sequence against Absurdle's host rule.
+# Word lists: OUR original Wordle 2315 answers / 12972 guesses, which
+# are NOT verified to match Absurdle's -- see CLAUDE.md. The host rule
+# is transcribed from qntm's FAQ and unverified against the live game.
+# Floor proved at 4 guesses; this is one witness of that length, the
+# first found in ascending-resulting-size order. Ties not enumerated.
+sequence: aesir yauld tench whoop
+  aesir  .....   168 left
+  yauld  .....    15 left
+  tench  ....y     1 left
+  whoop  GGGGG  WIN

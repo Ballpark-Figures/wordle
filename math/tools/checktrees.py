@@ -39,10 +39,21 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from wordle import decode, pattern
-from paths import N_ANSWERS, SOLVER, TREES, load_totals
+from paths import GUESS_WORDS, N_ANSWERS, SOLVER, TREES, load_totals
 
 HARD = SOLVER == "hardturns"
 SAMPLE = 20
+
+# The sweep's LEGAL GUESS set. Every guess on every line must come from it -- the
+# one exception being a PHANTOM final guess, which only `ansall` can produce: an
+# answer outside the guess list is won by narrowing to it and adding one, and the
+# tree writes the answer itself as that unplayable naming move so the line stays
+# a complete replay. Anywhere else in a line, an illegal guess is a real failure.
+# For the three sweeps whose answers all ARE legal guesses this reduces to "every
+# guess is legal", which they already satisfy -- so the check is new coverage, not
+# a behaviour change.
+with open(GUESS_WORDS) as _f:
+    LEGAL = {w.strip() for w in _f if w.strip()}
 
 
 def check_line(parts, hard):
@@ -55,6 +66,12 @@ def check_line(parts, hard):
         bad.append("says %d guesses, has %d" % (n, len(guesses)))
     if guesses[-1] != answer:
         bad.append("ends on %s, not the answer %s" % (guesses[-1], answer))
+    for k, g in enumerate(guesses):
+        if g in LEGAL:
+            continue
+        if k == len(guesses) - 1 and g == answer and answer not in LEGAL:
+            continue                    # the phantom naming move -- see LEGAL above
+        bad.append("guess %d %s is not a legal guess" % (k + 1, g))
 
     green = [None] * 5          # revealed pinned letters
     minc = {}                   # revealed minimum letter counts

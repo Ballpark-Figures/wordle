@@ -1,0 +1,21 @@
+kind=topk-solve
+width=8
+k=1
+rules=2026-09-03
+objective=expected-guesses-no-cap
+ranking=ascending-sum-of-squared-bins
+win=commutative-class
+optimum=0
+rank_only=0
+opening_fixed=1
+opening=38+16=54 70-21=49
+opening_blind=1
+opening_from=data/shared/nerdle/pairs_w8_n1000.csv
+guesses=374246
+answers=17723
+classes=11765
+total=58872
+expected=3.321785
+opener=38+16=54 70-21=49
+rank_seconds=0.3
+solve_seconds=48.4
