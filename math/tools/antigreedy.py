@@ -16,6 +16,7 @@ would launch the slow full recursion silently, so ask for --sample / --limit /
 --full / --opener-only explicitly, the way the stall tool insists on --out.
 """
 import argparse
+import csv
 import os
 import random
 import sys
@@ -44,11 +45,21 @@ def main():
                     help="--sample seed (default 0, for a stable answer)")
     ap.add_argument("--verbose", action="store_true",
                     help="print the greedy player's progress")
+    ap.add_argument("--out", help="CSV to append the run's results to")
+    ap.add_argument("--no-out", action="store_true",
+                    help="print only, save nothing (must be explicit)")
     args = ap.parse_args()
 
     if not (args.sample or args.limit or args.full or args.opener_only):
         ap.error("give a scope: --sample N, --limit N, --full, or --opener-only.\n"
                  "A bare run would silently start the slow full recursion.")
+    if not args.out and not args.no_out:
+        ap.error("give --out FILE, or --no-out to save nothing.\n"
+                 "A --full recursion can run for a long time, and a run with nowhere "
+                 "to put its answer is a run thrown away; prefer the wrapper, "
+                 "solver/run-antiwordle-greedy.sh.")
+    if args.out and args.no_out:
+        ap.error("--out and --no-out are mutually exclusive")
 
     answers = load_words("mystery")
     if args.sample:
@@ -62,15 +73,38 @@ def main():
 
     t0 = time.time()
     word, keep = greedy_opener(answers, answer_set)
+    open_secs = time.time() - t0
     print("greedy opener: %s  (expected surviving set %.4f, %.1f%% of %d)"
           % (word, keep, 100 * keep / len(answers), len(answers)))
-    print("  opener in %.1fs" % (time.time() - t0))
+    print("  opener in %.1fs" % open_secs)
 
+    exp = rec_secs = None
     if not args.opener_only:
         t0 = time.time()
         exp = greedy_expected(answers, answer_set, args.verbose)
+        rec_secs = time.time() - t0
         print("greedy expected guesses: %.4f" % exp)
-        print("  recursion in %.1fs" % (time.time() - t0))
+        print("  recursion in %.1fs" % rec_secs)
+
+    if args.out:
+        # One row per run. The SCOPE is a column rather than only a filename, so a
+        # row can never be read as applying to a different answer set than the one
+        # it was computed over.
+        scope = ("full" if args.full else
+                 "sample%d/seed%d" % (args.sample, args.seed) if args.sample else
+                 "limit%d" % args.limit if args.limit else "opener-only")
+        fresh = not os.path.exists(args.out) or os.path.getsize(args.out) == 0
+        os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
+        with open(args.out, "a", newline="") as fh:
+            w = csv.writer(fh)
+            if fresh:
+                w.writerow(["scope", "answers", "opener", "expected_keep",
+                            "expected_guesses", "opener_secs", "recursion_secs"])
+            w.writerow([scope, len(answers), word, "%.6f" % keep,
+                        "" if exp is None else "%.6f" % exp,
+                        "%.3f" % open_secs,
+                        "" if rec_secs is None else "%.3f" % rec_secs])
+        print("wrote %s" % args.out)
 
 
 if __name__ == "__main__":

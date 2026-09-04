@@ -34,8 +34,17 @@ produced feedback `pattern` if the answer were `w`?" and, crucially, lets one wo
 satisfy MANY feedback patterns.  So `antiwordle_split` is an OVERLAPPING cover, not
 a partition — a word lands in every bucket it is consistent with.  `antiwordle.py`'s
 `Cons`/`step`/`legal_mask` instead carry an exact green/minc/maxc/yban constraint and
-give a clean partition.  The two models disagree on duplicate-letter edge cases; this
-file intentionally keeps the old one so it reproduces the old answers.  If you want
+give a clean partition.
+
+THE BIGGEST DIVERGENCE IS NOT A DUPLICATE-LETTER EDGE CASE: this model has no
+"a yellow must MOVE" rule at all.  `consistent()` tests only `guess[i] in word` for
+a yellow tile -- presence, never position -- so it permits replaying a yellow letter
+on the very square it was yellow on.  Measured example: `aahed` against `crane`
+returns `y..y.`, putting `a` yellow on square 0; this model calls the follow-up
+`abase` legal, and `antiwordle.py` calls it illegal.  That rule is what separates
+antiwordle from ordinary hard mode, so the game modelled here is a LAXER one, its
+legal sets are larger, and its numbers are NOT comparable with the stall values in
+`antiwordle.py`.  Kept deliberately so this reproduces the old answers; if you want
 the audited semantics, that is a different computation, not a bug to fix here.
 
 WORD LISTS ARE OURS, NOT ANTIWORDLE.COM's — the 12972/2315 Wordle lists this whole
@@ -133,8 +142,9 @@ def greedy_opener(candidates, answers):
     """The greedy guess and the expected surviving-set size it achieves.
 
     Picks, from `candidates`, the word maximising the expected size of the surviving
-    candidate set — the single step of the greedy strategy, with no recursion, so it
-    is fast even on the full 2315. Returns `(word, expected_keep)`. Ties break to the
+    candidate set — the single step of the greedy strategy, with no
+    recursion. MEASURED at about n**2.2, which is ~2.3 minutes on the full 2315 --
+    affordable, but not instant. Returns `(word, expected_keep)`. Ties break to the
     first such word in `candidates` order, exactly as the original.
     """
     n = len(candidates)
