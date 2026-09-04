@@ -1271,6 +1271,77 @@ Run it with **`bash solver/run-nerdle-solve.sh [-k K] [--width W] [--rank-only]`
   ever carries the all-green code. It enumerates its small word lists IN MEMORY so it runs
   on a fresh clone. Run it alongside `tools/checknerdle.py`.
 
+## Letroso (letroso.com) — NOT a Wordle variant, and every secondary source is wrong
+`math/letroso.py` states the rules and IS the source of truth; read it before quoting
+anything. Run it with **`bash solver/run-letroso-rank.sh --length-prior lengths`** then
+**`bash solver/run-letroso-solve.sh --length-prior lengths`** (from `math/`).
+- **THE RULES CAME FROM THE SHIPPED BUNDLE, NOT FROM ANY ARTICLE.** Letroso is a
+  **Daydash** game (the Contexto/Conexo/Expresso studio), `lang="pt-br"` with en/es
+  localisations; `letroso.org` and the SEO sites are unaffiliated and describe a
+  DIFFERENT, WRONG game (they claim Wordle green/yellow plus "connection lines"). The
+  real algorithm is `zT`/`BT` in `assets/index-*.js`. **There is no positional
+  green/yellow at all.**
+- **The feedback is a MAXIMUM-SCORING LCS ALIGNMENT** between guess and answer.
+  `head`/`tail` = letters in the alignment (they occur in the answer in that relative
+  order); a maximal run consecutive in BOTH guess and answer draws as one connected
+  block, which is what marketing calls a connection line. `present` = in the answer by
+  multiset count but out of order. `absent` = not there. Plus `start`/`end` flags when
+  the alignment reaches the first/last letter of both. Among maximum-cardinality
+  alignments it maximises `d = 3*sum(position within run) + start + end`, then takes the
+  lexicographically largest pattern.
+- **VERIFIED, not inferred: the port reproduces all TWELVE worked examples in the game's
+  own instructions modal**, across all three shipped languages (en `example`, pt
+  `exemplo`, es `ejemplo`). That is the only external evidence and `tools/checkletroso.py`
+  pins it.
+- **YOU DO NOT KNOW THE ANSWER'S LENGTH.** `Pa=10` caps what you can TYPE (hence answers
+  are ≤10), there is no grid of known width, and **no minimum is stated anywhere in the
+  source** — the 3 in our lists is an ASSUMPTION (user's call). Their own list has 532
+  two-letter words. Unlimited guesses.
+- **A GREEDY LEFT-TO-RIGHT FEEDBACK IS WRONG, and was tried.** An unmatched position
+  resolves to `present` or `absent` depending on what the WHOLE alignment consumed, so
+  the lexicographic comparison is not decidable position by position: `aab` against
+  `babaa` is `(1,0,0,2,3)`, not the greedy's `(0,2,3,1,0)`. The differential test caught
+  it; do not re-derive it.
+- **THE ONE KNOWN AMBIGUITY, and it is MEASURED at zero.** The game's tie-break sort
+  comparator returns "less than" for EQUAL patterns and is therefore inconsistent, so
+  which of two equal-pattern alignments displays is up to V8. We resolve it by preferring
+  the LATEST match (`end` over `start`), matching the reference's enumeration order.
+  **On 5000 real word pairs the top pattern is NEVER tied**, so the tie-break never
+  actually decides; it fires only on toy inputs like `aa`/`a`. Do not report it as a risk
+  without that number.
+- **WE USE OUR OWN LISTS.** Letroso's real answer set is SERVER-SIDE and we do not have
+  it; its client validation list (`assets/all-en-*.js`, 93357 words, lengths 2-10) is a
+  permissive web-corpus list full of proper nouns and initialisms (`aachen`, `kph`,
+  `rss`). So answers/guesses are hello wordl's per-length lists 3-10: **139072 guesses,
+  30403 answers**. A number here describes THIS game on THESE lists, never letroso.com.
+- **LENGTH 3 IS OURS AND IS A MODELLING DECISION** (`build_letroso_lists.py`). hello's
+  answer curation starts at 4; its dictionary does have 1015 three-letter words. hello's
+  answer lists **cannot be reproduced by a frequency cut** — measured, no zipf bar at any
+  length exceeds ~65% precision — so length 3 is matched to 4-10 in PROPORTION instead:
+  `zipf >= 3.0` keeps **707 = 70%** of the pool, in the band the 58%-at-L=4 trend
+  extrapolates to. `len3/README.md` and `mystery.txt.meta` say it is not hello's.
+- **`--length-prior` IS PART OF THE OBJECTIVE AND HAS NO DEFAULT.** `lengths` (uniform
+  over the 8 lengths, the user's choice) vs `words` (uniform over the pooled list) are
+  different objectives: L=3 carries **12.5% vs 2.3%**. Under `lengths` the list SIZE no
+  longer affects weighting at all, which is why the L=3 prune is for realism only.
+- **The ranking rule is `topk.py`'s, NOT nerdle's**: `sum over bins != win of n_b * W_b`,
+  ties on lowest guess index — the expected number of candidate WORDS still alive. Sum of
+  squared bin sizes is undefined here because the answers are not equally likely.
+- **`-k K` restricts the ROOT too**, so the opener is the best of the K examined, not of
+  139072. Each K is a different strategy and gets its own file.
+- **COST, measured.** 4.23e9 feedback evaluations for a root scan, each an LCS DP rather
+  than a symbol compare: **15.9 us/pair** in the numba kernel against 981 us in pure
+  python, so ~19 core-hours, under an hour on 20 threads. The root ranking is CACHED
+  behind a fingerprint over both lists and the prior; **a mismatch is REFUSED**, since a
+  foreign ranking would be confidently wrong rather than missing. Chunked so Ctrl-C works;
+  an interrupt leaves no partial file.
+- **`python3 tools/checkletroso.py` is the GATE** — tutorial rows, `feedback` vs the
+  enumerate-every-path reference over 37332 exhaustive pairs, the numba kernel vs that on
+  4000 real pairs, root scoring vs an independent dict-bucketing implementation, both
+  priors summing to 1, a coverage tally that FAILS if any awkward feature never fired, and
+  an independent REPLAY of the solver's strategy answer-by-answer to check the cost
+  accounting. Run it alongside `solver/validate.sh`.
+
 ## Gameplay layout
 - (Describe this video's on-screen layout and the assets in `animations/assets/`.)
 
