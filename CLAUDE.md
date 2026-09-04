@@ -1263,6 +1263,19 @@ Run it with **`bash solver/run-nerdle-solve.sh [-k K] [--width W] [--rank-only]`
   quadratically and never makes it exhaustive. **The score is split quality, NOT expected
   guesses** — it does not know an answer won by the FIRST guess is cheaper than one won by
   the second.
+  - **THE SCREEN RETURNS ONLY WHAT IT WILL WRITE, and that limit is load-bearing.**
+    Turning every pair into a Python tuple **killed a FINISHED 25-hour sweep** at
+    `--top-n 30000`: 449985000 pairs need ~70 GB of tuples on a 25.8 GB machine, and
+    nothing was written until after that step. `pair_scores(keep=N)` is now the contract;
+    `keep=None` REFUSES above `MAX_MATERIALISE` rather than trying and dying. Scores are
+    int32 (max is NA², 3.1e8) and the kept top-N is maintained AS THE SWEEP RUNS.
+  - **PARTIAL RESULTS ARE CHECKPOINTED every few minutes, atomically**, so a kill never
+    loses a long sweep. `finished=` in the meta says whether the sweep completed;
+    `complete=` still says whether every scored pair was written.
+  - **THE INCUMBENT LOG IS WHAT SAVED THAT RUN.** The tee'd `NEW BEST` lines in
+    `data/local/nerdle/` were the only surviving record — recovered to
+    `pairs_w8_n30000_incumbents.csv`. Best pair `47-11=36 2*029=58` at 37788, **found at
+    5.8% of the sweep, with nothing improving across the remaining 24.5 hours**.
   - **ONLY THE BEST `--write-top` PAIRS ARE RECORDED (100000 default), GZIPPED.** Every
     pair is scored, but `--top-n 10000` is 49995000 of them and writing them all produced
     a **1.67 GB file in the committed tree**. The `.meta` carries `scored`/`written`/

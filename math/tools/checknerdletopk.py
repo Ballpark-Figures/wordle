@@ -206,8 +206,8 @@ else:
     for w in (5, 6):
         fast = game(w, 1)
         slow = game(w, 1, use_numba=False)
-        gs_f, sc_f = fast.pair_scores(10)
-        gs_s, sc_s = slow.pair_scores(10)
+        gs_f, sc_f, _ = fast.pair_scores(10)
+        gs_s, sc_s, _ = slow.pair_scores(10)
         if list(gs_f) != list(gs_s) or sc_f != sc_s:
             bad("width %d: the pair screen differs between kernel and reference" % w)
             continue
@@ -232,7 +232,7 @@ else:
         # Progress must not change the answer, and must reach every pair.
         calls = []
         gp2 = game(w, 1)
-        _, sc_p = gp2.pair_scores(10, progress=lambda d, t, e, n: calls.append((d, t)))
+        _, sc_p, _ = gp2.pair_scores(10, progress=lambda d, t, e, n: calls.append((d, t)))
         if sc_p != sc_f:
             bad("width %d: reporting progress changed the pair scores" % w)
         elif not calls or calls[-1][0] != len(sc_f) or calls[-1][1] != len(sc_f):
@@ -246,7 +246,7 @@ else:
         # the global best passes a naive eye and fails both of these.
         best_log = []
         gb = game(w, 1)
-        _, sc_b = gb.pair_scores(10, on_best=lambda s, f, t_, d, n, e:
+        _, sc_b, _ = gb.pair_scores(10, on_best=lambda s, f, t_, d, n, e:
                                  best_log.append(s))
         if sc_b != sc_f:
             bad("width %d: the incumbent log changed the pair scores" % w)
@@ -258,6 +258,36 @@ else:
         elif best_log[-1] != sc_f[0][0]:
             bad("width %d: the last reported best is %d, the winner is %d"
                 % (w, best_log[-1], sc_f[0][0]))
+
+        # The bounded return must equal the head of the full sort, and the
+        # checkpoint stream must be a valid partial result at every point --
+        # this is the path a 25-hour run depends on, so it cannot go untested.
+        _, top3, n_scored = gp2.pair_scores(10, keep=3)
+        if top3 != sc_f[:3]:
+            bad("width %d: keep=3 gives %s, the full sort's head is %s"
+                % (w, top3, sc_f[:3]))
+        if n_scored != len(sc_f):
+            bad("width %d: reported %d pairs scored, the full sort has %d"
+                % (w, n_scored, len(sc_f)))
+        ck = []
+        gp3 = game(w, 1)
+        _, fin, _ = gp3.pair_scores(10, keep=3, checkpoint_every=0.0,
+                                    on_checkpoint=lambda b, d, t, e: ck.append(list(b)))
+        if not ck:
+            bad("width %d: no checkpoint was ever taken" % w)
+        else:
+            for c in ck:
+                if c != sorted(c) or len(c) > 3:
+                    bad("width %d: a checkpoint was unsorted or oversized" % w)
+                    break
+            else:
+                # Each checkpoint is the best so far, so its head can only fall.
+                heads = [c[0][0] for c in ck if c]
+                if heads != sorted(heads, reverse=True) and len(set(heads)) > 1:
+                    if any(heads[i] < heads[i + 1] for i in range(len(heads) - 1)):
+                        bad("width %d: a checkpoint's best got WORSE: %s" % (w, heads))
+                if ck[-1] != fin:
+                    bad("width %d: the last checkpoint is not the final result" % w)
 
         # A pair must never split WORSE than its better half alone: adding a
         # second blind guess can only refine the partition.
