@@ -17,6 +17,14 @@
 #   maximised among strategies that never lose.  Once a yellow appears the badge
 #   is gone for that answer and the play is only required to finish the game.
 #
+# -k K BEAMS IT, and that changes what is being claimed.  With --topk the solver
+# recurses into only the K evenest-splitting guesses at every branching point,
+# the ROOT included, so the answer is the best of the openers EXAMINED and every
+# value is one a real strategy ACHIEVES -- a LOWER bound on that opener's true
+# optimum, never a proof of optimality.  --openers N sets how many openers are
+# examined separately from the beam width, because "how well is each opener
+# played" and "how many openers do we get to compare" are different questions.
+#
 # THE CAP IS THE GAME, NOT A TUNING KNOB.  --depth 6 is what "do not lose" means,
 # so the result is an optimum SUBJECT TO a 6-guess guarantee -- never quote it as
 # an unconstrained maximum.  Each depth is a different quantity, so each gets its
@@ -40,6 +48,8 @@ SHR=data/shared/greens
 DEPTH=6
 THREADS=18          # 18 cores here (6 performance + 12 efficiency)
 TTBITS=28           # 8.6 GB of 24 GB
+TOPK=0              # 0 = the exact search; K = beam width at every node
+NOPEN=0             # 0 = as many openers as the beam is wide
 OPENERS=()
 
 while [ $# -gt 0 ]; do
@@ -48,9 +58,26 @@ while [ $# -gt 0 ]; do
         --threads) THREADS="$2"; shift 2 ;;
         --tt-bits) TTBITS="$2";  shift 2 ;;
         --opener)  OPENERS+=("$2"); shift 2 ;;
+        -k|--topk) TOPK="$2";    shift 2 ;;
+        --openers) NOPEN="$2";   shift 2 ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
     esac
 done
+
+# EACH (depth, K, opener count) IS A DIFFERENT STRATEGY, so each gets its own
+# CSV and its own table.  A beamed value is not an optimum and must never land
+# in the same file as one, or be warm-started from another K's table -- the salt
+# would reject it anyway, but the filename is what stops anyone trying.
+SUF="d$DEPTH"
+KARGS=()
+if [ "$TOPK" -gt 0 ]; then
+    SUF="${SUF}_k$TOPK"
+    KARGS+=(--topk "$TOPK")
+    if [ "$NOPEN" -gt 0 ]; then
+        SUF="${SUF}_n$NOPEN"
+        KARGS+=(--openers "$NOPEN")
+    fi
+fi
 
 cd "$MATH" || exit 1
 
@@ -69,28 +96,29 @@ mkdir -p "$SHR" "$LOC" "$SHR/trees"
 # salted with the word lists AND with this program's own constant, so an
 # optturns tt.bin pointed here fails verification rather than answering.
 WARM=""
-[ -f "$LOC/tt.bin" ] && WARM="--tt-load $LOC/tt.bin"
+TTBIN="$LOC/tt_$SUF.bin"
+[ -f "$TTBIN" ] && WARM="--tt-load $TTBIN"
 
 if [ ${#OPENERS[@]} -gt 0 ]; then
-    OUT="$SHR/openers_d$DEPTH.csv"
+    OUT="$SHR/openers_$SUF.csv"
     ARGS=()
     for w in "${OPENERS[@]}"; do ARGS+=(--opener "$w"); done
-    echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] greens: named openers at depth $DEPTH $WARM" | tee -a "$LOC/run.log"
-    ./solver/greens "${ARGS[@]}" \
+    echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] greens: named openers, $SUF $WARM" | tee -a "$LOC/run.log"
+    ./solver/greens "${ARGS[@]}" "${KARGS[@]+"${KARGS[@]}"}" \
         --out "$OUT" \
         --trees "$SHR/trees" \
         --depth "$DEPTH" \
         --tt-bits "$TTBITS" --threads "$THREADS" $WARM \
-        --tt-save "$LOC/tt.bin" \
+        --tt-save "$TTBIN" \
         2>&1 | tee -a "$LOC/run.log"
     exit "${PIPESTATUS[0]}"
 fi
 
-OUT="$SHR/best_opener_d$DEPTH.csv"
-echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] greens: opener screen at depth $DEPTH $WARM" | tee -a "$LOC/sweep.log"
-./solver/greens --sweep \
+OUT="$SHR/best_opener_$SUF.csv"
+echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] greens: opener screen, $SUF $WARM" | tee -a "$LOC/sweep.log"
+./solver/greens --sweep "${KARGS[@]+"${KARGS[@]}"}" \
     --out "$OUT" \
     --depth "$DEPTH" \
     --tt-bits "$TTBITS" --threads "$THREADS" $WARM \
-    --tt-save "$LOC/tt.bin" \
+    --tt-save "$TTBIN" \
     2>&1 | tee -a "$LOC/sweep.log"

@@ -561,7 +561,43 @@ its state arithmetic against `strspace.py` over a shared deterministic walk — 
   first whose bound falls below the incumbent proves the whole tail is worse. Ties
   survive (every cut is strict). A `cut` row is a BOUND, never a number — the CSV's
   `status` column says which, and `tools/paths.py` deliberately cannot read this file.
-- **THE SCREEN'S BOUND CARRIES TWO PLIES, and that is what makes it prune.** "Answers
+- **THE EXACT SWEEP IS NOT VIABLE, AND THE BOUND IS WHY (MEASURED 2026-09-03).** The
+  screen orders openers by how many answers survive YELLOW-FREE, so the least
+  informative word in the list sorts FIRST: **`bubby`** (3 distinct letters) leaves
+  **1978 of 2315** answers yellow-free, **1338 of them in one all-grey bucket**. Its bound
+  therefore exceeds any achievable badge count, so it can never be cut — and descending
+  order means the walk spends its first hours on exactly the most expensive and least
+  promising openers. **The second ply cannot fix this**: its maximiser is always a guess
+  that learns nothing (for `bubby`'s all-grey bucket the best second guess is `bubby`
+  AGAIN, keeping all 1338), so excluding no-op splits recovers 6 of 1978 — 0.3% on the
+  worst openers, **0% on `crane`/`salet`/`raise`**. And no counting bound will do it
+  either: that bucket admits up to **32 yellow-free bins**, so the geometric cap over 5
+  guesses is ~1.08M against 1338 answers, vacuous by three orders of magnitude.
+- **SO THE WORKING MODE IS `--topk` (user's call, 2026-09-03), RANKED BY SUM OF SQUARES.**
+  `bash solver/run-greens.sh -k K [--openers N]`. Ascending sum of squared bin sizes, ties
+  on the lowest guess index — the repo's one ranking rule, and it measures the SPLIT the
+  survivor bound is blind to. State the claim precisely:
+  - **Every value is ACHIEVABLE, so it is a LOWER bound on the true optimum** — the
+    opposite direction from every other bound in this solver. It finds strategies; it
+    never proves one best.
+  - **The ROOT is beamed too**, so it is the best of the openers EXAMINED, not of 12972.
+  - **IT NEVER MAKES A STATE LOOK UNWINNABLE.** If no guess in the beam keeps everything
+    winnable the scan continues PAST the beam until one does, and `feas()` is never beamed
+    at all. **So clause 1 stays EXACT and only clause 2 is approximated** — an INFEASIBLE
+    under `--topk` still means genuinely infeasible, unlike `strturns`, where it says
+    nothing.
+  - **`--openers N` separates beam WIDTH from opener COUNT.** The convention elsewhere is
+    one K for both; here they are different questions (how well each opener is played vs
+    how many you get to compare), so a narrow beam over many openers is the shape that
+    surfaces strategies. Unset, it follows the convention.
+  - **TOPK is in the TT salt and in every filename.** Each K is a different strategy;
+    a table or a CSV from one K read as another would be a confidently wrong value that
+    is merely a lower bound.
+  - **The beam is CHECKED, not trusted:** `checkgreens.py` mirrors the identical rule in
+    `greens.py` and demands exact agreement at several K, that the beam never EXCEEDS the
+    exact value and sometimes falls below it (or it is not restricting anything), and that
+    K past the guess count reproduces the exact answer.
+- **The two-ply bound (exact mode only; `--topk` skips it).** "Answers
   surviving the opener yellow-free" is loose — surviving one guess is not surviving the
   game, and at depth 6 the counting term is saturated, so nothing else tightens it. So
   for each surviving bucket the bound also asks what the best SECOND guess could keep

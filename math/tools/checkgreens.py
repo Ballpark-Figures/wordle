@@ -55,7 +55,7 @@ OPTTURNS = os.path.join(MATH, "solver", "optturns")
 
 FAILS = []
 COVER = {"yellow line": 0, "yellow-free line": 0, "infeasible opener": 0,
-         "badge-vs-win conflict": 0, "tied openers": 0}
+         "badge-vs-win conflict": 0, "tied openers": 0, "beam below exact": 0}
 
 
 def fail(msg):
@@ -141,10 +141,12 @@ def build_case(tmp, answers, guesses, tag):
 _LINE = re.compile(r"^(\w+)\s+badges=(\d+) of (\d+)")
 
 
-def run_greens(apath, gpath, ppath, depth, openers, treedir=None):
+def run_greens(apath, gpath, ppath, depth, openers, treedir=None, topk=0):
     cmd = [SOLVER, "--answer-list", apath, "--guess-list", gpath,
            "--patterns", ppath, "--depth", str(depth), "--no-out",
            "--tt-bits", "20", "--threads", "1"]
+    if topk:
+        cmd += ["--topk", str(topk)]
     for w in openers:
         cmd += ["--opener", w]
     if treedir:
@@ -384,13 +386,15 @@ def check_binds(answers, guesses, depths, openers, values):
 _BEST = re.compile(r"^badges = (\d+) of (\d+)")
 
 
-def run_sweep(apath, gpath, ppath, depth, outpath=None):
+def run_sweep(apath, gpath, ppath, depth, outpath=None, topk=0):
     cmd = [SOLVER, "--sweep", "--answer-list", apath, "--guess-list", gpath,
            "--patterns", ppath, "--depth", str(depth),
            "--out", outpath] if outpath else [
            SOLVER, "--sweep", "--answer-list", apath, "--guess-list", gpath,
            "--patterns", ppath, "--depth", str(depth), "--no-out"]
     cmd += ["--tt-bits", "20", "--threads", "2"]
+    if topk:
+        cmd += ["--topk", str(topk)]
     p = subprocess.run(cmd, capture_output=True, text=True, cwd=MATH)
     if p.returncode != 0:
         fail("greens --sweep exited %d: %s" % (p.returncode, p.stderr.strip()[-400:]))
@@ -466,6 +470,71 @@ def check_resume(tmp, answers, guesses, depth):
               % (len(body), best1, len(ties1)))
 
 
+# --------------------------------------------------------------- 8. the beam
+
+def check_beam(tmp, answers, guesses, depth, openers):
+    """--topk is an APPROXIMATION, so it cannot be checked by "is it optimal?".
+    Three things can be checked, and together they pin it:
+
+      - it is DETERMINISTIC and its rule is writable down, so the C and the
+        Python reference must agree EXACTLY at each K;
+      - every value it reports is achievable, so it can never EXCEED the exact
+        value -- and it must sometimes fall below it, or the beam is not
+        actually restricting anything and the check proves nothing;
+      - at K past the guess count the restriction is vacuous, so it must
+        reproduce the exact answer exactly.
+    """
+    print("8. the --topk beam, against the same rule in the reference")
+    apath, gpath, ppath = build_case(tmp, answers, guesses, "k")
+    cands = tuple(sorted(answers))
+    gtuple = tuple(guesses)
+    for topk in (1, 3, 10):
+        got = run_greens(apath, gpath, ppath, depth, openers, topk=topk)
+        for w in openers:
+            want = greens.solve_opener(w, cands, gtuple, depth, topk=topk)
+            have = got.get(w)
+            if have != want:
+                fail("--topk %d opener %s: C says %s, reference says %s"
+                     % (topk, w, have, want))
+            exact = greens.solve_opener(w, cands, gtuple, depth)
+            if want > exact:
+                fail("--topk %d opener %s: beam %s EXCEEDS the exact %s -- a beam "
+                     "can only find strategies, never invent them" % (topk, w, want, exact))
+            if want < exact:
+                COVER["beam below exact"] += 1
+        print("   K=%-3d %s" % (topk, " ".join("%s=%s" % (w, got.get(w)) for w in openers)))
+    big = len(guesses) + 1
+    got = run_greens(apath, gpath, ppath, depth, openers, topk=big)
+    for w in openers:
+        exact = greens.solve_opener(w, cands, gtuple, depth)
+        if got.get(w) != exact:
+            fail("--topk %d (past the guess count) gives %s for %s, exact is %s"
+                 % (big, got.get(w), w, exact))
+    print("   K=%d (vacuous): reproduces the exact value for every opener" % big)
+
+
+def check_beam_sweep(tmp, answers, guesses, depth, topk):
+    """The beam picks the OPENERS too, so the winner must be the best of exactly
+    the K the rule selects -- not of all of them, and not of some other K."""
+    print("9. the beamed opener screen")
+    apath, gpath, ppath = build_case(tmp, answers, guesses, "b")
+    cands = tuple(sorted(answers))
+    gtuple = tuple(guesses)
+    examined = greens.opener_order(cands, gtuple)[:topk]
+    vals = {w: greens.solve_opener(w, cands, gtuple, depth, topk=topk) for w in examined}
+    want = max(vals.values())
+    want_ties = sorted(w for w, v in vals.items() if v == want)
+    best, ties = run_sweep(apath, gpath, ppath, depth, topk=topk)
+    if best != want:
+        fail("beamed screen reports %s, the same rule over its %d openers says %s"
+             % (best, len(examined), want))
+    elif sorted(ties) != want_ties:
+        fail("beamed screen ties %s, reference ties %s" % (sorted(ties), want_ties))
+    else:
+        print("   K=%d: %d openers examined, best %d, %d tied -- agrees exactly"
+              % (topk, len(examined), want, len(want_ties)))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--answers", type=int, default=18,
@@ -511,6 +580,8 @@ def main():
     # the screen is strict precisely so a tie survives it.
     check_sweep(tmp, answers[: max(6, len(answers) // 2)], guesses, max(depths))
     check_resume(tmp, answers[: max(6, len(answers) // 2)], guesses, max(depths))
+    check_beam(tmp, answers, guesses, max(depths), openers)
+    check_beam_sweep(tmp, answers, guesses, max(depths), 5)
 
     print("\ncoverage: " + ", ".join("%s %d" % (k, v) for k, v in COVER.items()))
     for k, v in COVER.items():

@@ -151,6 +151,41 @@ static double   TRACE_T0 = 0;
 static double   TRACE_LAST = 0;
 static double   REPORT_EVERY = 60.0;
 
+/* --topk K: at every branching point, recurse into only the K guesses that
+ * SPLIT the candidates most evenly (ascending sum of squared bin sizes, ties on
+ * the lowest guess index -- the one ranking rule this repo uses everywhere).
+ *
+ * WHAT IT DOES AND DOES NOT RESTRICT, because the difference is the whole
+ * definition:
+ *   - It restricts which guesses are RECURSED INTO, not which are PROFILED.
+ *     Pass 1 still scores all 12972 at every node, so a node costs what it
+ *     always did; the saving is in not exploring thousands of subtrees.
+ *   - THE ROOT IS A BRANCHING POINT LIKE ANY OTHER, so it restricts OPENERS
+ *     too: the sweep examines the K best openers by the same rule and reports
+ *     the best of THOSE -- a deliberately weaker claim than the exact sweep's,
+ *     and what makes it finish.
+ *   - IT NEVER MAKES A STATE LOOK UNWINNABLE.  If no guess in the beam keeps
+ *     every candidate winnable, the scan CONTINUES past the beam, in the same
+ *     order, until one does.  So clause 1 stays EXACT and only clause 2 -- the
+ *     badge maximisation -- is approximated.
+ *   - The post-yellow play is never beamed at all: feas() only has to WIN, and
+ *     restricting it would report INFEASIBLE for openers that are perfectly
+ *     winnable.
+ *
+ * Consequence worth stating plainly: every value it reports is ACHIEVABLE by a
+ * real strategy, so it is a LOWER bound on the true optimum -- the opposite
+ * direction from every other bound in this file. */
+static int      TOPK = 0;
+
+/* How many OPENERS the beamed sweep examines.  Defaults to TOPK, which is the
+ * convention every other solver here follows -- the root is a branching point
+ * like any other, so one K governs both.  But the two questions genuinely come
+ * apart for this objective: the beam WIDTH is how well each opener is played,
+ * while the opener COUNT is how many candidates you get to compare, and a run
+ * meant to surface good strategies wants a narrow beam over many openers rather
+ * than K of each.  Set it separately with --openers; unset, nothing changes. */
+static int      NOPENERS = 0;
+
 static int      BRANCH = NPAT - 1;   /* measured: non-winning bins, any guess */
 static int      GBRANCH = 31;        /* measured: yellow-free non-green bins */
 
@@ -424,6 +459,7 @@ typedef struct {
     int      kof[MAXD][NPAT];
     int64_t  ord[MAXD][MAXG];
     int64_t  ord2[MAXD][MAXG];      /* counting-sort destination, see solve_badge */
+    int      ubg[MAXD][MAXG];       /* --topk: each guess's bound, kept by index */
     long long nodes, probe, hit, fill;
 } Ctx;
 
@@ -660,6 +696,9 @@ static int solve_badge(const uint16_t *S, int n, int d, Ctx *ctx) {
      * bucket can still earn the badge, so their count caps the guess outright --
      * cheap, and tight enough to order every guess by.  Keyed as (NA - ub) so an
      * ASCENDING sort visits the best first with ties on the lowest guess index. */
+    int64_t *ssq = ctx->ord2[d];
+    int *ubg = ctx->ubg[d];
+    int nss = 0;
     for (int g = 0; g < NG; g++) {
         const pat_t *row = PAT + (size_t)g * NA;
         int bp[NPAT], nb = 0;
@@ -667,16 +706,50 @@ static int solve_badge(const uint16_t *S, int n, int d, Ctx *ctx) {
             int p = row[S[i]];
             if (cnt[p]++ == 0) bp[nb++] = p;
         }
-        int ub = 0, dead = (nb == 1);
+        int ub = 0, hopeless = 0;
+        int64_t ss = 0;
         for (int k = 0; k < nb; k++) {
             int p = bp[k], c = cnt[p];
+            if (TOPK > 0) ss += (int64_t)c * c;
             if (p == ALL_GREEN) ub += 1;
-            else if (!FEASOK[d - 1][c]) dead = 1;
+            else if (!FEASOK[d - 1][c]) hopeless = 1;
             else if (!YEL[p]) ub += UBTAB[d - 1][c];
             cnt[p] = 0;
         }
-        if (!dead) ord[m++] = ((int64_t)(NA - ub) << 20) | (int64_t)g;
+        if (nb == 1) continue;               /* reveals nothing, in either mode */
+        if (TOPK > 0) {
+            /* SELECTION IS BY SPLIT QUALITY ALONE -- deliberately NOT also by the
+             * counting bound.  Mixing the two would make the chosen K depend on a
+             * bound the reference implementation does not have, and the beam has
+             * to be reproducible outside this file to be checkable at all.  A
+             * guess the bound rejects still costs only the skip below. */
+            ssq[nss++] = (ss << 20) | (int64_t)g;
+            ubg[g] = hopeless ? -1 : ub;
+        }
+        else if (!hopeless) ord[m++] = ((int64_t)(NA - ub) << 20) | (int64_t)g;
     }
+    if (TOPK > 0) {
+        qsort(ssq, nss, sizeof(int64_t), cmp_i64);
+        int K = (TOPK < nss) ? TOPK : nss;
+        int best = INFEAS, bestg = -1;
+        for (int i = 0; i < nss; i++) {
+            /* Past the beam ONLY while nothing feasible has been found: the beam
+             * restricts the badge maximisation, never the win. */
+            if (i >= K && best >= 0) break;
+            int g = (int)(ssq[i] & 0xFFFFF);
+            /* Skip, never break: this order is split quality, not the bound, so
+             * a later guess can still have a bigger bound. */
+            if (ubg[g] <= best) continue;
+            int v = eval_badge(S, n, d, g, best + 1, ctx);
+            if (v >= 0 && v > best) { best = v; bestg = g; }
+            if (best == n) break;            /* every candidate badged */
+        }
+        long long workk = ctx->nodes - nodes0;
+        tt_put(h0, h1, d, best, bestg,
+               workk > 0xFFFFFFFFLL ? 0xFFFFFFFFu : (uint32_t)workk, &ctx->fill);
+        return best;
+    }
+
     /* COUNTING SORT, not qsort: the key is an integer bound in 0..n, and n is
      * usually tiny while NG is always 12972.  A qsort here was costing ~0.9 ms
      * of function-pointer comparisons per node against a pass-1 that costs
@@ -813,6 +886,19 @@ static int root_ub2(int g, int depth, Ctx *ctx) {
         total += bestp;
     }
     return total;
+}
+
+/* Split quality of an opener over the whole answer set: the sum of squared bin
+ * sizes, ascending, which is what --topk selects the K openers by.  Same rule as
+ * the per-node beam, so the root really is a branching point like any other. */
+static int64_t root_ssq(int g) {
+    int cnt[NPAT];
+    memset(cnt, 0, sizeof cnt);
+    const pat_t *row = PAT + (size_t)g * NA;
+    for (int a = 0; a < NA; a++) cnt[row[a]]++;
+    int64_t ss = 0;
+    for (int p = 0; p < NPAT; p++) ss += (int64_t)cnt[p] * cnt[p];
+    return ss;
 }
 
 /* Exact badge count for committing to `g` as the opener, CUT if provably below
@@ -973,6 +1059,11 @@ static void usage(void) {
       "  --tt-load/--tt-save FILE      warm start / snapshot\n"
       "  --threads N       OpenMP threads for the sweep\n"
       "  --report SECS     heartbeat interval during the walk (default 60, 0 off)\n"
+      "  --topk K, -k K    beam: recurse into the K evenest splitters at every\n"
+      "                    branching point, the ROOT included.  Reports the best\n"
+      "                    of the openers EXAMINED, not of all 12972.\n"
+      "  --openers N       examine N openers instead of K -- beam WIDTH and opener\n"
+      "                    COUNT are different questions.  Defaults to K.\n"
       "  --data DIR        data root (default ./data)\n"
       "  --guess-list/--answer-list/--patterns FILE    restricted runs (the gate)\n");
 }
@@ -999,6 +1090,9 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--tt-save") && i + 1 < argc) ttsave = argv[++i];
         else if (!strcmp(argv[i], "--threads") && i + 1 < argc) threads = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--report") && i + 1 < argc) REPORT_EVERY = atof(argv[++i]);
+        else if ((!strcmp(argv[i], "--topk") || !strcmp(argv[i], "-k")) && i + 1 < argc)
+            TOPK = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--openers") && i + 1 < argc) NOPENERS = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--data") && i + 1 < argc) datadir = argv[++i];
         else if (!strcmp(argv[i], "--guess-list") && i + 1 < argc) guesslist = argv[++i];
         else if (!strcmp(argv[i], "--answer-list") && i + 1 < argc) answerlist = argv[++i];
@@ -1080,9 +1174,15 @@ int main(int argc, char **argv) {
      * every key while meaning entirely different things -- a total of guesses
      * against a count of badges.  Salting always is what makes an optturns
      * tt.bin fail verification here instead of answering. */
+    /* TOPK is in the salt for the same reason the word lists are, and more
+     * urgently: under a beam the stored values are the best found within the
+     * restricted branching, NOT exact optima.  A table from one K read by
+     * another K -- or by the exact solver -- would hand back a confidently
+     * wrong value that is merely a lower bound.  Each K gets its own keyspace. */
     GSALT = 0x5EA0F69EE45ULL
           ^ ((uint64_t)NG * 0xD6E8FEB86659FD93ULL)
-          ^ ((uint64_t)NA * 0x9E3779B97F4A7C15ULL);
+          ^ ((uint64_t)NA * 0x9E3779B97F4A7C15ULL)
+          ^ ((uint64_t)(unsigned)TOPK * 0xA24BAED4963EE407ULL);
     for (int i = 0; i < NG; i++)
         for (int j = 0; GWORD[i][j]; j++)
             GSALT = (GSALT ^ (uint8_t)GWORD[i][j]) * 0x100000001B3ULL;
@@ -1168,8 +1268,37 @@ int main(int argc, char **argv) {
      * cut that way get a `cut` row and never a number -- they are bounded, not
      * solved, and the two must never be confused. */
     int *ub = malloc(sizeof(int) * NG);
+    int64_t *ord = malloc(sizeof(int64_t) * NG);
+    int nord = 0, noub = 0;
     double tscreen = now_s();
     long long screened = 0;
+
+    if (TOPK > 0) {
+        /* THE ROOT IS A BRANCHING POINT LIKE ANY OTHER, so the openers are
+         * selected by the same rule the nodes use: ascending sum of squared bin
+         * sizes, ties on the lowest guess index.  The two-ply bound is skipped
+         * entirely here -- it costs 21s and MEASURED it tightens the openers
+         * that matter by 0.3%, because its maximiser is always a guess that
+         * learns nothing (for `bubby` the best second guess is `bubby` again).
+         * The cheap one-ply bound is kept for the incumbent cut only. */
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static)
+#endif
+        for (int g = 0; g < NG; g++) ub[g] = root_ub(g, depth);
+        for (int g = 0; g < NG; g++) {
+            if (ub[g] == INFEAS) { noub++; continue; }
+            ord[nord++] = (root_ssq(g) << 20) | (int64_t)g;
+        }
+        qsort(ord, nord, sizeof(int64_t), cmp_i64);
+        int nopen = NOPENERS > 0 ? NOPENERS : TOPK;
+        if (nord > nopen) nord = nopen;
+        fprintf(stderr, "root: %d openers examined of %d, by ascending sum of "
+                        "squared bins (%d rejected outright)  [%.1fs]\n",
+                nord, NG, noub, now_s() - tscreen);
+        printf("--topk %d: the best of the %d openers EXAMINED, not of all %d, "
+               "and every value is ACHIEVABLE -- a lower bound on the true optimum\n",
+               TOPK, nord, NG);
+    } else {
     fprintf(stderr, "screening %d openers with the two-ply bound (no search yet; "
                     "this is the part that decides how much the walk can skip)\n", NG);
 #ifdef _OPENMP
@@ -1195,8 +1324,6 @@ int main(int argc, char **argv) {
     }
     fprintf(stderr, "root screen: %.1fs\n", now_s() - tscreen);
 
-    int64_t *ord = malloc(sizeof(int64_t) * NG);
-    int nord = 0, noub = 0;
     for (int g = 0; g < NG; g++) {
         if (ub[g] == INFEAS) { noub++; continue; }
         ord[nord++] = ((int64_t)(NA - ub[g]) << 20) | (int64_t)g;
@@ -1213,6 +1340,7 @@ int main(int argc, char **argv) {
         for (int i = 0; i < 5; i++) q[i] = NA - (int)(ord[(int64_t)i * (nord - 1) / 4] >> 20);
         fprintf(stderr, "root UB quartiles: %d %d %d %d %d (of %d answers)\n",
                 q[0], q[1], q[2], q[3], q[4], NA);
+    }
     }
 
     /* Resume: an existing CSV marks work done, seeds the incumbent AND rebuilds
@@ -1245,7 +1373,9 @@ int main(int argc, char **argv) {
     }
 
     double t0 = now_s();
-    printf("sweep: %d openers by descending badge upper bound; reporting THE best\n", nord);
+    printf("sweep: %d openers %s; reporting the best of them\n", nord,
+           TOPK > 0 ? "by ascending sum of squared bins (--topk)"
+                    : "by descending badge upper bound");
     fflush(stdout);
 
     /* SOLVE THE TOP-RANKED OPENER FIRST, SERIALLY.  The walk cuts against the
@@ -1296,7 +1426,7 @@ int main(int argc, char **argv) {
 #endif
         for (int i = 0; i < nord; i++) {
             int g = (int)(ord[i] & 0xFFFFF);
-            int myub = NA - (int)(ord[i] >> 20);
+            int myub = ub[g];        /* the key is split quality under --topk */
             if (done[g]) continue;
             int inc;
 #ifdef _OPENMP
@@ -1372,7 +1502,12 @@ int main(int argc, char **argv) {
         free(ctx);
     }
 
-    printf("\n=== BEST OPENER (answers %d, guesses %d, depth %d) ===\n", NA, NG, depth);
+    printf("\n=== BEST OPENER (answers %d, guesses %d, depth %d%s) ===\n",
+           NA, NG, depth, TOPK > 0 ? ", --topk" : "");
+    if (TOPK > 0)
+        printf("BEST OF THE %d OPENERS EXAMINED, not of all %d, and every value is a\n"
+               "LOWER bound on that opener's true optimum -- the beam only ever finds\n"
+               "strategies, never proves one best.\n", nord, NG);
     printf("badges = %d of %d  (%.5f of answers), %d openers tied\n",
            incumbent, NA, (double)incumbent / NA, nbest);
     for (int i = 0; i < nbest; i++) printf("  %s\n", GWORD[bestlist[i]]);

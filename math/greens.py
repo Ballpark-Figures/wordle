@@ -127,12 +127,38 @@ def feasible(cands, guesses, depth, memo=None):
     return ok
 
 
-def solve(cands, guesses, depth, memo=None, fmemo=None):
+def beam_order(cands, guesses):
+    """Guesses that SPLIT `cands`, ordered the way --topk selects them.
+
+    Ascending sum of squared bin sizes -- the evenest split first -- with ties on
+    the lowest guess index. It is the one ranking rule this repo uses, and the
+    ONLY thing the beam selects on: deliberately not also the solver's counting
+    bound, since a selection that depended on a bound this reference does not
+    have could not be checked against the solver at all.
+    """
+    scored = []
+    for i, g in enumerate(guesses):
+        parts = partition(g, cands)
+        if len(parts) == 1:
+            continue                       # reveals nothing
+        ss = sum(len(v) * len(v) for v in parts.values())
+        scored.append((ss, i, g))
+    scored.sort()
+    return [g for _, _, g in scored]
+
+
+def solve(cands, guesses, depth, memo=None, fmemo=None, topk=0):
     """(value, best guess) for a state whose badge is still ALIVE.
 
     value is INFEASIBLE (-1) when no strategy wins every candidate within
     `depth`; otherwise it is the maximum number of candidates that can be won
     yellow-free while still winning them all.
+
+    `topk` beams it, exactly as `solver/greens.c` does: recurse into only the
+    first `topk` of `beam_order`, EXCEPT that the scan continues past the beam
+    while nothing feasible has been found -- so clause 1 stays exact and only
+    clause 2 is approximated. A beamed value is achievable by a real strategy,
+    hence a LOWER bound on the unbeamed one.
     """
     if memo is None:
         memo = {}
@@ -153,7 +179,10 @@ def solve(cands, guesses, depth, memo=None, fmemo=None):
     ag = all_green(word_len)
 
     best, bestg = INFEASIBLE, None
-    for g in guesses:
+    order = beam_order(cands, guesses) if topk else guesses
+    for i, g in enumerate(order):
+        if topk and i >= topk and best >= 0:
+            break                          # past the beam, and something works
         parts = partition(g, cands)
         if len(parts) == 1:
             continue
@@ -166,18 +195,26 @@ def solve(cands, guesses, depth, memo=None, fmemo=None):
                     ok = False
                     break                  # clause 1: must still be winnable
             else:
-                v, _ = solve(sub, guesses, depth - 1, memo, fmemo)
+                v, _ = solve(sub, guesses, depth - 1, memo, fmemo, topk)
                 if v < 0:
                     ok = False
                     break
                 val += v
         if ok and val > best:
             best, bestg = val, g
+        if best == len(cands):
+            break                          # every candidate badged
     memo[key] = (best, bestg)
     return best, bestg
 
 
-def solve_opener(opener, answers, guesses, depth):
+def opener_order(answers, guesses):
+    """The openers --topk examines, best first: the root is a branching point
+    like any other, so it is the same rule over the whole answer set."""
+    return beam_order(tuple(sorted(answers)), guesses)
+
+
+def solve_opener(opener, answers, guesses, depth, topk=0):
     """Value of committing to `opener` as the first guess.
 
     The root is a branching point like any other, so this is just the guess loop
@@ -199,7 +236,7 @@ def solve_opener(opener, answers, guesses, depth):
             if not feasible(sub, guesses, depth - 1, fmemo):
                 return INFEASIBLE
         else:
-            v, _ = solve(sub, guesses, depth - 1, memo, fmemo)
+            v, _ = solve(sub, guesses, depth - 1, memo, fmemo, topk)
             if v < 0:
                 return INFEASIBLE
             val += v
