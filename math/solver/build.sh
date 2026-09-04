@@ -74,7 +74,11 @@ if [ $# -eq 0 ]; then
   # --longest parallelises over ANSWERS, which are independent searches sharing
   # only the incumbent and the (self-verifying) table, so it wants OpenMP.
   gcc $BASE $OMP -o antistall antistall.c
-  echo "built ./optturns, ./hardturns, ./mmturns, ./pairsplit, ./strturns, ./strguess, ./greens and ./antistall  (5 letters)"
+  # antiexpect maximises EXPECTED turns: a strategy played without knowing the
+  # answer, so its state carries BOTH the legal set and the still-possible answers.
+  # A different objective from antistall's per-answer maximum, hence its own program.
+  gcc $BASE -o antiexpect antiexpect.c
+  echo "built ./optturns, ./hardturns, ./mmturns, ./pairsplit, ./strturns, ./strguess, ./greens ./antistall and ./antiexpect  (5 letters)"
   exit 0
 fi
 
