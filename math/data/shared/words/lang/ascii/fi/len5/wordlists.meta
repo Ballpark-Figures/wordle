@@ -1,0 +1,17 @@
+lang=fi
+length=5
+source=wordfreq
+wordlist=large
+accents=ascii
+cutoff_rule=zipf-of-the-nth-english-word-of-this-length
+anchor_guesses=12972
+anchor_answers=2315
+guess_cutoff=1.84
+answer_cutoff=3.40
+guesses=13043
+answers=2829
+wordfreq_words=27116
+dropped_non_ascii=41
+merged_by_folding=1126
+alphabet=abcdefghijklmnopqrstuvwxyz
+alphabet_size=26

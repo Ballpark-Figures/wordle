@@ -1,0 +1,10 @@
+mode=quint
+metric=singles
+disjoint=1
+guesslist=data/shared/words/mystery.txt
+openers=1566
+scored=0
+written=0
+complete=1
+parents_complete=1
+minparent_meaning=emitting-parent

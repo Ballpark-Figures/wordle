@@ -1,0 +1,11 @@
+mode=sextet
+metric=singles
+disjoint=0
+min_letters=26
+guesslist=data/shared/words/mystery.txt
+openers=2315
+scored=61
+written=61
+complete=1
+parents_complete=1
+minparent_meaning=emitting-parent

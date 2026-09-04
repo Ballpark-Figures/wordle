@@ -1,0 +1,10 @@
+mode=quad
+metric=singles
+disjoint=0
+guesslist=data/shared/words/mystery.txt
+openers=2315
+scored=270036
+written=270036
+complete=1
+parents_complete=0
+minparent_meaning=best-of-sub-openers

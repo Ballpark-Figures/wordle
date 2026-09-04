@@ -1,0 +1,10 @@
+mode=triple
+metric=singles
+disjoint=0
+guesslist=data/shared/words/mystery.txt
+openers=2315
+scored=2065088805
+written=100000
+complete=0
+parents_complete=1
+minparent_meaning=emitting-parent

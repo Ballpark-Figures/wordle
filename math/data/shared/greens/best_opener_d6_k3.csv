@@ -1,0 +1,4 @@
+word,badges,prob,depth,status,seconds
+roate,133,0.05745,6,exact,0.4
+raile,139,0.06004,6,exact,0.4
+raise,,,6,cut,0.4
