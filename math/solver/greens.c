@@ -163,7 +163,8 @@ static double   REPORT_EVERY = 60.0;
  *   - THE ROOT IS A BRANCHING POINT LIKE ANY OTHER, so it restricts OPENERS
  *     too: the sweep examines the K best openers by the same rule and reports
  *     the best of THOSE -- a deliberately weaker claim than the exact sweep's,
- *     and what makes it finish.
+ *     and what makes it finish.  ONE K governs both; there is deliberately no
+ *     separate opener count.
  *   - IT NEVER MAKES A STATE LOOK UNWINNABLE.  If no guess in the beam keeps
  *     every candidate winnable, the scan CONTINUES past the beam, in the same
  *     order, until one does.  So clause 1 stays EXACT and only clause 2 -- the
@@ -176,15 +177,6 @@ static double   REPORT_EVERY = 60.0;
  * real strategy, so it is a LOWER bound on the true optimum -- the opposite
  * direction from every other bound in this file. */
 static int      TOPK = 0;
-
-/* How many OPENERS the beamed sweep examines.  Defaults to TOPK, which is the
- * convention every other solver here follows -- the root is a branching point
- * like any other, so one K governs both.  But the two questions genuinely come
- * apart for this objective: the beam WIDTH is how well each opener is played,
- * while the opener COUNT is how many candidates you get to compare, and a run
- * meant to surface good strategies wants a narrow beam over many openers rather
- * than K of each.  Set it separately with --openers; unset, nothing changes. */
-static int      NOPENERS = 0;
 
 static int      BRANCH = NPAT - 1;   /* measured: non-winning bins, any guess */
 static int      GBRANCH = 31;        /* measured: yellow-free non-green bins */
@@ -1060,10 +1052,8 @@ static void usage(void) {
       "  --threads N       OpenMP threads for the sweep\n"
       "  --report SECS     heartbeat interval during the walk (default 60, 0 off)\n"
       "  --topk K, -k K    beam: recurse into the K evenest splitters at every\n"
-      "                    branching point, the ROOT included.  Reports the best\n"
-      "                    of the openers EXAMINED, not of all 12972.\n"
-      "  --openers N       examine N openers instead of K -- beam WIDTH and opener\n"
-      "                    COUNT are different questions.  Defaults to K.\n"
+      "                    branching point, the ROOT included -- so it examines K\n"
+      "                    OPENERS too, and reports the best of THOSE, not of 12972.\n"
       "  --data DIR        data root (default ./data)\n"
       "  --guess-list/--answer-list/--patterns FILE    restricted runs (the gate)\n");
 }
@@ -1092,7 +1082,6 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--report") && i + 1 < argc) REPORT_EVERY = atof(argv[++i]);
         else if ((!strcmp(argv[i], "--topk") || !strcmp(argv[i], "-k")) && i + 1 < argc)
             TOPK = atoi(argv[++i]);
-        else if (!strcmp(argv[i], "--openers") && i + 1 < argc) NOPENERS = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--data") && i + 1 < argc) datadir = argv[++i];
         else if (!strcmp(argv[i], "--guess-list") && i + 1 < argc) guesslist = argv[++i];
         else if (!strcmp(argv[i], "--answer-list") && i + 1 < argc) answerlist = argv[++i];
@@ -1290,8 +1279,10 @@ int main(int argc, char **argv) {
             ord[nord++] = (root_ssq(g) << 20) | (int64_t)g;
         }
         qsort(ord, nord, sizeof(int64_t), cmp_i64);
-        int nopen = NOPENERS > 0 ? NOPENERS : TOPK;
-        if (nord > nopen) nord = nopen;
+        /* ONE K GOVERNS BOTH, and that is the point of the convention: the root
+         * is a branching point like any other, so the same rule that picks K
+         * guesses at a node picks K openers here. */
+        if (nord > TOPK) nord = TOPK;
         fprintf(stderr, "root: %d openers examined of %d, by ascending sum of "
                         "squared bins (%d rejected outright)  [%.1fs]\n",
                 nord, NG, noub, now_s() - tscreen);

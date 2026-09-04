@@ -574,22 +574,21 @@ its state arithmetic against `strspace.py` over a shared deterministic walk — 
   either: that bucket admits up to **32 yellow-free bins**, so the geometric cap over 5
   guesses is ~1.08M against 1338 answers, vacuous by three orders of magnitude.
 - **SO THE WORKING MODE IS `--topk` (user's call, 2026-09-03), RANKED BY SUM OF SQUARES.**
-  `bash solver/run-greens.sh -k K [--openers N]`. Ascending sum of squared bin sizes, ties
+  `bash solver/run-greens.sh -k K`. Ascending sum of squared bin sizes, ties
   on the lowest guess index — the repo's one ranking rule, and it measures the SPLIT the
   survivor bound is blind to. State the claim precisely:
   - **Every value is ACHIEVABLE, so it is a LOWER bound on the true optimum** — the
     opposite direction from every other bound in this solver. It finds strategies; it
     never proves one best.
-  - **The ROOT is beamed too**, so it is the best of the openers EXAMINED, not of 12972.
+  - **The ROOT is beamed too**, so it is the best of the K openers EXAMINED, not of 12972.
+    **ONE K GOVERNS BOTH** beam width and opener count, as in every other solver here. A
+    separate opener-count flag was proposed and REJECTED (user, 2026-09-03) — do not
+    re-add one.
   - **IT NEVER MAKES A STATE LOOK UNWINNABLE.** If no guess in the beam keeps everything
     winnable the scan continues PAST the beam until one does, and `feas()` is never beamed
     at all. **So clause 1 stays EXACT and only clause 2 is approximated** — an INFEASIBLE
     under `--topk` still means genuinely infeasible, unlike `strturns`, where it says
     nothing.
-  - **`--openers N` separates beam WIDTH from opener COUNT.** The convention elsewhere is
-    one K for both; here they are different questions (how well each opener is played vs
-    how many you get to compare), so a narrow beam over many openers is the shape that
-    surfaces strategies. Unset, it follows the convention.
   - **TOPK is in the TT salt and in every filename.** Each K is a different strategy;
     a table or a CSV from one K read as another would be a confidently wrong value that
     is merely a lower bound.

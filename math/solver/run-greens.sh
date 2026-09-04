@@ -19,11 +19,9 @@
 #
 # -k K BEAMS IT, and that changes what is being claimed.  With --topk the solver
 # recurses into only the K evenest-splitting guesses at every branching point,
-# the ROOT included, so the answer is the best of the openers EXAMINED and every
-# value is one a real strategy ACHIEVES -- a LOWER bound on that opener's true
-# optimum, never a proof of optimality.  --openers N sets how many openers are
-# examined separately from the beam width, because "how well is each opener
-# played" and "how many openers do we get to compare" are different questions.
+# THE ROOT INCLUDED -- so it examines K openers as well, and the answer is the
+# best of THOSE, not of all 12972.  Every value is one a real strategy ACHIEVES:
+# a LOWER bound on that opener's true optimum, never a proof of optimality.
 #
 # THE CAP IS THE GAME, NOT A TUNING KNOB.  --depth 6 is what "do not lose" means,
 # so the result is an optimum SUBJECT TO a 6-guess guarantee -- never quote it as
@@ -49,7 +47,6 @@ DEPTH=6
 THREADS=18          # 18 cores here (6 performance + 12 efficiency)
 TTBITS=28           # 8.6 GB of 24 GB
 TOPK=0              # 0 = the exact search; K = beam width at every node
-NOPEN=0             # 0 = as many openers as the beam is wide
 OPENERS=()
 
 while [ $# -gt 0 ]; do
@@ -59,24 +56,19 @@ while [ $# -gt 0 ]; do
         --tt-bits) TTBITS="$2";  shift 2 ;;
         --opener)  OPENERS+=("$2"); shift 2 ;;
         -k|--topk) TOPK="$2";    shift 2 ;;
-        --openers) NOPEN="$2";   shift 2 ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
     esac
 done
 
-# EACH (depth, K, opener count) IS A DIFFERENT STRATEGY, so each gets its own
-# CSV and its own table.  A beamed value is not an optimum and must never land
-# in the same file as one, or be warm-started from another K's table -- the salt
-# would reject it anyway, but the filename is what stops anyone trying.
+# EACH (depth, K) IS A DIFFERENT STRATEGY, so each gets its own CSV and its own
+# table.  A beamed value is not an optimum and must never land in the same file
+# as one, or be warm-started from another K's table -- the salt would reject it
+# anyway, but the filename is what stops anyone trying.
 SUF="d$DEPTH"
 KARGS=()
 if [ "$TOPK" -gt 0 ]; then
     SUF="${SUF}_k$TOPK"
     KARGS+=(--topk "$TOPK")
-    if [ "$NOPEN" -gt 0 ]; then
-        SUF="${SUF}_n$NOPEN"
-        KARGS+=(--openers "$NOPEN")
-    fi
 fi
 
 cd "$MATH" || exit 1
