@@ -244,6 +244,81 @@ detail. Run it with **`bash solver/run-mm-sweep.sh --depth D [-k K]`** (from `ma
   `vowels.py`, `depths.py` (tree depth + tree-vs-CSV check),
   `ttdump.py`/`ttverify.py`/`ttscan.py` (table snapshots).
 
+### Sweep status summaries (the standing format)
+When the user asks for an update / report / status on a sweep, run
+`python3 math/tools/report.py` (prefix `WORDLE_SOLVER=hardturns` for hard mode)
+and write it up in THIS shape. The tool already emits the sections in order;
+the write-up mirrors it. Both sweeps use the same format.
+
+**Section order — the tail is what shows without scrolling, so the most-read
+things come last.** Progress → slowest → histogram → remaining → worst →
+in flight → pace.
+
+1. **Progress** — `N / 12972 solved (X%)`, completions since the last update and
+   over what span, how many remain, run elapsed, the solver's own ETA. Second
+   line: `range lo .. hi`, spread in turns AND in total guesses. (Hard mode also
+   has INFEASIBLE openers — count them via `load_infeasible()`; progress is
+   solved + infeasible, and say so, since normal Wordle has none by construction.)
+2. **Slowest to solve** — markdown table, 10 rows, `word | time | expected`.
+   Note the solve time of anything that just landed even when it misses the list.
+3. **Histogram** — the FULL 0.01-bin table verbatim in a code block, every bin
+   from the best to the worst, every update. Do not trim it to the tail: the
+   whole distribution is the point, and the user reads the shape. Follow it with
+   a sentence naming which bins moved and by how much.
+4. **Remaining** — the dispatch-order queue in a code block, 10 per row, with
+   `<-- in flight` on the rows that hold threads. DROP this section once the
+   queue fits inside the thread count (report.py suppresses it automatically).
+5. **Worst words** — code block, **worst LAST** (ranks still count 1 = worst, so
+   they read bottom-up). Mark new entries, say who dropped off, and report where
+   the 10th-place CUTOFF moved.
+6. **In flight** — every running opener with its current runtime, longest first.
+7. **Pace** — the trailing-window table verbatim in a code block.
+
+**Content rules, learned the hard way:**
+- **Report measured values and DELTAS only.** What changed since the last update,
+  by how much. No forecasts about what will move next, nothing about what is
+  "likely final" or "won't hold".
+- **Never extrapolate from the ETA or a pace window to bound an INDIVIDUAL word.**
+  Throughput says nothing about how long one opener takes, and the sweep ends when
+  the LAST word lands. (`uhuru` ran 64.4 h alone at the end of the normal sweep.)
+- **Short pace windows are noise** — they swing by 3-8x between updates. Don't
+  narrate a trend from them.
+- **No letter-pattern theories** ("doubled letters are bad", "z words cluster")
+  unless actually computed over the full result set. A top-ten list is ten points.
+- **Lead with a one-line headline ONLY when something genuinely moved** — a new
+  worst opener, a percentage milestone, a record solve. Otherwise open with
+  Progress and let the numbers carry it.
+- Exact TIES are real (the objective is an integer): call them out rather than
+  letting them look like a rounding artifact.
+
+### Auto-update on every completion
+When the user asks for an update each time a word lands, do NOT poll and do NOT
+set an interval — the sweep log is an event stream. Arm a persistent Monitor on
+it and write a full summary on each event:
+
+    Monitor(command="tail -f -n 0 <math>/data/local/<solver>/sweep.log",
+            description="<solver> sweep completions",
+            persistent=True, timeout_ms=3600000)
+
+Why this works and what to know:
+- **The line lands the instant a word finishes.** `optturns` calls `fflush(stdout)`
+  right after each completion's printf (inside the same critical section that
+  writes the CSV row), and `run-sweep.sh` tees stdout to the log — so there is no
+  buffering lag and nothing to poll.
+- **No grep filter.** The log contains ONLY completion lines and run headers, so
+  every line is an event worth seeing. That also covers the two non-completion
+  cases for free: the final `12972/12972` line, and a `resuming` header if the
+  machine reboots and the Scheduled Task restarts the sweep.
+- **`-n 0`** so it streams from the current end instead of replaying the file.
+- **Several completions inside 200 ms batch into ONE notification.** Run the
+  report on the event, not once per word — the report reflects all of them.
+- **Silence is ambiguous.** `tail -f` on a dead writer looks exactly like a quiet
+  stretch, so a long gap warrants checking `pgrep -x <solver>` rather than
+  assuming nothing happened. (Late in a sweep a genuine 12 h gap is normal — one
+  holdout can run for days.)
+- **Each event costs a full summary**, so only arm this when asked, and note that
+  N words remaining means up to N more reports. `TaskStop` ends the watch.
+
 ## Other word lengths (4-11) — a DIFFERENT problem, not an extension
 - **The word lists are `hello wordl`'s, not the NYT's, and the two are NOT
   comparable.** `math/data/shared/words/hello/len<L>/{guess,mystery}.txt`, built by

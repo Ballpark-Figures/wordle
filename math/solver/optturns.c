@@ -1584,8 +1584,48 @@ static int find_word(char (*list)[WBUF], int n, const char *w) {
     return -1;
 }
 
-/* heuristic sweep order: fewest expected survivors first, so partial results
- * cover the interesting openers and the TT warms on shared deep states */
+/* Emit one index of the difficulty-sorted list into the dispatch order, unless
+ * it has already been emitted. Out-of-range indices clamp: rounding at deep
+ * levels can land on NG. */
+static void bisect_emit(int64_t *out, int *m, unsigned char *seen,
+                        const int64_t *sorted, long long idx) {
+    if (idx < 0) idx = 0;
+    if (idx >= NG) idx = NG - 1;
+    if (seen[idx]) return;
+    seen[idx] = 1;
+    out[(*m)++] = sorted[idx];
+}
+
+/* Sweep order: BISECTION over the difficulty-sorted opener list.
+ *
+ * The list is still sorted by fewest expected survivors (sum of squared
+ * pattern-class sizes, ties by guess index) -- that part is unchanged. What
+ * changed is the order the sorted list is DISPATCHED in: ends first, then the
+ * median, then the quartiles, then the odd eighths, and so on.
+ *
+ * WHY. Straight best-first order makes every partial result biased: the solved
+ * subset is always the easy end, so percentiles over it are meaningless, the
+ * histogram's hard tail stays empty until the run is nearly over, and the worst
+ * list churns constantly because the bad openers all arrive last. Bisection
+ * makes the solved set a STRATIFIED SAMPLE of the whole difficulty range at
+ * every moment -- lower variance than a random shuffle for the same purpose,
+ * and deterministic, so a restart reproduces the order with no seed to carry.
+ *
+ * WHAT IT COSTS. Best-first front-loaded cheap openers, so completions came
+ * fast early and the TT warmed on shared deep states first. Bisection mixes
+ * pathological openers in from the start, so early throughput is much lower and
+ * the second word dispatched is the worst-partitioned opener in the list. The
+ * TT half of that argument is weaker than it looks: hits are dominated by
+ * INTRA-word reuse, and a table at 0.01%% occupancy still returned 67%% hits.
+ *
+ * Already-solved openers keep their slot in the ORDER (the bisection is over
+ * the whole list, so the sequence does not shift as the CSV fills) but are
+ * skipped at dispatch by the done[] test in the sweep loop -- counted, not
+ * redone.
+ *
+ * Levels run to 2^20 > 2*NG, by which point consecutive rounded indices differ
+ * by less than 1 and every index has been emitted; the trailing loop is a
+ * belt-and-braces fill in case that ever stops holding. */
 static int64_t *sweep_order(void) {
     int64_t *ord = malloc(sizeof(int64_t) * NG);
     for (int g = 0; g < NG; g++) {
@@ -1598,7 +1638,27 @@ static int64_t *sweep_order(void) {
         ord[g] = (ss << 20) | (int64_t)g;
     }
     qsort(ord, NG, sizeof(int64_t), cmp_i64);
-    return ord;
+
+    int64_t *out = malloc(sizeof(int64_t) * NG);
+    unsigned char *seen = calloc((size_t)NG, 1);
+    if (!out || !seen) { fprintf(stderr, "sweep_order: out of memory\n"); exit(1); }
+    int m = 0;
+
+    bisect_emit(out, &m, seen, ord, 0);           /* easiest */
+    bisect_emit(out, &m, seen, ord, NG - 1);      /* hardest */
+    for (int k = 1; k <= 20 && m < NG; k++) {
+        long long den = 1LL << k;
+        for (long long i = 0; i < den / 2 && m < NG; i++) {
+            long long num = 2 * i + 1;            /* the ODD 2^-k fractions */
+            bisect_emit(out, &m, seen, ord,
+                        ((long long)NG * num + den / 2) / den);
+        }
+    }
+    for (int i = 0; i < NG && m < NG; i++) bisect_emit(out, &m, seen, ord, i);
+
+    free(seen);
+    free(ord);
+    return out;
 }
 
 int main(int argc, char **argv) {
