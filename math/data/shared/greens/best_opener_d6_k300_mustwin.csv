@@ -1,3 +1,4 @@
+# greens objective=must-win topk=300 depth=6 guesses=12972 answers=2315
 word,badges,prob,depth,status,seconds
 roate,294,0.12700,6,exact,2.6
 rials,,,6,cut,1.2
