@@ -56,7 +56,7 @@
 # strategy really does have to finish those games.
 #
 # Ctrl-C stops it -- openers already finished are in the CSV (flushed per opener)
-# and a resume picks up from there, but the table is lost unless --tt-save ran.
+# and a resume picks up from there.  The table is not kept -- see below.
 
 set -u
 
@@ -153,9 +153,21 @@ if [ -n "$OTHERS" ]; then
     echo "      machine deliberately rather than oversubscribing it."
 fi
 
-# A table snapshot is reused when present, so a re-run resumes warm.  The key is
-# salted with the word lists AND with this program's own constant, so an
-# optturns tt.bin pointed here fails verification rather than answering.
+# NOTHING SAVES A TABLE ANY MORE, and the reason is worth writing down.
+#
+# tt_save runs at the END of main, so it fired ONLY on normal completion -- which
+# is exactly when the table is worthless: a finished run's CSV marks every opener
+# done, so re-running the same settings resumes, finds nothing to do, and exits
+# without ever reading it.  The case where a warm table WOULD pay -- an
+# interrupted run -- saved nothing, because Ctrl-C never reaches that line.  So
+# the flag was backwards, and at 8.6 GB per settings combination it cost about
+# 172 GB of disk to be so.  It was copied from run-ans-sweep.sh, where a snapshot
+# IS load-bearing because that sweep runs for weeks and gets killed by reboots,
+# without asking whether this solver has the same problem.  It does not.
+#
+# --tt-load stays: it costs nothing, and a table created deliberately (by hand or
+# by the tt* tools) is still worth warming from.  With nothing writing one
+# automatically, WARM is simply empty.
 WARM=""
 TTBIN="$LOC/tt_$SUF.bin"
 [ -f "$TTBIN" ] && WARM="--tt-load $TTBIN"
@@ -169,7 +181,6 @@ if [ ${#OPENERS[@]} -gt 0 ]; then
         --trees "$TREES" \
         --depth "$DEPTH" \
         --tt-bits "$TTBITS" --threads "$THREADS" $WARM \
-        --tt-save "$TTBIN" \
         2>&1 | tee -a "$LOG"
     exit "${PIPESTATUS[0]}"
 fi
@@ -180,5 +191,4 @@ echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] greens: opener screen, $SUF $WARM" | tee 
     --trees "$TREES" \
     --depth "$DEPTH" \
     --tt-bits "$TTBITS" --threads "$THREADS" $WARM \
-    --tt-save "$TTBIN" \
     2>&1 | tee -a "$LOG"
