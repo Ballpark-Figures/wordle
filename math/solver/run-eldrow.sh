@@ -1,20 +1,23 @@
 #!/bin/bash
 # The Eldrow longest-stall search, ATTACHED with a tee'd log.
 #
-#     bash solver/run-eldrow.sh --beam --target 17           # from math/, or anywhere
-#     bash solver/run-eldrow.sh --beam --target 12 --words mystery --size 200
-#     bash solver/run-eldrow.sh --exact --sample 8           # exact, tiny list
+#     bash solver/run-eldrow.sh --beam --target 17                    # from math/, or anywhere
+#     bash solver/run-eldrow.sh --beam --target 15 --rand-top 50 --seed 1   # randomized beam
+#     bash solver/run-eldrow.sh --heuristic sum --target 12 --words mystery
+#     bash solver/run-eldrow.sh --exact --sample 8                    # exact, tiny list
 #
 # WHAT THIS COMPUTES: the longest NARROWING chain of guesses (guesses drawn from
-# the live candidate list) before the set collapses to one word -- either the
-# heuristic beam (--beam, a lower bound over a whole list) or the exact branch-and-
-# bound (--exact, small lists only). Counts guesses-to-a-singleton, not the final
-# naming. Over OUR word lists, not the game's value -- see eldrow.py. The exact
-# known-answer endgame counterpart is run-antiwordle-stall.sh; the greedy
-# expected-length heuristic is run-antiwordle-greedy.sh.
+# the live candidate list) before the set collapses to one word -- via the pass-
+# sweep beam (--beam, optionally randomized with --rand-top), the single-level
+# searches (--heuristic best|sum|new), or the exact branch-and-bound (--exact,
+# small lists only). The searches give a lower bound; --exact is exact. Counts
+# guesses-to-a-singleton, not the final naming. Over OUR word lists, not the game's
+# value -- see eldrow.py. The exact known-answer endgame counterpart is
+# run-antiwordle-stall.sh; the greedy expected-length heuristic is
+# run-antiwordle-greedy.sh.
 #
-# MODE IS REQUIRED (--beam or --exact): the tool refuses a bare run rather than
-# hang on an exact full-list search. Output is unbuffered and appended to a log.
+# MODE IS REQUIRED (--beam / --heuristic / --exact): the tool refuses a bare run
+# rather than hang on an exact full-list search. Output is appended to a log.
 
 set -u
 

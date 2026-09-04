@@ -62,6 +62,8 @@ same subtree is proven worse and skipped.
     depth, line = beam_stall(load_words("guess"), 17)   # beam, full dictionary
 """
 
+import random
+
 from wordle import WORD_LEN, load_words, pattern
 
 
@@ -151,7 +153,14 @@ def longest_chain(candidates, bound="size", word_len=WORD_LEN):
     return length, line
 
 
-# --- heuristic level beam: scales to the full dictionary ----------------------
+# --- heuristic level searches: scale to the full dictionary -------------------
+#
+# All the old beam controllers (sizePassLevelSearch, passLevelSearch, levelSearch,
+# sumLevelSearch, newLevelSearch, randSizePassLevelSearch) share ONE inner move:
+# expand a state -> append its reachable children to the next level -> re-rank ->
+# drop it. `_expand` is that move, so each controller below is just a different
+# rule for WHICH state to expand next. They differ only in the controller, never
+# in the expansion, which is why they all agree with the exact search in the limit.
 
 def _lex_key(state):
     return state[2]                                 # sorted_letterscore, desc tuple
@@ -161,46 +170,157 @@ def _sum_key(state):
     return sum(state[2])
 
 
-def beam_stall(candidates, target, size=1000, beam_cap=1_000_000, key="lex",
-               word_len=WORD_LEN):
-    """Beam search for a stall of length `target`: (deepest_depth, line).
+def _expand(levels, lvl, idx, target, keyfn, cap, word_len):
+    """Expand `levels[lvl][idx]`: append reachable children to lvl+1, re-rank, drop it.
 
-    Faithful port of the old `sizePassLevelSearch`. `levels[k]` holds states reached
-    at depth k, each a `(line, candidate_list, sorted_letterscore)`; a pass walks the
-    levels, expanding front states (best by `key`) until a per-level `size` budget of
-    candidates is consumed, keeping each level ranked and capped at `beam_cap`. A
-    branch is kept only if it could still reach `target` (`s[0] + level + 1 >=
-    target`) and the guess is not already in the line.
+    A branch is kept only if it could still reach `target` (`s[0] + lvl + 1 >=
+    target`, the original reachability filter) and its guess is not already in the
+    line. Returns the expanded state's candidate count — the budget unit the
+    size-limited controllers spend. `cap` truncates the re-ranked level, or None
+    leaves it whole (the uncapped controllers).
+    """
+    line, cand, _ = levels[lvl][idx]
+    for w in cand:
+        for branch in split(cand, w).values():
+            s = sorted_letterscore(branch, word_len)
+            if s[0] + lvl + 1 >= target and w not in line:
+                levels[lvl + 1].append((line + [w], branch, s))
+    levels[lvl].pop(idx)
+    levels[lvl + 1] = sorted(levels[lvl + 1], key=keyfn, reverse=True)
+    if cap is not None:
+        levels[lvl + 1] = levels[lvl + 1][:cap]
+    return len(cand)
+
+
+def _new_levels(candidates, target, word_len):
+    levels = [[] for _ in range(target + 1)]
+    levels[0] = [([], list(candidates), sorted_letterscore(candidates, word_len))]
+    return levels
+
+
+def beam_stall(candidates, target, size=1000, beam_cap=1_000_000, key="lex",
+               rand_top=None, rng=random, word_len=WORD_LEN):
+    """Pass-sweep beam for a stall of length `target`: (deepest_depth, line).
+
+    Faithful port of the old `sizePassLevelSearch`, and — with `rand_top` set — of
+    `randSizePassLevelSearch`. `levels[k]` holds states reached at depth k, each a
+    `(line, candidate_list, sorted_letterscore)`; a pass walks the levels, spending a
+    per-level `size` budget of candidates, keeping each level ranked by `key` and
+    capped at `beam_cap`.
+
+    `rand_top` chooses which state to expand: None takes the front (best by `key`,
+    the sizePass behaviour); an int r picks a RANDOM state among the top r (the
+    randSizePass behaviour, which keeps NO cap — pass `beam_cap=None` to match it
+    exactly). `rng` is the source of randomness (the `random` module by default, so
+    `random.seed(...)` makes a run reproducible). `key` is "lex" or "sum".
 
     Returns the deepest chain FOUND — a lower bound on the true longest stall.
-    `key` is "lex" (positional-diversity tuple, the original's ordering) or "sum".
     """
     n = target
     keyfn = _sum_key if key == "sum" else _lex_key
-    levels = [[] for _ in range(n + 1)]
-    levels[0] = [([], list(candidates), sorted_letterscore(candidates, word_len))]
+    levels = _new_levels(candidates, n, word_len)
 
     best_depth, best_line = 0, []
     while max((len(x) for x in levels), default=0) > 0 and len(levels[-1]) == 0:
         for lvl in range(len(levels) - 1):
             count = 0
             while count < size and levels[lvl]:
-                line, cand, _ = levels[lvl][0]
+                if rand_top is None:
+                    idx = 0
+                elif len(levels[lvl]) >= rand_top:
+                    idx = int(rng.random() * rand_top)
+                else:
+                    idx = int(rng.random() * len(levels[lvl]))
                 if lvl > best_depth:
-                    best_depth, best_line = lvl, line
-                count += len(cand)
-                for w in cand:
-                    for branch in split(cand, w).values():
-                        s = sorted_letterscore(branch, word_len)
-                        if s[0] + lvl + 1 >= n and w not in line:
-                            levels[lvl + 1].append((line + [w], branch, s))
-                levels[lvl].pop(0)
-                levels[lvl + 1] = sorted(levels[lvl + 1], key=keyfn,
-                                         reverse=True)[:beam_cap]
+                    best_depth, best_line = lvl, levels[lvl][idx][0]
+                count += _expand(levels, lvl, idx, n, keyfn, beam_cap, word_len)
     if len(levels[-1]) > 0:
         best_depth, best_line = n, levels[-1][0][0]
     return best_depth, best_line
 
 
-__all__ = ["beam_stall", "letterscore", "load_words", "longest_chain",
-           "sorted_letterscore", "split"]
+# --- single-level controllers: pick ONE level per step, by a drop heuristic ----
+
+def best_level(levels, drop=5):
+    """First level whose successor is empty or `drop` behind on the top score[0].
+
+    Verbatim port of the old `bestLevel`: scans levels for the frontier to work on
+    next. Returns None if none qualifies (the original would then index `None` and
+    crash; `heuristic_search` stops instead — see its note).
+    """
+    for i in range(len(levels) - 1):
+        if len(levels[i]) > 0 and (len(levels[i + 1]) == 0
+                                   or levels[i + 1][0][2][0] < levels[i][0][2][0] - drop):
+            return i
+    return None
+
+
+def sum_best_level(levels, drop=35):
+    """`best_level` measured by the SUM of the score tuple (old `sumBestLevel`)."""
+    for i in range(len(levels) - 1):
+        if len(levels[i]) > 0 and (len(levels[i + 1]) == 0
+                                   or sum(levels[i + 1][0][2]) < sum(levels[i][0][2]) - drop):
+            return i
+    return None
+
+
+def new_best_level(levels, counts, drop=5, count_cap=100):
+    """`best_level` with a visit counter so it rotates off a stuck level.
+
+    Verbatim port of `newBestLevel`, quirks preserved: it also fires when a level
+    has been picked `count_cap` times, bumps that level's counter, and (as written)
+    zeroes only the NEXT level's counter before returning. `counts` is mutated.
+    """
+    for i in range(len(levels) - 1):
+        if len(levels[i]) > 0 and (len(levels[i + 1]) == 0 or counts[i + 1] >= count_cap
+                                   or levels[i + 1][0][2][0] < levels[i][0][2][0] - drop):
+            counts[i] += 1
+            for j in range(i + 1, len(levels)):
+                counts[j] = 0
+                return i
+    return None
+
+
+def heuristic_search(candidates, target, selector="best", drop=None,
+                     count_cap=100, word_len=WORD_LEN):
+    """Single-level stall search: expand one front state per step, by `selector`.
+
+    Faithful port of the old `levelSearch` / `sumLevelSearch` / `newLevelSearch`:
+    each step picks ONE level via a drop heuristic and expands its front state, with
+    NO width cap. `selector` is "best" (bestLevel + lex ranking), "sum" (sumBestLevel
+    + sum ranking) or "new" (newBestLevel + lex ranking). `drop` overrides the
+    heuristic's threshold (defaults: 5 for best/new, 35 for sum, the originals).
+
+    Returns (deepest_depth, line). ONE intentional deviation from the originals: if
+    the selector qualifies no level it returns None, where the original would crash
+    on `levels[None]`; here the search stops and returns what it has. That case is
+    effectively unreachable under the while guard (the frontier always qualifies),
+    so it changes no reachable result — it just fails safe instead of raising.
+    """
+    keyfn = _sum_key if selector == "sum" else _lex_key
+    default_drop = 35 if selector == "sum" else 5
+    d = default_drop if drop is None else drop
+    levels = _new_levels(candidates, target, word_len)
+    counts = [0] * len(levels)                       # used only by "new"
+
+    best_depth, best_line = 0, []
+    while max((len(x) for x in levels), default=0) > 0 and len(levels[-1]) == 0:
+        if selector == "sum":
+            lvl = sum_best_level(levels, d)
+        elif selector == "new":
+            lvl = new_best_level(levels, counts, d, count_cap)
+        else:
+            lvl = best_level(levels, d)
+        if lvl is None:
+            break
+        if lvl > best_depth:
+            best_depth, best_line = lvl, levels[lvl][0][0]
+        _expand(levels, lvl, 0, target, keyfn, None, word_len)
+    if len(levels[-1]) > 0:
+        best_depth, best_line = target, levels[-1][0][0]
+    return best_depth, best_line
+
+
+__all__ = ["beam_stall", "best_level", "heuristic_search", "letterscore",
+           "load_words", "longest_chain", "new_best_level", "sorted_letterscore",
+           "split", "sum_best_level"]
