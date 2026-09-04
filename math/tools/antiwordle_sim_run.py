@@ -139,6 +139,7 @@ def main():
             writer.writeheader()
 
     best = []
+    best_mean, best_word, best_se = -1.0, None, 0.0
     t_start = time.time()
     for k, word in enumerate(todo, 1):
         gi = space.index[word]
@@ -151,6 +152,14 @@ def main():
             space, pat, gi, args.trials, rng, len(answers))
         secs = time.time() - t0
         best.append((mean, word))
+        if mean > best_mean:
+            best_mean, best_word, best_se = mean, word, se
+            # Printed the moment it happens, not only in the final summary: a full
+            # sweep runs for minutes and the running leader is the interesting part
+            # while it does. The SE is on the line because a "new best" inside a
+            # couple of SEs of the old one is noise, not a finding.
+            print("        NEW BEST: %-6s %.4f +/- %.4f  (opener %d/%d)"
+                  % (word, mean, se, k, len(todo)), flush=True)
         if writer:
             writer.writerow({"opener": word, "trials": args.trials,
                              "mean": "%.4f" % mean, "se": "%.4f" % se,
@@ -160,9 +169,10 @@ def main():
         if args.progress and (k % args.progress == 0 or k == len(todo)):
             el = time.time() - t_start
             rate = k / el if el else 0
-            print("  [%d/%d] %s mean=%.3f  %.0f openers/s  eta %.1f min"
-                  % (k, len(todo), word, mean, rate,
-                     (len(todo) - k) / rate / 60 if rate else 0), flush=True)
+            print("  [%d/%d] %.0f openers/s  eta %.1f min   best so far: %s %.4f"
+                  % (k, len(todo), rate,
+                     (len(todo) - k) / rate / 60 if rate else 0,
+                     best_word, best_mean), flush=True)
     if fh:
         fh.close()
 
