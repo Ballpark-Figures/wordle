@@ -6,10 +6,12 @@
 #     bash solver/run-antistall-sweep.sh --tt-bits 28       # a bigger table
 #     bash solver/run-antistall-sweep.sh --guess-list data/shared/words/mystery.txt
 #
-# WHAT THIS COMPUTES, precisely: for each of the 2315 answers, the longest run of
-# legal guesses before the answer must be named, played by someone who knew the
-# word from move one. Exact -- no depth cap (antiwordle has none) and no beam.
-# The count INCLUDES the final forced naming move.
+# WHAT THIS COMPUTES, precisely: for each of the 2315 answers, the LONGEST GAME for
+# that answer -- the whole line from an empty board, played by someone who knew the
+# word from move one. Exact: no depth cap (antiwordle has none) and no beam. The
+# count INCLUDES the final forced naming move. The length comes from playing words
+# that are legal but are not possible ANSWERS, so the guess list (12972) and the
+# answer list (2315) are separate objects.
 #
 #     bash solver/run-antistall-sweep.sh --longest      # a DIFFERENT question
 #
