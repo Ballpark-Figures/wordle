@@ -17,19 +17,30 @@
 # run-antiwordle-greedy.sh.
 #
 # MODE IS REQUIRED (--beam / --heuristic / --exact): the tool refuses a bare run
-# rather than hang on an exact full-list search. Output is appended to a log.
+# rather than hang on an exact full-list search, and it likewise refuses to run
+# without --out.
+#
+# Results append to a COMMITTED CSV, one row per run. Every knob that changes WHAT
+# was computed is a COLUMN -- mode, word list, target, settings -- and `kind` says
+# outright whether the number is exact or a lower bound, since the beam and the
+# single-level searches only ever FIND a chain, never prove one is longest. The
+# tee'd log is under data/local/, which is gitignored, so the log alone would not
+# have survived to the other machine.
 
 set -u
 
 MATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$MATH" || exit 1
 
+OUTDIR=data/shared/eldrow
 LOC=data/local/eldrow
+OUT="$OUTDIR/eldrow.csv"
 LOG="$LOC/eldrow.log"
-mkdir -p "$LOC"
+mkdir -p "$OUTDIR" "$LOC"
 
-echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] eldrow longest-stall search" | tee -a "$LOG"
+echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] eldrow longest-stall search -> $OUT" \
+    | tee -a "$LOG"
 # `${ARGS[@]+...}` guards the empty-array-under-set-u abort on macOS bash 3.2;
 # the tool errors on a missing mode, so an argless run reaches it and is refused.
 ARGS=("$@")
-python3 tools/eldrow_run.py ${ARGS[@]+"${ARGS[@]}"} 2>&1 | tee -a "$LOG"
+python3 tools/eldrow_run.py --out "$OUT" ${ARGS[@]+"${ARGS[@]}"} 2>&1 | tee -a "$LOG"

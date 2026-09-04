@@ -29,6 +29,7 @@ MODE IS REQUIRED (--beam / --heuristic / --exact): --exact on a big list would
 hang, and the searches need a target, so pick one explicitly.
 """
 import argparse
+import csv
 import os
 import random
 import sys
@@ -40,6 +41,30 @@ import random
 
 from eldrow import beam_stall, heuristic_search, longest_chain
 from wordle import load_words
+
+
+def _record(args, mode, words, n_words, target, result, kind, line, secs, settings):
+    """Append one row describing this run. One writer, so the three modes cannot
+    drift apart in what they record.
+
+    Every knob that changes WHAT was computed is a column, not just a filename: a
+    beam to target 15 and an exact search over 8 words are different quantities,
+    and `kind` says outright whether the number is exact or a lower bound -- the
+    beam and the single-level searches only ever find a chain, never prove one is
+    longest.
+    """
+    if not args.out:
+        return
+    fresh = not os.path.exists(args.out) or os.path.getsize(args.out) == 0
+    os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
+    with open(args.out, "a", newline="") as fh:
+        w = csv.writer(fh)
+        if fresh:
+            w.writerow(["mode", "words", "n_words", "target", "result", "kind",
+                        "settings", "secs", "line"])
+        w.writerow([mode, words, n_words, target, result, kind, settings,
+                    "%.3f" % secs, " ".join(line)])
+    print("wrote %s" % args.out)
 
 
 def main():
@@ -76,7 +101,18 @@ def main():
                     help="exact: pruning bound (see eldrow.py)")
     ap.add_argument("--seed", type=int, default=0,
                     help="seed for --sample and for --rand-top")
+    ap.add_argument("--out", help="CSV to append the run's result to")
+    ap.add_argument("--no-out", action="store_true",
+                    help="print only, save nothing (must be explicit)")
     args = ap.parse_args()
+
+    if not args.out and not args.no_out:
+        ap.error("give --out FILE, or --no-out to save nothing.\n"
+                 "A beam over the full dictionary can run a long time, and a run "
+                 "with nowhere to put its answer is a run thrown away; prefer the "
+                 "wrapper, solver/run-eldrow.sh.")
+    if args.out and args.no_out:
+        ap.error("--out and --no-out are mutually exclusive")
 
     if args.beam:
         if args.target < 1:
@@ -100,9 +136,15 @@ def main():
                                      beam_cap=args.beam_cap, key=args.key)
         print("deepest chain found: %d" % depth)
         print("line: %s" % " ".join(line))
-        print("  in %.1fs" % (time.time() - t0))
+        secs = time.time() - t0
+        print("  in %.1fs" % secs)
         if depth < args.target:
             print("(did not reach the target -- a lower bound, not a failure proof)")
+        _record(args, "beam-rand" if args.rand_top else "beam", args.words,
+                len(words), args.target, depth, "lower-bound", line, secs,
+                "size=%d,cap=%s,key=%s,rand_top=%d,seed=%d"
+                % (args.size, "none" if args.rand_top else args.beam_cap,
+                   args.key, args.rand_top, args.seed))
         return
 
     if args.heuristic:
@@ -115,9 +157,12 @@ def main():
         depth, line = heuristic_search(words, args.target, selector=args.heuristic)
         print("deepest chain found: %d" % depth)
         print("line: %s" % " ".join(line))
-        print("  in %.1fs" % (time.time() - t0))
+        secs = time.time() - t0
+        print("  in %.1fs" % secs)
         if depth < args.target:
             print("(did not reach the target -- a lower bound, not a failure proof)")
+        _record(args, "heuristic-" + args.heuristic, args.words, len(words),
+                args.target, depth, "lower-bound", line, secs, "")
         return
 
     # --exact
@@ -133,7 +178,12 @@ def main():
     length, line = longest_chain(words, bound=args.bound)
     print("longest chain (guesses to a singleton): %d" % length)
     print("line: %s" % " ".join(line))
-    print("  in %.1fs" % (time.time() - t0))
+    secs = time.time() - t0
+    print("  in %.1fs" % secs)
+    scope = ("sample%d/seed%d" % (args.sample, args.seed) if args.sample
+             else "limit%d" % args.limit)
+    _record(args, "exact", scope, len(words), "", length, "exact", line, secs,
+            "bound=%s" % args.bound)
 
 
 if __name__ == "__main__":
