@@ -71,8 +71,9 @@ if [ $# -eq 0 ]; then
   # shares no search code with the solver: no depth cap, a maximum rather than a
   # minimum, and no constraint struct at all, since with the answer fixed each
   # guess's effect precomputes to a bitset and the state reduces to the legal set.
-  # Single-threaded, so no OpenMP.
-  gcc $BASE -o antistall antistall.c
+  # --longest parallelises over ANSWERS, which are independent searches sharing
+  # only the incumbent and the (self-verifying) table, so it wants OpenMP.
+  gcc $BASE $OMP -o antistall antistall.c
   echo "built ./optturns, ./hardturns, ./mmturns, ./pairsplit, ./strturns, ./strguess, ./greens and ./antistall  (5 letters)"
   exit 0
 fi

@@ -262,6 +262,14 @@ static inline void tt_put(uint64_t h0, uint64_t h1, int val, int bestg) {
 
 /* ------------------------------------------------------- per-answer setup */
 
+/* CPU time is the wrong clock once threads exist: clock() sums across them and
+ * would report a 20-thread run as taking 20x as long as it did. */
+static double wall_time(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (double)ts.tv_sec + 1e-9 * (double)ts.tv_nsec;
+}
+
 typedef struct { int bound, g; } Cand;
 
 typedef struct {
@@ -298,6 +306,12 @@ typedef struct {
  * and it would have quietly become the whole runtime. */
 #define DEDUP_BITS 15
 #define DEDUP_SIZE (1 << DEDUP_BITS)
+
+static void ctx_free(Ctx *c) {
+    free(c->delta); free(c->spent); free(c->cand);
+    free(c->dedup); free(c->dstamp); free(c->lmask); free(c->gmask);
+    free(c);
+}
 
 static Ctx *ctx_new(void) {
     Ctx *c = calloc(1, sizeof(Ctx));
@@ -658,7 +672,7 @@ static int can_reach(Ctx *c, int depth, int nL, uint64_t h0, uint64_t h1,
         if (c->next_beat)
             printf("        ... %s still trying for %d: %lld nodes, %.0fs\n",
                    c->cur_answer, c->cur_need, c->nodes,
-                   (double)clock() / CLOCKS_PER_SEC - c->cur_t0);
+                   wall_time() - c->cur_t0);
         c->next_beat = c->nodes + 4000000;
         fflush(stdout);
     }
@@ -865,13 +879,52 @@ static void longest_line(Ctx *c, int ai, int need, char *out, size_t outsz) {
 }
 
 /* --longest: the longest game any answer admits, over the whole answer list. */
-static int run_longest(Ctx *c, FILE *out, int *todo, int ntodo,
+/* --longest, run across THREADS.
+ *
+ * The answers are independent searches, so they parallelise over the answer list;
+ * what they share is the incumbent and the transposition table.
+ *
+ * WHY RACING THE INCUMBENT IS SAFE.  can_reach is MONOTONE in its target: an
+ * answer that cannot reach k cannot reach anything above k. So an answer retired
+ * against whatever bar happened to be current stays retired against the final,
+ * higher one, and nothing has to be revisited -- exactly the property that made
+ * one sequential pass sufficient. Threads may therefore read a stale (lower) bar
+ * and merely do redundant work; they can never wrongly retire an answer. Each
+ * loop re-reads the bar, so a thread that passes keeps climbing until it fails.
+ *
+ * The TABLE is shared and salted per answer, and its entries are self-verifying,
+ * so concurrent writers cost at worst a recompute, never a wrong value.
+ *
+ * PER-THREAD COST is one Ctx: the 21 MB DELTA table dominates, plus ~7 MB of
+ * candidate arena, so about 28 MB a thread on top of whatever --tt-bits asks for.
+ */
+static int run_longest(Ctx *proto, FILE *out, int *todo, int ntodo,
                        int nseen, int resumed_floor) {
+    (void)proto;
+    int nthreads = 1;
+#ifdef _OPENMP
+    nthreads = omp_get_max_threads();
+#endif
+    fprintf(stderr, "threads: %d (%d MB of per-thread search state)\n",
+            nthreads, (int)(nthreads * ((size_t)NG * BSW * 8
+                     + (size_t)MAXD * NG * sizeof(Cand)) / (1024 * 1024)));
+
+    Ctx **ctxs = malloc((size_t)nthreads * sizeof(Ctx *));
+    for (int t = 0; t < nthreads; t++) ctxs[t] = ctx_new();
+
     /* PHASE A -- greedy lower bound per answer, which is also the visit order. */
     fprintf(stderr, "phase A: greedy playout for %d answers\n", ntodo);
     Cand *order = malloc((size_t)ntodo * sizeof(Cand));
-    double ta = (double)clock() / CLOCKS_PER_SEC;
+    double ta = wall_time();
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic, 4)
+#endif
     for (int k = 0; k < ntodo; k++) {
+        int tid = 0;
+#ifdef _OPENMP
+        tid = omp_get_thread_num();
+#endif
+        Ctx *c = ctxs[tid];
         ctx_load_answer(c, todo[k]);
         uint64_t h0, h1;
         int nL = intersect(BS_ALL, BS_ALL, c->arena[0], &h0, &h1);
@@ -879,87 +932,113 @@ static int run_longest(Ctx *c, FILE *out, int *todo, int ntodo,
         order[k].g = todo[k];
     }
     qsort(order, ntodo, sizeof(Cand), cand_cmp);
+
     int incumbent = resumed_floor;
     int witness = -1;
     for (int k = 0; k < ntodo; k++)
         if (order[k].bound > incumbent) { incumbent = order[k].bound; witness = order[k].g; }
     fprintf(stderr, "phase A done in %.1fs: best greedy %d (%s), worst %d\n",
-            (double)clock() / CLOCKS_PER_SEC - ta, order[0].bound,
-            AWORD[order[0].g], order[ntodo - 1].bound);
+            wall_time() - ta, order[0].bound, AWORD[order[0].g],
+            order[ntodo - 1].bound);
 
-    /* PHASE B -- ask each answer only whether it BEATS the incumbent. */
-    fprintf(stderr, "phase B: testing against a rising incumbent, best greedy first\n");
     char line[4096];
     line[0] = 0;
     if (witness >= 0) {
-        ctx_load_answer(c, witness);
-        longest_line(c, witness, incumbent, line, sizeof line);
-        /* Print it NOW. Greedy has already found a real, playable sequence; there
-         * is no reason to withhold it until something beats it, which on a long
-         * run can be hours. */
+        ctx_load_answer(ctxs[0], witness);
+        longest_line(ctxs[0], witness, incumbent, line, sizeof line);
+        /* Print it NOW. Greedy has a real playable sequence in hand; withholding
+         * it until something beats it can mean hours of silence. */
         printf("        BEST SO FAR (greedy): %d  (%s)  %s\n",
                incumbent, AWORD[witness], line);
         fflush(stdout);
     }
-    int unknown = 0;
+
+    fprintf(stderr, "phase B: testing against a rising incumbent, best greedy first\n");
+    int unknown = 0, done = 0;
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic, 1)
+#endif
     for (int k = 0; k < ntodo; k++) {
+        int tid = 0;
+#ifdef _OPENMP
+        tid = omp_get_thread_num();
+#endif
+        Ctx *c = ctxs[tid];
         int ai = order[k].g;
-        double t0 = (double)clock() / CLOCKS_PER_SEC;
+        double t0 = wall_time();
         ctx_load_answer(c, ai);
         uint64_t h0, h1;
         int pool;
         uint32_t umask;
         uint8_t gmk;
         int nL = start_state(c, ai, NULL, 0, &h0, &h1, &pool, &umask, &gmk);
-        int floor_tested = incumbent;
-        int record = 0;
-        c->cur_need = incumbent + 1;
         c->cur_t0 = t0;
-        /* Re-stated each iteration: the incumbent rises inside this loop, so a
-         * target captured once would have the heartbeat reporting a stale bar. */
-        c->cur_need = incumbent + 1;
-        while (can_reach(c, 0, nL, h0 ^ c->salt, h1 ^ c->salt, pool,
-                         incumbent + 1, umask, gmk)) {
-            incumbent++;
-            witness = ai;
-            record = 1;
-            /* Printed HERE, the moment the incumbent rises, not after the answer
-             * finishes: an answer can take half an hour, and a record found in
-             * its first minute is the most interesting thing the run has to say.
-             * The witness is rebuilt now too, while this answer's entries are
-             * still hot in the table. */
-            longest_line(c, ai, incumbent, line, sizeof line);
-            printf("        NEW LONGEST: %d  (%s)  %s\n", incumbent, AWORD[ai], line);
-            fflush(stdout);
-            c->cur_need = incumbent + 1;
+
+        int floor_tested, record = 0;
+        for (;;) {
+            int bar;
+#ifdef _OPENMP
+#pragma omp atomic read
+#endif
+            bar = incumbent;
+            floor_tested = bar;
+            c->cur_need = bar + 1;
+            if (!can_reach(c, 0, nL, h0 ^ c->salt, h1 ^ c->salt, pool,
+                           bar + 1, umask, gmk))
+                break;
+            /* This answer reaches bar + 1. Publish it, and rebuild the witness
+             * here while this answer's entries are still hot in the table. */
+#ifdef _OPENMP
+#pragma omp critical (antistall_record)
+#endif
+            {
+                if (bar + 1 > incumbent) {
+                    incumbent = bar + 1;
+                    witness = ai;
+                    record = 1;
+                    longest_line(c, ai, incumbent, line, sizeof line);
+                    printf("        NEW LONGEST: %d  (%s)  %s\n",
+                           incumbent, AWORD[ai], line);
+                    fflush(stdout);
+                }
+            }
         }
         if (c->overflow) {
             fprintf(stderr, "internal: recursion hit MAXD=%d on %s -- raise it\n",
                     MAXD, AWORD[ai]);
             exit(1);
         }
-        double secs = (double)clock() / CLOCKS_PER_SEC - t0;
+        double secs = wall_time() - t0;
         const char *verdict = c->budget_blown ? "unknown" : (record ? "record" : "no");
-        if (c->budget_blown) unknown++;
-        printf("[%d/%d] %s greedy=%d %s  nodes=%lld %.2fs\n",
-               nseen + k + 1, nseen + ntodo, AWORD[ai], order[k].bound, verdict,
-               c->nodes, secs);
-        fflush(stdout);
-        if (out) {
-            /* `value` is filled ONLY on a record -- for every other answer the run
-             * never computed one, and writing anything there would invent it. The
-             * `floor` column says what bar the answer was actually tested against,
-             * which is what makes a resumed run auditable. */
-            char val[16];
-            if (record) snprintf(val, sizeof val, "%d", incumbent);
-            else        val[0] = 0;
-            fprintf(out, "%s,%d,%s,%s,%d,%lld,%.3f,%s\n", AWORD[ai], order[k].bound,
-                    verdict, val, floor_tested + 1, c->nodes, secs,
-                    record ? line : "");
-            fflush(out);
+#ifdef _OPENMP
+#pragma omp critical (antistall_report)
+#endif
+        {
+            if (c->budget_blown) unknown++;
+            done++;
+            printf("[%d/%d] %s greedy=%d %s  nodes=%lld %.2fs\n",
+                   nseen + done, nseen + ntodo, AWORD[ai], order[k].bound, verdict,
+                   c->nodes, secs);
+            fflush(stdout);
+            if (out) {
+                /* `value` is filled ONLY on a record -- for every other answer the
+                 * run never computed one, and writing anything there would invent
+                 * it. `floor` says what bar the answer was actually tested
+                 * against, which is what makes a resumed run auditable. */
+                char val[16];
+                if (record) snprintf(val, sizeof val, "%d", incumbent);
+                else        val[0] = 0;
+                fprintf(out, "%s,%d,%s,%s,%d,%lld,%.3f,%s\n", AWORD[ai],
+                        order[k].bound, verdict, val, floor_tested + 1,
+                        c->nodes, secs, record ? line : "");
+                fflush(out);
+            }
         }
     }
     free(order);
+    for (int t = 0; t < nthreads; t++) ctx_free(ctxs[t]);
+    free(ctxs);
+
     printf("\nLONGEST GAME: %d guesses, answer %s\n  %s\n", incumbent,
            witness >= 0 ? AWORD[witness] : "(none)", line);
     if (unknown)
@@ -980,6 +1059,7 @@ static void usage(void) {
         "  --limit N        stop after N answers\n"
         "  --tt-bits B      transposition table size, 2^B entries (default 26)\n"
         "  --max-nodes N    abandon an answer past N states, reporting no number\n"
+        "  --threads N      threads for --longest (default: all cores)\n"
         "  --longest        find the LONGEST GAME any answer admits, and stop --\n"
         "                   a different, much cheaper question than the per-answer\n"
         "                   sweep, since only the maximum is computed\n"
@@ -1013,6 +1093,14 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--no-prune"))                    PRUNE = 0;
         else if (!strcmp(argv[i], "--longest"))                     LONGEST = 1;
         else if (!strcmp(argv[i], "--show-bound"))                  SHOWBOUND = 1;
+        else if (!strcmp(argv[i], "--threads") && i + 1 < argc) {
+#ifdef _OPENMP
+            omp_set_num_threads(atoi(argv[++i]));
+#else
+            i++;
+            fprintf(stderr, "built without OpenMP; --threads ignored\n");
+#endif
+        }
         else if (!strcmp(argv[i], "--guess-list") && i + 1 < argc)  guesslist = argv[++i];
         else if (!strcmp(argv[i], "--data") && i + 1 < argc)        datadir = argv[++i];
         else if (!strcmp(argv[i], "--after") && i + 1 < argc) {
@@ -1174,13 +1262,13 @@ int main(int argc, char **argv) {
         return 0;
     }
 
-    double t_start = (double)clock() / CLOCKS_PER_SEC;
+    double t_start = wall_time();
     if (LONGEST) {
         if (resumed_floor)
             fprintf(stderr, "resuming with incumbent %d from %d recorded answers\n",
                     resumed_floor, nseen);
         int rc = run_longest(c, out, todo, ntodo, nseen, resumed_floor);
-        printf("done in %.1fs\n", (double)clock() / CLOCKS_PER_SEC - t_start);
+        printf("done in %.1fs (wall)\n", wall_time() - t_start);
         if (out) fclose(out);
         return rc;
     }
@@ -1188,9 +1276,9 @@ int main(int argc, char **argv) {
         int ai = todo[k];
         char line[4096];
         line[0] = 0;
-        double t0 = (double)clock() / CLOCKS_PER_SEC;
+        double t0 = wall_time();
         int v = solve_one(c, ai, after, nafter, line, sizeof line);
-        double secs = (double)clock() / CLOCKS_PER_SEC - t0;
+        double secs = wall_time() - t0;
         if (v < 0) {
             printf("[%d/%d] %s = ABORTED  nodes=%lld edges=%lld %.2fs\n",
                    k + 1, ntodo, AWORD[ai], c->nodes, c->edges, secs);
@@ -1205,8 +1293,7 @@ int main(int argc, char **argv) {
         fflush(stdout);
         if (out) fflush(out);
     }
-    printf("done: %d answers in %.1fs\n", ntodo,
-           (double)clock() / CLOCKS_PER_SEC - t_start);
+    printf("done: %d answers in %.1fs (wall)\n", ntodo, wall_time() - t_start);
     if (out) fclose(out);
     return 0;
 }
