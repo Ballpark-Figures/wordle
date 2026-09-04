@@ -148,8 +148,9 @@ def run_greens(apath, gpath, ppath, depth, openers, treedir=None, topk=0,
            "--tt-bits", "20", "--threads", "1"]
     if topk:
         cmd += ["--topk", str(topk)]
-    if must_win:
-        cmd += ["--must-win"]
+    # ALWAYS explicit, in both directions: the default has moved once already and
+    # a gate that leans on it would silently start checking the other objective.
+    cmd += ["--must-win"] if must_win else ["--may-lose"]
     for w in openers:
         cmd += ["--opener", w]
     if treedir:
@@ -204,7 +205,7 @@ def check_values(tmp, answers, guesses, depths, openers, values):
         plain = run_greens(apath, gpath, ppath, depth, openers)
         mustw = run_greens(apath, gpath, ppath, depth, openers, must_win=True)
         for w in openers:
-            wp = greens.solve_opener(w, cands, gtuple, depth)
+            wp = greens.solve_opener(w, cands, gtuple, depth, must_win=False)
             wm = greens.solve_opener(w, cands, gtuple, depth, must_win=True)
             if plain.get(w) != wp:
                 fail("plain d=%d %s: C says %s, reference says %s"
@@ -417,7 +418,7 @@ def check_binds(answers, guesses, depths, openers, values):
                     free += 1
                 elif not greens.has_yellow(code):
                     free += solve_nowin(sub, gtuple, depth - 1, memo)
-            mine = greens.solve_opener(w, cands, gtuple, depth)
+            mine = greens.solve_opener(w, cands, gtuple, depth, must_win=False)
             if mine != free:
                 fail("d=%d %s: plain says %d, the independent version says %d"
                      % (depth, w, mine, free))
@@ -439,8 +440,7 @@ def run_sweep(apath, gpath, ppath, depth, outpath=None, topk=0, must_win=False):
     cmd += ["--tt-bits", "20", "--threads", "2"]
     if topk:
         cmd += ["--topk", str(topk)]
-    if must_win:
-        cmd += ["--must-win"]
+    cmd += ["--must-win"] if must_win else ["--may-lose"]
     p = subprocess.run(cmd, capture_output=True, text=True, cwd=MATH)
     if p.returncode != 0:
         fail("greens --sweep exited %d: %s" % (p.returncode, p.stderr.strip()[-400:]))

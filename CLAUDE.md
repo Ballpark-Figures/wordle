@@ -625,16 +625,21 @@ its state arithmetic against `strspace.py` over a shared deterministic walk — 
   lucky 1/6 does. **A single real badge would settle both.**
 - **TWO OBJECTIVES, AND THEY ARE DIFFERENT QUANTITIES.** Never quote one as the other
   or put them in one table.
-  - **DEFAULT (the badge question, user's correction 2026-09-04):** maximise the answers
-    **WON WITHIN 6 WITH NO YELLOW**. ONE EVENT per answer — it counts iff the play both
+  - **`--may-lose` — THE BADGE QUESTION** (user's correction 2026-09-04): maximise the
+    answers **WON WITHIN 6 WITH NO YELLOW**. ONE EVENT per answer — it counts iff the play both
     stays yellow-free AND finishes inside the cap. An answer that draws a yellow is
     simply LOST and **the strategy owes it nothing afterwards; it may abandon that
     game.** So yellow branches are never searched, no state is ever INFEASIBLE, and
     this is much the cheaper of the two.
-  - **`--must-win`:** the same maximisation SUBJECT TO still winning EVERY answer within
-    6. A strictly smaller strategy space, so **its value is always <= the default's**.
-  - **THE DISTINCTION IN ONE LINE:** default asks "how often can I win in 6 with all
-    greens?"; must-win asks "if I refuse to ever lose a game, how often can I win in 6
+  - **`--must-win` — THE DEFAULT:** the same maximisation SUBJECT TO still winning EVERY
+    answer within 6. A strictly smaller strategy space, so **its value is always <=
+    `--may-lose`'s**. **IT IS THE DEFAULT ONLY BECAUSE RUNS WERE QUEUED AGAINST IT**
+    (user, 2026-09-04) — not because it is the headline quantity, which it is not. A
+    silent change of meaning under an unchanged command line is the worst thing a flag
+    can do, which is why the polarity went this way and why the gate now passes the
+    objective EXPLICITLY in both directions rather than leaning on the default.
+  - **THE DISTINCTION IN ONE LINE:** `--may-lose` asks "how often can I win in 6 with all
+    greens?"; the default asks "if I refuse to ever lose a game, how often can I win in 6
     with all greens?". **Only the first is the badge question.**
   - **HOW THIS WAS GOT WRONG, so it is not repeated:** the user's answer was "Max badge,
     requiring that we win. Once we get a yellow, we stop checking." That was read as
@@ -753,15 +758,20 @@ its state arithmetic against `strspace.py` over a shared deterministic walk — 
   yellow, a yellow-free line, an infeasible opener, a binding win-constraint or a set of
   tied openers never occurred. Run it alongside `solver/validate.sh` and
   `tools/checkpatterns.py`.
-- **THE TREE DIFFERS BY OBJECTIVE, and ONLY `--opener` writes one — a sweep writes NO
-  tree at all** (`write_tree` is called from the single-opener path only, the same gap
-  `optturns --optimal-only` has; the wrapper's `mkdir` still leaves an empty `trees/`,
-  which is misleading). Under the default the tree is the **badge-alive part only**: a
-  yellow ends the branch, so the file holds exactly one line per BADGED answer and its
-  line count equals the reported count. Under `--must-win` it covers EVERY answer,
-  post-yellow play included — which is what lets `checkgreens.py` verify the guarantee
-  independently. Recover the winner's tree with `--opener <winner>` at the same depth,
-  K and objective; the search is deterministic, so it reproduces the value.
+- **A SWEEP KEEPS THE BEST TREE**, written on every improvement to
+  `shared/greens/trees_<settings>/<opener>.txt.gz` — so an interrupted run leaves the
+  best STRATEGY and not merely its score, which was the gap `optturns --optimal-only`
+  still has. Superseded openers keep their files, making the directory a record of how
+  the incumbent improved; the final report names the winner. It is written OUTSIDE the
+  critical section (per-thread arena, self-verifying table, one file per opener), so a
+  slow tree walk cannot stall the other threads.
+- **WHAT IS IN A TREE DEPENDS ON THE OBJECTIVE.** Under `--may-lose` it is the
+  **badge-alive part only**: a yellow ends the branch, so the file holds exactly one
+  line per BADGED answer and its line count IS the reported score. Under must-win it
+  covers EVERY answer, post-yellow play included — which is what lets `checkgreens.py`
+  verify the guarantee independently. **The tree directory is per (depth, K, objective)**
+  for the same reason the CSV is: one opener's tree differs between them and a shared
+  directory would have them clobbering each other.
 - **RUNS WITH DIFFERENT SETTINGS GO SIDE BY SIDE.** The wrapper guards on the OUTPUT
   FILE, not the process name: two runs appending to one CSV would each resume from it
   and read the other's rows as work already done, silently skipping openers neither

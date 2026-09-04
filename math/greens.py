@@ -20,7 +20,8 @@ number ships.
 TWO OBJECTIVES LIVE HERE, and they are DIFFERENT QUANTITIES.  Never quote one
 as the other, and never put them in one table.
 
-  PLAIN (the default, and the one asked for -- user, 2026-09-04):
+  PLAIN (`must_win=False`, `--may-lose`) -- THE BADGE QUESTION, and the one
+  originally asked for:
 
       MAXIMISE the number of answers WON WITHIN `depth` GUESSES WITH NO YELLOW.
 
@@ -30,7 +31,8 @@ as the other, and never put them in one table.
       afterwards -- it may abandon that game entirely.  So yellow branches are
       never searched, which is also why this is much the cheaper of the two.
 
-  MUST-WIN (`must_win=True`, `--must-win`):
+  MUST-WIN (the DEFAULT -- because runs were queued against it, which is not
+  the same as it being the headline quantity; it is not):
 
       The same maximisation SUBJECT TO the strategy still resolving EVERY answer
       within `depth`, yellow ones included.  Lexicographic: the guarantee first,
@@ -167,7 +169,7 @@ def beam_order(cands, guesses):
     return [g for _, _, g in scored]
 
 
-def solve(cands, guesses, depth, memo=None, fmemo=None, topk=0, must_win=False):
+def solve(cands, guesses, depth, memo=None, fmemo=None, topk=0, must_win=True):
     """(value, best guess) for a state whose badge is still ALIVE.
 
     value is INFEASIBLE (-1) when no strategy wins every candidate within
@@ -246,7 +248,7 @@ def opener_order(answers, guesses):
     return beam_order(tuple(sorted(answers)), guesses)
 
 
-def solve_opener(opener, answers, guesses, depth, topk=0, must_win=False):
+def solve_opener(opener, answers, guesses, depth, topk=0, must_win=True):
     """Value of committing to `opener` as the first guess.
 
     The root is a branching point like any other, so this is just the guess loop

@@ -192,8 +192,15 @@ static int      TOPK = 0;
  *
  * Plain asks "how often can I win in 6 with all greens?".  Must-win asks "if I
  * refuse to ever lose a game, how often can I win in 6 with all greens?".  Only
- * the first is the badge question. */
-static int      MUSTWIN = 0;
+ * the first is the badge question.
+ *
+ * MUST-WIN IS THE DEFAULT, which is NOT the same as it being the headline
+ * quantity -- it is not.  The default is where it is because runs were already
+ * queued against it (user, 2026-09-04), and a silent change of meaning under an
+ * unchanged command line is the worst thing a flag can do.  `--may-lose` asks
+ * for the badge question.  The objective is in every filename either way, so no
+ * file's name ever means two different things. */
+static int      MUSTWIN = 1;
 
 static int      BRANCH = NPAT - 1;   /* measured: non-winning bins, any guess */
 static int      GBRANCH = 31;        /* measured: yellow-free non-green bins */
@@ -1072,6 +1079,29 @@ static int write_tree(const char *dir, int g, int depth, Ctx *ctx) {
     return rc;
 }
 
+/* Write the tree of an opener that has just become the incumbent.
+ *
+ * WHY ON EVERY IMPROVEMENT rather than once at the end: a screen this long gets
+ * interrupted, and a run that kept only the winning NUMBER would leave the
+ * strategy behind -- which is the part anyone actually wants to play.  Files are
+ * named for the opener, so superseded ones stay too and the sequence is a free
+ * record of how the incumbent improved; the final report names the winner.
+ *
+ * Improvements are rare -- measured, 30 openers solved and a handful of
+ * improvements over 8400 processed -- so the cost is noise against the search. */
+static void write_best_tree(const char *dir, int g, int depth, Ctx *ctx, double t0) {
+    if (!dir) return;
+    double s1 = now_s();
+    if (write_tree(dir, g, depth, ctx) != 0)
+        fprintf(stderr, "%s: TREE FAILED to write\n", GWORD[g]);
+    else {
+        printf("[%7.0fs]   tree: %s/%s.txt.gz  (%.1fs)\n",
+               now_s() - t0, dir, GWORD[g], now_s() - s1);
+        fflush(stdout);
+    }
+}
+
+
 /* ------------------------------------------------------------------ main */
 
 static void usage(void) {
@@ -1088,10 +1118,11 @@ static void usage(void) {
       "  --tt-load/--tt-save FILE      warm start / snapshot\n"
       "  --threads N       OpenMP threads for the sweep\n"
       "  --report SECS     heartbeat interval during the walk (default 60, 0 off)\n"
-      "  --must-win        the OTHER objective: maximise the badge SUBJECT TO\n"
-      "                    winning every answer within the cap.  Default is the\n"
-      "                    badge question itself -- answers that draw a yellow\n"
-      "                    are lost and the strategy may abandon them.\n"
+      "  --may-lose        THE BADGE QUESTION: maximise the answers won within the\n"
+      "                    cap with no yellow.  An answer that draws a yellow is\n"
+      "                    lost and the strategy may abandon that game.\n"
+      "  --must-win        the default: the same maximisation SUBJECT TO winning\n"
+      "                    EVERY answer within the cap.  Always <= --may-lose.\n"
       "  --topk K, -k K    beam: recurse into the K evenest splitters at every\n"
       "                    branching point, the ROOT included -- so it examines K\n"
       "                    OPENERS too, and reports the best of THOSE, not of 12972.\n"
@@ -1123,7 +1154,8 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--report") && i + 1 < argc) REPORT_EVERY = atof(argv[++i]);
         else if ((!strcmp(argv[i], "--topk") || !strcmp(argv[i], "-k")) && i + 1 < argc)
             TOPK = atoi(argv[++i]);
-        else if (!strcmp(argv[i], "--must-win")) MUSTWIN = 1;
+        else if (!strcmp(argv[i], "--must-win")) MUSTWIN = 1;   /* the default */
+        else if (!strcmp(argv[i], "--may-lose")) MUSTWIN = 0;
         else if (!strcmp(argv[i], "--data") && i + 1 < argc) datadir = argv[++i];
         else if (!strcmp(argv[i], "--guess-list") && i + 1 < argc) guesslist = argv[++i];
         else if (!strcmp(argv[i], "--answer-list") && i + 1 < argc) answerlist = argv[++i];
@@ -1444,6 +1476,7 @@ int main(int argc, char **argv) {
             bestlist[nbest++] = g;
             printf("[%7.0fs] %s  badges=%d of %d  prob=%.5f  FIRST  %6.1fs\n",
                    now_s() - t0, GWORD[g], v, NA, (double)v / NA, dt);
+            write_best_tree(treedir, g, depth, c0, t0);
         } else if (v == INFEAS) infeas++;
         else cut++;
         if (out) {
@@ -1494,6 +1527,7 @@ int main(int argc, char **argv) {
             double s0 = now_s();
             int v = solve_opener(g, depth, inc, ctx);
             double dt = now_s() - s0;
+            int newbest = 0;
 #ifdef _OPENMP
 #pragma omp critical
 #endif
@@ -1521,6 +1555,7 @@ int main(int argc, char **argv) {
                         incumbent = v;
                         nbest = 0;
                         bestlist[nbest++] = g;
+                        newbest = 1;
                         printf("[%7.0fs] %s  badges=%d of %d  prob=%.5f  NEW BEST  %6.1fs\n",
                                now_s() - t0, GWORD[g], v, NA, (double)v / NA, dt);
                         fflush(stdout);
@@ -1537,6 +1572,12 @@ int main(int argc, char **argv) {
                     fflush(out);
                 }
             }
+            /* OUTSIDE the critical section deliberately: a tree walk can take a
+             * while and there is no reason to stall 17 other threads for it.
+             * Nothing is shared -- the arena is per-thread, the table is
+             * self-verifying, and the file is named for the opener, so two
+             * threads improving at once write two different files. */
+            if (newbest) write_best_tree(treedir, g, depth, ctx, t0);
         }
         free(ctx);
     }

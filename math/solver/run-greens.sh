@@ -12,16 +12,19 @@
 # WHAT THIS SOLVES, precisely.  TWO OBJECTIVES, and they are DIFFERENT
 # QUANTITIES -- never quote one as the other or put them in one table:
 #
-#   DEFAULT -- MAXIMISE the number of the 2315 answers WON WITHIN 6 GUESSES WITH
-#   NO YELLOW TILE.  One event per answer: it counts iff the play both stays
-#   yellow-free AND finishes inside the cap.  An answer that draws a yellow is
-#   simply lost, and the strategy owes it nothing afterwards -- it may abandon
-#   that game.  This is the badge question.
+#   --may-lose -- THE BADGE QUESTION.  MAXIMISE the number of the 2315 answers
+#   WON WITHIN 6 GUESSES WITH NO YELLOW TILE.  One event per answer: it counts
+#   iff the play both stays yellow-free AND finishes inside the cap.  An answer
+#   that draws a yellow is simply lost, and the strategy owes it nothing
+#   afterwards -- it may abandon that game.
 #
-#   --must-win -- the same maximisation SUBJECT TO the strategy still winning
-#   EVERY answer within 6, yellow ones included.  A strictly smaller strategy
-#   space, so its value is always <= the default's.  It answers "if I refuse to
-#   ever lose a game, how often can I win in 6 with all greens?".
+#   DEFAULT (--must-win) -- the same maximisation SUBJECT TO the strategy still
+#   winning EVERY answer within 6, yellow ones included.  A strictly smaller
+#   strategy space, so its value is always <= --may-lose's.  It answers "if I
+#   refuse to ever lose a game, how often can I win in 6 with all greens?".
+#
+#   MUST-WIN IS THE DEFAULT ONLY BECAUSE RUNS WERE QUEUED AGAINST IT, not
+#   because it is the headline quantity.  It is not.
 #
 # -k K BEAMS IT, and that changes what is being claimed.  With --topk the solver
 # recurses into only the K evenest-splitting guesses at every branching point,
@@ -40,11 +43,17 @@
 # are inferred rather than observed: that a FAILED game with no yellows does not
 # earn it, and that a lucky 1/6 does.
 #
-# THE TREE differs by objective, and only --opener writes one.  Under the default
-# it is the badge-alive part only: a yellow ends that branch, so the file holds
-# exactly one line per BADGED answer.  Under --must-win it covers every answer,
-# post-yellow play included, because there the strategy really does have to
-# finish those games.
+# THE SWEEP KEEPS THE BEST TREE.  Every time an opener improves the incumbent its
+# full strategy is written to trees_<settings>/<opener>.txt.gz, so an interrupted
+# run still leaves the best strategy found and not merely its score.  Superseded
+# openers keep their files, which makes the directory a record of how the
+# incumbent improved; the final report names the winner.
+#
+# WHAT IS IN A TREE depends on the objective.  Under --may-lose it is the
+# badge-alive part only: a yellow ends that branch, so the file holds exactly one
+# line per BADGED answer and its line count is the reported score.  Under
+# must-win it covers every answer, post-yellow play included, because there the
+# strategy really does have to finish those games.
 #
 # Ctrl-C stops it -- openers already finished are in the CSV (flushed per opener)
 # and a resume picks up from there, but the table is lost unless --tt-save ran.
@@ -59,7 +68,7 @@ DEPTH=6
 THREADS=18          # 18 cores here (6 performance + 12 efficiency)
 TTBITS=28           # 8.6 GB of 24 GB
 TOPK=0              # 0 = the exact search; K = beam width at every node
-MUSTWIN=0           # 1 = the other objective, see below
+MUSTWIN=1           # 1 = must-win (default); 0 = the badge question
 OPENERS=()
 
 while [ $# -gt 0 ]; do
@@ -70,6 +79,7 @@ while [ $# -gt 0 ]; do
         --opener)  OPENERS+=("$2"); shift 2 ;;
         -k|--topk) TOPK="$2";    shift 2 ;;
         --must-win) MUSTWIN=1;   shift ;;
+        --may-lose) MUSTWIN=0;   shift ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
     esac
 done
@@ -95,7 +105,8 @@ cd "$MATH" || exit 1
 [ -f data/local/patterns/patterns.npy ] || {
     echo "no pattern matrix -- run 'python3 build_patterns.py' from math/" >&2; exit 1; }
 
-mkdir -p "$SHR" "$LOC" "$SHR/trees"
+TREES="$SHR/trees_$SUF"
+mkdir -p "$SHR" "$LOC" "$TREES"
 
 # Output and log names are fixed by (depth, K, objective), so two runs with
 # DIFFERENT settings share nothing and may run side by side.
@@ -147,7 +158,7 @@ if [ ${#OPENERS[@]} -gt 0 ]; then
     echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] greens: named openers, $SUF $WARM" | tee -a "$LOG"
     ./solver/greens "${ARGS[@]}" "${KARGS[@]+"${KARGS[@]}"}" \
         --out "$OUT" \
-        --trees "$SHR/trees" \
+        --trees "$TREES" \
         --depth "$DEPTH" \
         --tt-bits "$TTBITS" --threads "$THREADS" $WARM \
         --tt-save "$TTBIN" \
@@ -158,6 +169,7 @@ fi
 echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] greens: opener screen, $SUF $WARM" | tee -a "$LOG"
 ./solver/greens --sweep "${KARGS[@]+"${KARGS[@]}"}" \
     --out "$OUT" \
+    --trees "$TREES" \
     --depth "$DEPTH" \
     --tt-bits "$TTBITS" --threads "$THREADS" $WARM \
     --tt-save "$TTBIN" \
