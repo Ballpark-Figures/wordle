@@ -91,16 +91,48 @@ fi
 
 cd "$MATH" || exit 1
 
-if pgrep -x greens >/dev/null; then
-    echo "greens is already running (pid $(pgrep -x greens | tr '\n' ' '))." >&2
-    echo "Attach to its output instead:  tail -F $MATH/$LOC/sweep.log" >&2
-    exit 1
-fi
 [ -x ./solver/greens ] || { echo "no greens binary -- run 'sh build.sh' in solver/" >&2; exit 1; }
 [ -f data/local/patterns/patterns.npy ] || {
     echo "no pattern matrix -- run 'python3 build_patterns.py' from math/" >&2; exit 1; }
 
 mkdir -p "$SHR" "$LOC" "$SHR/trees"
+
+# Output and log names are fixed by (depth, K, objective), so two runs with
+# DIFFERENT settings share nothing and may run side by side.
+if [ ${#OPENERS[@]} -gt 0 ]; then
+    OUT="$SHR/openers_$SUF.csv"
+    LOG="$LOC/run_$SUF.log"
+else
+    OUT="$SHR/best_opener_$SUF.csv"
+    LOG="$LOC/sweep_$SUF.log"
+fi
+
+# THE CONFLICT IS THE OUTPUT FILE, NOT THE BINARY.  Refusing on the process name
+# blocked perfectly safe pairs -- two objectives, or two beam widths, which have
+# separate CSVs, tables and logs.  What must never happen is two runs appending
+# to ONE CSV: each resumes from it, so they would read each other's rows as work
+# already done and silently skip openers neither had solved.  So the check is
+# for a live run writing THIS file, which also catches one started before this
+# guard existed, since it reads the actual command lines.
+CLASH=$(ps -Ao pid,command | grep "solver/greens " | grep -v grep         | grep -F -- "--out $OUT" | awk '{print $1}' | tr '\n' ' ')
+if [ -n "$CLASH" ]; then
+    echo "a greens run is ALREADY writing $OUT (pid $CLASH)." >&2
+    echo "Two runs sharing one CSV would corrupt each other's resume." >&2
+    echo "Attach to it instead:  tail -F $MATH/$LOG" >&2
+    exit 1
+fi
+
+# Different settings: allowed, but say what it costs.  The table is the whole
+# memory footprint and it is per-process, and threads are not shared out.
+OTHERS=$(pgrep -x greens | tr '\n' ' ')
+if [ -n "$OTHERS" ]; then
+    GB=$(awk "BEGIN{printf \"%.1f\", 32 * 2^$TTBITS / 1e9}")
+    echo "NOTE: greens is already running with other settings (pid $OTHERS)."
+    echo "      That is fine -- each (depth, K, objective) has its own CSV, table and log."
+    echo "      This run adds ${GB} GB of table and asks for $THREADS threads on top of"
+    echo "      whatever those are using.  Pass --tt-bits / --threads to share the"
+    echo "      machine deliberately rather than oversubscribing it."
+fi
 
 # A table snapshot is reused when present, so a re-run resumes warm.  The key is
 # salted with the word lists AND with this program's own constant, so an
@@ -110,25 +142,23 @@ TTBIN="$LOC/tt_$SUF.bin"
 [ -f "$TTBIN" ] && WARM="--tt-load $TTBIN"
 
 if [ ${#OPENERS[@]} -gt 0 ]; then
-    OUT="$SHR/openers_$SUF.csv"
     ARGS=()
     for w in "${OPENERS[@]}"; do ARGS+=(--opener "$w"); done
-    echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] greens: named openers, $SUF $WARM" | tee -a "$LOC/run.log"
+    echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] greens: named openers, $SUF $WARM" | tee -a "$LOG"
     ./solver/greens "${ARGS[@]}" "${KARGS[@]+"${KARGS[@]}"}" \
         --out "$OUT" \
         --trees "$SHR/trees" \
         --depth "$DEPTH" \
         --tt-bits "$TTBITS" --threads "$THREADS" $WARM \
         --tt-save "$TTBIN" \
-        2>&1 | tee -a "$LOC/run.log"
+        2>&1 | tee -a "$LOG"
     exit "${PIPESTATUS[0]}"
 fi
 
-OUT="$SHR/best_opener_$SUF.csv"
-echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] greens: opener screen, $SUF $WARM" | tee -a "$LOC/sweep.log"
+echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] greens: opener screen, $SUF $WARM" | tee -a "$LOG"
 ./solver/greens --sweep "${KARGS[@]+"${KARGS[@]}"}" \
     --out "$OUT" \
     --depth "$DEPTH" \
     --tt-bits "$TTBITS" --threads "$THREADS" $WARM \
     --tt-save "$TTBIN" \
-    2>&1 | tee -a "$LOC/sweep.log"
+    2>&1 | tee -a "$LOG"

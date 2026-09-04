@@ -762,6 +762,12 @@ its state arithmetic against `strspace.py` over a shared deterministic walk — 
   post-yellow play included — which is what lets `checkgreens.py` verify the guarantee
   independently. Recover the winner's tree with `--opener <winner>` at the same depth,
   K and objective; the search is deterministic, so it reproduces the value.
+- **RUNS WITH DIFFERENT SETTINGS GO SIDE BY SIDE.** The wrapper guards on the OUTPUT
+  FILE, not the process name: two runs appending to one CSV would each resume from it
+  and read the other's rows as work already done, silently skipping openers neither
+  solved. Different (depth, K, objective) means different CSV, table and log, so it is
+  allowed and merely warns about the table GB and threads it adds. The check reads live
+  COMMAND LINES, so it also catches a run started before the guard existed.
 - Data under `math/data/{shared,local}/greens/`; trees in `shared/greens/trees/`.
   **Depth, K and the objective are all in the filename** — three different quantities
   must never share a file.
