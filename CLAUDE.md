@@ -780,6 +780,23 @@ its state arithmetic against `strspace.py` over a shared deterministic walk — 
   verify the guarantee independently. **The tree directory is per (depth, K, objective)**
   for the same reason the CSV is: one opener's tree differs between them and a shared
   directory would have them clobbering each other.
+- **THE CSV SELF-DESCRIBES, AND A RESUME REFUSES A FOREIGN ONE.** Its first line is
+  `# greens objective=... topk=... depth=... guesses=... answers=...`, and a run whose
+  stamp disagrees EXITS instead of resuming. **This is a scar**: every result from
+  before the two objectives existed (2026-09-03 evening through 09-04 13:50, k1 to
+  k13000 plus the live k10000) was written under a name that later came to mean the
+  OTHER objective, so a `--may-lose` resume silently continued a MUST-WIN search and
+  reported it as its own — under the correct may-lose banner, which is what made it
+  invisible. Depth was in every row; the objective and K were in the PATH ALONE, and a
+  filename cannot check itself. Those files are renamed `*_mustwin.csv` with the stamp
+  backfilled. **A file with no stamp is REFUSED, not trusted.**
+- **NOTHING SAVES THE TT ANY MORE.** `tt_save` sits at the end of `main`, so it fired
+  only on NORMAL COMPLETION — exactly when the table is worthless, since a finished
+  run's CSV marks every opener done and a resume then exits without reading it. The
+  case that would pay, an interrupted run, saved nothing because Ctrl-C never reaches
+  that line. Backwards, and 8.6 GB per settings combination (~160 GB) to be so. It was
+  copied from `run-ans-sweep.sh`, where a snapshot IS load-bearing. `--tt-load` stays
+  for a table made deliberately.
 - **RUNS WITH DIFFERENT SETTINGS GO SIDE BY SIDE.** The wrapper guards on the OUTPUT
   FILE, not the process name: two runs appending to one CSV would each resume from it
   and read the other's rows as work already done, silently skipping openers neither

@@ -1302,14 +1302,51 @@ int main(int argc, char **argv) {
     fprintf(stderr, "threads: %d\n", omp_get_max_threads());
 #endif
 
+    /* THE CSV SELF-DESCRIBES, because a FILENAME CANNOT CHECK ITSELF.
+     *
+     * This is a scar.  Every result from before the two objectives existed was
+     * written under a name that later came to mean the OTHER objective, and a
+     * resume then continued that search and reported it as its own -- with the
+     * right banner printed above it, which is what made it invisible.  Depth was
+     * in every row; the objective and K were in the path alone.
+     *
+     * So the first line records the whole identity of the run, and a resume
+     * REFUSES a file whose line disagrees.  Same discipline as the TT salt: a
+     * foreign file must fail verification rather than answer. */
+    char stamp[320];
+    snprintf(stamp, sizeof stamp,
+             "# greens objective=%s topk=%d depth=%d guesses=%d answers=%d",
+             MUSTWIN ? "must-win" : "may-lose", TOPK, depth, NG, NA);
+
     FILE *out = NULL;
     if (outpath) {
         int fresh = 1;
         FILE *rf = fopen(outpath, "r");
         if (rf) { char ch; fresh = (fread(&ch, 1, 1, rf) != 1); fclose(rf); }
+        if (!fresh) {
+            char line[512] = "";
+            FILE *vf = fopen(outpath, "r");
+            if (vf) { if (!fgets(line, sizeof line, vf)) line[0] = 0; fclose(vf); }
+            char *nl = strchr(line, '\n');
+            if (nl) *nl = 0;
+            if (line[0] != '#') {
+                fprintf(stderr,
+                        "%s has no objective stamp, so it predates them and its\n"
+                        "contents cannot be told from its name.  Rename it to what it\n"
+                        "actually holds and prepend this line:\n  %s\n", outpath, stamp);
+                return 1;
+            }
+            if (strcmp(line, stamp) != 0) {
+                fprintf(stderr,
+                        "%s was written by a DIFFERENT run:\n  file: %s\n  this: %s\n"
+                        "Resuming it would continue that search and report it as this one's.\n",
+                        outpath, line, stamp);
+                return 1;
+            }
+        }
         out = fopen(outpath, "a");
         if (!out) { fprintf(stderr, "cannot append to %s\n", outpath); return 1; }
-        if (fresh) fprintf(out, "word,badges,prob,depth,status,seconds\n");
+        if (fresh) fprintf(out, "%s\nword,badges,prob,depth,status,seconds\n", stamp);
     }
 
     if (nopen > 0) {
@@ -1444,6 +1481,7 @@ int main(int argc, char **argv) {
     if (rf) {
         char line[256];
         while (fgets(line, sizeof line, rf)) {
+            if (line[0] == '#') continue;          /* the objective stamp */
             char w[64]; int b;
             int nf = sscanf(line, "%63[^,],%d", w, &b);
             if (nf < 1) continue;
