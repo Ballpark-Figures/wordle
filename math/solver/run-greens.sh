@@ -75,7 +75,7 @@ if [ ${#OPENERS[@]} -gt 0 ]; then
     OUT="$SHR/openers_d$DEPTH.csv"
     ARGS=()
     for w in "${OPENERS[@]}"; do ARGS+=(--opener "$w"); done
-    echo "[$(date -Is)] greens: named openers at depth $DEPTH $WARM" | tee -a "$LOC/run.log"
+    echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] greens: named openers at depth $DEPTH $WARM" | tee -a "$LOC/run.log"
     ./solver/greens "${ARGS[@]}" \
         --out "$OUT" \
         --trees "$SHR/trees" \
@@ -87,7 +87,7 @@ if [ ${#OPENERS[@]} -gt 0 ]; then
 fi
 
 OUT="$SHR/best_opener_d$DEPTH.csv"
-echo "[$(date -Is)] greens: opener screen at depth $DEPTH $WARM" | tee -a "$LOC/sweep.log"
+echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] greens: opener screen at depth $DEPTH $WARM" | tee -a "$LOC/sweep.log"
 ./solver/greens --sweep \
     --out "$OUT" \
     --depth "$DEPTH" \

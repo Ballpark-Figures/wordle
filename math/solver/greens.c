@@ -135,6 +135,22 @@ static uint8_t  YEL[NPAT];
  * UBTAB[d][n]: the most badges obtainable from n candidates with d guesses. */
 static uint8_t  FEASOK[MAXD][MAXA + 1];
 static int      UBTAB[MAXD][MAXA + 1];
+/* Progress reporting.  A run of this shape is silent for hours by construction
+ * -- the walk only has something to SAY when the incumbent improves -- so every
+ * long-running phase needs a heartbeat of its own or there is no way to tell a
+ * working solver from a wedged one.
+ *
+ * TRACE_ROOT is set only while ONE opener is being solved on ONE thread (the
+ * serial probe, and any --opener run), so the root of eval_badge can narrate its
+ * buckets without the parallel walk's 18 threads interleaving.  d == ROOT_D
+ * identifies the root exactly: every recursive call is at a strictly smaller
+ * depth. */
+static int      TRACE_ROOT = 0;
+static int      ROOT_D = 0;
+static double   TRACE_T0 = 0;
+static double   TRACE_LAST = 0;
+static double   REPORT_EVERY = 60.0;
+
 static int      BRANCH = NPAT - 1;   /* measured: non-winning bins, any guess */
 static int      GBRANCH = 31;        /* measured: yellow-free non-green bins */
 
@@ -565,11 +581,25 @@ static int eval_badge(const uint16_t *S, int n, int d, int g, int floor, Ctx *ct
 
     /* clause 1 proper, on the YELLOW buckets: they score nothing, so this is all
      * that is ever asked of them -- "once we get a yellow, we stop checking". */
+    int trace = (TRACE_ROOT && d == ROOT_D), ndone_b = 0, nyel = 0;
+    if (trace)
+        for (int k = 0; k < nb; k++) if (bp[k] != ALL_GREEN && YEL[bp[k]]) nyel++;
     for (int k = 0; k < nb; k++)
-        if (bp[k] != ALL_GREEN && YEL[bp[k]])
+        if (bp[k] != ALL_GREEN && YEL[bp[k]]) {
             if (!feas(buf + bstart[k], bcnt[k], d - 1, ctx)) return INFEAS;
+            if (trace && (++ndone_b % 16 == 0 || ndone_b == nyel)) {
+                char ps[PATSTR_BUF];
+                pat_str(bp[k], ps);
+                printf("    [%6.0fs] winnable: %d/%d yellow branches checked (%s, %d answers)\n",
+                       now_s() - TRACE_T0, ndone_b, nyel, ps, bcnt[k]);
+                fflush(stdout);
+            }
+        }
 
     /* clause 2, on the yellow-free buckets, which are also held to clause 1 */
+    int nfree = 0, kfree = 0;
+    if (trace)
+        for (int k = 0; k < nb; k++) if (bp[k] != ALL_GREEN && !YEL[bp[k]]) nfree++;
     for (int k = 0; k < nb; k++) {
         if (bp[k] == ALL_GREEN || YEL[bp[k]]) continue;
         int own = UBTAB[d - 1][bcnt[k]];
@@ -578,6 +608,14 @@ static int eval_badge(const uint16_t *S, int n, int d, int g, int floor, Ctx *ct
         int v = solve_badge(buf + bstart[k], bcnt[k], d - 1, ctx);
         if (v < 0) return INFEAS;
         badges += v;
+        if (trace) {
+            char ps[PATSTR_BUF];
+            pat_str(bp[k], ps);
+            printf("    [%6.0fs] badge branch %d/%d (%s, %3d answers): %d badges, "
+                   "%d so far, at most %d more\n",
+                   now_s() - TRACE_T0, ++kfree, nfree, ps, bcnt[k], v, badges, rest);
+            fflush(stdout);
+        }
         if (badges + rest < floor) return PRUNED;
     }
     return badges;
@@ -597,6 +635,23 @@ static int solve_badge(const uint16_t *S, int n, int d, Ctx *ctx) {
     if (tt_get(h0, h1, d, &cached, &cachedg)) { ctx->hit++; return cached; }
 
     long long nodes0 = ctx->nodes++;
+    /* The root trace narrates BRANCHES, and the branches are sorted largest
+     * first -- so the very first one is the all-grey bucket, the biggest
+     * subproblem in the whole opener, and it would otherwise be silent for as
+     * long as it takes.  This is the heartbeat inside it.  Only ever active on
+     * the single thread solving one opener, so the globals need no guarding, and
+     * the node-count mask keeps it to one clock read per 4096 nodes. */
+    if (TRACE_ROOT && (ctx->nodes & 0xFFF) == 0) {
+        double el = now_s();
+        if (el - TRACE_LAST >= REPORT_EVERY) {
+            TRACE_LAST = el;
+            printf("      [%6.0fs] working: %lld nodes, %lld TT probes (%.1f%% hit), "
+                   "now at %d candidates with %d guesses left\n",
+                   el - TRACE_T0, ctx->nodes, ctx->probe,
+                   100.0 * ctx->hit / (ctx->probe ? ctx->probe : 1), n, d);
+            fflush(stdout);
+        }
+    }
     int *cnt = ctx->cnt[d];
     int64_t *ord = ctx->ord[d];
     int m = 0;
@@ -917,6 +972,7 @@ static void usage(void) {
       "  --tt-bits B       transposition table size, 2^B entries (default 28)\n"
       "  --tt-load/--tt-save FILE      warm start / snapshot\n"
       "  --threads N       OpenMP threads for the sweep\n"
+      "  --report SECS     heartbeat interval during the walk (default 60, 0 off)\n"
       "  --data DIR        data root (default ./data)\n"
       "  --guess-list/--answer-list/--patterns FILE    restricted runs (the gate)\n");
 }
@@ -942,6 +998,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--tt-load") && i + 1 < argc) ttload = argv[++i];
         else if (!strcmp(argv[i], "--tt-save") && i + 1 < argc) ttsave = argv[++i];
         else if (!strcmp(argv[i], "--threads") && i + 1 < argc) threads = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--report") && i + 1 < argc) REPORT_EVERY = atof(argv[++i]);
         else if (!strcmp(argv[i], "--data") && i + 1 < argc) datadir = argv[++i];
         else if (!strcmp(argv[i], "--guess-list") && i + 1 < argc) guesslist = argv[++i];
         else if (!strcmp(argv[i], "--answer-list") && i + 1 < argc) answerlist = argv[++i];
@@ -1076,7 +1133,9 @@ int main(int argc, char **argv) {
             int g = find_word(GWORD, NG, openers[k]);
             if (g < 0) { fprintf(stderr, "no such guess word: %s\n", openers[k]); return 1; }
             double t0 = now_s();
+            ROOT_D = depth; TRACE_T0 = TRACE_LAST = t0; TRACE_ROOT = 1;
             int v = solve_opener(g, depth, 0, ctx);
+            TRACE_ROOT = 0;
             double dt = now_s() - t0;
             if (v == INFEAS)
                 printf("%s  INFEASIBLE -- cannot win every answer within %d  (%.1fs)\n",
@@ -1110,6 +1169,9 @@ int main(int argc, char **argv) {
      * solved, and the two must never be confused. */
     int *ub = malloc(sizeof(int) * NG);
     double tscreen = now_s();
+    long long screened = 0;
+    fprintf(stderr, "screening %d openers with the two-ply bound (no search yet; "
+                    "this is the part that decides how much the walk can skip)\n", NG);
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -1118,7 +1180,17 @@ int main(int argc, char **argv) {
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic, 16)
 #endif
-        for (int g = 0; g < NG; g++) ub[g] = root_ub2(g, depth, sc);
+        for (int g = 0; g < NG; g++) {
+            ub[g] = root_ub2(g, depth, sc);
+            long long k;
+#ifdef _OPENMP
+#pragma omp atomic capture
+#endif
+            k = ++screened;
+            if (k % 500 == 0)
+                fprintf(stderr, "  screening openers: %lld/%d  (%.0fs)\n",
+                        k, NG, now_s() - tscreen);
+        }
         free(sc);
     }
     fprintf(stderr, "root screen: %.1fs\n", now_s() - tscreen);
@@ -1152,6 +1224,7 @@ int main(int argc, char **argv) {
     int *bestlist = malloc(sizeof(int) * NG);
     int nbest = 0, searched = 0, cut = 0, infeas = 0;
     int ndone = 0;
+    double last_report = 0;
     FILE *rf = outpath ? fopen(outpath, "r") : NULL;
     if (rf) {
         char line[256];
@@ -1184,7 +1257,13 @@ int main(int argc, char **argv) {
         if (done[g]) continue;
         Ctx *c0 = calloc(1, sizeof(Ctx));
         double s0 = now_s();
+        printf("[%7.0fs] %s: solving the first opener serially to seed the bound "
+               "-- narrating its root branches so this phase is not silent\n",
+               now_s() - t0, GWORD[g]);
+        fflush(stdout);
+        ROOT_D = depth; TRACE_T0 = TRACE_LAST = s0; TRACE_ROOT = 1;
         int v = solve_opener(g, depth, incumbent, c0);
+        TRACE_ROOT = 0;                  /* the parallel walk must not interleave */
         double dt = now_s() - s0;
         g_probe += c0->probe; g_hit += c0->hit; g_fill += c0->fill;
         free(c0);
@@ -1252,6 +1331,18 @@ int main(int argc, char **argv) {
             {
                 g_probe += ctx->probe; g_hit += ctx->hit; g_fill += ctx->fill;
                 ctx->probe = ctx->hit = ctx->fill = 0;
+                double el = now_s() - t0;
+                if (REPORT_EVERY > 0 && el - last_report >= REPORT_EVERY) {
+                    last_report = el;
+                    int seen = searched + cut + infeas;
+                    printf("[%7.0fs] %d/%d openers  (%d solved, %d cut, %d infeasible)"
+                           "  best %d of %d = %.5f", el, seen, nord, searched, cut,
+                           infeas, incumbent, NA, (double)incumbent / NA);
+                    if (nbest) printf("  leader %s%s", GWORD[bestlist[0]],
+                                      nbest > 1 ? " (tied)" : "");
+                    printf("  TT %.1f%% hit\n", 100.0 * g_hit / (g_probe ? g_probe : 1));
+                    fflush(stdout);
+                }
                 const char *status = "exact";
                 if (v == INFEAS)   { infeas++;   status = "infeasible"; }
                 else if (v == CUT) { cut++;      status = "cut"; }

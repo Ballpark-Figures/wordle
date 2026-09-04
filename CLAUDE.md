@@ -577,6 +577,24 @@ its state arithmetic against `strspace.py` over a shared deterministic walk — 
   fallback stays exhaustive. Neither may change an answer — an explicit abort fires if
   the guess list is ever not descending, since a mis-sort would silently cut winners
   instead of failing.
+- **IT IS SILENT BY CONSTRUCTION UNLESS TOLD NOT TO BE, so every phase narrates.** The
+  walk only has something to SAY when the incumbent improves, and an improvement may
+  never come — so silence is the normal state and says nothing about whether the solver
+  is working. Three heartbeats cover it: the root screen counts openers as it bounds
+  them, the serial probe narrates its root branches (yellow ones every 16, badge ones
+  each) plus a node-count line every `--report` seconds inside the big all-grey branch,
+  and the walk reports openers done / cut / infeasible with the current leader. **The
+  root trace is single-threaded ONLY** (`TRACE_ROOT`, cleared before the parallel walk) —
+  18 threads narrating one `d == ROOT_D` test would interleave into noise.
+- **MEASURED 2026-09-03, first real launch:** the two-ply screen over all 12972 openers
+  takes **21 s**, rejects nothing outright, and its bounds run **1972 / 1040 / 858 / 714
+  / 328** (max, quartiles, min, of 2315). So the pruning budget is entirely a question of
+  where the true optimum lands in that spread. The first opener had NOT finished after
+  ~3 minutes.
+- **`date -Is` IS GNU-ONLY and prints NOTHING on macOS**, so a wrapper header came out as
+  `[] greens: ...`. `run-greens.sh` uses `date -u +%Y-%m-%dT%H:%M:%SZ` instead.
+  `run-sweep.sh`, `run-hard-sweep.sh` and `run-ans-sweep.sh` still carry the broken form
+  — harmless there unless `inflight.py` is asked to find a run boundary on this machine.
 - **A RESUMED run rebuilds the tie list from the CSV**, or it would report only the ties
   found since restarting and read as a complete answer.
 - **`python3 math/tools/checkgreens.py` is the GATE**, ~2s: the yellow predicate
