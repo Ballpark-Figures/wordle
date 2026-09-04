@@ -38,6 +38,10 @@ math/solver/optturns[0-9]
 math/solver/optturns[0-9][0-9]
 math/solver/pairsplit
 math/solver/antistall
+math/solver/cover
+math/solver/greens
+math/solver/strguess
+math/solver/strturns
 
 # Machine-local solver working data: resume checkpoints / memo pickles
 # (regenerable, can be GBs). Committed results live in math/data/shared/.

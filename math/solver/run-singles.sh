@@ -364,6 +364,17 @@ if [ "$STAGE" = triples ] || [ "$STAGE" = all ]; then
     else
         PAIRSRC="$ALLPAIRS"
     fi
+    # Naming a file that is not there is a different problem from none being
+    # found, and the message used to report the second for both -- naming a file
+    # the user had not asked for and telling them to rerun a stage they did not
+    # need. The other two stages already say this properly.
+    if [ -n "$PAIRFROM" ] && [ ! -f "$PAIRFROM" ]; then
+        echo "--pairs-from: no such file: $PAIRFROM" >&2
+        echo "pair rankings on disk:" >&2
+        ls -1 "$SHARED"/pair_singletons*.csv "$LOC"/pair_singletons*.csv 2>/dev/null \
+            | sed 's/^/  /' >&2
+        exit 1
+    fi
     [ -f "$PAIRSRC" ] || {
         echo "no pair ranking at $PAIROUT" >&2
         [ "$EXHAUSTIVE" = 1 ] && echo "(nor the exhaustive list at $ALLPAIRS)" >&2
