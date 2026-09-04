@@ -147,27 +147,64 @@ def _score_all(Wg, Lg, Wa, La, w, out, nchunk):
         _score_chunk(Wg, Lg, Wa, La, w, lo, hi, out)
 
 
-def rank_root(guesses, answers, w, progress=None):
+def rank_root(guesses, answers, w, progress=None, checkpoint=None, fp=None):
     """Score every guess against every answer.  Returns the score array.
 
-    THE SLOW STEP, and deliberately chunked: a njit call never returns to the
-    interpreter, so a single call over all 139072 guesses would make Ctrl-C do
-    nothing for hours and report no progress.  Returning between chunks is what
-    makes it interruptible.  Do not merge it back into one call.
+    THE SLOW STEP, and deliberately chunked for two reasons.  A njit call never
+    returns to the interpreter, so a single call over all 139072 guesses would
+    make Ctrl-C do nothing for hours and report no progress.  And at ~19
+    core-hours this job MUST survive an interruption -- a Ctrl-C, or the Windows
+    Update reboot the machine takes on its own -- so it CHECKPOINTS.
+
+    `checkpoint` is a .npz path under data/local/ (regenerable bulk).  It holds
+    the partial scores, how many chunks are done, and the fingerprint; a
+    checkpoint whose fingerprint does not match is IGNORED, never resumed from,
+    for the same reason a foreign ranking is refused.  It is written atomically
+    via a temp file and rename, so a crash mid-write cannot corrupt it, and is
+    removed once the full ranking is saved.
     """
     Wg, Lg = encode_words(guesses)
     Wa, La = encode_words(answers)
     out = np.zeros(len(guesses), np.float64)
     nchunk = (len(guesses) + _CHUNK - 1) // _CHUNK
-    step = max(1, nchunk // 200)
     done = 0
+
+    if checkpoint and os.path.exists(checkpoint):
+        try:
+            z = np.load(checkpoint)
+            if fp is not None and str(z["fp"]) == fp and z["scores"].shape == out.shape:
+                out = z["scores"]
+                done = int(z["done"])
+                print("resuming from checkpoint: %d/%d chunks already scored"
+                      % (done, nchunk))
+            else:
+                print("checkpoint %s does not match this fingerprint -- ignoring it"
+                      % checkpoint)
+        except Exception as exc:                      # pragma: no cover
+            print("unreadable checkpoint %s (%s) -- starting over"
+                  % (checkpoint, exc))
+
+    step = max(1, nchunk // 200)
     while done < nchunk:
         end = min(nchunk, done + step)
         _score_all(Wg[:end * _CHUNK], Lg[:end * _CHUNK], Wa, La, w, out, end)
         done = end
+        if checkpoint:
+            os.makedirs(os.path.dirname(checkpoint), exist_ok=True)
+            # np.savez appends .npz itself, so name the temp file with it and
+            # rename that -- the rename is what makes the write atomic.
+            tmp = checkpoint + ".tmp.npz"
+            np.savez(tmp, scores=out, done=done, fp=(fp or ""))
+            os.replace(tmp, checkpoint)
         if progress:
             progress(min(done * _CHUNK, len(guesses)), len(guesses))
     return out
+
+
+def clear_checkpoint(path):
+    """Drop a checkpoint once the full ranking is safely saved."""
+    if path and os.path.exists(path):
+        os.remove(path)
 
 
 def fingerprint(guesses, answers, prior):

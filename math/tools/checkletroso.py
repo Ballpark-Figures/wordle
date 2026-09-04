@@ -33,6 +33,7 @@ WHAT IT PINS, and why each check exists.
 
 import argparse
 import itertools
+import tempfile
 import os
 import random
 import sys
@@ -235,6 +236,38 @@ def main():
         tot += w[i] * n
     check("replay reproduces the solver's expected guesses", abs(tot - cost) < 1e-9,
           "replay %.6f vs solver %.6f (opener %s)" % (tot, cost, opener))
+
+    print("\n9. the root scan's checkpoint survives an interruption")
+    random.seed(5)
+    ca = sorted(random.sample(answers, 300))
+    cg = sorted(random.sample(guesses, 1400))
+    cw = T.weights(ca, "lengths")
+    cfp = T.fingerprint(cg, ca, "lengths")
+    ck = os.path.join(tempfile.mkdtemp(), "rank.ckpt.npz")
+    base = T.rank_root(cg, ca, cw)
+
+    class _Boom(Exception):
+        pass
+
+    hits = [0]
+
+    def _prog(done, total):
+        hits[0] += 1
+        if hits[0] == 2:
+            raise _Boom
+    try:
+        T.rank_root(cg, ca, cw, progress=_prog, checkpoint=ck, fp=cfp)
+    except _Boom:
+        pass
+    check("a checkpoint was written mid-scan", os.path.exists(ck))
+    resumed = T.rank_root(cg, ca, cw, checkpoint=ck, fp=cfp)
+    check("resuming reproduces the uninterrupted scan exactly",
+          np.array_equal(base, resumed))
+    foreign = T.rank_root(cg, ca, cw, checkpoint=ck, fp="deadbeefdeadbeef")
+    check("a foreign-fingerprint checkpoint is ignored, not resumed from",
+          np.array_equal(base, foreign))
+    T.clear_checkpoint(ck)
+    check("clear_checkpoint removes it", not os.path.exists(ck))
 
     print()
     if fails:

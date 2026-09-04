@@ -1350,8 +1350,12 @@ anything. Run it with **`bash solver/run-letroso-rank.sh --length-prior lengths`
   than a symbol compare: **15.9 us/pair** in the numba kernel against 981 us in pure
   python, so ~19 core-hours, under an hour on 20 threads. The root ranking is CACHED
   behind a fingerprint over both lists and the prior; **a mismatch is REFUSED**, since a
-  foreign ranking would be confidently wrong rather than missing. Chunked so Ctrl-C works;
-  an interrupt leaves no partial file.
+  foreign ranking would be confidently wrong rather than missing. **It CHECKPOINTS to
+  `data/local/letroso/` every few chunks and RESUMES** — at ~19 core-hours it has to
+  survive a Ctrl-C or a reboot, so re-running the same command picks up where it stopped;
+  a checkpoint whose fingerprint does not match is ignored, never resumed from. (An
+  earlier version saved only on completion, which was fine for nerdle's 110s rank and a
+  defect here.)
 - **`python3 tools/checkletroso.py` is the GATE** — tutorial rows, `feedback` vs the
   enumerate-every-path reference over 37332 exhaustive pairs, the numba kernel vs that on
   4000 real pairs, root scoring vs an independent dict-bucketing implementation, both

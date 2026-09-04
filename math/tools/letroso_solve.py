@@ -74,9 +74,13 @@ def main():
                              % (done, total, rate, el / 3600, eta / 3600))
             sys.stdout.flush()
 
-        scores = T.rank_root(guesses, answers, w, progress=progress)
+        ckpt = os.path.join(T.DATA.replace("shared", "local"),
+                            "root_rank_%s.ckpt.npz" % args.length_prior)
+        scores = T.rank_root(guesses, answers, w, progress=progress,
+                             checkpoint=ckpt, fp=fp)
         print()
         T.save_ranking(rank_file, guesses, scores, fp, args.length_prior)
+        T.clear_checkpoint(ckpt)
         print("wrote %s" % rank_file)
     else:
         words, scores_sorted = cached
@@ -94,6 +98,22 @@ def main():
         print("  %2d. %-11s %.4f" % (i + 1, guesses[gi], scores[gi]))
 
     if args.rank_only:
+        # The full ranking is already in rank_file; --out gets the readable head
+        # of it, so the file the wrapper names actually exists.
+        if args.out:
+            os.makedirs(os.path.dirname(args.out), exist_ok=True)
+            with open(args.out, "w") as f:
+                f.write("# letroso opener ranking, top %d of %d.\n"
+                        % (min(args.top, len(order)), len(guesses)))
+                f.write("# A RANKING, NOT A RESULT: a good first-guess score says\n")
+                f.write("# nothing about what happens after the reply.\n")
+                f.write("# full ranking: %s\n" % rank_file)
+                f.write("# prior=%s fingerprint=%s\n" % (args.length_prior, fp))
+                f.write("rank,guess,score\n")
+                for i in range(min(args.top, len(order))):
+                    gi = int(order[i])
+                    f.write("%d,%s,%.6f\n" % (i + 1, guesses[gi], scores[gi]))
+            print("wrote %s" % args.out)
         return 0
 
     print("\nsolving (k=%d)..." % args.topk)

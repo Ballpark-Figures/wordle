@@ -23,8 +23,11 @@
 #
 # COST.  4.23e9 feedback evaluations, each an LCS alignment DP rather than a
 # symbol compare -- measured 15.9 us, so about 19 core-hours, under an hour on
-# 20 threads.  The run is chunked so Ctrl-C works and progress prints; an
-# interrupt leaves NO partial file, the save happens only on completion.
+# 20 threads.  The run is chunked so Ctrl-C works and progress prints, and it
+# CHECKPOINTS to data/local/letroso/ every few chunks -- so a Ctrl-C, or the
+# reboot the machine takes on its own, costs minutes rather than the whole run.
+# Re-run the same command to resume; the checkpoint is dropped once the full
+# ranking is written, and one whose fingerprint does not match is ignored.
 #
 # The cached ranking carries a FINGERPRINT over both word lists and the prior.
 # A mismatch is REFUSED, never used -- a foreign ranking would make every score
@@ -57,7 +60,7 @@ STEM="root_rank_${PRIOR}"
     echo "  run: python3 build_letroso_lists.py" >&2; exit 1; }
 
 . "$(dirname "${BASH_SOURCE[0]}")/_guard.sh"
-guard_output letroso_solve.py "$OUTDIR/$STEM.csv.gz" || exit 1
+guard_output letroso_solve.py "$OUTDIR/${STEM}_top.csv" || exit 1
 
 echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] letroso rank $STEM" | tee -a "$LOC/$STEM.log"
 "$PY" -u tools/letroso_solve.py --length-prior "$PRIOR" --rank-only \
