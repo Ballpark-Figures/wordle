@@ -192,10 +192,12 @@ def _best_table(n, r, A, G, U):
     return best
 
 
-def feedback(answer, guess):
-    """The displayed feedback for `guess` against `answer`.
+def candidates(answer, guess):
+    """Every RESOLVED candidate feedback, best first.
 
-    Returns (pattern, start, end).  Exactly equals feedback_ref() -- verified
+    The displayed reply is the first; the rest exist only so the gate can
+    measure how often the tie-break actually decides anything.  Returns
+    (pattern, start, end) triples.  Exactly equals feedback_ref() -- verified
     exhaustively by tools/checkletroso.py -- but explores only the OPTIMAL
     alignments rather than the reference's every-minimum-cost-path enumeration.
 
@@ -256,12 +258,18 @@ def feedback(answer, guess):
         if len(matched) == 1 and not st and not en:
             s[matched[0]] = PRESENT
         scored.append((tuple(s), en, st))
-    # Lexicographically largest pattern.  Among equal patterns the reference's
-    # order decides, and it appends the DIAGONAL branch first at every cell, so
-    # it prefers the LATEST match -- `end` ahead of `start`.
+    # Lexicographically largest pattern first.  Among equal patterns the
+    # reference's order decides, and it appends the DIAGONAL branch first at
+    # every cell, so it prefers the LATEST match -- `end` ahead of `start`.
     scored.sort(reverse=True)
-    pat, en, st = scored[0]
-    return pat, st, en
+    return [(pat, st, en) for pat, en, st in scored]
+
+
+def feedback(answer, guess):
+    """The displayed feedback: the winner among candidates()."""
+    if not guess:
+        return (), False, False
+    return candidates(answer, guess)[0]
 
 
 def encode(pattern, start, end):
