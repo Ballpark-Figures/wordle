@@ -1,0 +1,10 @@
+# multiwordle opener sweep: 200 trials per word at k=2, seed 3
+# strategy in math/multiwordle.py; every word faces the SAME 200 answer draws
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/multiwordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,seconds
+aahed,200,5.875000,0.082953,1.173139,4,6.0,10,0.023
+aalii,200,5.915000,0.075281,1.064632,3,6.0,10,0.008
+aargh,200,5.740000,0.082742,1.170148,4,6.0,11,0.007
+aarti,200,5.775000,0.077795,1.100194,4,6.0,9,0.007
+abaca,200,6.075000,0.082650,1.168848,3,6.0,10,0.008
+abaci,200,5.765000,0.069809,0.987243,3,6.0,9,0.007

@@ -1,0 +1,14 @@
+# DIGEST of k27_clint-soare_t1000000_s0.csv (0.3 GB), which is gitignored: over GitHub's file-size limit.
+# The lines below are copied verbatim from that file's own summary block.
+# multiwordle, fixed opening then smallest-board greedy (see math/multiwordle.py)
+# boards=27 trials=1000000 opening=clint soare seed=0
+# opening taken from the first data row of data/shared/singletons/pair_singletons.csv
+# answers drawn without replacement from the 2315 mystery words; no guess cap
+# trials 1000000, boards 27, opening clint soare, seed 0
+# mean total guesses 29.0657  +/- 0.0003 (standard error)
+# sd 0.2579   min 29   median 29.0   max 32
+# mean guesses per board 1.0765
+#   29 guesses  936736   93.67%
+#   30 guesses   60838    6.08%
+#   31 guesses    2371    0.24%
+#   32 guesses      55    0.01%

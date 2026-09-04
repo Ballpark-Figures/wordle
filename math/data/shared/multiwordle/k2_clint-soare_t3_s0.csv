@@ -1,0 +1,13 @@
+# multiwordle, fixed opening then smallest-board greedy (see math/multiwordle.py)
+# boards=2 trials=3 opening=clint soare seed=0
+# opening taken from the first data row of data/shared/singletons/pair_singletons.csv
+# answers drawn without replacement from the 2315 mystery words; no guess cap
+game,guesses,answers,sequence
+0,5,super privy,clint soare grimy privy super
+1,5,aphid fella,clint soare affix aphid fella
+2,5,cleat spoon,clint soare cleat synod spoon
+# trials 3, boards 2, opening clint soare, seed 0
+# mean total guesses 5.0000  +/- 0.0000 (standard error)
+# sd 0.0000   min 5   median 5.0   max 5
+# mean guesses per board 2.5000
+#    5 guesses       3  100.00%

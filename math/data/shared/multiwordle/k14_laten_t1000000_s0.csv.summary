@@ -1,0 +1,19 @@
+# DIGEST of k14_laten_t1000000_s0.csv (0.2 GB), which is gitignored: over GitHub's file-size limit.
+# The lines below are copied verbatim from that file's own summary block.
+# multiwordle, fixed opening then smallest-board greedy (see math/multiwordle.py)
+# boards=14 trials=1000000 opening=laten seed=0
+# opening taken from the first data row of data/shared/singletons/guess_singletons.csv
+# answers drawn without replacement from the 2315 mystery words; no guess cap
+# trials 1000000, boards 14, opening laten, seed 0
+# mean total guesses 16.4826  +/- 0.0009 (standard error)
+# sd 0.9140   min 15   median 16.0   max 23
+# mean guesses per board 1.1773
+#   15 guesses  114628   11.46%
+#   16 guesses  437523   43.75%
+#   17 guesses  323878   32.39%
+#   18 guesses  101718   10.17%
+#   19 guesses   19396    1.94%
+#   20 guesses    2587    0.26%
+#   21 guesses     258    0.03%
+#   22 guesses      11    0.00%
+#   23 guesses       1    0.00%

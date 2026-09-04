@@ -1,0 +1,8 @@
+# multiwordle opener sweep: 20 trials per word at k=3, seed 0
+# strategy in math/multiwordle.py; every word faces the SAME 20 answer draws
+# opening is 'clint' plus the swept word, played blind
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/multiwordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,seconds
+aahed,20,6.400000,0.222427,0.994723,5,6.0,9,0.016
+aalii,20,7.300000,0.193309,0.864505,6,7.0,9,0.001
+aargh,20,6.350000,0.150000,0.670820,5,6.0,8,0.001

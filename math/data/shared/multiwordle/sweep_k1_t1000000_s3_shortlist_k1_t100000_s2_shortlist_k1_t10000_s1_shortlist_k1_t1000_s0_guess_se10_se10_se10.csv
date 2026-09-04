@@ -1,0 +1,11 @@
+# multiwordle opener sweep: 1000000 trials per word at k=1, seed 3
+# strategy in math/multiwordle.py; every word faces the SAME 1000000 answer draws
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/multiwordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,seconds
+slate,1000000,3.820516,0.000997,0.997054,1,4.0,10,19.866
+least,1000000,3.830202,0.000994,0.993926,1,4.0,10,19.807
+salet,1000000,3.836412,0.001003,1.002587,2,4.0,11,20.197
+reast,1000000,3.834927,0.001015,1.014677,2,4.0,11,19.674
+stale,1000000,3.844275,0.000999,0.998567,1,4.0,10,20.735
+trace,1000000,3.841590,0.001028,1.028072,1,4.0,11,19.348
+teals,1000000,3.849062,0.000982,0.982185,2,4.0,10,19.276
