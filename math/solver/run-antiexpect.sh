@@ -29,7 +29,13 @@
 # reads. --rank-none ranks alphabetically: a BASELINE to measure a real ranking
 # against, never a strategy.
 #
-# COMMIT THE CSV. data/shared is the committed, synced location by convention, but
+# THE TREE IS THE DELIVERABLE. Alongside the CSV the wrapper writes
+# expect.k<K>...tree.txt: one line per answer, giving the whole line of play with
+# the feedback interleaved, in the same format optturns uses. You cannot play an
+# expected-turns number; you can play the tree. Its mean line length equals the
+# reported value, which tools/checkantiexpect.py verifies.
+#
+# COMMIT THE CSV AND THE TREE. data/shared is the committed, synced location by convention, but
 # writing there does not commit it -- and until it is committed a long run is one
 # cleanup away from gone, with no history to recover it from.
 #
@@ -73,6 +79,7 @@ done
 OUTDIR=data/shared/antiwordle
 LOC=data/local/antiwordle
 OUT="$OUTDIR/expect.k${K}${TAG}.csv"
+TREE="$OUTDIR/expect.k${K}${TAG}.tree.txt"
 LOG="$LOC/expect.k${K}${TAG}.log"
 mkdir -p "$OUTDIR" "$LOC"
 
@@ -82,4 +89,7 @@ echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] antiwordle expected-turns search -> $OUT"
     | tee -a "$LOG"
 
 # `${ARGS[@]+...}` guards the empty-array-under-set-u abort on macOS bash 3.2.
-./solver/antiexpect --out "$OUT" ${ARGS[@]+"${ARGS[@]}"} 2>&1 | tee -a "$LOG"
+# --tree is not optional here: the STRATEGY is the deliverable, and an
+# expected-turns number with no tree beside it cannot be played or checked.
+./solver/antiexpect --out "$OUT" --tree "$TREE" ${ARGS[@]+"${ARGS[@]}"} 2>&1 \
+    | tee -a "$LOG"

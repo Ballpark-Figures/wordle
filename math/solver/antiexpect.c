@@ -240,6 +240,12 @@ static inline uint64_t mix64(uint64_t z) {
     return z;
 }
 
+static double wall_time(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (double)ts.tv_sec + 1e-9 * (double)ts.tv_nsec;
+}
+
 /* -------------------------------------------------------------- the search */
 
 typedef struct { double score; int g; } Cand;
@@ -269,6 +275,12 @@ typedef struct {
     uint16_t *part;               /* MAXD * MAXA: answers regrouped by pattern */
     long long nodes;
     int       overflow, blown;
+    /* Progress. The search can run for a long time with nothing to say, and silence
+     * is indistinguishable from a hang -- the same lesson as the stall sweep. */
+    double    t0;
+    long long next_beat;
+    int       root_k, root_n;
+    int       quiet;
 } Ctx;
 
 static Ctx *ctx_new(void) {
@@ -417,6 +429,14 @@ static double value(Ctx *c, int depth, int nL, const uint16_t *A, int nA,
     if (MAXNODES && c->nodes >= MAXNODES) { c->blown = 1; return -1.0; }
     c->nodes++;
 
+    if (!c->quiet && c->nodes >= c->next_beat) {
+        if (c->next_beat)
+            printf("        ... root guess %d/%d, %lld nodes, %.0fs\n",
+                   c->root_k, c->root_n, c->nodes, wall_time() - c->t0);
+        c->next_beat = c->nodes + 4000000;
+        fflush(stdout);
+    }
+
     /* Rank the words legal HERE by their score and keep the best K. Never a global
      * top-K filtered by legality -- that runs dry once play has narrowed. */
     Cand *cand = c->cand + (size_t)depth * MAXG;
@@ -441,13 +461,108 @@ static double value(Ctx *c, int depth, int nL, const uint16_t *A, int nA,
     double best = -1.0;
     int best_g = -1;
     for (int i = 0; i < ncand; i++) {
+        if (depth == 0) { c->root_k = i + 1; c->root_n = ncand; }
         double v = try_guess(c, depth, cand[i].g, A, nA);
         if (v < 0) return -1.0;
-        if (v > best) { best = v; best_g = cand[i].g; }
+        if (v > best) {
+            best = v; best_g = cand[i].g;
+            /* Reported at the ROOT as it happens, not only in the summary: the
+             * leading opener and its value are the interesting part while the
+             * search runs, and each root guess can take a long time. */
+            if (depth == 0 && !c->quiet) {
+                printf("        NEW BEST: %-6s %.6f expected turns"
+                       "  (root guess %d/%d, %lld nodes, %.0fs)\n",
+                       GWORD[best_g], best, i + 1, ncand, c->nodes,
+                       wall_time() - c->t0);
+                fflush(stdout);
+            }
+        }
     }
     tt_put(h0, h1, best, best_g);
     if (best_out) *best_out = best_g;
     return best;
+}
+
+/* ---------------------------------------------------------------- the tree
+ *
+ * A number without the strategy is unusable -- you cannot PLAY an expected-turns
+ * figure. The tree is the deliverable; the number is its summary.
+ *
+ * One line per answer, in optturns' format:
+ *
+ *     <answer> <guesses> <g1> <pattern1> <g2> <pattern2> ... <gN>
+ *
+ * where the last guess IS the answer and patterns read b/y/g. That fully determines
+ * the strategy on every reachable state -- one answer is drawn per game, so 2315
+ * lines cover every path the strategy can be taken down.
+ *
+ * Written PLAIN, not gzipped as optturns writes its 12972 trees: there is one per
+ * run here, and being able to grep it is worth more than the space.
+ *
+ * The walk RE-SEARCHES rather than trusting a stored move, because the table
+ * evicts; after a finished search almost every lookup is a hit, so it is cheap. */
+
+static void pattern_str(int p, char *out) {
+    for (int i = 0, div = NPAT / 3; i < WORDLEN; i++, div /= 3)
+        out[i] = "byg"[(p / div) % 3];
+    out[WORDLEN] = 0;
+}
+
+static int emit_tree(Ctx *c, const char *path, uint64_t root_h0, uint64_t root_h1) {
+    FILE *out = fopen(path, "w");
+    c->quiet = 1;                    /* the walk re-searches; do not re-announce */
+    if (!out) { fprintf(stderr, "cannot write %s\n", path); return -1; }
+
+    long long lines = 0;
+    for (int a = 0; a < NA; a++) {
+        memcpy(c->legal[0], BS_ALL, sizeof BS_ALL);
+        for (int w = 0; w < BSW; w++) c->lw[0][w] = (uint16_t)w;
+        c->lnw[0] = BSW;
+        uint16_t *A0 = c->alive;
+        for (int x = 0; x < NA; x++) A0[x] = (uint16_t)x;
+        int nA = NA, nL = NG, depth = 0;
+        uint64_t h0 = root_h0, h1 = root_h1;
+
+        char words[MAXD][WBUF], pats[MAXD][WORDLEN + 1];
+        int n = 0;
+        for (;;) {
+            int g = -1;
+            double v = value(c, depth, nL, c->alive + (size_t)depth * MAXA, nA,
+                             h0, h1, &g);
+            if (v < 0 || g < 0) { fclose(out); return -1; }
+            snprintf(words[n], WBUF, "%s", GWORD[g]);
+            int p = PAT[(size_t)g * NASTRIDE + a];
+            if (p == ALL_GREEN) { n++; break; }
+            pattern_str(p, pats[n]);
+            n++;
+            if (depth + 2 >= MAXD) { fclose(out); return -1; }
+
+            Delta d;
+            delta_build(&d, g, p);
+            nL = intersect(c->legal[depth], c->lw[depth], c->lnw[depth], &d,
+                           c->legal[depth + 1], c->lw[depth + 1],
+                           &c->lnw[depth + 1], &h0, &h1);
+            const pat_t *row = PAT + (size_t)g * NASTRIDE;
+            uint16_t *src = c->alive + (size_t)depth * MAXA;
+            uint16_t *dst = c->alive + (size_t)(depth + 1) * MAXA;
+            int m = 0;
+            for (int i = 0; i < nA; i++)
+                if (row[src[i]] == p) dst[m++] = src[i];
+            nA = m;
+            depth++;
+        }
+        fprintf(out, "%s %d", AWORD[a], n);
+        for (int i = 0; i < n; i++) {
+            fprintf(out, " %s", words[i]);
+            if (i + 1 < n) fprintf(out, " %s", pats[i]);
+        }
+        fputc('\n', out);
+        lines++;
+    }
+    fclose(out);
+    c->quiet = 0;
+    fprintf(stderr, "tree: %lld lines -> %s\n", lines, path);
+    return 0;
 }
 
 /* ------------------------------------------------------------- the ranking */
@@ -500,6 +615,7 @@ static void usage(void) {
       "  --rank FILE      per-word ranking CSV (opener,mean) -- e.g. a sim sweep\n"
       "  --rank-none      rank by guess index instead; a BASELINE, not a strategy\n"
       "  --out FILE       CSV to write the result to\n"
+      "  --tree FILE      write the STRATEGY, one line per answer (the deliverable)\n"
       "  --no-out         print only, save NOTHING -- must be explicit\n"
       "  --tt-bits B      transposition table size, 2^B entries (default 26)\n"
       "  --max-nodes N    give up past N states, reporting no number\n"
@@ -512,12 +628,14 @@ int main(int argc, char **argv) {
     setvbuf(stdout, NULL, _IOLBF, 0);
     const char *outpath = NULL, *datadir = "data", *rankpath = NULL;
     int no_out = 0, ttbits = 26, nanswers = 0, ranknone = 0;
+    const char *treepath = NULL;
 
     for (int i = 1; i < argc; i++) {
         if      (!strcmp(argv[i], "-k") && i + 1 < argc)            TOPK = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--rank") && i + 1 < argc)        rankpath = argv[++i];
         else if (!strcmp(argv[i], "--rank-none"))                   ranknone = 1;
         else if (!strcmp(argv[i], "--out") && i + 1 < argc)         outpath = argv[++i];
+        else if (!strcmp(argv[i], "--tree") && i + 1 < argc)        treepath = argv[++i];
         else if (!strcmp(argv[i], "--no-out"))                      no_out = 1;
         else if (!strcmp(argv[i], "--tt-bits") && i + 1 < argc)     ttbits = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--max-nodes") && i + 1 < argc)   MAXNODES = atoll(argv[++i]);
@@ -593,10 +711,11 @@ int main(int argc, char **argv) {
     }
 
     fprintf(stderr, "k=%d, %d guesses, %d answers\n", TOPK, NG, NA);
-    double t0 = (double)clock() / CLOCKS_PER_SEC;
+    double t0 = wall_time();
+    c->t0 = t0;
     int opener = -1;
     double val = value(c, 0, NG, A0, NA, lh0, lh1, &opener);
-    double secs = (double)clock() / CLOCKS_PER_SEC - t0;
+    double secs = wall_time() - t0;
 
     if (c->overflow) {
         fprintf(stderr, "internal: recursion hit MAXD=%d -- raise it\n", MAXD);
@@ -611,6 +730,9 @@ int main(int argc, char **argv) {
            val, opener >= 0 ? GWORD[opener] : "(none)", TOPK, c->nodes, secs);
     printf("  best found examining %d guesses per node -- a LOWER bound on the\n"
            "  optimum, and an achievable strategy, not the maximum.\n", TOPK);
+
+    if (treepath && emit_tree(c, treepath, lh0, lh1) != 0)
+        fprintf(stderr, "warning: could not write the tree to %s\n", treepath);
 
     if (outpath) {
         int fresh = 1;

@@ -18,6 +18,12 @@ answers, the same ranking, the same K.
   ranking and lowest-index tie-breaks on both sides it should, and a divergence means
   the two are exploring different guesses even where they agree on the number.
 
+  THE TREE. The strategy file is the actual deliverable -- you cannot play an
+  expected-turns number -- so it is checked rather than trusted: every guess legal
+  when played, every line ending on its own answer and no earlier, and the MEAN of
+  its lengths equal to the value reported. That last one ties the file to the number
+  and would catch a tree written from a different search than the one summarised.
+
   MONOTONICITY IN K, on the C alone. Top-K examines the K best-scoring legal words,
   and the top-5 contains the top-3, so a larger K searches a superset and the value
   can only rise. A drop means the restriction is not nested — the failure that a
@@ -33,15 +39,16 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from antiwordle import GuessSpace
+from antiwordle import CONS_NONE, GuessSpace, TRITS, legal, step
 from antiwordle_expect import expected_turns
 from build_patterns import load_patterns
-from wordle import load_words
+from wordle import ALL_GREEN, load_words
 
 MATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BINARY = os.path.join(MATH, "solver", "antiexpect")
@@ -59,6 +66,37 @@ def run_c(nans, k, extra=()):
     if not m:
         raise SystemExit("antiexpect gave no result:\n%s%s" % (p.stdout, p.stderr))
     return float(m.group(1)), m.group(2)
+
+
+def check_tree(space, pat, answers, path, reported):
+    """Every line legal in sequence, ending on its answer; mean length == value."""
+    lengths = []
+    with open(path) as fh:
+        for raw in fh:
+            f = raw.split()
+            answer, n, rest = f[0], int(f[1]), f[2:]
+            plays = rest[0::2]
+            if len(plays) != n:
+                return f"{answer}: header says {n} guesses, line has {len(plays)}"
+            ai = answers.index(answer)
+            cons = CONS_NONE
+            for i, w in enumerate(plays):
+                if w not in space.index:
+                    return f"{answer}: {w} is not a legal word"
+                if not legal(cons, w):
+                    return f"{answer}: {w} illegal at guess {i + 1}"
+                code = int(pat[space.index[w], ai])
+                if (code == ALL_GREEN) != (i == n - 1):
+                    return (f"{answer}: guess {i + 1} ({w}) "
+                            + ("ends early" if code == ALL_GREEN else "is not the answer"))
+                cons = step(cons, space.letter_tuples[space.index[w]], TRITS[code])
+            lengths.append(n)
+    if len(lengths) != len(answers):
+        return f"{len(lengths)} lines for {len(answers)} answers"
+    mean = sum(lengths) / len(lengths)
+    if abs(mean - reported) > 1e-9:
+        return f"mean line length {mean:.9f} != reported {reported:.9f}"
+    return None
 
 
 def main():
@@ -88,6 +126,17 @@ def main():
         if not ok:
             FAILS.append("answers=%d k=%d: %s" % (
                 nans, k, "value" if not same_val else "opener"))
+
+    print("\n  the strategy tree:")
+    answers_all = load_words("mystery")
+    with tempfile.NamedTemporaryFile(suffix=".txt") as tf:
+        nans, k = 12, 3
+        cval, _ = run_c(nans, k, ["--tree", tf.name])
+        why = check_tree(space, pat, answers_all[:nans], tf.name, cval)
+        print("    %s  %d lines, legal in sequence, mean == reported value"
+              % ("PASS" if why is None else "FAIL " + why, nans))
+        if why:
+            FAILS.append("tree: " + why)
 
     print("\n  monotone in K (C alone, answers=6):")
     vals = []
