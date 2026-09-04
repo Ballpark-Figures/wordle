@@ -94,9 +94,17 @@ if [ "$TOPK" -gt 0 ]; then
     SUF="${SUF}_k$TOPK"
     KARGS+=(--topk "$TOPK")
 fi
+# ALWAYS FORWARD THE OBJECTIVE, IN BOTH DIRECTIONS.  Passing it only in the
+# must-win case and letting the binary's default cover the other is exactly how
+# `--may-lose` came to run a MUST-WIN search under a may-lose FILENAME: the
+# binary's default moved, and a wrapper that leans on a default inherits every
+# future change to it.  The binary now refuses to guess, so this cannot recur,
+# but the rule stands on its own: never let two places own one decision.
 if [ "$MUSTWIN" -eq 1 ]; then
     SUF="${SUF}_mustwin"
     KARGS+=(--must-win)
+else
+    KARGS+=(--may-lose)
 fi
 
 cd "$MATH" || exit 1

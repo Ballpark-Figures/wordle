@@ -194,13 +194,19 @@ static int      TOPK = 0;
  * refuse to ever lose a game, how often can I win in 6 with all greens?".  Only
  * the first is the badge question.
  *
- * MUST-WIN IS THE DEFAULT, which is NOT the same as it being the headline
- * quantity -- it is not.  The default is where it is because runs were already
- * queued against it (user, 2026-09-04), and a silent change of meaning under an
- * unchanged command line is the worst thing a flag can do.  `--may-lose` asks
- * for the badge question.  The objective is in every filename either way, so no
- * file's name ever means two different things. */
-static int      MUSTWIN = 1;
+ * THERE IS NO DEFAULT HERE -- one of --must-win or --may-lose is REQUIRED.
+ *
+ * It had a default, and that is precisely how `--may-lose` once ran a MUST-WIN
+ * search under a may-lose FILENAME: the wrapper forwarded the flag only in the
+ * must-win case and let this default cover the other, so when the default moved,
+ * the two disagreed silently and the file name lied about its contents.  A
+ * defaulted objective is a domain ANSWER hiding in configuration.  Refusing to
+ * run is the only default that cannot quietly bias a result.
+ *
+ * The wrapper still has a default -- must-win, because runs were queued against
+ * it -- and forwards it explicitly.  That is the right place for a default: one
+ * that a human reads, not one a program falls back on. */
+static int      MUSTWIN = -1;
 
 static int      BRANCH = NPAT - 1;   /* measured: non-winning bins, any guess */
 static int      GBRANCH = 31;        /* measured: yellow-free non-green bins */
@@ -1121,8 +1127,9 @@ static void usage(void) {
       "  --may-lose        THE BADGE QUESTION: maximise the answers won within the\n"
       "                    cap with no yellow.  An answer that draws a yellow is\n"
       "                    lost and the strategy may abandon that game.\n"
-      "  --must-win        the default: the same maximisation SUBJECT TO winning\n"
-      "                    EVERY answer within the cap.  Always <= --may-lose.\n"
+      "  --must-win        the same maximisation SUBJECT TO winning EVERY answer\n"
+      "                    within the cap.  Always <= --may-lose.  ONE OF THESE\n"
+      "                    TWO IS REQUIRED -- there is no default objective.\n"
       "  --topk K, -k K    beam: recurse into the K evenest splitters at every\n"
       "                    branching point, the ROOT included -- so it examines K\n"
       "                    OPENERS too, and reports the best of THOSE, not of 12972.\n"
@@ -1161,6 +1168,15 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--answer-list") && i + 1 < argc) answerlist = argv[++i];
         else if (!strcmp(argv[i], "--patterns") && i + 1 < argc) patpath = argv[++i];
         else { fprintf(stderr, "unknown arg: %s\n\n", argv[i]); usage(); return 1; }
+    }
+    if (MUSTWIN < 0) {
+        fprintf(stderr,
+                "greens: the OBJECTIVE is required -- pass --may-lose or --must-win.\n"
+                "  --may-lose  maximise the answers won within the cap with NO YELLOW;\n"
+                "              an answer that draws a yellow is lost and may be abandoned\n"
+                "  --must-win  the same, SUBJECT TO winning EVERY answer within the cap\n"
+                "They are different quantities. Use solver/run-greens.sh, which passes one.\n");
+        return 1;
     }
     if (depth < 1 || depth > MAXD - 1) {
         fprintf(stderr, "--depth must be 1..%d (MAXD is %d)\n", MAXD - 1, MAXD);

@@ -631,7 +631,15 @@ its state arithmetic against `strspace.py` over a shared deterministic walk — 
     simply LOST and **the strategy owes it nothing afterwards; it may abandon that
     game.** So yellow branches are never searched, no state is ever INFEASIBLE, and
     this is much the cheaper of the two.
-  - **`--must-win` — THE DEFAULT:** the same maximisation SUBJECT TO still winning EVERY
+  - **THE BINARY HAS NO DEFAULT OBJECTIVE — one of the two flags is REQUIRED**, and
+    that is a scar. It had one, and the wrapper forwarded the flag only in the must-win
+    case, letting the binary's default cover the other; when the default moved,
+    `--may-lose` silently ran a MUST-WIN search and wrote it under a may-lose FILENAME.
+    **Never let two places own one decision.** A defaulted objective is a domain ANSWER
+    hiding in configuration, so refusing to run is the only safe default. The WRAPPER
+    keeps a default (must-win) and forwards it explicitly — a default a human reads, not
+    one a program falls back on. The gate passes it explicitly in both directions too.
+  - **`--must-win` — the WRAPPER's default:** the same maximisation SUBJECT TO still winning EVERY
     answer within 6. A strictly smaller strategy space, so **its value is always <=
     `--may-lose`'s**. **IT IS THE DEFAULT ONLY BECAUSE RUNS WERE QUEUED AGAINST IT**
     (user, 2026-09-04) — not because it is the headline quantity, which it is not. A
