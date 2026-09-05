@@ -24,19 +24,25 @@
 # have it, so a number here describes THIS game on THESE lists, never
 # letroso.com.  See data/shared/words/hello/len3/README.md.
 #
-# RUN run-letroso-rank.sh FIRST.  The root scan is ~19 core-hours and is cached;
-# this reads it rather than recomputing.  A missing or foreign cache means this
-# recomputes it inline, which is fine but slow.
+# RUN run-letroso-rank.sh FIRST, and this REFUSES until you have.  The root scan
+# is ~19 core-hours; without the cached ranking this would silently redo all of
+# it inline.  That is not a slow path worth taking quietly -- queue the two
+# commands back to back in one terminal and the second starts an independent
+# 19-core-hour scan the moment the first ends, which is exactly what happened on
+# 2026-09-05.  --force-rescan is there if you really do want it to compute the
+# ranking itself.
 
 set -u
 MATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 PRIOR=""
 K=1
+FORCE=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --length-prior) PRIOR="$2"; shift 2 ;;
         -k|--topk)      K="$2";     shift 2 ;;
+        --force-rescan) FORCE=1;    shift ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
     esac
 done
@@ -57,6 +63,26 @@ OUT="$OUTDIR/$STEM.csv"
 [ -f data/shared/words/hello/len3/mystery.txt ] || {
     echo "missing the length-3 lists" >&2
     echo "  run: python3 build_letroso_lists.py" >&2; exit 1; }
+
+RANK="$OUTDIR/root_rank_${PRIOR}.csv.gz"
+if [ -z "$FORCE" ] && [ ! -f "$RANK" ]; then
+    echo "REFUSING: no cached opener ranking at $RANK" >&2
+    echo "  Without it this recomputes the whole ~19 core-hour root scan inline," >&2
+    echo "  duplicating the work run-letroso-rank.sh exists to do once." >&2
+    echo "  Run this first, and let it FINISH:" >&2
+    echo "    bash solver/run-letroso-rank.sh --length-prior $PRIOR" >&2
+    echo "  (or pass --force-rescan if you really want this to compute it)" >&2
+    exit 1
+fi
+
+# Both wrappers share ONE checkpoint path per prior, so two concurrent scans
+# would write over each other's progress.  Refuse while a rank scan is live.
+LIVE=$(pgrep -f "letroso_solve.py .*--rank-only" 2>/dev/null | tr '\n' ' ')
+if [ -n "$LIVE" ]; then
+    echo "REFUSING: a root-rank scan is already running (pid $LIVE)." >&2
+    echo "  Wait for it to finish; this will then read its cached ranking." >&2
+    exit 1
+fi
 
 . "$(dirname "${BASH_SOURCE[0]}")/_guard.sh"
 guard_output letroso_solve.py "$OUT" || exit 1
