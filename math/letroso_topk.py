@@ -138,8 +138,15 @@ def _score_chunk(Wg, Lg, Wa, La, w, lo, hi, out):
 
 
 @njit(parallel=True, cache=True)
-def _score_all(Wg, Lg, Wa, La, w, out, nchunk):
-    for c in prange(nchunk):
+def _score_all(Wg, Lg, Wa, La, w, out, c0, c1):
+    """Score chunks [c0, c1) in parallel.
+
+    TAKES A RANGE, NOT A COUNT.  It used to prange(nchunk) from zero while the
+    driver passed the running total, so every call re-scored every chunk from
+    the beginning -- quadratic work, 136x over a full 139072-opener run, and the
+    tell was an ETA that CLIMBED instead of holding steady.
+    """
+    for c in prange(c0, c1):
         lo = c * _CHUNK
         hi = lo + _CHUNK
         if hi > Wg.shape[0]:
@@ -184,10 +191,19 @@ def rank_root(guesses, answers, w, progress=None, checkpoint=None, fp=None):
             print("unreadable checkpoint %s (%s) -- starting over"
                   % (checkpoint, exc))
 
+
     step = max(1, nchunk // 200)
+    # Counts chunk-scorings so the gate can prove no chunk is scored twice --
+    # see the note on _score_all.
+    chunks_scored = [0]
     while done < nchunk:
         end = min(nchunk, done + step)
-        _score_all(Wg[:end * _CHUNK], Lg[:end * _CHUNK], Wa, La, w, out, end)
+        _score_all(Wg, Lg, Wa, La, w, out, done, end)
+        chunks_scored[0] += end - done
+        # Published per iteration, not at the end, so it is still readable after
+        # an interrupt -- which is exactly when it is worth reading.
+        rank_root.chunks_scored = chunks_scored[0]
+        rank_root.nchunk = nchunk
         done = end
         if checkpoint:
             os.makedirs(os.path.dirname(checkpoint), exist_ok=True)
@@ -198,6 +214,8 @@ def rank_root(guesses, answers, w, progress=None, checkpoint=None, fp=None):
             os.replace(tmp, checkpoint)
         if progress:
             progress(min(done * _CHUNK, len(guesses)), len(guesses))
+    rank_root.chunks_scored = chunks_scored[0]
+    rank_root.nchunk = nchunk
     return out
 
 

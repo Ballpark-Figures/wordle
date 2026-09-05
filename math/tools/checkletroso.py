@@ -269,6 +269,28 @@ def main():
     T.clear_checkpoint(ck)
     check("clear_checkpoint removes it", not os.path.exists(ck))
 
+    # The chunked driver must score each chunk EXACTLY ONCE.  It once passed a
+    # running total to a prange that started at zero, so every call re-scored
+    # everything from the beginning -- 136x the work over a full run, with a
+    # climbing ETA as the only symptom.  Counting is the cheap permanent guard.
+    T.rank_root(cg, ca, cw)
+    check("a fresh scan scores each chunk exactly once",
+          T.rank_root.chunks_scored == T.rank_root.nchunk,
+          "%d scorings for %d chunks" % (T.rank_root.chunks_scored,
+                                         T.rank_root.nchunk))
+    hits[0] = 0
+    try:
+        T.rank_root(cg, ca, cw, progress=_prog, checkpoint=ck, fp=cfp)
+    except _Boom:
+        pass
+    first = T.rank_root.chunks_scored
+    T.rank_root(cg, ca, cw, checkpoint=ck, fp=cfp)
+    check("an interrupted-then-resumed scan also scores each chunk once",
+          first + T.rank_root.chunks_scored == T.rank_root.nchunk,
+          "%d + %d for %d chunks" % (first, T.rank_root.chunks_scored,
+                                     T.rank_root.nchunk))
+    T.clear_checkpoint(ck)
+
     print()
     if fails:
         print("FAILED: " + ", ".join(fails))
