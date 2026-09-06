@@ -1,0 +1,3 @@
+k,ranking,answers,expected_turns,kind,opener,nodes,secs
+3,data/shared/antiwordle/sim.t1000.s0.csv,2315,8.4596112311,lower-bound,qajaq,261831,1.655
+3,data/shared/antiwordle/sim.t1000.s0.csv,2315,8.4596112311,lower-bound,qajaq,261833,8.208
