@@ -8,6 +8,15 @@ node; guesses are ranked by the expected number of candidates still alive
 (winning bin excluded), ties on the lowest guess index; the search recurses into
 the K best and keeps whichever actually minimises expected guesses.
 
+--answers-only RESTRICTS THE GUESS SET to that language's answer (mystery) list,
+so every guess -- opener and follow-up -- is itself a possible answer. This is
+the language analogue of the English answers-only sweep (run-ans-sweep.sh), and
+everything else is unchanged: same beam, same ranking, same length-5-only rule,
+same expected-guesses-outright objective with NO depth cap. It is a DIFFERENT
+strategy from the full-guess-list run and lands in its own files, so the two are
+never mixed. (No feasibility caveat transfers from the English answers-only
+sweep: that one is capped at 6 guesses and the cap binds; this one has no cap.)
+
 THERE IS NO DEPTH CAP. This is expected guesses OUTRIGHT -- the same footing as
 the multiwordle, foximax and adversarial numbers, and NOT the footing of any
 optturns/hardturns/ansall total, every one of which is an optimum SUBJECT TO a
@@ -104,10 +113,15 @@ def build_patterns(guesses: list[str], answers: list[str],
     return P
 
 
-def solve_language(lg: str, root: str, length: int, k: int) -> dict:
+def solve_language(lg: str, root: str, length: int, k: int,
+                   answers_only: bool = False) -> dict:
     d = os.path.join(root, lg, f"len{length}")
-    guesses = read_words(os.path.join(d, "guess.txt"))
     answers = read_words(os.path.join(d, "mystery.txt"))
+    # answers_only: guesses ARE the answer list, the language analogue of
+    # --guess-list mystery.txt in the English answers-only sweep. Every answer is
+    # trivially a legal guess, so TopKGame's playability guard is satisfied, and
+    # the alphabet (below) covers every letter in play since guesses == answers.
+    guesses = answers if answers_only else read_words(os.path.join(d, "guess.txt"))
     meta = read_meta(os.path.join(d, "wordlists.meta"))
     alphabet = sorted({c for w in guesses for c in w})
 
@@ -133,7 +147,8 @@ COLUMNS = ["lang", "guesses", "answers", "alphabet_size", "accents",
            "opener", "total_guesses", "expected_guesses", "seconds"]
 
 
-def write_meta(path: str, k: int, length: int, langs: list[str]) -> None:
+def write_meta(path: str, k: int, length: int, langs: list[str],
+               answers_only: bool = False) -> None:
     with open(path, "w", encoding="utf-8") as fh:
         fh.write("kind=lang-topk-solve\n")
         fh.write(f"k={k}\n")
@@ -145,6 +160,10 @@ def write_meta(path: str, k: int, length: int, langs: list[str]) -> None:
         fh.write("root_restricted_by_k=1\n")
         fh.write("optimum=0\n")
         fh.write("weights=uniform\n")
+        # answers_only: the guess set is the answer (mystery) list, so a guess is
+        # always a possible answer. A DIFFERENT strategy from the full run.
+        fh.write(f"answers_only={1 if answers_only else 0}\n")
+        fh.write(f"guess_set={'answers' if answers_only else 'full'}\n")
         fh.write("wordlists=build_lang_wordlists.py\n")
         fh.write("comparable_with_optturns=0\n")
 
@@ -152,6 +171,7 @@ def write_meta(path: str, k: int, length: int, langs: list[str]) -> None:
 def main(argv: list[str]) -> None:
     k, length, root, out = 1, ONLY_LENGTH, LANG_WORDS, None
     langs = None
+    answers_only = False
     it = iter(argv)
     for a in it:
         if a in ("-k", "--topk"):
@@ -164,8 +184,12 @@ def main(argv: list[str]) -> None:
             root = next(it)
         elif a == "--out":
             out = next(it)
+        elif a == "--answers-only":
+            answers_only = True
         else:
-            raise SystemExit(f"unknown arg {a!r} (-k/--length/--langs/--words/--out)")
+            raise SystemExit(
+                f"unknown arg {a!r} "
+                "(-k/--length/--langs/--words/--out/--answers-only)")
 
     if out is None:
         raise SystemExit(
@@ -200,7 +224,9 @@ def main(argv: list[str]) -> None:
         print(f"{row['lang']:<6}{row['opener']:>10}{row['expected_guesses']:>14}"
               f"{row['answers']:>9}{row['guesses']:>9}{row['seconds']:>8}{note}")
 
-    print(f"top-{k} beam, length {length}, average guesses OUTRIGHT (no depth cap)")
+    guess_set = "answers only" if answers_only else "full guess list"
+    print(f"top-{k} beam, length {length}, {guess_set}, "
+          "average guesses OUTRIGHT (no depth cap)")
     print(f"{'lang':<6}{'opener':>10}{'avg guesses':>14}"
           f"{'answers':>9}{'guesses':>9}{'secs':>8}")
     for lg in langs:
@@ -209,12 +235,12 @@ def main(argv: list[str]) -> None:
         if lg in done:
             show(done[lg], "  (done earlier)")
             continue
-        row = solve_language(lg, root, length, k)
+        row = solve_language(lg, root, length, k, answers_only)
         show(row)
         with open(out, "a", encoding="utf-8") as fh:   # flush per language
             fh.write(",".join(str(row[c]) for c in COLUMNS) + "\n")
 
-    write_meta(out + ".meta", k, length, langs)
+    write_meta(out + ".meta", k, length, langs, answers_only)
     print(f"\nwrote {out}")
 
 
