@@ -51,6 +51,8 @@ from __future__ import annotations
 
 import gzip
 import os
+import sys
+import time
 
 import numpy as np
 
@@ -73,6 +75,7 @@ MAXD = 32              # recursion guard; see the docstring -- NOT a cap
 PRIORS = ("lengths", "words")
 _HSIZE = 1 << 17       # open-addressed bin table; > 2x the answer count
 _CHUNK = 256           # guesses per parallel chunk, so scratch is per chunk
+_REPORT_SECS = float(os.environ.get("LETROSO_REPORT", "5"))  # solve heartbeat cadence
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(_HERE, "data", "shared", "letroso")
@@ -341,6 +344,35 @@ class Solver:
         self._wsum = np.zeros(_HSIZE, np.float64)
         self._touched = np.empty(len(answers), np.int64)
         self._scores = np.empty(len(guesses), np.float64)
+        # solve() heartbeat state -- observability only; see _report.  Progress
+        # is measured at the ROOT: answers resolved out of the answer count, and
+        # how many of the opener's root buckets have finished.
+        self._t0 = 0.0
+        self._last = 0.0
+        self._nodes = 0
+        self._resolved = 0
+        self._bucket = 0
+        self._nbuckets = 0
+        self._ntotal = len(answers)
+
+    def _report(self, force=False):
+        """A throttled progress line mirroring the greens/strsts heartbeat.
+        Reads counters, never touches the search -- pure observability."""
+        now = time.time()
+        if not force and now - self._last < _REPORT_SECS:
+            return
+        self._last = now
+        el = now - self._t0
+        nrate = self._nodes / el if el else 0.0
+        arate = self._resolved / el if el else 0.0
+        eta = (self._ntotal - self._resolved) / arate if arate else 0.0
+        pct = 100.0 * self._resolved / self._ntotal if self._ntotal else 0.0
+        sys.stdout.write(
+            "[%7.0fs] %5.1f%%  %d/%d answers  bucket %d/%d  |  "
+            "%d nodes, %.0f/s, eta %.0fs\n"
+            % (el, pct, self._resolved, self._ntotal,
+               self._bucket, self._nbuckets, self._nodes, nrate, eta))
+        sys.stdout.flush()
 
     def _rank(self, cand, at_root):
         if at_root and self.root_scores is not None:
@@ -359,6 +391,8 @@ class Solver:
         if depth >= MAXD:
             raise RuntimeError("MAXD hit -- see the docstring; this should be "
                                "impossible while answers are legal guesses")
+        self._nodes += 1
+        self._report()
         total_w = self.w[cand].sum()
         best_cost, best_g = None, -1
         for gi in self._rank(cand, at_root):
@@ -366,19 +400,33 @@ class Solver:
             codes = np.empty(cand.shape[0], np.int64)
             win = _partition(self.Wg, self.Lg, self.Wa, self.La, self.w, gi,
                              cand, codes, self._best, self._stack, self._left)
+            uniq = np.unique(codes)
+            if at_root:
+                # Root-bucket progress for the opener currently being tried
+                # (reset per opener so k>1 tracks the live one).  Answers the
+                # opener wins outright resolve for free; the rest resolve one
+                # root bucket at a time as their subtrees complete.
+                self._nbuckets = int((uniq != win).sum())
+                self._bucket = 0
+                self._resolved = int((codes == win).sum())
             cost = total_w
-            for code in np.unique(codes):
+            for code in uniq:
                 if code == win:
                     continue
                 sub = cand[codes == code]
                 cost += self._solve(sub, depth + 1)[0]
+                if at_root:
+                    self._bucket += 1
+                    self._resolved += int(sub.shape[0])
             if best_cost is None or cost < best_cost:
                 best_cost, best_g = cost, gi
         return best_cost, best_g
 
     def solve(self):
         if self._cache is None:
+            self._t0 = time.time()
             cand = np.arange(len(self.answers), dtype=np.int64)
             cost, gi = self._solve(cand, 0, at_root=True)
+            self._report(force=True)
             self._cache = (cost, self.guesses[gi])
         return self._cache
