@@ -44,8 +44,15 @@
 # done.  What you do NOT get from a stopped run is a PROOF: the leader is "best
 # of those examined, in a heuristic order", not the optimum.  Say it that way.
 #
+# LENGTH 3 IS NOT ON THE SAME FOOTING.  hello curates answers only at 4+, so the
+# length-3 mystery.txt is OURS -- a frequency rule (zipf >= 3.0) applied to hello's
+# 3-letter dictionary, built by build_letroso_lists.py, NOT build_wordlists.py.  Do
+# not run `build_wordlists.py 3`: it would filter hello's targets.json (which has no
+# 3-letter answers) to an EMPTY list and clobber ours.  A length-3 result is a
+# modelling decision of ours; say so when quoting it.  See len3/README.md.
+#
 # PREREQUISITES, both from math/:
-#     python3 build_wordlists.py                # once, all lengths
+#     python3 build_wordlists.py                # once, lengths 4..11 (length 3 is separate; see above)
 #     python3 build_patterns.py --length 6      # the matrix for THIS length
 #     sh build.sh 6                             # in solver/, the binary for THIS length
 
@@ -75,9 +82,9 @@ while [ $# -gt 0 ]; do
 done
 
 case "$LENGTH" in
-    4|5|6|7|8|9|10|11) ;;
-    "") echo "usage: bash solver/run-length-sweep.sh --length <4..11> --depth <d> [--order ssq|lb]" >&2; exit 1 ;;
-    *)  echo "unsupported length '$LENGTH' (4..11)" >&2; exit 1 ;;
+    3|4|5|6|7|8|9|10|11) ;;
+    "") echo "usage: bash solver/run-length-sweep.sh --length <3..11> --depth <d> [--order ssq|lb]" >&2; exit 1 ;;
+    *)  echo "unsupported length '$LENGTH' (3..11)" >&2; exit 1 ;;
 esac
 case "$DEPTH" in
     ''|*[!0-9]*) echo "--depth is required and must be a number (the cap IS the objective)" >&2; exit 1 ;;
