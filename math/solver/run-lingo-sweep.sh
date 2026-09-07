@@ -45,7 +45,11 @@ LENGTH=5
 DEPTH=""
 TOPK=0
 TTBITS=24           # 0.5 GB -- the per-letter subgames are small
-THREADS=8
+# The subgames are tiny (each opener solves in ms), so tree WRITING dominates,
+# and tree writes are serialised (one gzip pipe at a time -- see write_tree in
+# optturns.c). Many threads then just contend on that lock: measured on letter
+# 'b', 4 threads (10s) beat 1 (13s) beat 8 (21s). So a modest default, not 20.
+THREADS=4
 LETTERS=""          # empty -> every letter that has a list
 
 while [ $# -gt 0 ]; do

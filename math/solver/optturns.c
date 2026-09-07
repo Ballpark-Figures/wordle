@@ -1678,35 +1678,52 @@ done:
 static int write_tree(const char *dir, int g, int depth, Ctx *ctx) {
     char cmd[1200];
     snprintf(cmd, sizeof cmd, "gzip -1 > '%s/%s.txt.gz'", dir, GWORD[g]);
-    FILE *out = popen(cmd, "w");
-    if (!out) return -1;
-
-    int *sc = pat_scratch(3);
-    int *cnt = PSLOT(sc, 0), *start = PSLOT(sc, 1), *fill = PSLOT(sc, 2);
-    uint16_t *buf = ctx->tbuf[depth];
-    const pat_t *row = PAT + (size_t)g * NA;
-    for (int a = 0; a < NA; a++) cnt[row[a]]++;
-    int acc = 0;
-    for (int p = 0; p < NPAT; p++) { start[p] = acc; acc += cnt[p]; }
-    start[NPAT] = acc;
-    memcpy(fill, start, (size_t)NPAT * sizeof(int));
-    for (int a = 0; a < NA; a++) buf[fill[row[a]]++] = (uint16_t)a;
-
-    char path[4096];
     int rc = 0;
-    if (cnt[ALL_GREEN] > 0) fprintf(out, "%s 1 %s\n", GWORD[g], GWORD[g]);
-    for (int p = 0; p < NPAT && rc == 0; p++) {
-        if (p == ALL_GREEN || cnt[p] == 0) continue;
-        char ps[PATSTR_BUF];
-        pat_str(p, ps);
-        int plen = snprintf(path, sizeof path, "%s %s ", GWORD[g], ps);
-        Cons kid;
-        if (USE_CONS) cons_apply(&kid, &CONS_NONE, g, p);
-        rc = emit_tree(out, buf + start[p], cnt[p], depth - 1, path, plen, 1,
-                       USE_CONS ? &kid : &CONS_NONE, ctx);
+
+    /* popen/pclose fork a gzip child. When many openers finish in quick
+     * succession -- e.g. the Lingo per-letter sweeps, where each opener solves
+     * in milliseconds -- concurrent popen() calls across OpenMP threads leak one
+     * thread's still-open pipe fd into another thread's forked child, so that
+     * gzip never sees EOF and pclose() hangs forever in wait4(): a deadlock that
+     * looks like a random crash/stall late in a sweep. The normal 12972 sweep
+     * almost never hits it only because its openers take minutes, so two popens
+     * rarely overlap. Serialise the whole popen..pclose so at most one gzip pipe
+     * is ever open. Tree emission is pure I/O (every value is already memoised),
+     * so this costs nothing measurable even on the 20-thread sweep, and the
+     * emitted trees are byte-identical. */
+#pragma omp critical(treewrite)
+    {
+        FILE *out = popen(cmd, "w");
+        if (!out) {
+            rc = -1;
+        } else {
+            int *sc = pat_scratch(3);
+            int *cnt = PSLOT(sc, 0), *start = PSLOT(sc, 1), *fill = PSLOT(sc, 2);
+            uint16_t *buf = ctx->tbuf[depth];
+            const pat_t *row = PAT + (size_t)g * NA;
+            for (int a = 0; a < NA; a++) cnt[row[a]]++;
+            int acc = 0;
+            for (int p = 0; p < NPAT; p++) { start[p] = acc; acc += cnt[p]; }
+            start[NPAT] = acc;
+            memcpy(fill, start, (size_t)NPAT * sizeof(int));
+            for (int a = 0; a < NA; a++) buf[fill[row[a]]++] = (uint16_t)a;
+
+            char path[4096];
+            if (cnt[ALL_GREEN] > 0) fprintf(out, "%s 1 %s\n", GWORD[g], GWORD[g]);
+            for (int p = 0; p < NPAT && rc == 0; p++) {
+                if (p == ALL_GREEN || cnt[p] == 0) continue;
+                char ps[PATSTR_BUF];
+                pat_str(p, ps);
+                int plen = snprintf(path, sizeof path, "%s %s ", GWORD[g], ps);
+                Cons kid;
+                if (USE_CONS) cons_apply(&kid, &CONS_NONE, g, p);
+                rc = emit_tree(out, buf + start[p], cnt[p], depth - 1, path, plen, 1,
+                               USE_CONS ? &kid : &CONS_NONE, ctx);
+            }
+            pclose(out);
+            free(sc);
+        }
     }
-    pclose(out);
-    free(sc);
     return rc;
 }
 
