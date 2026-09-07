@@ -1,0 +1,108 @@
+{
+  "length": 5,
+  "word_source": "wordle",
+  "letters": {
+    "a": {
+      "answers": 141,
+      "guesses": 737
+    },
+    "b": {
+      "answers": 173,
+      "guesses": 909
+    },
+    "c": {
+      "answers": 198,
+      "guesses": 922
+    },
+    "d": {
+      "answers": 111,
+      "guesses": 685
+    },
+    "e": {
+      "answers": 72,
+      "guesses": 303
+    },
+    "f": {
+      "answers": 136,
+      "guesses": 598
+    },
+    "g": {
+      "answers": 115,
+      "guesses": 638
+    },
+    "h": {
+      "answers": 69,
+      "guesses": 489
+    },
+    "i": {
+      "answers": 34,
+      "guesses": 165
+    },
+    "j": {
+      "answers": 20,
+      "guesses": 202
+    },
+    "k": {
+      "answers": 20,
+      "guesses": 376
+    },
+    "l": {
+      "answers": 88,
+      "guesses": 577
+    },
+    "m": {
+      "answers": 107,
+      "guesses": 693
+    },
+    "n": {
+      "answers": 37,
+      "guesses": 325
+    },
+    "o": {
+      "answers": 41,
+      "guesses": 262
+    },
+    "p": {
+      "answers": 142,
+      "guesses": 859
+    },
+    "q": {
+      "answers": 23,
+      "guesses": 78
+    },
+    "r": {
+      "answers": 105,
+      "guesses": 628
+    },
+    "s": {
+      "answers": 366,
+      "guesses": 1565
+    },
+    "t": {
+      "answers": 149,
+      "guesses": 815
+    },
+    "u": {
+      "answers": 33,
+      "guesses": 189
+    },
+    "v": {
+      "answers": 43,
+      "guesses": 242
+    },
+    "w": {
+      "answers": 83,
+      "guesses": 413
+    },
+    "y": {
+      "answers": 6,
+      "guesses": 181
+    },
+    "z": {
+      "answers": 3,
+      "guesses": 105
+    }
+  },
+  "total_answers": 2315,
+  "total_guesses": 12956
+}

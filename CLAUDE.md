@@ -1397,6 +1397,47 @@ anything. Run it with **`bash solver/run-letroso-rank.sh --length-prior lengths`
   an independent REPLAY of the solver's strategy answer-by-answer to check the cost
   accounting. Run it alongside `solver/validate.sh`.
 
+## Lingo (`run-lingo-sweep.sh`) — Wordle with the FIRST LETTER GIVEN, per letter
+Lingo (the game show) reveals the opening letter; we model ONE INDEPENDENT game
+per starting letter. `math/solver/README.md` "Lingo" is the detail; the key facts:
+- **NO NEW SOLVER CODE — it is the validated `optturns` on restricted lists.** For
+  each letter L both the answer pool and the legal guesses are restricted to words
+  starting with L, so position 0 is always green and **the feedback function is
+  Wordle's, UNCHANGED**. The restriction is entirely `--guess-list` (follow-ups AND
+  swept openers) + `--answer-list` (the total's answers) + `--patterns` (a matrix
+  built for exactly those columns). `validate.sh` is untouched and still passes.
+- **THE FEEDBACK RULE IS UNVERIFIED** against the real show — we assume Wordle's
+  green/yellow/grey with Wordle's duplicate-letter handling (the user's modelling
+  call, 2026-09-07). Same standing as the Absurdle / Sea-of-Greens rules; a real
+  Lingo board would settle it. Say so when quoting any number.
+- **THE ANSWER POOL IS THE CURATED mystery LIST** (user's call): length 5 = the
+  2315 NYT answers filtered by letter, guesses from the 12972 — the lists
+  `patterns.npy` is built from. Length 6 has no NYT set, so it falls back to the
+  **hello wordl** len-6 lists like the length sweeps — a different, NOT comparable
+  curation (see "Other word lengths"). A number describes THIS game on THESE lists.
+- **THE CAP IS PART OF THE OBJECTIVE.** Lingo gives five guesses (the given first
+  letter is not one), so `--depth 5` IS the game; `--depth` is REQUIRED and each
+  depth gets its own results dir. `INFEASIBLE` is an expected result (normal
+  Wordle's "follow SALET's tree" escape needs a word that starts with L, so it does
+  not transfer) — report totals as optima SUBJECT TO the guarantee, never as
+  minimum expected guesses. Never table a Lingo total beside an `optturns` one.
+- **`-k K` is a beam (upper bound) and restricts the ROOT too** — same caveat every
+  `--topk` sweep here carries.
+- **Run it with `bash solver/run-lingo-sweep.sh --depth 5 [--length L] [--letter X]`
+  (from `math/`)**, attached, tee'd-log rules as the other sweeps. It auto-builds
+  the per-letter lists (`build_lingo_lists.py`) and per-letter matrix
+  (`build_patterns.py --answer-list`, additive + off the shared matrix paths).
+  Length 5 uses plain `optturns`; other lengths need `sh build.sh <L>` first.
+  Data: committed CSVs in `data/shared/lingo/len<L>_d<D>/<letter>_totals.csv`;
+  matrices/trees/tt/log under `data/local/lingo/`. `python3 tools/lingo_report.py
+  --length L --depth D` prints the best opener per letter.
+- **`python3 tools/checklingo.py` is the GATE.** The one new artifact is the
+  per-letter matrix, so the load-bearing check diffs every column BIT-IDENTICAL
+  against the shared length matrix (`checkpatterns.py` validates that against
+  `wordle.pattern`), proving true feedback AND correct column order; it also pins
+  the lists as exactly the filtered full lists and replays emitted trees
+  length-generally. Run it alongside `solver/validate.sh` and `checkpatterns.py`.
+
 ## Gameplay layout
 - (Describe this video's on-screen layout and the assets in `animations/assets/`.)
 
