@@ -5,6 +5,7 @@
 #     bash solver/run-lingo-sweep.sh --depth 5 --letter s      # one letter
 #     bash solver/run-lingo-sweep.sh --depth 5 --length 6      # 6-letter (hello lists)
 #     bash solver/run-lingo-sweep.sh --depth 5 --topk 100      # beam (upper bound)
+#     bash solver/run-lingo-sweep.sh --depth 5 --answers-only  # guess ANSWER words only
 #
 # WHAT THIS SOLVES, precisely, for EACH starting letter L:
 #
@@ -19,6 +20,17 @@
 #   * --guess-list <L>/guess.txt      restricts follow-ups AND swept openers to L
 #   * --answer-list <L>/mystery.txt   makes the total run over L's answers only
 #   * --patterns    <L>.npy           the matrix built for exactly those columns
+#
+# --answers-only: restrict the legal GUESSES to the letter's ANSWER words too
+# (--guess-list <L>/mystery.txt instead of guess.txt), so every guess must itself
+# be a possible answer. This is the per-letter analogue of the repo's answers-only
+# (ansturns) sweep, and a DIFFERENT objective from the default -- it reuses the
+# SAME per-letter matrix (answers are a subset of guesses, so those rows already
+# exist), only the guess list changes. Results go to a separate `_ans` directory
+# and the solver salts its TT on the guess set, so the two never mix. NB the real
+# game show lets you guess any valid word, so this is an analytical variant, not
+# Lingo's rule; the cap BINDS HARDER here (fewer guesses to probe with), so
+# INFEASIBLE openers are more common and are an expected result.
 #
 # THE FEEDBACK RULE IS UNVERIFIED against the real game show: we assume Lingo's
 # marks are Wordle's green/yellow/grey with Wordle's duplicate-letter handling.
@@ -51,6 +63,7 @@ TTBITS=24           # 0.5 GB -- the per-letter subgames are small
 # 'b', 4 threads (10s) beat 1 (13s) beat 8 (21s). So a modest default, not 20.
 THREADS=4
 LETTERS=""          # empty -> every letter that has a list
+ANSONLY=0           # 1 -> guesses restricted to the letter's answer words
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -60,9 +73,15 @@ while [ $# -gt 0 ]; do
         --tt-bits) TTBITS="$2"; shift 2 ;;
         --threads) THREADS="$2"; shift 2 ;;
         --letter)  LETTERS="$LETTERS $2"; shift 2 ;;
+        --answers-only) ANSONLY=1; shift ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
     esac
 done
+
+# answers-only gets its OWN results directory (a different objective), and the
+# guess list becomes the letter's answers instead of its full guess list.
+SUF=""
+[ "$ANSONLY" -eq 1 ] && SUF="_ans"
 
 if [ -z "$DEPTH" ]; then
     echo "run-lingo-sweep.sh: --depth is REQUIRED (the cap is part of the objective;" >&2
@@ -101,7 +120,7 @@ fi
 [ -n "$LETTERS" ] || { echo "no letters found under $LISTDIR" >&2; exit 1; }
 
 MATRIXDIR="data/local/lingo/patterns/len${LENGTH}"
-RESULTDIR="data/shared/lingo/len${LENGTH}_d${DEPTH}"
+RESULTDIR="data/shared/lingo/len${LENGTH}_d${DEPTH}${SUF}"
 mkdir -p "$MATRIXDIR" "$RESULTDIR"
 
 TOPKFLAG=""
@@ -109,7 +128,8 @@ TOPKFLAG=""
 
 for L in $LETTERS; do
     AW="$LISTDIR/$L/mystery.txt"
-    GW="$LISTDIR/$L/guess.txt"
+    # default: guess any word starting with L; answers-only: guess only L's answers
+    if [ "$ANSONLY" -eq 1 ]; then GW="$AW"; else GW="$LISTDIR/$L/guess.txt"; fi
     if [ ! -f "$AW" ] || [ ! -f "$GW" ]; then
         echo "no lists for letter '$L' at $LISTDIR/$L -- skipping" >&2
         continue
@@ -121,13 +141,13 @@ for L in $LETTERS; do
         python3 build_patterns.py --answer-list "$AW" --out "$MAT" $LENGTHFLAG >&2 || exit 1
     fi
 
-    LOC="data/local/lingo/len${LENGTH}_d${DEPTH}/$L"
+    LOC="data/local/lingo/len${LENGTH}_d${DEPTH}${SUF}/$L"
     mkdir -p "$LOC"
     OUT="$RESULTDIR/${L}_totals.csv"
     WARM=""
     [ -f "$LOC/tt.bin" ] && WARM="--tt-load $LOC/tt.bin"
 
-    echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] lingo len${LENGTH} letter '$L' depth ${DEPTH}${TOPKFLAG:+ }${TOPKFLAG} $WARM" \
+    echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] lingo len${LENGTH} letter '$L' depth ${DEPTH}${SUF:+ answers-only}${TOPKFLAG:+ }${TOPKFLAG} $WARM" \
         | tee -a "$LOC/sweep.log"
 
     $BIN $LENGTHFLAG --sweep \
@@ -142,4 +162,4 @@ for L in $LETTERS; do
         2>&1 | tee -a "$LOC/sweep.log"
 done
 
-echo "done. best opener per letter:  python3 tools/lingo_report.py --length ${LENGTH} --depth ${DEPTH}"
+echo "done. best opener per letter:  python3 tools/lingo_report.py --length ${LENGTH} --depth ${DEPTH}${SUF:+ --answers-only}"

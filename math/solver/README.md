@@ -918,8 +918,21 @@ python3 build_lingo_lists.py --length 5          # once: per-letter word lists
 bash solver/run-lingo-sweep.sh --depth 5         # all letters
 bash solver/run-lingo-sweep.sh --depth 5 --letter s
 bash solver/run-lingo-sweep.sh --depth 5 --length 6   # needs 'sh build.sh 6'
+bash solver/run-lingo-sweep.sh --depth 5 --answers-only   # guess ANSWER words only
 python3 tools/lingo_report.py --length 5 --depth 5    # best opener per letter
 ```
+
+**`--answers-only`** restricts the legal guesses to the letter's own answer words
+(`--guess-list` points at `mystery.txt` instead of `guess.txt`), so every guess —
+opener and follow-ups — must itself be a possible answer. It is the per-letter
+analogue of the repo's answers-only (`ansturns`) sweep, and a DIFFERENT objective:
+it reuses the SAME per-letter matrix (answers ⊆ guesses, so those rows already
+exist) and changes only the guess list. Results land in a separate `_ans`
+directory and the solver salts its TT on the guess set, so the two never mix; read
+them with `tools/lingo_report.py … --answers-only`. NB the real game show lets you
+guess any valid word, so this is an analytical variant, not Lingo's rule — and the
+cap binds harder (fewer words to probe with), so `INFEASIBLE` openers are more
+likely and are an expected result.
 
 The wrapper drives the plain solver per letter with:
 

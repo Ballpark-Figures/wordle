@@ -122,13 +122,18 @@ def _read_totals(csv_path):
     return totals
 
 
-def check_trees(length, depth, letters, fails):
+def check_trees(length, depth, letters, fails, answers_only=False):
     la = None if length == 5 else length
     word_len = length
+    suf = "_ans" if answers_only else ""
+    # answers-only trees may ONLY play answer words, so the legal set is the
+    # mystery list, not the full guess list -- checking against guess.txt would
+    # be a weaker superset test that misses a stray non-answer guess.
+    legal_file = "mystery.txt" if answers_only else "guess.txt"
     result_dir = os.path.join(_MATH, "data", "shared", "lingo",
-                              "len%d_d%d" % (length, depth))
+                              "len%d_d%d%s" % (length, depth, suf))
     tree_root = os.path.join(_MATH, "data", "local", "lingo",
-                             "len%d_d%d" % (length, depth))
+                             "len%d_d%d%s" % (length, depth, suf))
     any_tree = False
     for L in letters:
         tree_dir = os.path.join(tree_root, L, "trees")
@@ -136,7 +141,7 @@ def check_trees(length, depth, letters, fails):
         if not files:
             continue
         any_tree = True
-        with open(os.path.join(_LISTS, "len%d" % length, L, "guess.txt")) as f:
+        with open(os.path.join(_LISTS, "len%d" % length, L, legal_file)) as f:
             legal = {x.strip() for x in f if x.strip()}
         with open(os.path.join(_LISTS, "len%d" % length, L, "mystery.txt")) as f:
             answers = {x.strip() for x in f if x.strip()}
@@ -195,6 +200,7 @@ def main():
     argv = sys.argv[1:]
     length = int(argv[argv.index("--length") + 1]) if "--length" in argv else 5
     depth = int(argv[argv.index("--depth") + 1]) if "--depth" in argv else None
+    answers_only = "--answers-only" in argv
     listdir = os.path.join(_LISTS, "len%d" % length)
     if not os.path.isdir(listdir):
         raise SystemExit("no lists at %s -- run: python3 build_lingo_lists.py "
@@ -209,12 +215,13 @@ def main():
         random.seed(0)
         letters = sorted(random.sample(present, min(6, len(present))))
 
-    print("checklingo: length %d, letters %s" % (length, " ".join(letters)))
+    print("checklingo: length %d%s, letters %s"
+          % (length, " (answers-only)" if answers_only else "", " ".join(letters)))
     fails = []
     check_lists_and_matrix(length, letters, fails)
     if depth is not None or "--letter" in argv:
         d = depth if depth is not None else 5
-        check_trees(length, d, letters, fails)
+        check_trees(length, d, letters, fails, answers_only=answers_only)
 
     if fails:
         print("\nFAIL (%d):" % len(fails))

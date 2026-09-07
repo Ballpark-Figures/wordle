@@ -41,13 +41,15 @@ def main():
     argv = sys.argv[1:]
     length = int(argv[argv.index("--length") + 1]) if "--length" in argv else 5
     depth = int(argv[argv.index("--depth") + 1]) if "--depth" in argv else 5
+    suf = "_ans" if "--answers-only" in argv else ""
     d = os.path.join(_MATH, "data", "shared", "lingo",
-                     "len%d_d%d" % (length, depth))
+                     "len%d_d%d%s" % (length, depth, suf))
     files = sorted(glob.glob(os.path.join(d, "*_totals.csv")))
     if not files:
         raise SystemExit("no results at %s -- run the sweep first" % d)
 
-    print("Lingo best opener per letter  (length %d, depth %d)" % (length, depth))
+    print("Lingo best opener per letter  (length %d, depth %d%s)"
+          % (length, depth, ", answers-only" if suf else ""))
     print("%-3s %-8s %6s %9s %8s %6s" %
           ("ltr", "opener", "total", "expected", "openers", "infeas"))
     for path in files:
