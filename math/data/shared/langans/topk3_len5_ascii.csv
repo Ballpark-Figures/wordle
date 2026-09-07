@@ -1,0 +1,14 @@
+lang,guesses,answers,alphabet_size,accents,opener,total_guesses,expected_guesses,seconds
+ca,1995,1995,26,ascii,seria,6658,3.3373,0.7
+cs,3883,3883,26,ascii,katie,14042,3.6163,2.2
+de,2115,2115,26,ascii,raten,7268,3.4364,0.6
+en,2320,2320,26,ascii,rates,7954,3.4284,0.7
+es,2173,2173,26,ascii,seria,7446,3.4266,0.6
+fi,2829,2829,26,ascii,saint,9752,3.4472,1.1
+fr,1911,1911,26,ascii,tares,6388,3.3428,0.5
+it,2200,2200,26,ascii,seria,7552,3.4327,0.6
+nb,2210,2210,26,ascii,saret,7539,3.4113,0.7
+nl,1906,1906,26,ascii,toren,6507,3.4140,0.5
+pl,2875,2875,26,ascii,seria,10173,3.5384,1.2
+pt,2399,2399,26,ascii,seria,8234,3.4323,0.8
+sv,2389,2389,26,ascii,saret,8197,3.4311,0.8
