@@ -1774,7 +1774,17 @@ static void bisect_emit(int64_t *out, int *m, unsigned char *seen,
  * Levels run to 2^20 > 2*NG, by which point consecutive rounded indices differ
  * by less than 1 and every index has been emitted; the trailing loop is a
  * belt-and-braces fill in case that ever stops holding. */
-static int64_t *sweep_order(void) {
+/* `bisect`: dispatch order for the difficulty-sorted opener list.
+ *   1 -- BISECTION (ends, median, quartiles ...), for the EXHAUSTIVE sweeps that
+ *        examine every opener: a stopped run then holds a stratified sample of
+ *        the whole difficulty range (see the block comment above).
+ *   0 -- straight ASCENDING sum of squares (best splitters first), for --topk,
+ *        which examines only the first K and therefore wants the K BEST, not the
+ *        bisection's {easiest, HARDEST, ...}.  Reusing the bisection order here
+ *        was a bug: at K=2 it dispatched the single WORST-partitioned opener as
+ *        the second word (e.g. immix), the opposite of "top K by sum of squares".
+ */
+static int64_t *sweep_order(int bisect) {
     int64_t *ord = malloc(sizeof(int64_t) * NG);
     for (int g = 0; g < NG; g++) {
         const pat_t *row = PAT + (size_t)g * NA;
@@ -1786,6 +1796,7 @@ static int64_t *sweep_order(void) {
         ord[g] = (ss << 20) | (int64_t)g;
     }
     qsort(ord, NG, sizeof(int64_t), cmp_i64);
+    if (!bisect) return ord;                       /* ascending ss: best first */
 
     int64_t *out = malloc(sizeof(int64_t) * NG);
     unsigned char *seen = calloc((size_t)NG, 1);
@@ -2503,7 +2514,10 @@ int main(int argc, char **argv) {
              * openers EXAMINED, not the best of all NG. That is a weaker claim
              * than the exact sweep makes, and it is the point -- it is what lets
              * a small K finish. */
-            int64_t *so = sweep_order();          /* ascending sum of squared bins */
+            /* --topk wants the K BEST splitters (ascending ss, bisect=0); the
+             * exact --order ssq path examines every opener, so it keeps the
+             * bisection dispatch order for a stratified stopped-run sample. */
+            int64_t *so = sweep_order(TOPK > 0 ? 0 : 1);
             /* --order ssq is the SAME ordering with no truncation: every opener
              * is still examined, so the result is exact -- only the visit order
              * changes.  --topk is what makes the claim weaker, not this. */
@@ -2888,7 +2902,7 @@ int main(int argc, char **argv) {
     if (!out) { fprintf(stderr, "cannot append to %s\n", outpath); return 1; }
     if (ndone == 0) fprintf(out, "word,total,expected,depth,seconds\n");
 
-    int64_t *ord = sweep_order();
+    int64_t *ord = sweep_order(1);   /* full sweep: bisection dispatch order */
     double t0 = now_s();
     int completed = 0;
 
