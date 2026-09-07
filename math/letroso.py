@@ -57,13 +57,16 @@ compared left to right).
   reproduced all twelve tutorial rows.  tools/checkletroso.py MEASURES how often
   the situation can arise at all, so the exposure is a number and not a shrug.
 
-WORD LISTS.  We use OUR OWN lists, and they are NOT Letroso's -- say so whenever
-a number is quoted.  The game's real answer set is server-side and we do not
-have it; its client-side validation list is a permissive web-corpus list full of
-proper nouns and initialisms (`aachen`, `kph`, `rss`), which is not what we want
-to model anyway.  So answers and guesses both come from hello wordl's per-length
-lists, exactly as the length sweeps next door do -- with length 3 built by us,
-since hello's answer curation starts at 4.  See build_letroso_lists.py.
+WORD LISTS.  The GUESS list IS letroso's own (letroso.com's client validation
+list, `assets/all-en-<hash>.js`) -- a word we accept is a word letroso accepts,
+and one it rejects (e.g. `clarionets`) we reject too.  The ANSWER list is still
+OURS and is NOT letroso's: the game's real answer set is server-side and we do
+not have it, so we model it from hello wordl's curated `targets.json`,
+intersected with letroso's guess list.  Lengths 2 and 3 have no hello answers
+and their answer lists are built by our own frequency rule.  Everything lives
+under `data/shared/words/letroso/len<L>/`; see build_letroso_lists.py.  So a
+number here still describes THIS game on THESE lists, never letroso.com -- but
+the guess half now matches the live game exactly.
 """
 
 from __future__ import annotations
@@ -72,7 +75,7 @@ import os
 import unicodedata
 
 MAXLEN = 10        # `Pa` in the bundle: the longest word that can be TYPED
-MINLEN = 3         # ASSUMPTION -- the bundle states no minimum; see CLAUDE.md
+MINLEN = 2         # letroso's list has 532 two-letter words; no minimum is stated
 
 # Pattern digits, in the bundle's own order (it indexes this array literally).
 NAMES = ("absent", "present", "head", "tail")
@@ -317,12 +320,12 @@ def share_emoji(answer, guess):
 
 
 def load_words(kind, lengths=range(MINLEN, MAXLEN + 1)):
-    """Union hello's per-length lists.  `kind` is "guess" or "mystery"."""
+    """Union letroso's per-length lists.  `kind` is "guess" or "mystery"."""
     if kind not in ("guess", "mystery"):
         raise ValueError("kind must be 'guess' or 'mystery', not %r" % kind)
     words = []
     for L in lengths:
-        path = os.path.join(_WORDS, "hello", "len%d" % L, "%s.txt" % kind)
+        path = os.path.join(_WORDS, "letroso", "len%d" % L, "%s.txt" % kind)
         if not os.path.exists(path):
             raise SystemExit(
                 "missing %s\n  build it: python3 build_letroso_lists.py" % path)

@@ -1339,21 +1339,42 @@ anything. Run it with **`bash solver/run-letroso-rank.sh --length-prior lengths`
   **On 5000 real word pairs the top pattern is NEVER tied**, so the tie-break never
   actually decides; it fires only on toy inputs like `aa`/`a`. Do not report it as a risk
   without that number.
-- **WE USE OUR OWN LISTS.** Letroso's real answer set is SERVER-SIDE and we do not have
-  it; its client validation list (`assets/all-en-*.js`, 93357 words, lengths 2-10) is a
-  permissive web-corpus list full of proper nouns and initialisms (`aachen`, `kph`,
-  `rss`). So answers/guesses are hello wordl's per-length lists 3-10: **139072 guesses,
-  30403 answers**. A number here describes THIS game on THESE lists, never letroso.com.
-- **LENGTH 3 IS OURS AND IS A MODELLING DECISION** (`build_letroso_lists.py`). hello's
-  answer curation starts at 4; its dictionary does have 1015 three-letter words. hello's
-  answer lists **cannot be reproduced by a frequency cut** — measured, no zipf bar at any
-  length exceeds ~65% precision — so length 3 is matched to 4-10 in PROPORTION instead:
-  `zipf >= 3.0` keeps **707 = 70%** of the pool, in the band the 58%-at-L=4 trend
-  extrapolates to. `len3/README.md` and `mystery.txt.meta` say it is not hello's.
-- **`--length-prior` IS PART OF THE OBJECTIVE AND HAS NO DEFAULT.** `lengths` (uniform
-  over the 8 lengths, the user's choice) vs `words` (uniform over the pooled list) are
-  different objectives: L=3 carries **12.5% vs 2.3%**. Under `lengths` the list SIZE no
-  longer affects weighting at all, which is why the L=3 prune is for realism only.
+- **THE GUESS LIST IS LETROSO'S OWN (changed 2026-09-07; it used to be hello's).** The
+  one thing knowable client-side is what letroso will ACCEPT as a guess: its bundle ships
+  `assets/all-en-<hash>.js`, one JSON array of **93357** lowercase words, lengths **2-10**
+  (`Pa`=10 caps typing; 532 two-letter words). `build_letroso_lists.py` fetches that
+  (discovering the deploy-specific hash from `index-*.js`, caching the raw bundle under
+  `data/local/letroso/`) and writes per-length **guess** lists to
+  `data/shared/words/letroso/len<L>/` — a NEW dir, NOT `hello/` (the Wordle length-sweeps
+  still read hello's guesses and must not be disturbed). So a word we accept is a word
+  letroso accepts, and one it rejects (e.g. **`clarionets`** — in hello's Scrabble
+  dictionary but NOT in letroso's list) we reject too. `MINLEN` is now **2**.
+  - **The earlier decision to guess from hello's lists is REVERSED.** It was the reason we
+    diverged from the live game; the user's call is to match letroso's guess list wherever
+    possible (2026-09-07). letroso's list is a permissive web-corpus set full of proper
+    nouns/initialisms (`aachen`, `kph`, `rss`) — we take it anyway, because it IS the game.
+- **THE ANSWER LIST IS STILL OURS, and NOT letroso's** — its real answer set is
+  server-side and unknown. We model it from hello wordl's curated `mystery.txt` (Norvig
+  frequency, hand-pruned), **INTERSECTED with letroso's guess list** so every answer is a
+  legal guess (`ANS2G` indexes answers into guesses). The intersection drops ~3-14% of
+  hello's answers per length (they are not letroso-legal, so unwinnable anyway). A number
+  here still describes THIS game on THESE lists, never letroso.com — but the guess half
+  now matches the live game exactly.
+- **LENGTHS 2 AND 3 ARE OURS AND ARE A MODELLING DECISION** (`build_letroso_lists.py`).
+  hello's answer curation starts at 4, so those two lengths have no hello answers; we build
+  them with the same rule the len-3 list always used — keep the guess words with
+  `wordfreq zipf >= ZIPF_BAR` (3.0), chosen to put the answers/guesses ratio in line with
+  4-10 (58% at L=4, rising as words shorten). **The pool it now filters is LETROSO's**
+  short-word list, not hello's (len 3 went 1015 -> 3619 words). `--bar` keeps a different,
+  recorded rule open; each `mystery.txt.meta` records which rule built it.
+- **`--length-prior` IS PART OF THE OBJECTIVE AND HAS NO DEFAULT.** `lengths` (uniform over
+  the lengths present — now **9**, lengths 2-10, the user's choice) vs `words` (uniform over
+  the pooled list) are different objectives. The prior derives its length set from the
+  answers, so adding length 2 shifts every length's share automatically.
+- **THE CACHED ROOT RANKING IS FINGERPRINTED OVER BOTH LISTS**, so this change makes
+  `data/shared/letroso/root_rank_lengths.csv.gz` STALE — re-run `run-letroso-rank.sh`
+  before trusting any solve. The old `hello/len3/` dir is now orphaned (only the old
+  letroso path read it); harmless, left in place.
 - **The ranking rule is `topk.py`'s, NOT nerdle's**: `sum over bins != win of n_b * W_b`,
   ties on lowest guess index — the expected number of candidate WORDS still alive. Sum of
   squared bin sizes is undefined here because the answers are not equally likely.

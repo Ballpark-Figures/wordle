@@ -144,8 +144,10 @@ def main():
                     "examined, not of all %d)\n" % (args.topk, len(guesses)))
             f.write("guesses: %d  answers: %d\n" % (len(guesses), len(answers)))
             f.write("fingerprint: %s\n" % fp)
-            f.write("lists: hello wordl len3-10; len3 answers are OURS "
-                    "(see data/shared/words/hello/len3/README.md)\n")
+            f.write("lists: guesses are LETROSO's own (len2-10); answers are "
+                    "OURS -- hello wordl mystery lists pruned to letroso-legal "
+                    "(len2/3 built by our zipf rule); see "
+                    "data/shared/words/letroso/README.md\n")
             f.write("seconds: %.1f\n" % secs)
         print("wrote %s" % args.out)
     return 0
