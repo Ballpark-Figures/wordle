@@ -64,6 +64,7 @@
 #endif
 /* 3**WORDLEN, as an integer constant expression -- array sizes need one and the
  * preprocessor cannot compute a power, so it is a lookup by token paste. */
+#define P3_3 27
 #define P3_4 81
 #define P3_5 243
 #define P3_6 729
