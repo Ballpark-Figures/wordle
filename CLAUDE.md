@@ -232,7 +232,48 @@ detail. Run it with **`bash solver/run-mm-sweep.sh --depth D [-k K]`** (from `ma
   replays every line against `wordle.pattern`, re-derives the hard-mode
   constraint from scratch, and checks answer coverage, guess counts, hint reuse
   and tree-sum-vs-CSV. Exits nonzero, so it works as a gate. Run it after any
-  solver change, alongside `solver/validate.sh`.
+  solver change, alongside `solver/validate.sh`. **It does NOT know the ULTRA
+  rule** (see below) — it checks hard-mode legality, so it cannot fully validate
+  an ultra tree.
+
+## `ultraturns` — ULTRA HARD MODE, stricter than hard mode
+- **`optturns.c` now builds a FOURTH binary, `ultraturns` (`-DULTRA`)** — a legal
+  guess must itself be **CONSISTENT with every clue so far** (a word the answer
+  could still be), not merely hard-mode-legal. So a word you guessed and missed is
+  illegal thereafter, because its own greys/yellows rule it out. The legal set at
+  any node is exactly the 12972 words still consistent. `sh build.sh` builds it.
+- **The objective is `ultra >= hard >= normal`, THREE DIFFERENT GAMES.** A strictly
+  smaller legal set can only raise the total. **Never put an `ultraturns` total in a
+  table with a `hardturns` or `optturns` one** — same trap as a capped optimum beside
+  an expected-guesses one.
+- **The constraint is REAL EXTRA STATE, exactly as hard mode**, so it is hashed into
+  the TT key (a DISTINCT ultra salt, so a foreign `tt.bin` fails verification). It
+  rides as **per-position allowed-letter masks + per-letter `lo`/`hi` counts** — the
+  `strspace.py` representation, which is **EXACT for FILTERING words** (the
+  repeated-letter trap is about ENUMERATING patterns and does not arise; the real
+  answers are still partitioned by the real pattern matrix). `cons_apply`/
+  `cons_legal`/`cons_hash` have an `#if ULT` branch beside hard mode's; the search
+  paths generalize hard mode's `HARD ?` to a shared **`USE_CONS` = `HARD || ULT`**
+  macro (folds to 0 in normal/mm, so those binaries stay bit-identical —
+  `validate.sh` still reproduces all five totals).
+- **Candidates are always legal**, so the `n==1`/`n==2`/`d>n` shortcuts hold unchanged.
+- **`--depth` is REQUIRED and it BINDS** (INFEASIBLE is expected, like hard mode), and
+  it does NOT escalate — pinned to `--depth`, each depth its own CSV.
+- **Run it with `bash solver/run-ultra-sweep.sh --depth D -k K`** (from `math/`),
+  attached — mirrors `run-mm-sweep.sh` (`--optimal-only`, `--print-openers`, per-(depth,K)
+  CSV `optimal_dD_kK.csv` under `data/{shared,local}/ultraturns/`, tt save/load). **topk
+  is the intended mode** (the exact solver is slow — the legal set is large near the
+  root), so the wrapper REQUIRES `-k`; the result is an UPPER BOUND, best of the K openers
+  examined. No trees from the sweep — the winner's tree needs a follow-up
+  `./solver/ultraturns --opener <winner> --depth D --topk K --trees <dir>`.
+- **Like `mmturns`, it is NOT in `paths.py`** — its output is `optimal_*.csv`, read
+  directly, and its tt snapshot is the binary's own `--tt-save`, so `WORDLE_SOLVER=
+  ultraturns` is not a thing.
+- **NO DEDICATED GATE YET.** The ultra legality property to check independently is that
+  **every guess after the opener reproduces every prior clue** (`pattern(g_i,g_j)==p_i`
+  for all `i<j`). A one-off replay verifier confirmed it on `salet`'s full tree (2315
+  answers, all lines legal, tree summed to the reported total) when the mode shipped;
+  building that into `checktrees.py` (or its own `checkultra.py`) is the open follow-up.
 
 - `math/tools/` holds the analysis scripts, all importing `paths.py` for
   locations. **`python3 math/tools/report.py`** is the standing status report

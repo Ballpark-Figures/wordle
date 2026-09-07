@@ -187,6 +187,41 @@ typedef uint32_t pat_t;
 #define MM 0
 #endif
 
+/* ULTRA ("ultra hard mode"): a legal guess must itself be CONSISTENT with every
+ * clue so far -- i.e. it must still be a word the answer could be.  This is
+ * STRICTER than hard mode, which only forces greens to be repeated in place and
+ * yellow letters to reappear somewhere; ultra mode also honours greys (exact
+ * counts, forbidden positions) and yellow POSITION exclusions.  build.sh emits
+ * `ultraturns` from this same file with -DULTRA.
+ *
+ * Like hard mode the accumulated requirement is REAL EXTRA STATE, not a function
+ * of the candidate set S: two lines reaching the same S can have eliminated
+ * DIFFERENT guess-only words, so their legal-guess sets differ and the constraint
+ * is hashed into the TT key.  See the ULTRA branch of the constraint block below
+ * for the representation and why (position masks + per-letter lo/hi counts) is
+ * EXACT for filtering words. */
+#ifdef ULTRA
+#define ULT 1
+#else
+#define ULT 0
+#endif
+#if ULT && defined(HARDMODE)
+#error "ULTRA and HARDMODE are incompatible: ultra mode restricts guesses to \
+words consistent with EVERY clue, a strict superset of hard mode's rule.  Build \
+them as separate binaries."
+#endif
+#if ULT && defined(MASTERMIND)
+#error "ULTRA and MASTERMIND are incompatible: consistency is defined by per-tile \
+colours, which peg counts do not report."
+#endif
+
+/* USE_CONS: the modes that carry an accumulated CONSTRAINT down the recursion as
+ * extra TT state and restrict the legal guesses to it -- hard mode and ultra
+ * mode.  Normal and Mastermind do not, so this folds to a compile-time 0 in
+ * `optturns`/`mmturns` and every constraint branch below disappears at -O3,
+ * leaving those binaries bit-for-bit what they were. */
+#define USE_CONS (HARD || ULT)
+
 static int      NG, NA;
 /* Salts the TT key with the identity of the GUESS SET (see --guess-list).  It is
  * 0 for the full 12972-word list, which leaves every hash bit-identical to what
@@ -272,10 +307,34 @@ static int      LBTAB[MAXD][MAXA + 1];
 
 #define BSW  ((MAXG + 63) / 64)          /* bitset words spanning all guesses */
 
+#if ULT
+/* ULTRA mode's constraint is the FULL Wordle-consistency of a word: a legal
+ * guess must reproduce every clue exactly.  That is captured EXACTLY by
+ *     allow[i]  -- the set of letters the answer may hold at position i
+ *     lo[c],hi[c] -- bounds on how many copies of c the answer holds
+ * and nothing else.  Why exact: against a single clue (g, p) a word w satisfies
+ * pattern(g, w) == p iff (a) w[i] == g[i] at greens and w[i] != g[i] elsewhere,
+ * and (b) count_c(w) == green+yellow copies when g has a grey copy of c, else
+ * count_c(w) >= that many -- because Wordle hands out yellows left-to-right by
+ * count, so the yellow/grey split of a repeated letter is a pure function of the
+ * answer's count.  Both parts are position masks + count bounds, and the
+ * conjunction of clues is their intersection (masks AND, lo = max, hi = min).
+ * NB the "repeated-letter trap" that strspace.py guards is a fact about
+ * ENUMERATING reachable patterns, not about FILTERING words, and does not arise
+ * here: we partition the real answers by the real pattern matrix and use the
+ * constraint only to pick legal guesses. */
+typedef struct {
+    uint32_t allow[WORDLEN];             /* bit c set = letter c permitted at position i */
+    uint8_t  lo[26];                     /* answer holds >= lo[c] copies of c */
+    uint8_t  hi[26];                     /* answer holds <= hi[c] copies (WORDLEN = no cap) */
+} Cons;
+#define ALLOW_ALL  ((1u << 26) - 1)
+#else
 typedef struct {
     int8_t  green[WORDLEN];              /* pinned letter 0..25, or -1 */
     uint8_t minc[26];                    /* required occurrences of each letter */
 } Cons;
+#endif
 
 static uint64_t BS_POS[WORDLEN][26][BSW];      /* guesses with letter c at position i */
 static uint64_t BS_CNT[26][WORDLEN + 1][BSW];  /* guesses containing >= k copies of c */
@@ -286,8 +345,13 @@ static uint64_t BS_ALL[BSW];             /* every legal guess; NG..MAXG-1 clear 
 static Cons CONS_NONE;
 
 static void cons_none_init(void) {
+#if ULT
+    for (int i = 0; i < WORDLEN; i++) CONS_NONE.allow[i] = ALLOW_ALL;
+    for (int c = 0; c < 26; c++) { CONS_NONE.lo[c] = 0; CONS_NONE.hi[c] = WORDLEN; }
+#else
     memset(&CONS_NONE, 0, sizeof CONS_NONE);
     for (int i = 0; i < WORDLEN; i++) CONS_NONE.green[i] = -1;
+#endif
 }
 
 static void build_bitsets(void) {
@@ -305,6 +369,71 @@ static void build_bitsets(void) {
     }
 }
 
+#if ULT
+/* Fold the feedback (g, p) into a parent constraint (ULTRA: full consistency). */
+static void cons_apply(Cons *out, const Cons *in, int g, int p) {
+    int present[26] = { 0 };            /* green+yellow copies of c in THIS guess */
+    int greyc[26]   = { 0 };            /* grey copies of c in THIS guess */
+    *out = *in;
+    /* position 0 is the MSB, so the divisor starts at 3^(WORDLEN-1) */
+    for (int i = 0, div = NPAT / 3; i < WORDLEN; i++, div /= 3) {
+        int t = (p / div) % 3;                        /* 0 = b, 1 = y, 2 = g */
+        int c = GWORD[g][i] - 'a';
+        if (t == 2) out->allow[i] = 1u << c;          /* green: answer holds c here */
+        else        out->allow[i] &= ~(1u << c);      /* yellow/grey: not here */
+        if (t == 0) greyc[c]++; else present[c]++;    /* grey vs green|yellow */
+    }
+    for (int c = 0; c < 26; c++) {
+        int m = present[c];
+        if (m > out->lo[c]) out->lo[c] = (uint8_t)m;              /* >= m copies */
+        if (greyc[c] && m < out->hi[c]) out->hi[c] = (uint8_t)m;  /* grey caps at exactly m */
+    }
+}
+
+/* Expand a constraint into the ascending list of guesses it permits (ULTRA). */
+static int cons_legal(const Cons *C, uint16_t *out) {
+    uint64_t m[BSW];
+    memcpy(m, BS_ALL, sizeof m);
+    for (int i = 0; i < WORDLEN; i++) {
+        uint32_t a = C->allow[i];
+        if (a == ALLOW_ALL) continue;                 /* every letter allowed here */
+        uint64_t pm[BSW] = { 0 };
+        for (int c = 0; c < 26; c++)
+            if (a & (1u << c))
+                for (int w = 0; w < BSW; w++) pm[w] |= BS_POS[i][c][w];
+        for (int w = 0; w < BSW; w++) m[w] &= pm[w];
+    }
+    for (int c = 0; c < 26; c++) {
+        int lo = C->lo[c], hi = C->hi[c];
+        if (lo > 0)        for (int w = 0; w < BSW; w++) m[w] &= BS_CNT[c][lo][w];
+        if (hi < WORDLEN)  for (int w = 0; w < BSW; w++) m[w] &= ~BS_CNT[c][hi + 1][w];
+    }
+    int n = 0;
+    for (int w = 0; w < BSW; w++) {
+        uint64_t x = m[w];
+        while (x) {
+            int b = __builtin_ctzll(x);
+            x &= x - 1;
+            out[n++] = (uint16_t)((w << 6) + b);
+        }
+    }
+    return n;
+}
+
+/* Mixed into the TT key so ultra-mode entries can never be confused with
+ * normal-, hard- or Mastermind-mode ones -- a distinct salt from hard mode's,
+ * so a tt.bin loaded into the wrong binary fails verification and recomputes. */
+static inline uint64_t cons_hash(const Cons *C) {
+    uint64_t h = 0xB5297A4D2A1F3C6DULL;               /* ultra-mode salt */
+    for (int i = 0; i < WORDLEN; i++)
+        h = (h ^ (uint64_t)C->allow[i]) * 0x100000001B3ULL;
+    for (int c = 0; c < 26; c++) {
+        h = (h ^ (uint64_t)C->lo[c]) * 0x100000001B3ULL;
+        h = (h ^ (uint64_t)C->hi[c]) * 0x100000001B3ULL;
+    }
+    return h;
+}
+#else
 /* Fold the feedback (g, p) into a parent constraint. */
 static void cons_apply(Cons *out, const Cons *in, int g, int p) {
     int req[26] = { 0 };
@@ -355,6 +484,7 @@ static inline uint64_t cons_hash(const Cons *C) {
         h = (h ^ (uint64_t)C->minc[c]) * 0x100000001B3ULL;
     return h;
 }
+#endif
 
 /* ---------------------------------------------------------------- helpers */
 
@@ -826,8 +956,8 @@ static int eval_guess(const uint16_t *S, int n, int d, int g, int best,
         lbrest -= own;
         if (total + lbrest + own >= best) return INF;
         Cons kid;
-        if (HARD) cons_apply(&kid, C, g, bp[k]);
-        int v = solve(buf + bstart[k], bcnt[k], d - 1, HARD ? &kid : C, ctx);
+        if (USE_CONS) cons_apply(&kid, C, g, bp[k]);
+        int v = solve(buf + bstart[k], bcnt[k], d - 1, USE_CONS ? &kid : C, ctx);
         if (v >= INF) return INF;
         total += v;
         if (total + lbrest >= best) return INF;
@@ -849,7 +979,7 @@ static int solve(const uint16_t *S, int n, int d, const Cons *C, Ctx *ctx) {
          * and there is nothing to search.  Hard mode falls through to the
          * general search instead, since there the legal set is constrained;
          * it never reaches here anyway, its answers all being legal guesses. */
-        if (!HARD) {
+        if (!USE_CONS) {
             for (int g = 0; g < NG; g++)
                 if (PAT[(size_t)g * NA + S[0]] != PAT[(size_t)g * NA + S[1]]) return 4;
             return INF;                         /* no guess separates the two */
@@ -871,14 +1001,14 @@ static int solve(const uint16_t *S, int n, int d, const Cons *C, Ctx *ctx) {
     if (lb0 >= INF) return INF;
 
     uint64_t h0, h1;
-    hash_state(S, n, d, HARD ? cons_hash(C) : 0, &h0, &h1);
+    hash_state(S, n, d, USE_CONS ? cons_hash(C) : 0, &h0, &h1);
     int cached, cachedg;
     ctx->probe++;
     if (tt_get(h0, h1, d, &cached, &cachedg)) { ctx->hit++; return cached; }
 
     /* Only now, past the TT, is the legal set worth materialising. */
     uint16_t *leg = ctx->leg[d];
-    int nleg = HARD ? cons_legal(C, leg) : NG;
+    int nleg = USE_CONS ? cons_legal(C, leg) : NG;
 
     long long nodes0 = ctx->nodes++;
     int best = INF, bestg = -1;
@@ -890,7 +1020,7 @@ static int solve(const uint16_t *S, int n, int d, const Cons *C, Ctx *ctx) {
         for (int pass = 0; pass < 2; pass++) {
             int lim = (pass == 0) ? n : nleg;
             for (int t = 0; t < lim; t++) {
-                int g = (pass == 0) ? ANS2G[S[t]] : (HARD ? (int)leg[t] : t);
+                int g = (pass == 0) ? ANS2G[S[t]] : (USE_CONS ? (int)leg[t] : t);
                 if (g < 0) continue;            /* --phantom-final: unplayable candidate */
                 const pat_t *row = PAT + (size_t)g * NA;
                 /* Count every element -- never break early.  bp[] must end up
@@ -922,7 +1052,7 @@ static int solve(const uint16_t *S, int n, int d, const Cons *C, Ctx *ctx) {
     int64_t *ssq = ctx->ord[d];                  /* reused as (ss << 20 | g) */
     int bestlb = INF, bestlb_g = -1, bestlb_in = 0, nss = 0;
     for (int t = 0; t < nleg; t++) {
-        int g = HARD ? (int)leg[t] : t;
+        int g = USE_CONS ? (int)leg[t] : t;
         const pat_t *row = PAT + (size_t)g * NA;
         int bp[MAXA], nb = 0;                    /* bucket ordinal, nb <= n */
         for (int i = 0; i < n; i++) {
@@ -1008,7 +1138,7 @@ static int solve(const uint16_t *S, int n, int d, const Cons *C, Ctx *ctx) {
          * guesses this call, so anything else is a stale value from a previous
          * state at this depth */
         for (int t = 0; t < nleg; t++) {
-            int g = HARD ? (int)leg[t] : t;
+            int g = USE_CONS ? (int)leg[t] : t;
             if (lbg[g] < best && g != bestlb_g)
                 ord[m++] = ((int64_t)lbg[g] << 20) | (int64_t)g;
         }
@@ -1048,15 +1178,15 @@ static int best_move(const uint16_t *S, int n, int d, const Cons *C, Ctx *ctx) {
     if (v >= INF) return -1;
     if (d > n) d = n;
     uint64_t h0, h1;
-    hash_state(S, n, d, HARD ? cons_hash(C) : 0, &h0, &h1);
+    hash_state(S, n, d, USE_CONS ? cons_hash(C) : 0, &h0, &h1);
     int val, bg;
     if (tt_get(h0, h1, d, &val, &bg) && bg >= 0 && val == v) return bg;
     uint16_t *leg = ctx->leg[d];
-    int nleg = HARD ? cons_legal(C, leg) : NG;
+    int nleg = USE_CONS ? cons_legal(C, leg) : NG;
     for (int pass = 0; pass < 2; pass++) {
         int lim = (pass == 0) ? n : nleg;
         for (int t = 0; t < lim; t++) {
-            int g = (pass == 0) ? ANS2G[S[t]] : (HARD ? (int)leg[t] : t);
+            int g = (pass == 0) ? ANS2G[S[t]] : (USE_CONS ? (int)leg[t] : t);
             if (g < 0) continue;                /* --phantom-final: unplayable candidate */
             if (eval_guess(S, n, d, g, v + 1, C, ctx) == v) return g;
         }
@@ -1102,9 +1232,9 @@ static int emit_tree(FILE *out, const uint16_t *S, int n, int d,
         pat_str(p, ps);
         int add = snprintf(path + plen, 4096 - plen, "%s %s ", gw, ps);
         Cons kid;
-        if (HARD) cons_apply(&kid, C, g, p);
+        if (USE_CONS) cons_apply(&kid, C, g, p);
         if (emit_tree(out, buf + start[p], cnt[p], d - 1, path, plen + add, ply + 1,
-                      HARD ? &kid : C, ctx) < 0) {
+                      USE_CONS ? &kid : C, ctx) < 0) {
             free(sc);
             return -1;
         }
@@ -1131,8 +1261,8 @@ static int solve_opener(int g, int depth, Ctx *ctx) {
     for (int p = 0; p < NPAT; p++) {
         if (p == ALL_GREEN || cnt[p] == 0) continue;
         Cons kid;                                /* the opener itself is unconstrained */
-        if (HARD) cons_apply(&kid, &CONS_NONE, g, p);
-        int v = solve(root + start[p], cnt[p], depth - 1, HARD ? &kid : &CONS_NONE, ctx);
+        if (USE_CONS) cons_apply(&kid, &CONS_NONE, g, p);
+        int v = solve(root + start[p], cnt[p], depth - 1, USE_CONS ? &kid : &CONS_NONE, ctx);
         if (v >= INF) { free(sc); return INF; }
         total += v;
     }
@@ -1260,8 +1390,8 @@ static int solve_opener_bounded(int g, int depth, Ctx *ctx, int bound) {
         int p = ps[i];
         lbrest -= LBTAB[depth - 1][cnt[p]];
         Cons kid;
-        if (HARD) cons_apply(&kid, &CONS_NONE, g, p);
-        int v = solve(root + start[p], cnt[p], depth - 1, HARD ? &kid : &CONS_NONE, ctx);
+        if (USE_CONS) cons_apply(&kid, &CONS_NONE, g, p);
+        int v = solve(root + start[p], cnt[p], depth - 1, USE_CONS ? &kid : &CONS_NONE, ctx);
         if (v >= INF) return INF;
         total += v;
         if (total + lbrest > bound) return CUTOFF;
@@ -1571,9 +1701,9 @@ static int write_tree(const char *dir, int g, int depth, Ctx *ctx) {
         pat_str(p, ps);
         int plen = snprintf(path, sizeof path, "%s %s ", GWORD[g], ps);
         Cons kid;
-        if (HARD) cons_apply(&kid, &CONS_NONE, g, p);
+        if (USE_CONS) cons_apply(&kid, &CONS_NONE, g, p);
         rc = emit_tree(out, buf + start[p], cnt[p], depth - 1, path, plen, 1,
-                       HARD ? &kid : &CONS_NONE, ctx);
+                       USE_CONS ? &kid : &CONS_NONE, ctx);
     }
     pclose(out);
     free(sc);
@@ -1749,8 +1879,22 @@ int main(int argc, char **argv) {
     (void)depth_set;
 #endif
 
-    /* Hard mode escalates by default; normal mode keeps ONE fixed cap, so its
-     * behaviour and its results are exactly what they have always been. */
+    /* Ultra mode, like hard mode and Mastermind, has genuine INFEASIBLE openers
+     * (the legal set is restricted to consistent guesses, so "follow SALET's
+     * tree afterwards" is illegal), so the cap BINDS and is part of the
+     * objective -- a depth-6 pass and a depth-7 pass are different quantities.
+     * It refuses to run without an explicit --depth and every depth gets its own
+     * CSV.  It does NOT escalate: the cap is pinned to --depth (see below). */
+    if (ULT && !depth_set) {
+        fprintf(stderr, "ultraturns: --depth is required -- in ultra hard mode the "
+                "cap binds and is part of the objective (INFEASIBLE is an expected "
+                "result), so each depth is a different quantity\n");
+        return 1;
+    }
+
+    /* Hard mode escalates by default; normal and ULTRA mode keep ONE fixed cap.
+     * (Ultra could escalate like hard, but pinning the cap keeps every opener
+     * under the same constraint and matches the "cap is the objective" rule.) */
     if (depthmax < 0) depthmax = HARD ? MAXD - 1 : depth;
     if (depthmax < depth) depthmax = depth;
     if (depthmax > MAXD - 1) {
@@ -1907,8 +2051,10 @@ int main(int argc, char **argv) {
     uint64_t seed = 0xD1B54A32D192ED03ULL;
     for (int a = 0; a < NA; a++) { ZOB0[a] = splitmix64(&seed); ZOB1[a] = splitmix64(&seed); }
 
-    if (HARD) { build_bitsets(); fprintf(stderr, "mode: HARD\n"); }
-    else      fprintf(stderr, "mode: normal\n");
+    if (USE_CONS) build_bitsets();
+    fprintf(stderr, "mode: %s\n",
+            ULT ? "ULTRA (guesses must stay consistent with every clue)"
+                : HARD ? "HARD" : "normal");
 
     BRANCH = measure_branching();
     /* 3**L is the ENCODING space; exactly L of those codes are unreachable --
@@ -1967,7 +2113,7 @@ int main(int argc, char **argv) {
      * are evaluated.  Evaluating one ordering per triple would leave five of six
      * untried, a far bigger error than the pair case's one of two. */
     if (triplelist) {
-        if (HARD) {
+        if (USE_CONS) {
             fprintf(stderr, "--triple-list is normal-mode only\n");
             return 1;
         }
@@ -2139,10 +2285,10 @@ int main(int argc, char **argv) {
      * Within that list, though, the evaluation is exact: every pair is either
      * solved exactly or proven worse than the incumbent, and ties are kept. */
     if (pairlist) {
-        if (HARD) {
-            fprintf(stderr, "--pair-list is normal-mode only: in hard mode the second "
-                    "word's legality depends on the first one's feedback, so a BLIND "
-                    "pair is not a well-defined opening\n");
+        if (USE_CONS) {
+            fprintf(stderr, "--pair-list is normal-mode only: in hard/ultra mode the "
+                    "second word's legality depends on the first one's feedback, so a "
+                    "BLIND pair is not a well-defined opening\n");
             return 1;
         }
         if (depth < 3) {
