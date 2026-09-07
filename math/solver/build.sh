@@ -87,7 +87,7 @@ WORDS_DIR="../data/shared/words/hello"
 for L in "$@"; do
   case "$L" in
     3|4|5|6|7|8|9|10|11) ;;
-    *) echo "build.sh: unsupported length '$L' (3..11; every array bound derives from WORDLEN)" >&2
+    *) echo "build.sh: unsupported length '$L' (3..11; a new length needs a P3_<L> entry in optturns.c)" >&2
        exit 1 ;;
   esac
 
