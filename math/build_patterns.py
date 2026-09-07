@@ -8,6 +8,15 @@ Shape and dtype depend on which problem is being built:
   python build_patterns.py --full       # all-words: 12972 x 12972 uint8, ~168 MB
   python build_patterns.py --length 7   # hello wordl at 7 letters: 24028 x 5137 uint16
 
+  python build_patterns.py --answer-list PATH --out OUT [--length L]
+        # a CUSTOM answer axis: rows = the length's full guess list, columns =
+        # exactly the words in PATH, in file order.  Used by the Lingo cell,
+        # which needs one small matrix per starting letter (the letter's answers
+        # are a subset of the mystery list, and --answer-list in the solver
+        # requires a matrix whose COLUMNS match that subset exactly, in order --
+        # it is not a runtime column-subset).  Additive and off the default
+        # paths, so it cannot touch the shared matrices below.
+
 `--full` is a SEPARATE file, not a replacement: the 12972 x 2315 default is what
 the normal, hard and answers-only sweeps all read, and overwriting it would
 break them.
@@ -93,21 +102,88 @@ def build(full=False, length=None):
     return pat
 
 
+def build_answer_list(answer_list, out, length=None):
+    """Build rows = the length's full guess list, columns = the words in
+    ``answer_list`` (in file order), and write to ``out`` (+ ``out.meta.json``).
+
+    This is the Lingo per-letter matrix. It reuses the exact same ``pattern_row``
+    every other matrix is built with, so it cannot encode feedback differently;
+    the one thing it adds is a caller-chosen COLUMN SET and order, which the
+    solver's ``--answer-list`` requires to match its answer file byte-for-byte.
+    ``tools/checklingo.py`` diffs the result against the shared length matrix to
+    prove the columns are the right ones in the right order.
+    """
+    guesses = load_words("guess", length)
+    with open(answer_list) as f:
+        answers = [line.strip() for line in f if line.strip()]
+    if not answers:
+        raise SystemExit("answer list %s is empty" % answer_list)
+    word_len = len(guesses[0])
+    for w in answers:
+        if len(w) != word_len:
+            raise SystemExit("answer %r is not %d letters (matrix would be wrong)"
+                             % (w, word_len))
+    ans_codes = to_codes(answers)
+    dtype = pattern_dtype(word_len)
+    pat = np.empty((len(guesses), len(answers)), dtype=dtype)
+    t0 = time.time()
+    for i, g in enumerate(guesses):
+        pat[i] = pattern_row(g, ans_codes)
+    dt = time.time() - t0
+    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
+    np.save(out, pat)
+    meta = {
+        "shape": [len(guesses), len(answers)],
+        "guess_words": len(guesses),
+        "answer_words": len(answers),
+        "word_len": word_len,
+        "word_source": "hello" if length is not None else "wordle",
+        "answers": os.path.abspath(answer_list),
+        "dtype": np.dtype(dtype).name,
+        "encoding": f"base-3, pos0=MSB, 0=grey 1=yellow 2=green, "
+                    f"ALL_GREEN={3 ** word_len - 1}",
+        "build_seconds": round(dt, 2),
+        "mb": round(pat.nbytes / 1e6, 2),
+    }
+    # np.save appends .npy; write the sidecar next to the actual file
+    npy = out if out.endswith(".npy") else out + ".npy"
+    with open(npy + ".meta.json", "w") as f:
+        json.dump(meta, f, indent=2)
+    print(f"wrote {npy}  {meta['mb']} MB  {meta['dtype']}  "
+          f"{meta['shape'][0]}x{meta['shape'][1]} in {dt:.2f}s")
+    return pat
+
+
 def load_patterns(full=False, length=None):
     """Load the matrix (mmap'd — reads don't pull the whole file into RAM)."""
     return np.load(_paths(full, length)[0], mmap_mode="r")
 
 
+def _arg(argv, flag):
+    return argv[argv.index(flag) + 1] if flag in argv else None
+
+
 if __name__ == "__main__":
     argv = sys.argv[1:]
-    lengths = []
+    length = None
     if "--length" in argv:
         i = argv.index("--length")
-        lengths = [int(a) for a in argv[i + 1:] if not a.startswith("-")]
-        if not lengths:
+        rest = [int(a) for a in argv[i + 1:] if not a.startswith("-")]
+        if not rest:
             raise SystemExit("--length needs at least one word length")
-    if lengths:
-        for length in lengths:
-            build(length=length)
+        length = rest
+
+    if "--answer-list" in argv:
+        # custom answer axis: a single length only (rows come from one guess list)
+        out = _arg(argv, "--out")
+        if not out:
+            raise SystemExit("--answer-list requires --out PATH")
+        one = length[0] if length else None
+        if length and len(length) != 1:
+            raise SystemExit("--answer-list takes at most one --length")
+        build_answer_list(_arg(argv, "--answer-list"), out, length=one)
+    elif length:
+        for L in length:
+            build(length=L)
     else:
         build(full="--full" in argv)

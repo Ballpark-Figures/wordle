@@ -219,6 +219,81 @@ tree too (`python3 tools/checktrees.py salet`) — the hard-mode legality check 
 skipped there, and the same tree fails ~1450 of 2315 lines if you force it on,
 which is what confirms the check actually fires.
 
+## Ultra hard mode (`ultraturns`)
+
+`ultraturns` is the fourth compile-time mode of `optturns.c` (`-DULTRA`). Same
+word lists, same objective shape, **a stricter legal-guess rule than hard mode**:
+
+> Minimise the **total guesses summed over all 2315 answers**, where every guess
+> — the opener and every follow-up — must itself be **consistent with every clue
+> seen so far** (a word the answer could still be), subject to resolving every
+> answer within `--depth` guesses.
+
+So the legal guess set at any node is exactly the set of the 12972 words still
+consistent with the accumulated feedback. That is strictly smaller than hard
+mode's: hard mode only forces greens to be repeated in place and yellow letters
+to reappear *somewhere*, and lets any grey-satisfying word through; ultra mode
+also honours **greys** (exact letter counts, forbidden positions) and **yellow
+position exclusions**. A word you guessed and missed is illegal thereafter,
+because its own greys/yellows rule it out.
+
+**Do not put an `ultraturns` total in a table with a `hardturns` or `optturns`
+one.** A strictly smaller legal set can only raise the total, so
+`ultra ≥ hard ≥ normal` — three different objectives, not one game at three
+difficulty settings. Same trap as mixing a capped optimum with an
+expected-guesses one.
+
+**The constraint is REAL EXTRA STATE, exactly as in hard mode.** Two lines
+reaching the same candidate set `S` can have eliminated different guess-only
+words, so their legal sets differ; the accumulated constraint is hashed into the
+TT key. It is carried as **per-position allowed-letter masks plus per-letter
+`lo`/`hi` count bounds** — the same representation `strspace.py` uses — which is
+**exact for filtering words** (against a clue `(g, p)`, `pattern(g, w) == p` iff
+`w` matches at greens, differs elsewhere, and holds the count implied by the
+green/yellow/grey split; the conjunction of clues is the intersection). The
+"repeated-letter trap" `strspace.py` guards is a fact about *enumerating*
+reachable patterns, not about filtering, and does not arise here — the real
+answers are still partitioned by the real pattern matrix. `cons_apply` /
+`cons_legal` / `cons_hash` have an `#if ULT` branch beside hard mode's; the
+bitset machinery (`BS_POS` / `BS_CNT` / `BS_ALL`) is shared.
+
+**Candidates are always legal** (an answer consistent with the clues trivially
+satisfies its own constraint), so the `n == 1`, `n == 2` and `d > n` shortcuts
+hold unchanged, exactly as in hard mode.
+
+**`--depth` is REQUIRED and it BINDS.** Like hard mode and Mastermind, ultra
+mode has genuine `INFEASIBLE` openers — "follow SALET's tree afterwards" is
+illegal when the follow-up must stay consistent — so the cap is part of the
+objective and each depth is a different quantity with its own CSV. Unlike hard
+mode this does **not** escalate the cap; it is pinned to `--depth`.
+
+**`ULTRA` is in the TT salt** (a distinct constant from hard mode's), so an
+`optturns`/`hardturns`/`mmturns` `tt.bin` fails verification in `ultraturns`
+instead of answering, and vice versa.
+
+```sh
+# from math/
+bash solver/run-ultra-sweep.sh --depth 6 -k 100     # best opener, top-k 100
+./solver/ultraturns --opener salet --depth 6 --topk 100 \
+    --trees data/shared/ultraturns/trees            # one opener, with its tree
+```
+
+`--topk` is the intended mode: the exact solver is correct but slow here,
+because the legal set is large near the root. The wrapper requires it, mirrors
+`run-mm-sweep.sh` (`--optimal-only`, `--print-openers`, per-`(depth, K)` CSV
+under `data/{shared,local}/ultraturns/`), and emits no trees — the winner's tree
+needs a follow-up `--opener <winner>` run at the same depth and K, exactly as
+Mastermind does. The result is an **upper bound**, best of the K openers
+examined, and `INFEASIBLE` under `--topk` says nothing about the problem, only
+about the restricted branching.
+
+**No dedicated gate yet.** `checktrees.py` verifies hard-mode legality, not the
+stricter ultra rule, so it does not fully validate an ultra tree. The property
+to check independently is that **every guess after the opener reproduces every
+prior clue** (`pattern(g_i, g_j) == p_i` for all `i < j`), which the smoke test
+that shipped this mode confirmed on `salet`'s full tree (2315 answers, all lines
+legal). Building that into a real gate is the open follow-up.
+
 ## Mastermind feedback (`mmturns`)
 
 `mmturns` is the third compile-time mode of `optturns.c` (`-DMASTERMIND`,
@@ -823,6 +898,70 @@ exhaustive scan of every opener to prove it.
 number) or `infeasible`. It is deliberately NOT readable by `tools/paths.py`:
 badges and total guesses are incomparable quantities and must not land in one
 report.
+
+## Lingo (`run-lingo-sweep.sh`) — Wordle with the first letter given
+
+Lingo (the game show) shows you the opening letter, then you guess whole words
+that begin with it. We model one INDEPENDENT game per starting letter: for each
+letter L, both the answer pool and the legal guesses are restricted to words
+starting with L. Because every word shares position 0, that tile is always green
+and the FEEDBACK FUNCTION IS WORDLE'S, UNCHANGED — the whole restriction lives in
+the WORD LISTS, so there is **no new solver code**. It is three existing flags:
+
+> For each starting letter L, minimise the TOTAL guesses summed over L's answers,
+> where every guess — opener and follow-ups — is a legal guess STARTING WITH L,
+> subject to resolving every answer within `--depth` guesses.
+
+```sh
+# from math/
+python3 build_lingo_lists.py --length 5          # once: per-letter word lists
+bash solver/run-lingo-sweep.sh --depth 5         # all letters
+bash solver/run-lingo-sweep.sh --depth 5 --letter s
+bash solver/run-lingo-sweep.sh --depth 5 --length 6   # needs 'sh build.sh 6'
+python3 tools/lingo_report.py --length 5 --depth 5    # best opener per letter
+```
+
+The wrapper drives the plain solver per letter with:
+
+* `--guess-list len<L>/<letter>/guess.txt` — restricts follow-ups AND the swept
+  openers to words starting with the letter (README "Answers-only" mechanics).
+* `--answer-list len<L>/<letter>/mystery.txt` — makes the total run over just
+  that letter's answers.
+* `--patterns len<L>/<letter>.npy` — the matrix built for exactly those columns
+  (`build_patterns.py --answer-list`), auto-built by the wrapper on first use.
+
+**The answer pool is the CURATED list.** Length 5 uses the NYT lists (the 2315
+mystery answers filtered by letter, guesses from the 12972), the same lists the
+committed `patterns.npy` is built from. Length 6 has no NYT set, so it falls back
+to the hello wordl 6-letter lists like the length sweeps — a different, not
+comparable curation. A Lingo number describes THIS game on THESE lists.
+
+**THE FEEDBACK RULE IS UNVERIFIED** against the real show: we assume Lingo's
+marks are Wordle's green/yellow/grey with Wordle's duplicate-letter handling
+(the user confirmed this modelling). A real Lingo board would settle it — the
+same standing as the Absurdle and Sea-of-Greens rules.
+
+**THE CAP IS PART OF THE OBJECTIVE.** Lingo gives five guesses (the given first
+letter is not one), so `--depth 5` is the game; `--depth` is required and each
+depth gets its own results directory. `INFEASIBLE` openers are an expected
+result — report totals as optima SUBJECT TO the guarantee, never as unconstrained
+minimum expected guesses. (Feasibility is not proven a priori here: normal-mode
+Wordle's "follow SALET's tree" escape needs SALET, which does not start with most
+letters, so an `INFEASIBLE` row is real data.)
+
+Output per (length, depth, letter): `data/shared/lingo/len<L>_d<D>/<letter>_
+totals.csv` committed (the product), trees/tt/log under `data/local/lingo/...`.
+Resume is automatic per letter from the CSV. Per-letter matrices live in
+`data/local/lingo/patterns/` (regenerable, gitignored).
+
+**The gate is `python3 tools/checklingo.py`.** The one new artifact is the
+per-letter matrix, so the load-bearing check diffs every column of it
+BIT-IDENTICAL against the corresponding column of the shared length matrix
+(which `checkpatterns.py` validates against `wordle.pattern`) — proving true
+feedback AND correct column order. It also checks the lists are exactly the
+filtered full lists, and replays any emitted trees length-generally (coverage,
+legality, `wordle.pattern` agreement, one next guess per prefix, tree-sum vs
+CSV). Run it alongside `solver/validate.sh` and `tools/checkpatterns.py`.
 
 ## Output format
 
