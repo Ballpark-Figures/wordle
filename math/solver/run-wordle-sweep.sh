@@ -64,6 +64,11 @@
 #   why it stops being interesting at 3 (three named in order cost 6, and so does
 #   a perfect three-way split).
 #
+#   NOT UNDER --rank win_rate: the chooser minimises expected GUESSES, which is
+#   the wrong criterion there, so a win-rate run takes the ranking file's own
+#   ordering unless --best-order is passed explicitly.  An arbitrary ordering that
+#   is known to be arbitrary beats one optimised for a different question.
+#
 #   ORDER MATTERS UNDER IT, and the default answer is to work out the BEST
 #   ordering of each set exactly before any games are played
 #   (tools/order_openings.py) and sweep only that one -- half the work on pairs, a
@@ -306,8 +311,22 @@ if [ -n "$OPENFROM" ]; then
             OPENFLAGS="$OPENFLAGS --both-orders"; LISTNAME="${LISTNAME}_bothorders"
         fi
     elif [ "$BESTORDER" = -1 ]; then
-        # not asked for either way: order only earns the work when it can matter
-        if [ "$ADAPT" != 0 ]; then BESTORDER=1; else BESTORDER=0; fi
+        # not asked for either way: order only earns the work when it can matter,
+        # and only when the chooser is answering the question being asked.
+        #
+        # NOT UNDER --rank win_rate (user's call, 2026-09-08).  order_openings.py
+        # picks the ordering with the lowest EXPECTED GUESSES; under a win-rate
+        # ranking that is the wrong criterion, so it would quietly build the whole
+        # cascade on mean-best orderings.  Better to take the ranking file's own
+        # ordering -- arbitrary, and SAID to be arbitrary -- than to apply a
+        # chooser that optimises something else.  --best-order still forces it on
+        # for anyone who wants exactly that.
+        if [ "$ADAPT" != 0 ] && [ "$RANK" = mean ]; then BESTORDER=1; else BESTORDER=0; fi
+    fi
+    if [ "$BESTORDER" = 1 ] && [ "$RANK" != mean ]; then
+        echo "NOTE: --best-order chooses the ordering with the lowest EXPECTED" >&2
+        echo "  GUESSES, but this run ranks on $RANK.  The orderings will be" >&2
+        echo "  mean-best, not $RANK-best." >&2
     fi
     WORDS="$OUTDIR/$LISTNAME.txt"
     "$PY" tools/opening_list.py $OPENFLAGS --out "$WORDS" || exit 1

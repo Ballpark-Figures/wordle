@@ -1210,6 +1210,10 @@ CSV row per word, flushed).
   cheap, cut generously, re-run the survivors larger at a **FRESH `--seed`** (the
   wrapper WARNS on a repeat — the same seed replays the games that chose the
   shortlist), repeat. `--shortlist-from SWEEP.csv` does a stage in one command.
+- **"REGULAR", OR AN UNQUALIFIED REQUEST, MEANS THE MEAN-BASED RANKING** (user,
+  2026-09-08). A win-rate run is always named as one; anything else is `--rank
+  mean`, the default. So "the next blind quint pass" is the mean cascade's next
+  pass, never the win-rate cascade's.
 - **WIN RATE IS A PARALLEL RANKING, not a variant (user's call, 2026-09-08):
   `--rank win_rate` on the sweep and on `run-wordle-paired.sh`.** Everything the
   mean ranking drives, the win rate drives in the same shape — the printed leader,
@@ -1217,6 +1221,13 @@ CSV row per word, flushed).
   from its source, so it stays one all the way down. **It lands in the stem as
   `_win`**, because a win-rate cascade and a mean cascade off the same root at the
   same pass are two different experiments that would otherwise collide.
+- **THE ORDERING CHOOSER IS OFF UNDER `--rank win_rate` (user's call,
+  2026-09-08).** `order_openings.py` minimises EXPECTED GUESSES, which is the
+  wrong criterion for a win-rate cascade, so applying it there would quietly build
+  the whole thing on mean-best orderings. A win-rate run takes the ranking file's
+  own ordering instead — arbitrary, and SAID to be arbitrary, which is the honest
+  option when the alternative optimises a different question. `--best-order` still
+  forces it on and warns what it optimised.
 - **A PROPORTION'S STANDARD ERROR IS EXACTLY ZERO AT THE CEILING, so the cut uses
   PLUS-FOUR (Agresti-Coull).** `sqrt(p(1-p)/t)` is 0 when a word wins every game,
   and at t=100 many do — a 5-SE cut in those units becomes "must also be exactly
