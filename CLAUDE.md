@@ -1476,6 +1476,59 @@ tee'd log — never a bare `tools/wordle_in_one.py`, which REFUSES without the f
   pct_rand_guesses`). The all-guesses
   games file is gzipped (264778 rows). Log under `data/local/singletons/`.
 
+## Tree states (`run-tree-states.sh`) — the same two questions, at every level
+The in-game companion to Wordle in One: it walks the emitted OPTIMAL TREES and
+asks, at each LEVEL k (the state after k guesses and their feedback) and each
+cumulative (greens, yellows) count, how often the strategy has already narrowed
+the answer to ONE word and how often a random pick from what is still alive would
+be right. **`bash solver/run-tree-states.sh --top N`** (from `math/`), attached,
+tee'd log; `WORDLE_SOLVER` picks the sweep, `--top N` names the file.
+- **Exact and deterministic** — a pure function of the committed trees and word
+  lists. Nothing searches or samples. **MEASURED ~0.1 s per opener**, so the top
+  1000 is a couple of minutes.
+- **THE STATE DEFINITION IS THE USER'S CALL (2026-09-08), and the repeated-letter
+  reading is "UNPLACED COPIES".** `greens` = POSITIONS pinned green by any guess
+  so far (a position stays pinned; a later guess playing another letter there does
+  not unpin it). `yellows` = COPIES of a letter known present but not yet pinned,
+  SUMMED over letters — two loose B's count 2, and a letter with one copy green
+  and another loose contributes 1. `grays` = 5 − greens − yellows. Chosen over
+  "distinct unplaced letters" and over the literal "appeared yellow and never
+  green" because it is the one making **greens + yellows the ANSWER SLOTS
+  ACCOUNTED FOR**, hence grays exactly the slots still blank — an invariant
+  asserted at every node. A different reading is a different table.
+- **WEIGHTING IS BY ANSWERS, not by nodes (user's call)** — a node holding `n`
+  candidates contributes `n` cases, so `pct_single` is the share of ANSWERS
+  sitting in an already-narrowed node. `nodes` is reported beside `cases`, so the
+  node-weighted reading stays recoverable (and `pct_rand_answers` IS `nodes/cases`,
+  the same 1/n identity as in Wordle in One).
+- **A WON GAME IS NOT A CASE.** A tree line records no pattern for its final guess
+  (it would be all green), so a game ending at turn k has no level-k state and
+  leaves every deeper level. Level counts therefore FALL with depth.
+- **`--top N` POOLS N DIFFERENT STRATEGIES**, best first by `total` in the sweep's
+  CSV, ties on the word. Each contributes its own 2315 answers, so every opener
+  carries EQUAL weight however good it is — a property of the aggregate, not of
+  any tree. A single opener's numbers need `--top 1` on that opener's rank.
+- **THE TREES ARE THE CONSTRAINED OPTIMA** (minimum total guesses subject to
+  resolving every answer within 6), so these are states of THAT strategy, never of
+  an unconstrained expected-guess minimiser. Same rule as everywhere: do not table
+  them beside an outright-expectation number.
+- **TWO GATES, BOTH ALWAYS ON AND BOTH DIFFERENTIAL** — mutation-tested when the
+  tool shipped (a distinct-letters yellow rule, an off-by-one candidate count and
+  a forgotten pinned position were each caught): (1) sampled lines have their
+  cumulative state re-derived FROM THE STRINGS by a route that never looks at a
+  tile — greens as positions where some guess matched the answer, known counts as
+  `max over rows of min(count in guess, count in answer)` — and every recorded
+  pattern re-derived with `wordle.pattern`; (2) on the first few openers a node's
+  candidate count `n` and legal-word count `m` are recomputed by FILTERING THE
+  WORD LISTS, which pins the tree's partition as the consistent set and checks the
+  incremental matrix filtering inside the walk.
+- **It reads the SQUARE 12972x12972 matrix** for the legal-word column
+  (`python3 build_patterns.py --full`), gitignored under `local/` — wrapper and
+  tool both refuse with that command on a fresh clone.
+- Data: `math/data/shared/treestates/states_<solver>_top<N>.csv`
+  (`level,greens,yellows,grays,nodes,cases,singles,pct_single,pct_rand_answers,
+  pct_rand_guesses`); log under `math/data/local/treestates/`.
+
 ## Nerdle (8-symbol equations) — the GUESS enumeration, pass one
 A different game living beside the wordle variants. `math/nerdle.py` states the rules
 and IS the source of truth; read it before quoting any count. Run it with
