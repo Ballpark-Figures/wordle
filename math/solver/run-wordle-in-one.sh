@@ -27,6 +27,16 @@
 #   words.  Two different quantities over the same answer set, so each writes
 #   its OWN files and their numbers must never share a table.
 #
+#   THE TWO RANDOM-GUESS COLUMNS are the same question one step weaker: not
+#   "does the row force the answer?" but "if I now guessed at random from what
+#   the row leaves alive, how often would I be right?".  pct_rand_answers draws
+#   from the ANSWER words still consistent with the row (at most 2315),
+#   pct_rand_guesses from the LEGAL GUESS words still consistent with it (at
+#   most 12972); a row leaving n such words contributes 1/n and the cell reports
+#   the mean over its pairs.  So both are at least pct, and the legal-word pool
+#   is always the worse of the two, being a superset.  A pick from the WHOLE
+#   list ignoring the row would be a flat 1/2315 or 1/12972 and is NOT this.
+#
 #   The all-green row is a singleton that tells you nothing you did not already
 #   know by typing the word.  Its denominator is exactly the 2315 self-pairs, so
 #   its 100% is arithmetic, not a measurement -- read pct_nowin there.
@@ -43,6 +53,8 @@
 #   --guesses answers : wordle_in_one_games.csv, wordle_in_one_breakdown.csv
 #   --guesses all     : wordle_in_one_games_allguesses.csv.gz,
 #                       wordle_in_one_breakdown_allguesses.csv
+# Breakdown columns: greens,yellows,grays,games,games_nowin,pairs,pct,pct_nowin,
+# pct_rand_answers,pct_rand_guesses.
 # Log under data/local/singletons/.
 
 set -u
@@ -70,6 +82,14 @@ cd "$MATH" || exit 1
 
 PY=../.venv/bin/python
 [ -x "$PY" ] || { echo "no venv python at $PY" >&2; exit 1; }
+
+# The legal-word random-pick column reads the SQUARE guess x guess matrix -- a
+# separate artifact from the 12972x2315 one, gitignored like the rest of
+# data/local/, so it is missing on a fresh clone.
+[ -f data/local/patterns/patterns_full.npy ] || {
+    echo "the random-guess columns need the square guess x guess matrix." >&2
+    echo "  Build it with '$PY build_patterns.py --full' (~18s, 168 MB)." >&2
+    exit 1; }
 
 MARKER="wordle_in_one.py --guesses $GUESSES"
 RUNNING=$(pgrep -f -- "$MARKER" 2>/dev/null | tr '\n' ' ')

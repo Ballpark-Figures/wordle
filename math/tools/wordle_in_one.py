@@ -29,6 +29,27 @@ answer drawn uniformly from the 2315. It is NOT the fraction of DISTINCT
 (guess, pattern) rows of that shape that are singletons, which weights a
 2-answer bucket the same as a 300-answer one and is a different number.
 
+THE TWO RANDOM-GUESS COLUMNS ARE THE SAME QUESTION ONE STEP WEAKER. `pct` asks
+how often the row FORCES the answer (one candidate left); `pct_rand_answers` and
+`pct_rand_guesses` ask how often you would be right if you now guessed at random
+from the words the row leaves alive -- the ANSWER words still consistent with it
+(a pool of at most 2315), and the LEGAL GUESS words still consistent with it (at
+most 12972). A pair whose row leaves n such words contributes 1/n, and the cell
+reports the MEAN over its pairs, so both are >= `pct` (a forced answer is 1/1)
+and `pct_rand_guesses` <= `pct_rand_answers` (the legal-word pool is a superset,
+and contains every consistent answer). "Consistent" is `ultraturns`' notion: a
+word the answer could still be. A pick from the WHOLE list, ignoring the row, is
+a flat 1/2315 or 1/12972 and is not what these columns report.
+
+  A tidy identity worth knowing: summing 1/n over the n pairs of one bucket gives
+  exactly 1, so `pct_rand_answers` is also the count of DISTINCT non-empty
+  (guess, pattern) rows of that composition over its pair count.
+
+THE ANSWER-POOL COLUMN NEEDS ONLY patterns.npy; THE GUESS-POOL COLUMN NEEDS THE
+SQUARE 12972x12972 MATRIX (`python3 build_patterns.py --full`, ~18s/168 MB),
+which is gitignored under data/local/ and so is MISSING ON A FRESH CLONE. The
+tool refuses with that command rather than dying inside numpy.
+
 THE ALL-GREEN ROW IS A SPECIAL CASE. When the guess is itself the answer the row
 is all green, a singleton by the definition above but one that tells you nothing
 you did not already know by typing the word. It lands in the (green=5) bin, so it
@@ -47,7 +68,8 @@ Outputs, under data/shared/singletons/:
   wordle_in_one_games[_allguesses].csv[.gz]   one row per game: guess,answer,
                                  pattern,greens,yellows,grays (pattern G/Y/B)
   wordle_in_one_breakdown[_allguesses].csv    per (greens,yellows) composition:
-                                 games, games_nowin, pairs, pct, pct_nowin
+                                 games, games_nowin, pairs, pct, pct_nowin,
+                                 pct_rand_answers, pct_rand_guesses
 The all-guesses games file is gzipped (264778 rows).
 A pure function of the committed word lists, so it regenerates anywhere.
 """
@@ -95,6 +117,20 @@ L = len(guesses[0])
 NPAT = 3 ** L
 WIN = all_green(L)
 
+# The SQUARE guess x guess matrix, for the legal-word random-pick column. It is
+# a SEPARATE artifact from the 12972x2315 one every other tool here reads, and
+# it lives under the gitignored data/local/, so it is missing on a fresh clone.
+try:
+    PATF = load_patterns(full=True)
+except FileNotFoundError:
+    raise SystemExit(
+        "the random-guess columns need the SQUARE guess x guess pattern "
+        "matrix.\nBuild it with 'python3 build_patterns.py --full' "
+        "(about 18s, 168 MB).")
+if PATF.shape != (len(guesses), len(guesses)):
+    raise SystemExit("patterns_full.npy is %s, not %d x %d -- rebuild it"
+                     % (PATF.shape, len(guesses), len(guesses)))
+
 # For each of the 243 codes, its (greens, yellows, grays) counts. tile 2=green,
 # 1=yellow, 0=gray in the base-3 encoding (see wordle.decode).
 comp = np.zeros((NPAT, 3), dtype=np.int64)   # columns: greens, yellows, grays
@@ -121,13 +157,34 @@ else:
 tally = np.zeros((L + 1, L + 1), dtype=np.int64)
 tally_nowin = np.zeros((L + 1, L + 1), dtype=np.int64)
 code_pairs = np.zeros(NPAT, dtype=np.int64)   # (guess, answer) pairs per pattern
+# Sum of 1/(words the row leaves alive) over the pairs in each pattern, once for
+# the answer pool and once for the legal-guess pool.
+rand_ans_code = np.zeros(NPAT, dtype=np.float64)
+rand_gss_code = np.zeros(NPAT, dtype=np.float64)
 per_guess = {}          # guess word -> singleton count (for the gate)
 games = []              # (guess, answer, pattern_code)
+
+gidx = {w: i for i, w in enumerate(guesses)}
+ans_cols = np.array([gidx[a] for a in answers], dtype=np.int64)
 
 for gi in guess_idx:
     row = np.asarray(PAT[gi], dtype=np.int64)            # pattern per answer
     counts = np.bincount(row, minlength=NPAT)
     code_pairs += counts                                 # the DENOMINATOR
+    # the same row over all 12972 legal words. GATE: restricted to the answer
+    # columns it must BE the 12972x2315 matrix's row -- that pins both the
+    # column order and the two matrices agreeing, and it is what makes the
+    # legal-word bucket a superset of the answer bucket.
+    row_full = np.asarray(PATF[gi], dtype=np.int64)
+    if not np.array_equal(row_full[ans_cols], row):
+        raise SystemExit("GATE FAILED: patterns_full.npy disagrees with "
+                         "patterns.npy on the row for %s" % guesses[gi])
+    counts_full = np.bincount(row_full, minlength=NPAT)
+    nz = counts > 0
+    # summing 1/n over the n pairs of a bucket gives exactly 1 for the answer
+    # pool, and n/m for the legal-word pool (m >= n by the gate above)
+    rand_ans_code[nz] += 1.0
+    rand_gss_code[nz] += counts[nz] / counts_full[nz]
     is_single = counts[row] == 1                         # boolean over answers
     ai = np.nonzero(is_single)[0]
     per_guess[guesses[gi]] = len(ai)
@@ -144,9 +201,21 @@ pairs = np.zeros((L + 1, L + 1), dtype=np.int64)
 np.add.at(pairs, (comp[:, 0], comp[:, 1]), code_pairs)
 assert int(pairs.sum()) == len(guess_idx) * len(answers)
 
+rand_ans = np.zeros((L + 1, L + 1), dtype=np.float64)
+rand_gss = np.zeros((L + 1, L + 1), dtype=np.float64)
+np.add.at(rand_ans, (comp[:, 0], comp[:, 1]), rand_ans_code)
+np.add.at(rand_gss, (comp[:, 0], comp[:, 1]), rand_gss_code)
+# a forced answer is a pick of 1 from 1, and the legal-word pool contains every
+# consistent answer, so these orderings hold cell by cell
+assert (rand_ans >= tally - 1e-9).all(), "random-pick rate below the singleton rate"
+assert (rand_gss <= rand_ans + 1e-9).all(), "legal-word pool beat the answer pool"
+assert (rand_ans <= pairs + 1e-9).all(), "a random-pick rate exceeded 100%"
+
 total = int(tally.sum())
 total_nowin = int(tally_nowin.sum())
 total_pairs = int(pairs.sum())
+total_rand_ans = float(rand_ans.sum())
+total_rand_gss = float(rand_gss.sum())
 
 
 def pct(num, den):
@@ -199,15 +268,22 @@ with open(BREAK_OUT, "w") as f:
     f.write("# games=all singletons, games_nowin excludes the all-green "
             "self-answer; pairs=every (guess, answer) pair whose row has this "
             "composition; pct=100*games/pairs, pct_nowin=100*games_nowin/pairs\n")
-    f.write("greens,yellows,grays,games,games_nowin,pairs,pct,pct_nowin\n")
+    f.write("# pct_rand_answers/pct_rand_guesses=mean over those pairs of "
+            "1/(words the row leaves consistent), drawing from the 2315 answers "
+            "and from the 12972 legal guesses respectively -- how often a random "
+            "pick from what is still alive would be right\n")
+    f.write("greens,yellows,grays,games,games_nowin,pairs,pct,pct_nowin,"
+            "pct_rand_answers,pct_rand_guesses\n")
     for g in range(L + 1):
         for y in range(L + 1 - g):
             if not (tally[g, y] or pairs[g, y]):
                 continue
-            f.write("%d,%d,%d,%d,%d,%d,%.5f,%.5f\n"
+            f.write("%d,%d,%d,%d,%d,%d,%.5f,%.5f,%.5f,%.5f\n"
                     % (g, y, L - g - y, tally[g, y], tally_nowin[g, y],
                        pairs[g, y], pct(tally[g, y], pairs[g, y]),
-                       pct(tally_nowin[g, y], pairs[g, y])))
+                       pct(tally_nowin[g, y], pairs[g, y]),
+                       pct(rand_ans[g, y], pairs[g, y]),
+                       pct(rand_gss[g, y], pairs[g, y])))
 
 print("wrote %s (%d games)" % (os.path.relpath(GAMES_OUT, _MATH), total))
 print("wrote %s" % os.path.relpath(BREAK_OUT, _MATH))
@@ -215,43 +291,57 @@ print("\nguess set: %d %s words; answers: %d; pairs: %d"
       % (len(guess_idx), "answer" if args.guesses == "answers" else "legal guess",
          len(answers), total_pairs))
 print("%d games total (%.4f%% of all pairs); %d excluding the all-green "
-      "self-answer (%.4f%%)\n"
+      "self-answer (%.4f%%)"
       % (total, pct(total, total_pairs), total_nowin,
          pct(total_nowin, total_pairs)))
+print("a random pick from what the row leaves alive is right %.4f%% of the time "
+      "(answer pool) / %.4f%% (legal-guess pool)\n"
+      % (pct(total_rand_ans, total_pairs), pct(total_rand_gss, total_pairs)))
 
 # printed breakdown
-print("singleton RATE by (greens, yellows, grays):")
-print("%6s %7s %6s %10s %12s %12s %9s %10s"
+print("singleton RATE by (greens, yellows, grays), and the rate a RANDOM pick "
+      "from what the row leaves alive is right:")
+print("%6s %7s %6s %10s %12s %12s %9s %10s %11s %11s"
       % ("green", "yellow", "gray", "games", "games_nowin", "pairs", "pct",
-         "pct_nowin"))
+         "pct_nowin", "rand_ans", "rand_guess"))
 for g in range(L + 1):
     for y in range(L + 1 - g):
         if not (tally[g, y] or pairs[g, y]):
             continue
-        print("%6d %7d %6d %10d %12d %12d %8.4f%% %9.4f%%"
+        print("%6d %7d %6d %10d %12d %12d %8.4f%% %9.4f%% %10.4f%% %10.4f%%"
               % (g, y, L - g - y, tally[g, y], tally_nowin[g, y], pairs[g, y],
                  pct(tally[g, y], pairs[g, y]),
-                 pct(tally_nowin[g, y], pairs[g, y])))
+                 pct(tally_nowin[g, y], pairs[g, y]),
+                 pct(rand_ans[g, y], pairs[g, y]),
+                 pct(rand_gss[g, y], pairs[g, y])))
 
-print("\nmarginal by greens:")
+def marginal(label, k, won, pr, ra, rg):
+    print("  %d %s: %8d games / %10d pairs = %7.4f%%   rand %7.4f%% / %7.4f%%"
+          % (k, label, won, pr, pct(won, pr), pct(ra, pr), pct(rg, pr)))
+
+
+print("\nmarginal by greens (rand = answer pool / legal-guess pool):")
 for g in range(L + 1):
-    s, p = int(tally[g].sum()), int(pairs[g].sum())
-    if p:
-        print("  %d green: %8d games / %10d pairs = %7.4f%%" % (g, s, p, pct(s, p)))
+    if int(pairs[g].sum()):
+        marginal("green", g, int(tally[g].sum()), int(pairs[g].sum()),
+                 float(rand_ans[g].sum()), float(rand_gss[g].sum()))
 print("marginal by yellows:")
 for y in range(L + 1):
-    s, p = int(tally[:, y].sum()), int(pairs[:, y].sum())
-    if p:
-        print("  %d yellow: %8d games / %10d pairs = %7.4f%%" % (y, s, p, pct(s, p)))
+    if int(pairs[:, y].sum()):
+        marginal("yellow", y, int(tally[:, y].sum()), int(pairs[:, y].sum()),
+                 float(rand_ans[:, y].sum()), float(rand_gss[:, y].sum()))
 print("marginal by grays:")
 gray_games = np.zeros(L + 1, dtype=np.int64)
 gray_pairs = np.zeros(L + 1, dtype=np.int64)
+gray_ra = np.zeros(L + 1, dtype=np.float64)
+gray_rg = np.zeros(L + 1, dtype=np.float64)
 for g in range(L + 1):
     for y in range(L + 1 - g):
         gray_games[L - g - y] += tally[g, y]
         gray_pairs[L - g - y] += pairs[g, y]
+        gray_ra[L - g - y] += rand_ans[g, y]
+        gray_rg[L - g - y] += rand_gss[g, y]
 for k in range(L + 1):
     if gray_pairs[k]:
-        print("  %d gray: %8d games / %10d pairs = %7.4f%%"
-              % (k, int(gray_games[k]), int(gray_pairs[k]),
-                 pct(int(gray_games[k]), int(gray_pairs[k]))))
+        marginal("gray", k, int(gray_games[k]), int(gray_pairs[k]),
+                 float(gray_ra[k]), float(gray_rg[k]))

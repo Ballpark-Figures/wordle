@@ -1430,6 +1430,23 @@ tee'd log — never a bare `tools/wordle_in_one.py`, which REFUSES without the f
   uniform over the 2315. It is NOT the fraction of DISTINCT (guess, pattern) ROWS
   of that shape that are singletons, which weights a 2-answer bucket like a
   300-answer one. Say which one a number is.
+- **THE TWO RANDOM-GUESS COLUMNS ARE THE SAME QUESTION ONE STEP WEAKER.** `pct`
+  asks how often the row FORCES the answer; `pct_rand_answers` / `pct_rand_guesses`
+  ask how often a random pick from what the row leaves ALIVE would be right — the
+  consistent ANSWER words (at most 2315) and the consistent LEGAL GUESS words (at
+  most 12972). A row leaving `n` alive contributes `1/n`, the cell is the MEAN over
+  its pairs, so both are `>= pct` and the legal-word column is always the smaller
+  (its pool is a superset containing every consistent answer). **A pick from the
+  WHOLE list ignoring the row is a flat 1/2315 or 1/12972 and is NOT what these
+  report.** Identity worth knowing: `1/n` summed over a bucket's `n` pairs is
+  exactly 1, so `pct_rand_answers` is also the count of DISTINCT non-empty
+  (guess, pattern) rows of that composition over its pairs.
+- **THE LEGAL-WORD COLUMN NEEDS THE SQUARE 12972x12972 MATRIX** (`python3
+  build_patterns.py --full`, ~18s/168 MB), gitignored under `data/local/` and so
+  MISSING ON A FRESH CLONE — the wrapper and the tool both refuse with that
+  command. Its use is GATED: each row of the square matrix, restricted to the
+  answer columns, must EQUAL the 12972x2315 matrix's row, which pins the column
+  order and makes the legal-word bucket a provable superset of the answer bucket.
 - **The all-green row's 100% is ARITHMETIC, not a measurement** — a guess equal to
   the answer is a singleton that tells you nothing you did not know by typing it,
   and its denominator is exactly the 2315 self-pairs. `games_nowin`/`pct_nowin`
@@ -1442,7 +1459,8 @@ tee'd log — never a bare `tools/wordle_in_one.py`, which REFUSES without the f
   no-win total must match their column sum. It fails loudly rather than reporting.
 - Data under `math/data/shared/singletons/`: `wordle_in_one_games[_allguesses]
   .csv[.gz]` (one row per game) and `wordle_in_one_breakdown[_allguesses].csv`
-  (`greens,yellows,grays,games,games_nowin,pairs,pct,pct_nowin`). The all-guesses
+  (`greens,yellows,grays,games,games_nowin,pairs,pct,pct_nowin,pct_rand_answers,
+  pct_rand_guesses`). The all-guesses
   games file is gzipped (264778 rows). Log under `data/local/singletons/`.
 
 ## Nerdle (8-symbol equations) — the GUESS enumeration, pass one
