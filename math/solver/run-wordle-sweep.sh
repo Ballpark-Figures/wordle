@@ -35,7 +35,7 @@
 # larger and at a fresh seed, repeat.  A word leading every stage is a finding.
 #
 #   --shortlist-from SWEEP.csv does the next stage in one command: it cuts a word
-#   list from that sweep (--se N standard errors of the best word's, default 10;
+#   list from that sweep (--se N standard errors of the best word's, DEFAULT 5;
 #   or --shortlist-top N) and sweeps only those words.  USE A FRESH --seed WITH
 #   IT: the draw stream is seeded per word, so stage 2 at the same seed replays
 #   stage 1's games as its first -t, re-using the sample that chose the shortlist.
@@ -53,6 +53,16 @@
 # at most the word in flight and re-running the same command picks up where it
 # stopped.
 #
+# WHY THE DEFAULT CUT IS 5 STANDARD ERRORS (user's call, 2026-09-08).  It started
+# at 10, multiwordle's default, and MEASURED on the first pass that was too wide to
+# screen: at t=100 a word's standard error is ~0.10, so ten of them span a full
+# guess and the cut kept 12367 of 12972 words under the answer follow-up (12911
+# under guess).  5 SE keeps the net generous while actually narrowing the field.
+# The cut is in every filename, so stages cut differently can never be confused.
+# NOTE this is the WORDLE wrapper's default; multiwordle's wrapper keeps its own
+# 10, and tools/sweep_shortlist.py -- shared by both -- is unchanged.  Each wrapper
+# carries a default a human reads, rather than a shared one that moves under them.
+#
 # Each (follow-up, t, seed, word list) is a different sweep and gets its own file.
 
 set -u
@@ -67,7 +77,8 @@ LIMIT=""
 WIN=6
 PROGRESS=""
 SHORTFROM=""
-SHORTSE=""
+# 5 standard errors: generous, but narrow enough to screen.  See the note above.
+SHORTSE=5
 SHORTTOP=""
 SHORTVALUE="mean"
 
@@ -138,8 +149,8 @@ if [ -n "$SHORTFROM" ]; then
         echo "  another; the ranking does not carry between them." >&2
         exit 1
     fi
-    CUTNAME="se${SHORTSE:-10}"
-    CUT="--se ${SHORTSE:-10}"
+    CUTNAME="se${SHORTSE}"
+    CUT="--se ${SHORTSE}"
     if [ -n "$SHORTTOP" ]; then
         CUT="--top $SHORTTOP"; CUTNAME="top$SHORTTOP"
     fi

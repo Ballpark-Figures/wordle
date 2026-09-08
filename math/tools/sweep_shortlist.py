@@ -20,10 +20,17 @@ both stages has been asked twice.
 
 THE CUT IS A NET, NOT A VERDICT -- KEEP IT GENEROUS.  --se N keeps every word
 within N standard errors of the best word's value, using the BEST word's standard
-error by default (--own-se uses each word's own, which is slightly more permissive
-since the losers' errors are larger).  A tight cut risks discarding the true best
-word on one unlucky sample; that error is unrecoverable, while an over-wide cut
-only costs time.  10 SE at t=100 is a deliberately wide net.
+error by default (--own-se uses each word's own, which measures each word in its
+own noise -- a DIFFERENT question, which can drop a word a fixed cut keeps).  A
+tight cut risks discarding the true best word on one unlucky sample; that error is
+unrecoverable, while an over-wide cut only costs time.
+
+N IS THE CALLER'S CHOICE AND EACH WRAPPER CARRIES ITS OWN, deliberately: how wide
+a net is generous depends on how big the standard errors are at that stage's -t.
+run-multiwordle-sweep.sh passes 10; run-wordle-sweep.sh passes 5, after 10 was
+measured to keep 95% of the field at t=100.  This module's own default of 10 is
+for a direct invocation only -- both wrappers pass the flag explicitly, so neither
+can move under the other.
 
 USE A DIFFERENT --seed FOR STAGE 2.  The draw stream is seeded per word, so a
 stage-2 run at the SAME seed replays stage 1's games as its first -t of them --

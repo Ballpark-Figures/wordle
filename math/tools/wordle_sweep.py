@@ -31,9 +31,10 @@ optimistic: it belongs to whichever word got the kindest sample, and at small `-
 the spread of pure noise across 12972 words is many times one word's standard
 error.  **The head of a sweep is a SHORTLIST, not a winner.**  The sound use is
 two-stage: sweep wide at small `-t` to screen, cut a generous shortlist
-(tools/sweep_shortlist.py, 10 standard errors), then re-run the survivors at
-larger `-t` and a FRESH SEED, repeating until the field is small enough to
-separate.  A word that leads every stage is a finding; a word that leads only the
+(tools/sweep_shortlist.py; the wrapper's default is 5 standard errors, measured
+against the alternative -- 10 kept 95% of the field at t=100), then re-run the
+survivors at larger `-t` and a FRESH SEED, repeating until the field is small
+enough to separate.  A word that leads every stage is a finding; a word that leads only the
 screen is a coin flip.
 
 TWO NUMBERS MEANS TWO POSSIBLE SHORTLISTS.  The mean and the win rate are ranked

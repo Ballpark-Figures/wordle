@@ -1229,6 +1229,27 @@ CSV row per word, flushed).
 - **MEASURED (2026-09-08, this machine): ~490 words/s at `-t 100` under the
   `answer` follow-up and ~262/s under `guess`** — so a full 12972-word stage 1 is
   well under two minutes either way.
+- **THE CUT IS 5 STANDARD ERRORS, not multiwordle's 10 (user's call, 2026-09-08),
+  and that is MEASURED rather than preferred**: at `t=100` a word's SE is ~0.10, so
+  10 SE spans a full guess and kept **12367 of 12972** words (`answer`) / 12911
+  (`guess`) — too wide to screen anything. The default lives in
+  `run-wordle-sweep.sh`; multiwordle's wrapper keeps its own 10 and the shared
+  tool is untouched, so neither pipeline's cut can move under the other. The cut
+  is in every filename, so stages cut differently cannot be confused.
+- **THE WINNER'S CURSE IS NOT THEORETICAL HERE — MEASURED on pass 1 to 2 of the
+  `answer` sweep (2026-09-08).** Stage 1's leader `parle` (3.5000 at t=100) came
+  back at **3.9450 at t=1000, rank 730 of 12367** — a 0.445 regression, about 13 of
+  its own stage-2 standard errors. **Only 2 of stage 1's top 20 were still in stage
+  2's top 20**, and the new leader `trace` had been **rank 700** in the screen. So
+  the generous net is load-bearing, not caution: any cut tight enough to look
+  decisive at t=100 would have thrown the leader away. Quote this when explaining
+  why a screen head is never reported as a winner.
+- **A WIN-RATE CUT IS DEGENERATE AT SMALL `-t` — do not use `--shortlist-value
+  win_rate` at t=100.** A word scoring 100/100 has a binomial SE of exactly 0, so
+  "within N SE of the best" collapses to "also exactly 100%": measured, it kept
+  3555 words (`answer`) and **5** (`guess`), an exact-tie filter rather than a net.
+  Fixing it needs an interval that stays finite at p=1 (Wilson, say); until then
+  the mean is the only sound column to cut on.
 
 - **`python3 tools/checkwordlesim.py` is the GATE**: it replays the same seeds
   through an independent implementation that keeps candidates as LISTS OF WORDS and
