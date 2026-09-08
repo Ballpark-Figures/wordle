@@ -82,6 +82,17 @@ class CoupledDraw:
         return int(self.tail.ans2g[pick])
 
 
+def next_t(t):
+    """The next rung of the 1-2-3-5 ladder above `t` -- the sweeps' own ladder."""
+    d = 100
+    while d <= 10 ** 12:
+        for m in (1, 2, 3, 5):
+            if m * d > t:
+                return m * d
+        d *= 10
+    return t * 10
+
+
 def read_sweep_settings(path):
     """A sweep CSV's own account of itself: openings, follow-up, adapt, t, seed.
 
@@ -91,16 +102,27 @@ def read_sweep_settings(path):
     is the only place it was recorded.  Parsing prose is a fallback, never the
     plan -- hence the settings line.
     """
-    head, rows = [], []
+    head, rows, sigma, header = [], [], {}, None
     with open(path) as f:
         for line in f:
             if line.startswith("#"):
                 head.append(line.rstrip("\n"))
                 continue
             cols = [c.strip() for c in line.rstrip("\n").split(",")]
-            if cols[0] == "word" or not cols[0]:
+            if header is None and cols[0] == "word":
+                header = cols
+                continue
+            if not cols[0]:
                 continue
             rows.append(cols[0])
+            # a PAIRED source carries how many paired sigma each opening sits
+            # behind the leader; that, not the unpaired stderr in the same file,
+            # is what a cut here has to mean
+            if header and "sigma" in header:
+                try:
+                    sigma[cols[0]] = float(cols[header.index("sigma")])
+                except (ValueError, IndexError):
+                    pass
     blob = "\n".join(head)
     out = {"openings": rows}
     m = re.search(r"# settings follow_up=(\w+) pair_adaptive=(\d+) "
@@ -113,16 +135,36 @@ def read_sweep_settings(path):
         m = re.search(r"# wordle opener sweep: (\d+) trials per word, "
                       r"follow-up (\w+), seed (\d+)", blob)
         if not m:
-            raise SystemExit("%s does not look like a sweep CSV" % path)
-        out.update(trials=int(m.group(1)), fallback=m.group(2),
-                   seed=int(m.group(3)), win_within=6)
-        a = re.search(r"ABANDONED once the follow-up is down to (\d+)", blob)
-        out["adapt"] = int(a.group(1)) if a else 0
+            # a PAIRED file written before the settings line existed states the
+            # same facts in its own first line
+            pm = re.search(r"# paired comparison of \d+ openings, (\d+) games, "
+                           r"follow-up (\w+), pair-adaptive (\d+), seed (\d+)",
+                           blob)
+            if pm:
+                out.update(trials=int(pm.group(1)), fallback=pm.group(2),
+                           adapt=int(pm.group(3)), seed=int(pm.group(4)),
+                           win_within=6)
+                m = None
+            else:
+                raise SystemExit("%s does not look like a sweep or paired CSV"
+                                 % path)
+        if m:
+            out.update(trials=int(m.group(1)), fallback=m.group(2),
+                       seed=int(m.group(3)), win_within=6)
+            a = re.search(r"ABANDONED once the follow-up is down to (\d+)", blob)
+            out["adapt"] = int(a.group(1)) if a else 0
     m = re.search(r"# lineage root=(\S+) pass=(\d+)", blob)
+    if not m:
+        # a paired file written before the lineage line states the same thing in
+        # its prose: "... taken from <file> (root <root>, pass <n>)"
+        m = re.search(r"\(root (\S+), pass (\d+)\)", blob)
     out["root"] = m.group(1) if m else "unknown"
     out["pass"] = int(m.group(2)) if m else 0
     if not rows:
         raise SystemExit("%s has no openings" % path)
+    out["sigma"] = sigma
+    m = re.search(r"# lineage .*round=(\d+)", blob)
+    out["round"] = int(m.group(1)) if m else 0
     return out
 
 
@@ -133,6 +175,7 @@ def parse_args(argv):
     t = None
     seed = None
     top = None
+    sigma_cut = 5.0
     max_openings = 50
     openings = []
     progress = 20000
@@ -147,6 +190,8 @@ def parse_args(argv):
             top = int(argv[i + 1]); i += 2
         elif a == "--max-openings":
             max_openings = int(argv[i + 1]); i += 2
+        elif a == "--sigma":
+            sigma_cut = float(argv[i + 1]); i += 2
         elif a == "--print-stem":
             out = "--print-stem"; i += 1
         elif a == "--opening":
@@ -179,6 +224,18 @@ def parse_args(argv):
             fallback = meta["fallback"]
         if adapt is None:
             adapt = meta["adapt"]
+        if meta["sigma"]:
+            # CHAINING a paired round: cut on the PAIRED sigma.  Everything within
+            # --sigma of the leader survives; the leader's own row carries no
+            # sigma and always does.
+            keep = [w for w in openings if meta["sigma"].get(w, 0.0) <= sigma_cut]
+            # stderr, not stdout: --print-stem's output is READ by the wrapper,
+            # and a stray line on stdout became the filename.
+            print("cut at %g paired sigma: %d of %d openings kept"
+                  % (sigma_cut, len(keep), len(openings)), file=sys.stderr)
+            openings = keep
+            if t is None:
+                t = next_t(meta["trials"])   # and more games each round
         if t is None:
             t = meta["trials"]
         if seed is None:
@@ -209,19 +266,21 @@ def parse_args(argv):
         # The wrapper asks HERE what the file should be called, so the derivation
         # lives in one place rather than being re-implemented in shell.
         root = meta["root"] if meta else "openings"
-        stem = "paired_%s_%s_p%d_t%d_s%d" % (fallback, root,
-                                             meta["pass"] if meta else 0, t, seed)
+        rnd = (meta["round"] + 1) if meta else 1
+        stem = "paired_%s_%s_p%d_r%d_t%d_s%d" % (
+            fallback, root, meta["pass"] if meta else 0, rnd, t, seed)
         if adapt:
             stem += "_adapt%d" % adapt
         print(stem)
         print(len(openings))
         raise SystemExit(0)
-    return sweep or src, openings, fallback, adapt, t, seed, out, progress, meta
+    return (sweep or src, openings, fallback, adapt, t, seed, out, progress,
+            meta, sigma_cut)
 
 
 def main(argv):
-    (src, openings, fallback, adapt, t, seed, out, progress,
-     meta) = parse_args(argv)
+    (src, openings, fallback, adapt, t, seed, out, progress, meta,
+     sigma_cut) = parse_args(argv)
 
     guesses = load_words("guess")
     answers = load_words("mystery")
@@ -318,9 +377,18 @@ def main(argv):
     print("\n%.1fs" % (time.time() - t0))
 
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
+    rnd = (meta["round"] + 1) if meta else 1
     with open(out, "w") as f:
         for line in lines:
             f.write("# " + line + "\n")
+        # the same machine-readable lines a sweep writes, so THIS file can be the
+        # source of the next round: settings, lineage, and which round it is
+        f.write("# settings follow_up=%s pair_adaptive=%d win_within=6 "
+                "trials=%d seed=%d words=%d\n" % (fallback, adapt, t, seed, n))
+        f.write("# lineage root=%s pass=%d round=%d source=%s\n"
+                % (meta["root"] if meta else "openings",
+                   meta["pass"] if meta else 0, rnd,
+                   os.path.basename(src) if src else "(none)"))
         # THE SAME LEADING COLUMNS AS A SWEEP -- word, trials, mean, stderr -- so
         # tools/sweep_shortlist.py and every reader of a sweep CSV can read this
         # file too.  The paired columns follow; they are the point, but they do

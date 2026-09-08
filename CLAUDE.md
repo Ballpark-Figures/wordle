@@ -1427,6 +1427,13 @@ differences instead.
   reported as `mean(d) +/- sd(d)/sqrt(t)`. No new modelling — the same games, read
   as differences. **It sharpens COMPARISONS WITHIN the set only**; the absolute
   means keep their own errors, and it says nothing about openings outside the set.
+- **MEASURED ON THE FIRST REAL RUN (2026-09-08), and this is why it exists**: 22
+  adaptive-pair finalists that the sweep had left inside 1.5 SE resolved into a
+  two-way TIE (`claes print` / `plant cries`, 0.4 sigma apart) with everything
+  else separated at 1.4 to 8.6 sigma. The pairing was **14.9x tighter** than the
+  unpaired errors on the closest pair — anagram openings play nearly identical
+  games, so almost all of the variance cancels. It also overturned the sweep's own
+  leader: `clans tripe`, which led pass 17, sits 3.4 sigma behind.
 - **TWO COUPLINGS, and the second was the user's call (2026-09-08) and the bigger
   half.** MEASURED on `dance horst blimp` vs `chant dorse blimp`, t=20000:
   unpaired error 0.00413; sharing the ANSWER 0.00310 (1.3x); sharing the answer
@@ -1455,6 +1462,16 @@ differences instead.
   `diff_vs_leader,paired_stderr,sigma`, so `sweep_shortlist.py` and every other
   reader of a sweep CSV reads it too. The name is derived by the tool itself
   (`--print-stem`), so the wrapper does not re-implement it in shell.
+- **ROUNDS CHAIN, AND THE CUT IS ON THE PAIRED SIGMA.** A paired CSV is itself a
+  valid `--from`: **`--sigma N` (default 5) keeps every opening within N PAIRED
+  sigma of the leader** and the trials advance one rung of the same 1-2-3-5
+  ladder, seed +1. That is the right cut for this file — its own `stderr` column
+  is the conservative unpaired error the pairing exists to replace, so a
+  `sweep_shortlist.py` cut on it would be answering the wrong question. MEASURED
+  on the first real run: 22 openings, 5-sigma keeps 10, 3-sigma keeps 5.
+- **THE PAIRED FILE WRITES THE SAME `# settings` AND `# lineage` LINES A SWEEP
+  DOES** (plus `round=`), which is what makes a round chainable; files written
+  before those lines existed are recovered from their own prose.
 - **No per-game storage**: pairwise sums and sums of squares are accumulated, so
   `-t` can be as large as wanted for any number of finalists. It compares
   FINALISTS, not fields — every opening plays every game, so `--max-openings`

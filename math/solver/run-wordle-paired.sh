@@ -28,6 +28,12 @@
 # is (openings x trials); --max-openings refuses more than 50 unless raised
 # deliberately, and --top N takes the best N of the source instead.
 #
+# CHAINING ROUNDS.  A paired CSV is itself a valid --from, and then the cut is on
+# the PAIRED SIGMA (--sigma, default 5): everything within that many paired sigma
+# of the leader survives and the trials advance one rung of the 1-2-3-5 ladder.
+# That is the right cut for this file -- its own `stderr` column is the
+# conservative unpaired error the pairing exists to replace.
+#
 # --dry-run resolves the name and the count and stops.
 
 set -u
@@ -38,6 +44,7 @@ FROM=""
 T=""
 SEED=""
 TOP=""
+SIGMA=""
 MAXOPEN=""
 FALLBACK=""
 ADAPT=""
@@ -50,6 +57,7 @@ while [ $# -gt 0 ]; do
         -t|--trials)      T="$2";        shift 2 ;;
         --seed)           SEED="$2";     shift 2 ;;
         --top)            TOP="$2";      shift 2 ;;
+        --sigma)          SIGMA="$2";    shift 2 ;;
         --max-openings)   MAXOPEN="$2";  shift 2 ;;
         --fallback)       FALLBACK="$2"; shift 2 ;;
         --pair-adaptive)  ADAPT="$2";    shift 2 ;;
@@ -70,6 +78,7 @@ FLAGS="--from-sweep $FROM"
 [ -n "$T" ]        && FLAGS="$FLAGS -t $T"
 [ -n "$SEED" ]     && FLAGS="$FLAGS --seed $SEED"
 [ -n "$TOP" ]      && FLAGS="$FLAGS --top $TOP"
+[ -n "$SIGMA" ]    && FLAGS="$FLAGS --sigma $SIGMA"
 [ -n "$MAXOPEN" ]  && FLAGS="$FLAGS --max-openings $MAXOPEN"
 [ -n "$FALLBACK" ] && FLAGS="$FLAGS --fallback $FALLBACK"
 [ -n "$ADAPT" ]    && FLAGS="$FLAGS --pair-adaptive $ADAPT"
