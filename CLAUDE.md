@@ -1386,6 +1386,45 @@ CSV row per word, flushed).
   hand-made rows in both directions. Run it alongside `solver/validate.sh` and
   `tools/checkpatterns.py`.
 
+## Wordle in One (`run-wordle-in-one.sh`) — singleton ROWS, and their RATE
+A "Wordle in One" is a feedback ROW that names its answer outright: a guess and a
+pattern that exactly ONE of the 2315 mystery answers produces, so seeing it forces
+the answer. `math/tools/wordle_in_one.py` enumerates every such (guess, answer,
+pattern) and breaks them down by tile composition. Run it with **`bash
+solver/run-wordle-in-one.sh --guesses answers|all`** (from `math/`), attached,
+tee'd log — never a bare `tools/wordle_in_one.py`, which REFUSES without the flag.
+- **Exact and deterministic** — a pure function of the committed word lists and
+  the pattern matrix. No sampling, no seed, no cap, so a re-run reproduces its
+  files byte for byte and there is no standard error to quote.
+- **THE GUESS SET IS PART OF THE QUESTION AND IS NEVER DEFAULTED IN THE SCRIPT**
+  (the greens scar — the WRAPPER carries a default a human reads, `answers`, and
+  forwards it explicitly). `answers` plays only the 2315 mystery words (the
+  user's original call: "every singleton produced by every answer word, not all
+  guesses"); `all` plays any of the 12972 legal words. **Two different quantities
+  over the same answer set — never put their numbers in one table**, and each
+  writes its own files.
+- **THE RATE IS PAIR-WEIGHTED (user's call, 2026-09-08), and the other reading is
+  a different number.** A cell's denominator is every (guess, answer) PAIR whose
+  row has that composition, so `pct` answers "I played a word and saw this many
+  greens and yellows — how often is the answer already forced?", the answer
+  uniform over the 2315. It is NOT the fraction of DISTINCT (guess, pattern) ROWS
+  of that shape that are singletons, which weights a 2-answer bucket like a
+  300-answer one. Say which one a number is.
+- **The all-green row's 100% is ARITHMETIC, not a measurement** — a guess equal to
+  the answer is a singleton that tells you nothing you did not know by typing it,
+  and its denominator is exactly the 2315 self-pairs. `games_nowin`/`pct_nowin`
+  exclude it; every other cell has `games == games_nowin`.
+- **A 0.00% cell is a RESULT** (the all-gray row, say), so cells with pairs but no
+  singletons are printed. A cell missing entirely had NO pairs: 4 greens + 1
+  yellow is impossible, which is the 238-of-243 rule.
+- **THE GATE IS BUILT IN**: per-guess singleton totals must match the committed
+  `guess_singletons_answers.csv` (answers) / `guess_singletons.csv` (all), and the
+  no-win total must match their column sum. It fails loudly rather than reporting.
+- Data under `math/data/shared/singletons/`: `wordle_in_one_games[_allguesses]
+  .csv[.gz]` (one row per game) and `wordle_in_one_breakdown[_allguesses].csv`
+  (`greens,yellows,grays,games,games_nowin,pairs,pct,pct_nowin`). The all-guesses
+  games file is gzipped (264778 rows). Log under `data/local/singletons/`.
+
 ## Nerdle (8-symbol equations) — the GUESS enumeration, pass one
 A different game living beside the wordle variants. `math/nerdle.py` states the rules
 and IS the source of truth; read it before quoting any count. Run it with
