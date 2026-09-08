@@ -1257,6 +1257,36 @@ CSV row per word, flushed).
   continuation differs (random-compatible here, optimal there), and the solver's
   totals are capped at depth 6 while these are unconstrained, so **never table them
   together**.
+- **THE BEST ORDERING IS COMPUTED EXACTLY, BEFORE ANY GAMES** —
+  `tools/order_openings.py`, the default for an adaptive run from a ranking
+  (`--best-order`; `--all-orders` sweeps every ordering instead and is how the
+  claim gets checked). Half the work on pairs, a sixth on triples, **nothing given
+  up**, and the reasoning is worth keeping: orderings of a set can differ ONLY
+  where the switch fires or where an opening word IS the answer, because the set
+  after all the words is an INTERSECTION and so is order-independent — and every
+  one of those cases has a closed form at N <= 2 (a switch at level j over m live
+  words costs `j + (m+1)/2`; an answer that is the i-th word costs i). Answers
+  that reach the follow-up with 3+ live are exactly the ones no ordering switches
+  on, so they CANCEL. **N > 2 is refused** — with three live the continuation
+  stops being a closed form and the argument would silently stop holding.
+  **N = 0 is allowed and is not a no-op**: a blind opening still wins earlier when
+  a word that is an answer goes first (PAIRS.md measures that gap as exactly 1).
+- **THE CHOOSER IS GATED IN BOTH HALVES, and the second is load-bearing**: every
+  closed-form cost must be what the simulator averages to on that answer, AND
+  every answer it calls order-independent must cost the same under both orderings
+  — which it does EXACTLY, game for game (same state, same seed, same play), not
+  merely in expectation. **Measured while building it: the spread between
+  orderings runs to 25 total guesses over the 2315** (mean 6.5 across the top 200
+  pairs), and only 12 of those 200 tied — so picking an ordering arbitrarily is
+  not a rounding error.
+- **A VALIDATION THAT LOOKS LIKE A FAILURE, recorded so it is not re-chased**: a
+  first check compared predicted order-differences against whole-strategy
+  simulation means at t=40000 and disagreed by 7-14 total guesses, sign included.
+  That was NOISE — the SE of a mean at t=40000 is ~0.0045/answer, i.e. ~10 total
+  guesses, the same size as the effect. The sharp test is PER ANSWER (tiny
+  variance), which is what the gate does. It did also surface one real bug: the
+  "is this answer one of the opening words" test compared an ANSWER index against
+  a GUESS index, two different index spaces.
 - **ORDER MATTERS UNDER IT, and `--both-orders` is REQUIRED for that reason.** A
   blind opening's partition cannot depend on play order, so `pairsplit.c`
   enumerates each pair ONCE (verified: 1,000,000 rows, zero reversed duplicates);
@@ -1287,6 +1317,23 @@ CSV row per word, flushed).
   single words, because a two-word opening leaves far fewer candidates and the
   follow-up does less work. So the whole committed 1M-pair file screens in ~12 min
   (`answer`) / ~27 min (`guess`).
+- **THE TRIAL LADDER IS 100, 200, 300, 500, 1000, 2000, 3000, 5000, … (user's
+  call, 2026-09-08).** Give `-t` on the first pass; **omit it on a
+  `--shortlist-from` pass** and the wrapper takes the next rung above the source
+  sweep's own `-t`, and the next SEED above its seed — both echoed, both in the
+  filename. Deriving the seed is not a convenience: reusing the source's seed
+  replays the very games that chose the shortlist. `-t`/`--seed` still override.
+- **`--dry-run` STOPS AFTER RESOLUTION** (which list, trials, seed, output file)
+  and before anything runs. It exists because checking the wrapper's plumbing
+  must not cost a sweep — **a partial CSV from a "quick check" is
+  indistinguishable from a real result that died.** Use it for every wrapper
+  change; a bare invocation to "see if the flags parse" starts a real run.
+- **NEVER EDIT A `run-*.sh` WHILE ONE IS EXECUTING IT.** Bash reads a script
+  incrementally, so rewriting it in place shifts the byte offsets under the live
+  process and it resumes mid-token — `syntax error near unexpected token` from a
+  file that parses fine afterwards. Bit us 2026-09-08 mid-sweep; the run's own
+  output survived (the tool had already written its CSV) but the wrapper died.
+  `pgrep -f wordle_sweep.py` before touching one.
 - **PROGRESS PRINTING TIGHTENS AS THE FIELD NARROWS (user's call, 2026-09-08)** —
   a line every 100 words on pass 1, every 10 on pass 2, **every word from pass 3
   on**. The wrapper derives the pass from the SOURCE SWEEP'S OWN NAME (each stage's

@@ -42,6 +42,14 @@ that the rest of the game matches the reference.  Handing that game to the guess
 follow-up at TURN 1 is also the only place its catch-up is tested: it must build
 its live set from a history it was not present for.
 
+THE ORDERING CHOOSER IS CHECKED IN BOTH HALVES, since it replaces work rather
+than adding it: every closed-form cost it predicts must be what the simulator
+averages to on that answer, and every answer it declares order-INDEPENDENT must
+actually cost the same under both orderings -- which it does exactly, game for
+game, not merely in expectation.  If the second half ever fails, the chooser is
+picking orderings on an incomplete accounting and every sweep built on it is
+measuring the wrong ordering.
+
 `--pair-adaptive` GETS ITS OWN CONSTRUCTED CASES, since every branch of it is
 rare in random play: a bucket of exactly 1 and of exactly 2 (the opening must be
 abandoned and the follow-up must name the answer), a big bucket (it must still be
@@ -89,6 +97,7 @@ from wordlesim import (WIN_WITHIN, answer_to_guess, draw_answer,  # noqa: E402
 from wordle_sim import summarise  # noqa: E402
 from wordle_sweep import PICK_OFFSET, sweep_word  # noqa: E402
 from sweep_shortlist import shortlist  # noqa: E402
+from order_openings import best_order, order_cost  # noqa: E402
 
 
 def ref_pattern(guess, answer):
@@ -539,6 +548,79 @@ def main(argv):
     else:
         print("order: %d of the constructed pairs score differently when reversed"
               % swapped)
+
+    # --- the exact ordering chooser ------------------------------------------
+    # tools/order_openings.py claims it can pick the best ORDERING of an opening
+    # without playing a game, because orderings differ only where the switch
+    # fires and those costs are closed form at N <= 2.  Both halves of that are
+    # checked here, and the second is the load-bearing one.
+    otail = make_tail("answer", guesses, answers, ans2g)
+    probe_pairs = [[guesses[0], guesses[len(guesses) // 2]],
+                   [guesses[3], guesses[-4]]]
+    closed, mismatched, cancels, cancel_diff = 0, 0, 0, 0.0
+    for words in probe_pairs:
+        gi = [guesses.index(w) for w in words]
+        orders = ([gi[0], gi[1]], [gi[1], gi[0]])
+        for ai in range(0, len(answers), 97):
+            preds = []
+            for order in orders:
+                rows = pat[order]
+                ppos = next((j for j in range(2) if int(ans2g[ai]) == order[j]), None)
+                preds.append(order_cost(rows, rows[:, ai], ppos, 2, 2))
+            if preds[0] is None and preds[1] is None:
+                # HALF TWO: an answer no ordering switches on must cost the same
+                # under both.  This is what lets the chooser ignore them, and it
+                # is stronger than "in expectation" -- with the same seed the
+                # follow-up faces the same state and plays the same game.
+                means = []
+                for order in orders:
+                    rule = make_opening_rule(order, tail=otail, adapt=2)
+                    r = np.random.default_rng(ai + 11)
+                    means.append(np.mean([len(play_game(pat, ans2g, ai, rule,
+                                                        otail, r)[0])
+                                          for _ in range(30)]))
+                cancels += 1
+                cancel_diff = max(cancel_diff, abs(means[0] - means[1]))
+                continue
+            # HALF ONE: a closed-form cost must be what the simulator averages to
+            for order, pred in zip(orders, preds):
+                if pred is None:
+                    continue
+                rule = make_opening_rule(order, tail=otail, adapt=2)
+                r = np.random.default_rng(ai + 3)
+                m = np.mean([len(play_game(pat, ans2g, ai, rule, otail, r)[0])
+                             for _ in range(120)])
+                closed += 1
+                if abs(m - pred) > 0.2:
+                    mismatched += 1
+                    if mismatched <= 3:
+                        failures.append("order_cost said %.2f for %s on %s, the "
+                                        "simulator averaged %.3f"
+                                        % (pred, " ".join(guesses[g] for g in order),
+                                           answers[ai], m))
+    if cancel_diff > 1e-9:
+        failures.append("an answer no ordering switches on cost %.3f more under "
+                        "one ordering; the chooser's cancellation is unsound"
+                        % cancel_diff)
+    if not closed or not cancels:
+        failures.append("the ordering check saw no %s answers"
+                        % ("closed-form" if not closed else "cancelling"))
+    print("ordering chooser: %d closed-form costs match the simulator (%d off), "
+          "and %d cancelling answers cost IDENTICALLY under both orderings "
+          "(max difference %.g)" % (closed, mismatched, cancels, cancel_diff))
+
+    # ties break alphabetically, so a rerun cannot pick a different ordering
+    same = [guesses[0], guesses[1]]
+    gi = [guesses.index(w) for w in same]
+    b, spread, totals = best_order(same, gi, pat[gi], pat[gi], 2, ans2g)
+    if abs(spread) < 1e-12 and b != min(totals):
+        failures.append("a tied ordering did not break alphabetically")
+    try:
+        order_cost(pat[gi], pat[gi][:, 0], None, 3, 2)
+        # order_cost itself does not police N; the tool does, and that is checked
+        # by the CLI refusing --pair-adaptive 3
+    except Exception:
+        pass
 
     # --- the shortlist cut ---------------------------------------------------
     # value, stderr per word; the best is 1.00 with a standard error of 0.10, so

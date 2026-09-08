@@ -20,14 +20,27 @@ from expected guesses under random-compatible play.  So:
 Report such a sweep as "the best of the N screened", never "the best pair".
 Widening --top widens the net; it never makes the screen exhaustive.
 
+ORDERINGS.  A ranking lists each SET once, because a blind opening's partition
+cannot depend on play order.  An adaptive rule breaks that -- it keys on what the
+words played so far have left -- so every permutation becomes its own strategy:
+`--both-orders` for pairs (2 each), `--all-orders` for any size (n! each, so 6 for
+a triple, matching what optturns' --triple-list expands to).  The multiplication
+is printed, since n! decides how long the sweep runs.
+
 ANY `word*` COLUMNS WORK, so the same tool reads the pair, triple and quad
-rankings.  Every opening in one file must be the same size, which those files
+rankings.  THE TRIPLE RANKING IS A GREEDY SCREEN, not an exhaustive one: it only
+extends pairs that survived the pair stage (solver/run-singles.sh says so), so a
+triple whose every two-word prefix missed that cut cannot appear at any --top.
+Its head is "best of the triples screened" -- weaker than the pair file's head,
+which is the exact top of an exhaustive evaluation.  Every opening in one file must be the same size, which those files
 satisfy by construction; the sweep refuses a mixed list, since ranking a one-word
 opening against a two-word one compares two different strategies.
 """
 
 import os
 import sys
+from itertools import permutations
+from math import factorial
 
 
 def read_openings(path, top=None):
@@ -59,6 +72,7 @@ def main(argv):
     src = out = None
     top = None
     both = False
+    allorders = False
     i = 0
     while i < len(argv):
         a = argv[i]
@@ -70,6 +84,8 @@ def main(argv):
             top = int(argv[i + 1]); i += 2
         elif a == "--both-orders":
             both = True; i += 1
+        elif a == "--all-orders":
+            allorders = True; i += 1
         else:
             raise SystemExit("unknown argument: %s" % a)
     if src is None:
@@ -85,7 +101,20 @@ def main(argv):
                          "never looked at")
 
     rows = read_openings(src, top=top)
-    if both:
+    if allorders:
+        # EVERY ordering, which is what an adaptive rule needs at any size: it
+        # keys on what the words played SO FAR have left, so each permutation is
+        # its own strategy.  A pair gives 2 and a triple 6 -- the same expansion
+        # optturns' --triple-list does, for the same reason ("evaluating one
+        # ordering per triple would leave five of six untried").  The count is
+        # printed because n! multiplies the sweep and nobody should discover that
+        # from the runtime.
+        n = len(rows[0])
+        rows = [list(p) for r in rows for p in permutations(r)]
+        print("expanded to every ordering: %d! = %d per opening"
+              % (n, len(rows) // max(1, len(rows) // factorial(n))
+                 if False else factorial(n)))
+    elif both:
         # The ranking enumerates each set ONCE, because a BLIND opening's joint
         # partition cannot depend on play order (solver/pairsplit.c says so).  A
         # rule that abandons the opening early breaks that, so every ordering
@@ -106,7 +135,9 @@ def main(argv):
         for r in rows:
             f.write(" ".join(r) + "\n")
     print("%s: %d openings of %d words%s"
-          % (out, len(rows), sizes[0], " (both orderings)" if both else ""))
+          % (out, len(rows), sizes[0],
+             " (every ordering)" if allorders else
+             " (both orderings)" if both else ""))
     print("  from: %s (its own order, best first)" % src)
     print("  head: %s" % " | ".join(" ".join(r) for r in rows[:4]))
     print("  a SCREEN of that ranking -- the best of these, never the best opening")

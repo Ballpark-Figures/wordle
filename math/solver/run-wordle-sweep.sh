@@ -64,6 +64,14 @@
 #   why it stops being interesting at 3 (three named in order cost 6, and so does
 #   a perfect three-way split).
 #
+#   ORDER MATTERS UNDER IT, and the default answer is to work out the BEST
+#   ordering of each set exactly before any games are played
+#   (tools/order_openings.py) and sweep only that one -- half the work on pairs, a
+#   sixth on triples, and nothing given up, because the orderings of a set differ
+#   only where the switch fires and every one of those cases has a closed-form
+#   cost at N <= 2.  --all-orders sweeps them all instead, which is how that claim
+#   is checked.  The old note follows, and still says why doing neither is wrong:
+#
 #   ORDER MATTERS UNDER IT, which is the whole reason --both-orders exists.  A
 #   blind opening's partition cannot depend on play order, so the pair rankings
 #   enumerate each pair ONCE; this rule keys on what the FIRST word alone leaves,
@@ -76,6 +84,16 @@
 #   legal words under --fallback guess.  That is the one place this differs from
 #   the exact solver, which only ever counts answers -- a player drawing from the
 #   12972 cannot know that two ANSWERS remain.
+#
+# THE TRIAL LADDER: 100, 200, 300, 500, 1000, 2000, 3000, 5000, ... (user's call,
+# 2026-09-08).  Give -t on the first pass; on a --shortlist-from pass, OMIT it and
+# the wrapper takes the next rung above the source sweep's own -t, and the next
+# SEED above its seed.  Both are echoed and both are in the filename, so a derived
+# run says exactly what it did.  Deriving them is not a convenience: passing the
+# source's seed again would replay the very games that chose the shortlist, and
+# the 1-2-3-5 ladder narrows the field in smaller steps than a straight x10, which
+# is what a screen that keeps 95% of its field at t=100 actually needs.  Pass -t
+# or --seed explicitly to override either.
 #
 # THE HEAD OF A SWEEP IS A SHORTLIST, NOT A WINNER.  With 12972 words at -t games
 # each, the best-looking mean belongs to whichever word drew the kindest sample,
@@ -125,6 +143,7 @@ set -u
 MATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 T=""
+SEEDGIVEN=0
 FALLBACK=""
 SEED=0
 WORDS="guess"
@@ -139,7 +158,10 @@ SHORTVALUE="mean"
 OPENFROM=""
 OPENTOP=""
 BOTHORDERS=0
+ALLORDERS=0
+BESTORDER=-1        # -1 = decide from --pair-adaptive; 0/1 = the user said so
 ADAPT=0
+DRYRUN=0
 # Which pass this is; a run with no --shortlist-from is the first.
 STAGE=1
 
@@ -147,7 +169,7 @@ while [ $# -gt 0 ]; do
     case "$1" in
         -t|--trials)        T="$2";          shift 2 ;;
         --fallback)         FALLBACK="$2";   shift 2 ;;
-        --seed)             SEED="$2";       shift 2 ;;
+        --seed)             SEED="$2"; SEEDGIVEN=1; shift 2 ;;
         --words)            WORDS="$2";      shift 2 ;;
         --limit)            LIMIT="$2";      shift 2 ;;
         --win-within)       WIN="$2";        shift 2 ;;
@@ -159,14 +181,32 @@ while [ $# -gt 0 ]; do
         --openings-from)    OPENFROM="$2";   shift 2 ;;
         --top)              OPENTOP="$2";    shift 2 ;;
         --both-orders)      BOTHORDERS=1;    shift 1 ;;
+        --all-orders)       ALLORDERS=1;     shift 1 ;;
+        --best-order)       BESTORDER=1;     shift 1 ;;
+        --no-best-order)    BESTORDER=0;     shift 1 ;;
         --pair-adaptive)    ADAPT="$2";      shift 2 ;;
+        --dry-run)          DRYRUN=1;        shift 1 ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
     esac
 done
 
 case "$T" in
-    ''|*[!0-9]*|0) echo "-t must be a positive number (games per word)" >&2; exit 1 ;;
+    '') ;;      # may be derived from --shortlist-from below
+    *[!0-9]*|0) echo "-t must be a positive number (games per word)" >&2; exit 1 ;;
 esac
+
+# The next rung of the 1-2-3-5 ladder strictly above $1.
+next_t() {
+    d=100
+    while [ "$d" -le 100000000 ]; do
+        for m in 1 2 3 5; do
+            v=$((m * d))
+            if [ "$v" -gt "$1" ]; then echo "$v"; return; fi
+        done
+        d=$((d * 10))
+    done
+    echo $(($1 * 10))
+}
 case "$FALLBACK" in
     answer|guess) ;;
     '') echo "--fallback is required: 'answer' or 'guess', which random word the" >&2
@@ -187,6 +227,13 @@ case "$SHORTVALUE" in
 esac
 
 cd "$MATH" || exit 1
+
+# -t is required on a FIRST pass; a later pass derives it from its source.
+if [ -z "$T" ] && [ -z "$SHORTFROM" ]; then
+    echo "-t is required on a first pass (games per opening); a --shortlist-from" >&2
+    echo "  pass may omit it and take the next rung of the 1-2-3-5 ladder." >&2
+    exit 1
+fi
 
 PY=../.venv/bin/python
 [ -x "$PY" ] || { echo "no venv python at $PY" >&2; exit 1; }
@@ -217,24 +264,45 @@ if [ -n "$OPENFROM" ]; then
                        echo "  looked at, so the number is part of the result." >&2
                        exit 1 ;;
     esac
-    # An adaptive rule keys on what the FIRST word alone leaves, so the two
-    # orderings of a pair are different strategies.  The rankings list each pair
-    # once (correctly, for a blind opening), so sweeping them as-is would examine
-    # one ordering and never say which.  Refuse rather than do that quietly.
-    if [ "$ADAPT" != 0 ] && [ "$BOTHORDERS" = 0 ]; then
-        echo "REFUSING: --pair-adaptive makes the ORDER part of the strategy, but" >&2
-        echo "  $OPENFROM lists each pair once." >&2
-        echo "  Add --both-orders to sweep both, or drop --pair-adaptive." >&2
-        exit 1
-    fi
+    # ORDER.  A ranking lists each SET once, correctly for a blind opening.  Under
+    # an adaptive rule each ordering is its own strategy, and there are three
+    # honest things to do about it, all of them explicit:
+    #
+    #   --best-order  (the default when adaptive)  work out the best ordering of
+    #                 each set EXACTLY, before any games, and sweep only that one.
+    #                 tools/order_openings.py explains why that is exact rather
+    #                 than a screen; it costs a pair sweep half and a triple sweep
+    #                 five sixths of its work, with nothing given up.
+    #   --all-orders  sweep every ordering (2 for a pair, 6 for a triple).  The
+    #                 slow way, and the way to CHECK the fast one.
+    #   --both-orders the pair-only spelling of --all-orders, kept because the
+    #                 committed pair runs were named with it.
+    #
+    # Sweeping one arbitrary ordering is the option NOT offered: it would examine
+    # half the strategies and say nothing about which half.
     OPENFLAGS="--from $OPENFROM --top $OPENTOP"
     LISTNAME="openings_$(basename "$OPENFROM" .csv)_top${OPENTOP}"
-    if [ "$BOTHORDERS" = 1 ]; then
-        OPENFLAGS="$OPENFLAGS --both-orders"
-        LISTNAME="${LISTNAME}_bothorders"
+    if [ "$BOTHORDERS" = 1 ] || [ "$ALLORDERS" = 1 ]; then
+        BESTORDER=0
+        if [ "$ALLORDERS" = 1 ]; then
+            OPENFLAGS="$OPENFLAGS --all-orders"; LISTNAME="${LISTNAME}_allorders"
+        else
+            OPENFLAGS="$OPENFLAGS --both-orders"; LISTNAME="${LISTNAME}_bothorders"
+        fi
+    elif [ "$BESTORDER" = -1 ]; then
+        # not asked for either way: order only earns the work when it can matter
+        if [ "$ADAPT" != 0 ]; then BESTORDER=1; else BESTORDER=0; fi
     fi
     WORDS="$OUTDIR/$LISTNAME.txt"
     "$PY" tools/opening_list.py $OPENFLAGS --out "$WORDS" || exit 1
+    if [ "$BESTORDER" = 1 ]; then
+        # The best ordering depends on the follow-up (which pool the switch counts)
+        # and on N, so both are in the name: these are different questions.
+        ORDERED="$OUTDIR/${LISTNAME}_bestorder_${FALLBACK}_adapt${ADAPT}.txt"
+        "$PY" tools/order_openings.py --from "$WORDS" --fallback "$FALLBACK" \
+            --pair-adaptive "$ADAPT" --out "$ORDERED" || exit 1
+        WORDS="$ORDERED"
+    fi
 fi
 
 if [ -n "$SHORTFROM" ]; then
@@ -271,6 +339,17 @@ if [ -n "$SHORTFROM" ]; then
     # A later stage at the earlier seed replays the games that chose the
     # shortlist.  Loud, not fatal: it is a judgement about what the run means.
     SRCSEED=$(echo "$SRCSTEM" | sed -n 's/.*_s\([0-9][0-9]*\)_.*/\1/p')
+    SRCT=$(echo "$SRCSTEM" | sed -n 's/.*_t\([0-9][0-9]*\)_.*/\1/p')
+    # Derive the next pass's trials and seed from the source, unless given.
+    if [ -z "$T" ]; then
+        [ -n "$SRCT" ] || { echo "cannot read -t from $SRCSTEM; pass -t" >&2; exit 1; }
+        T=$(next_t "$SRCT")
+        echo "trials: $SRCT in $SRCSTEM, so this pass runs -t $T (the 1-2-3-5 ladder)"
+    fi
+    if [ "$SEEDGIVEN" = 0 ] && [ -n "$SRCSEED" ]; then
+        SEED=$((SRCSEED + 1))
+        echo "seed: $SRCSEED in the source, so this pass uses --seed $SEED"
+    fi
     if [ "$SRCSEED" = "$SEED" ]; then
         echo "WARNING: this stage is using seed $SEED, the same seed as $SRCSTEM." >&2
         echo "  The draw stream is seeded per word, so its first $T games REPLAY" >&2
@@ -301,6 +380,19 @@ STEM="sweep_${FALLBACK}_t${T}_s${SEED}_$(basename "$WORDS" .txt)"
 [ -n "$LIMIT" ] && STEM="${STEM}_lim${LIMIT}"
 [ "$WIN" = 6 ] || STEM="${STEM}_w${WIN}"
 OUT="$OUTDIR/$STEM.csv"
+
+# --dry-run stops HERE: everything above is resolution (which list, which trials,
+# which seed, which file), and everything below starts a run.  It exists because
+# checking that the wrapper's own plumbing works must not cost anybody a sweep --
+# a partial CSV from a "quick check" is indistinguishable from a real result that
+# died, and the user runs the computations here.
+if [ "$DRYRUN" = 1 ]; then
+    echo "dry run: would write $OUT"
+    echo "  words   $WORDS"
+    echo "  trials  $T   seed $SEED   follow-up $FALLBACK   pair-adaptive $ADAPT"
+    echo "  progress every $PROGRESS opening(s)"
+    exit 0
+fi
 
 # Shared refuse-if-something-else-writes-this-file guard.  Its second check is
 # by process NAME, which is "python" here, so only the output-file half applies.
