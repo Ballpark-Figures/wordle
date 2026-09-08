@@ -53,6 +53,7 @@ openings came from is still a screen.
 
 import os
 import sys
+import time
 from itertools import permutations
 
 import numpy as np
@@ -102,8 +103,13 @@ def order_cost(order_rows, order_keys, answer_pos, adapt, k):
     return None                               # order-independent: cancels
 
 
-def best_order(words, gi, pat_rows, pool_rows, adapt, ans2g):
+def best_order_reference(words, gi, pat_rows, pool_rows, adapt, ans2g):
     """The best ordering of one opening, and the spread between orderings.
+
+    THE SLOW, OBVIOUS IMPLEMENTATION, kept as the oracle for the fast one below.
+    It walks the answers one at a time in Python, which is exactly why it cannot
+    be the one a 10000-opening sweep calls -- but it is the readable statement of
+    the rule, and `checkwordlesim.py` diffs the two.
 
     `pat_rows`  (k, n_answers)  each word's reply against every ANSWER
     `pool_rows` (k, n_pool)     each word's reply against every POOL word
@@ -135,11 +141,76 @@ def best_order(words, gi, pat_rows, pool_rows, adapt, ans2g):
     return best, spread, totals
 
 
+def order_costs(rows_pool, rows_ans, order_gi, ans2g, adapt):
+    """Per-answer exact cost under ONE ordering, vectorised over the answers.
+
+    Returns (cost, known).  `known` is False exactly where the cost is the same
+    under every ordering -- the answer reached the follow-up with more than
+    `adapt` words live and no opening word was it -- so those entries cancel and
+    are left out of the comparison.
+
+    The live set after the first j words is "the pool words whose replies to all
+    of them match the answer's", so it is a GROUP COUNT over a key built one word
+    at a time -- one pass over the pool per level, not a loop over answers.  The
+    key is compressed with np.unique rather than encoded as base-243 digits: at
+    three words that encoding spans 14.3 million values, and allocating a counter
+    that size per ordering is slower than sorting the pool.
+    """
+    k, na = rows_ans.shape
+    cost = np.zeros(na, dtype=np.float64)
+    known = np.zeros(na, dtype=bool)
+    key_pool = np.zeros(rows_pool.shape[1], dtype=np.int64)
+    key_ans = np.zeros(na, dtype=np.int64)
+    sizes = None
+    for j in range(k):
+        key_pool = key_pool * 243 + rows_pool[j]
+        key_ans = key_ans * 243 + rows_ans[j]
+        uniq, inv = np.unique(key_pool, return_inverse=True)
+        counts = np.bincount(inv, minlength=len(uniq))
+        # every answer is in the pool, so its key is present and searchsorted is exact
+        sizes = counts[np.searchsorted(uniq, key_ans)]
+        is_word = (~known) & (ans2g == order_gi[j])
+        cost[is_word] = j + 1                      # this word IS the answer
+        known |= is_word
+        if adapt and j + 1 < k:
+            fire = (~known) & (sizes <= adapt)
+            cost[fire] = (j + 1) + np.where(sizes[fire] == 1, 1.0, 1.5)
+            known |= fire                          # abandon the rest, name one
+    if adapt:
+        fin = (~known) & (sizes <= adapt)
+        cost[fin] = k + np.where(sizes[fin] == 1, 1.0, 1.5)
+        known |= fin                               # the follow-up names one
+    return cost, known
+
+
+def best_order(words, gi, pat_rows, pool_rows, adapt, ans2g):
+    """The best ordering of one opening, and the spread between orderings.
+
+    The vectorised path, and what every sweep calls.  `best_order_reference`
+    above states the same rule answer by answer and is diffed against this one by
+    tools/checkwordlesim.py -- a fast path that nothing contradicts is how a
+    silent wrong answer ships.
+    """
+    k = len(words)
+    best, best_total, totals = None, None, {}
+    for perm in permutations(range(k)):
+        order_gi = [gi[i] for i in perm]
+        cost, known = order_costs(pool_rows[list(perm)], pat_rows[list(perm)],
+                                  np.asarray(order_gi), ans2g, adapt)
+        total = float(cost[known].sum())
+        name = " ".join(words[i] for i in perm)
+        totals[name] = total
+        if best_total is None or total < best_total - 1e-12 or (
+                abs(total - best_total) <= 1e-12 and name < best):
+            best, best_total = name, total
+    return best, max(totals.values()) - min(totals.values()), totals
+
+
 def main(argv):
     src = out = None
     fallback = None
     adapt = 2
-    report = 0
+    report = 500
     i = 0
     while i < len(argv):
         a = argv[i]
@@ -187,16 +258,23 @@ def main(argv):
                          % " and ".join(map(str, sorted(sizes))))
 
     pos = {w: i for i, w in enumerate(guesses)}
+    ans2g_arr = np.asarray(ans2g)
     lines, spreads, ties = [], [], 0
+    print("ordering %d openings exactly (follow-up %s, pair-adaptive %d)"
+          % (len(sets), fallback, adapt), flush=True)
+    t0 = time.time()
     for n, words in enumerate(sets):
         gi = [pos[w] for w in words]
         best, spread, totals = best_order(
-            words, gi, pat[gi], pool[gi], adapt, ans2g)
+            words, gi, pat[gi], pool[gi], adapt, ans2g_arr)
         lines.append(best)
         spreads.append(spread)
         ties += spread == 0
         if report and (n + 1) % report == 0:
-            print("  %d/%d  %-20s spread %.1f guesses" % (n + 1, len(sets), best, spread))
+            el = time.time() - t0
+            print("  %d/%d  %-20s spread %5.1f   %.0f/s  eta %.1f min"
+                  % (n + 1, len(sets), best, spread, (n + 1) / el,
+                     (len(sets) - n - 1) / ((n + 1) / el) / 60), flush=True)
 
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
     with open(out, "w") as f:

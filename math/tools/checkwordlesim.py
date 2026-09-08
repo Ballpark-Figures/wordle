@@ -97,7 +97,8 @@ from wordlesim import (WIN_WITHIN, answer_to_guess, draw_answer,  # noqa: E402
 from wordle_sim import summarise  # noqa: E402
 from wordle_sweep import PICK_OFFSET, sweep_word  # noqa: E402
 from sweep_shortlist import shortlist  # noqa: E402
-from order_openings import best_order, order_cost  # noqa: E402
+from order_openings import (best_order, best_order_reference,  # noqa: E402
+                             order_cost)
 
 
 def ref_pattern(guess, answer):
@@ -608,6 +609,27 @@ def main(argv):
     print("ordering chooser: %d closed-form costs match the simulator (%d off), "
           "and %d cancelling answers cost IDENTICALLY under both orderings "
           "(max difference %.g)" % (closed, mismatched, cancels, cancel_diff))
+
+    # THE FAST PATH AGAINST THE SLOW ONE.  best_order() groups the pool with one
+    # unique/bincount per level; best_order_reference() walks the answers in
+    # Python.  They must agree exactly -- a 47x speedup that nothing contradicts
+    # is how a silently wrong ordering ships, and every sweep is built on this.
+    disagreed = 0
+    for i in range(0, 40):
+        words = [guesses[i * 37 % len(guesses)], guesses[(i * 91 + 5) % len(guesses)]]
+        if words[0] == words[1]:
+            continue
+        gi = [guesses.index(w) for w in words]
+        fast = best_order(words, gi, pat[gi], pat[gi], 2, np.asarray(ans2g))
+        slow = best_order_reference(words, gi, pat[gi], pat[gi], 2, ans2g)
+        if fast[0] != slow[0] or abs(fast[1] - slow[1]) > 1e-9 or any(
+                abs(fast[2][k] - slow[2][k]) > 1e-9 for k in fast[2]):
+            disagreed += 1
+            if disagreed <= 3:
+                failures.append("fast/slow ordering disagree on %s: %s vs %s"
+                                % (" ".join(words), fast[2], slow[2]))
+    print("ordering fast path: 40 pairs agree with the scalar reference "
+          "(%d disagreements)" % disagreed)
 
     # ties break alphabetically, so a rerun cannot pick a different ordering
     same = [guesses[0], guesses[1]]

@@ -1271,6 +1271,19 @@ CSV row per word, flushed).
   stops being a closed form and the argument would silently stop holding.
   **N = 0 is allowed and is not a no-op**: a blind opening still wins earlier when
   a word that is an answer goes first (PAIRS.md measures that gap as exactly 1).
+- **IT IS VECTORISED, AND THE SCALAR VERSION SURVIVES AS THE ORACLE.** The live
+  set after the first j words is a GROUP COUNT over a key built one word at a
+  time, so it is one `unique`/`bincount` pass over the pool per level, not a loop
+  over the 2315 answers — **47x**, and `best_order_reference` states the same rule
+  answer by answer for `checkwordlesim.py` to diff against. (The key is compressed
+  with `np.unique` rather than encoded base-243: at three words that encoding
+  spans 14.3M values and allocating a counter that size per ordering costs more
+  than sorting the pool.) **Bit us first: the scalar version ran ~0.017s per pair,
+  which is 3 minutes for 10000 pairs and much worse on the guess pool — and the
+  wrapper passed no `--report`, so a first pass sat silent with no output at all.**
+  It now prints a header immediately and a progress line every 500 openings.
+  MEASURED after: ~700 openings/s on the guess pool, so a 10000-pair first pass
+  orders in seconds.
 - **THE CHOOSER IS GATED IN BOTH HALVES, and the second is load-bearing**: every
   closed-form cost must be what the simulator averages to on that answer, AND
   every answer it calls order-independent must cost the same under both orderings
