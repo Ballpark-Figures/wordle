@@ -1120,6 +1120,55 @@ numbers carry a standard error and are not comparable with any `optturns`-family
   guess and FAILS if either never happened, so a pass cannot silently mean rule 4 went
   untested. Run it alongside `solver/validate.sh` and `tools/checkpatterns.py`.
 
+## `wordlesim` — single-board strategy SIMULATION (the strategy sandbox)
+Ordinary one-board Wordle, one named STRATEGY, measured by Monte Carlo. Like
+multiwordle and foximax this MEASURES a heuristic — nothing searches — so its
+numbers carry a standard error and are NOT comparable with any `optturns`-family
+optimum. `math/wordlesim.py` states the game and the strategy protocol and IS the
+source of truth. Run it with **`bash solver/run-wordle-sim.sh --strategy NAME -t T
+[--seed S]`** (from `math/`), attached, same tee'd-log rules as the sweeps.
+- **TWO NUMBERS, and only one of them involves six.** The MEAN is expected guesses
+  **OUTRIGHT** — play is NEVER truncated, a game that misses at six keeps going
+  until the word is found — so it sits with multiwordle / foximax / the adversarial
+  hill-climb and NOT with the "optimum subject to a 6-guess guarantee" every
+  optturns/hardturns/ansall total reports. Never table the two together. Six enters
+  ONLY as the reporting threshold the **WIN RATE** is read off (the fraction of
+  those untruncated scores at or under it); `--win-within` moves it and lands in its
+  own file, since it is a different reported quantity.
+- **NO CAP IS NEEDED FOR TERMINATION** — a tail guess is always a live candidate,
+  so an all-green ends the game and any other reply eliminates the word just played.
+  `_MAX_TURNS` is a runaway ASSERTION derived from that, not a modelling cap.
+- **THE STRATEGY PROTOCOL IS THE POINT, because almost every strategy here is
+  "something specific for a while, then guess a random compatible answer".** A
+  strategy is a callable `strategy(turn, alive, played, replies, rng) -> guess
+  index or None`, and **returning `None` means "my part is over — fall through to
+  the shared random-compatible tail"**. So a new strategy writes only its own part.
+  Register it in `wordlesim.STRATEGIES` (name -> factory taking the lists + its own
+  `--strategy-arg`s); `--strategy list` prints the registry.
+- **THE TAIL, exactly: guess a word drawn UNIFORMLY AT RANDOM from the answers
+  still consistent with every reply so far.** Candidates are the 2315 mystery
+  words; a guess may be any of the 12972 (so a strategy's own part can play a
+  non-candidate probe). A board is solved only when the answer is actually PLAYED.
+- **`random` is the baseline and defers on EVERY turn** — it is the tail and
+  nothing else. On turn one every answer is alive, so its opening word is itself a
+  uniform draw: **no opener is an input and no word is hardcoded anywhere.**
+- **THE STRATEGY IS AN INPUT AND IS NEVER DEFAULTED** (the greens scar) — the
+  simulator and the wrapper both refuse without `--strategy`, and it names the
+  output file. Each (strategy, t, seed) is a different sample with its own file,
+  `data/shared/wordlesim/<strategy>_t<T>_s<SEED>.csv`, one row per game (answer +
+  full guess sequence + the win flag) with the summary as trailing `#` lines; log
+  under `data/local/wordlesim/`. Rows flush per game, so a Ctrl-C keeps the games
+  played. Re-running the same three reproduces the file exactly.
+- **`python3 tools/checkwordlesim.py` is the GATE**: it replays the same seeds
+  through an independent implementation that keeps candidates as LISTS OF WORDS and
+  recomputes every reply from the STRINGS by the **multiset rule** (a different
+  algorithm from `wordle.pattern`'s consuming left-to-right scan, so a
+  repeated-letter mistake cannot be shared), demanding identical guess sequences;
+  it also checks, from the strings, that every tail guess really was compatible
+  with every earlier reply, exercises the prefix-then-`None` path with a synthetic
+  opener, and tallies coverage — FAILING if no game ran past six or none came in
+  under it. Run it alongside `solver/validate.sh` and `tools/checkpatterns.py`.
+
 ## Nerdle (8-symbol equations) — the GUESS enumeration, pass one
 A different game living beside the wordle variants. `math/nerdle.py` states the rules
 and IS the source of truth; read it before quoting any count. Run it with
