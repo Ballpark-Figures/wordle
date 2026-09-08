@@ -631,6 +631,49 @@ def main(argv):
     print("ordering fast path: 40 pairs agree with the scalar reference "
           "(%d disagreements)" % disagreed)
 
+    # TRIPLES: the second-level switch, and the chooser over 6 orderings.  Both
+    # are new surface a pair sweep never touches -- the rule must abandon the
+    # THIRD word when the first two have left 2 or fewer, and the chooser must
+    # rank six orderings, not two.
+    tri = [guesses[0], guesses[len(guesses) // 2], guesses[-1]]
+    tgi = [guesses.index(w) for w in tri]
+    fast = best_order(tri, tgi, pat[tgi], pat[tgi], 2, np.asarray(ans2g))
+    slow = best_order_reference(tri, tgi, pat[tgi], pat[tgi], 2, ans2g)
+    if fast[0] != slow[0] or abs(fast[1] - slow[1]) > 1e-9:
+        failures.append("fast/slow ordering disagree on the triple %s: %s vs %s"
+                        % (" ".join(tri), fast[2], slow[2]))
+    if len(fast[2]) != 6:
+        failures.append("a triple produced %d orderings, not 6" % len(fast[2]))
+    # constructed: after two words 2 or fewer live, but more than 2 after one
+    r1 = pat[tgi[0]]
+    c1 = np.bincount(r1, minlength=int(r1.max()) + 1)
+    second_level = None
+    for ai in range(len(answers)):
+        if c1[r1[ai]] <= 2:
+            continue                       # the FIRST level would fire instead
+        both = (r1 == r1[ai]) & (pat[tgi[1]] == pat[tgi[1]][ai])
+        if int(both.sum()) <= 2:
+            second_level = ai
+            break
+    if second_level is None:
+        failures.append("no answer survives word 1 but not word 2, so the "
+                        "second-level switch could not be constructed")
+    else:
+        played, _ = play_game(pat, ans2g, second_level,
+                              make_opening_rule(tgi, tail=otail, adapt=2),
+                              otail, np.random.default_rng(9))
+        words = [guesses[g] for g in played]
+        if tri[2] in words:
+            failures.append("the third word was played over a 2-candidate field: %s"
+                            % " ".join(words))
+        elif words[:2] != tri[:2]:
+            failures.append("the first two words were not played: %s" % " ".join(words))
+        else:
+            print("triples: 6 orderings ranked and matching the reference; with "
+                  "%s the field survives %s and not %s, so the THIRD word is "
+                  "abandoned (%s)" % (answers[second_level], tri[0], tri[1],
+                                      " ".join(words)))
+
     # ties break alphabetically, so a rerun cannot pick a different ordering
     same = [guesses[0], guesses[1]]
     gi = [guesses.index(w) for w in same]

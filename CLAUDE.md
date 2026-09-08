@@ -1317,6 +1317,19 @@ CSV row per word, flushed).
   them that knowledge for the stopping rule while denying it for the guess would
   be two different players inside one strategy. The gate exhibits a position
   holding 1 answer but 3 legal words, where the two follow-ups genuinely differ.
+- **TRIPLES: the switch applies at BOTH levels, exactly as the solver does it**
+  (`optturns` drops g2-and-g3 after g1, then g3 after g2), and `AdaptiveOpening`
+  gets this for free by testing before every word after the first. The gate
+  constructs the second-level case — an answer that survives word 1 but not
+  word 2, so the THIRD word must be abandoned — since random play reaches it
+  rarely.
+- **ORDER MATTERS FAR MORE FOR TRIPLES: MEASURED spreads of 313 total guesses
+  between the best and worst ordering** (answer pool) and a mean of 158 over 40
+  triples on the guess pool, against 6.5 for pairs — two levels of switching, six
+  orderings, and **0 of 40 triples tied**. So the chooser is not an optimisation
+  here, it is most of the answer. Diffed against the scalar oracle on 60 triples
+  (6 orderings each): 0 disagreements. MEASURED cost: ~15 sets/s on the answer
+  pool, so a 5000-triple first pass orders in about 6 minutes.
 - **A PAIR RUN IS A SCREEN OF A RANKING BUILT FOR A DIFFERENT QUESTION.** 84,129,906
   pairs cannot be simulated, so it examines the head of
   `data/shared/singletons/pair_singletons.csv` — which ranks pairs by how many
