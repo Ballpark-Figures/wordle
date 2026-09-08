@@ -160,6 +160,7 @@ SHORTTOP=""
 SHORTVALUE="mean"
 OPENFROM=""
 OPENTOP=""
+RANK=""
 BOTHORDERS=0
 ALLORDERS=0
 BESTORDER=-1        # -1 = decide from --pair-adaptive; 0/1 = the user said so
@@ -190,6 +191,7 @@ while [ $# -gt 0 ]; do
         --best-order)       BESTORDER=1;     shift 1 ;;
         --no-best-order)    BESTORDER=0;     shift 1 ;;
         --pair-adaptive)    ADAPT="$2";      shift 2 ;;
+        --rank)             RANK="$2";       shift 2 ;;
         --dry-run)          DRYRUN=1;        shift 1 ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
     esac
@@ -225,6 +227,15 @@ esac
 case "$ADAPT" in
     ''|*[!0-9]*) echo "--pair-adaptive must be a non-negative number of words" >&2
                  exit 1 ;;
+esac
+# ONE FLAG, ONE MEANING.  Ranking by win rate and CUTTING by win rate are the
+# same decision -- a cascade that cut on one and reported the other would be
+# neither -- so --rank sets both, and it is in the stem because a win-rate
+# cascade and a mean cascade off the same root are two different experiments.
+case "$RANK" in
+    ''|mean) RANK=mean ;;
+    win_rate) SHORTVALUE=win_rate ;;
+    *) echo "--rank must be 'mean' or 'win_rate'" >&2; exit 1 ;;
 esac
 case "$SHORTVALUE" in
     mean|win_rate) ;;
@@ -330,6 +341,13 @@ if [ -n "$SHORTFROM" ]; then
         exit 1
     fi
     # Prefer the source's own lineage header; fall back to unpicking its stem.
+    SRCRANK=$(sed -n 's/^# settings .*rank=\([a-z_]*\).*/\1/p' "$SHORTFROM" | head -1)
+    if [ -n "$SRCRANK" ] && [ "$RANK" = mean ]; then
+        # the cascade's ranking is a property of the CASCADE, not of one command
+        RANK="$SRCRANK"
+        [ "$RANK" = mean ] || { SHORTVALUE=win_rate
+            echo "ranking: inherited $RANK from the source"; }
+    fi
     ROOT=$(sed -n 's/^# lineage root=\([^ ]*\) .*/\1/p' "$SHORTFROM" | head -1)
     SRCPASS=$(sed -n 's/^# lineage .*pass=\([0-9][0-9]*\) .*/\1/p' "$SHORTFROM" | head -1)
     if [ -z "$ROOT" ]; then
@@ -437,6 +455,7 @@ STEM="sweep_${FALLBACK}_${ROOT}_p${PASSNO}_t${T}_s${SEED}"
 # N is part of the objective, so it is in the name; 0 keeps the blind stem every
 # earlier sweep already used.
 [ "$ADAPT" = 0 ] || STEM="${STEM}_adapt${ADAPT}"
+[ "$RANK" = mean ] || STEM="${STEM}_win"
 [ -n "$LIMIT" ] && STEM="${STEM}_lim${LIMIT}"
 [ "$WIN" = 6 ] || STEM="${STEM}_w${WIN}"
 OUT="$OUTDIR/$STEM.csv"
@@ -462,7 +481,7 @@ if [ "$DRYRUN" = 1 ]; then
     echo "dry run: would write $OUT"
     echo "  words   $WORDS"
     echo "  lineage root $ROOT, pass $PASSNO"
-    echo "  trials  $T   seed $SEED   follow-up $FALLBACK   pair-adaptive $ADAPT"
+    echo "  trials  $T   seed $SEED   follow-up $FALLBACK   pair-adaptive $ADAPT   rank $RANK"
     echo "  progress every $PROGRESS opening(s)"
     exit 0
 fi
@@ -476,6 +495,7 @@ FLAGS="-t $T --fallback $FALLBACK --seed $SEED --words $WORDS --win-within $WIN 
 FLAGS="$FLAGS --root $ROOT --pass $PASSNO"
 [ -n "$SHORTFROM" ] && FLAGS="$FLAGS --source $(basename "$SHORTFROM")"
 [ "$ADAPT" = 0 ] || FLAGS="$FLAGS --pair-adaptive $ADAPT"
+[ "$RANK" = mean ] || FLAGS="$FLAGS --rank $RANK"
 [ -n "$LIMIT" ] && FLAGS="$FLAGS --limit $LIMIT"
 FLAGS="$FLAGS --progress $PROGRESS"
 

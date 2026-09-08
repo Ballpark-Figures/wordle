@@ -1210,6 +1210,27 @@ CSV row per word, flushed).
   cheap, cut generously, re-run the survivors larger at a **FRESH `--seed`** (the
   wrapper WARNS on a repeat — the same seed replays the games that chose the
   shortlist), repeat. `--shortlist-from SWEEP.csv` does a stage in one command.
+- **WIN RATE IS A PARALLEL RANKING, not a variant (user's call, 2026-09-08):
+  `--rank win_rate` on the sweep and on `run-wordle-paired.sh`.** Everything the
+  mean ranking drives, the win rate drives in the same shape — the printed leader,
+  the shortlist cut, the paired comparison — and a cascade INHERITS its ranking
+  from its source, so it stays one all the way down. **It lands in the stem as
+  `_win`**, because a win-rate cascade and a mean cascade off the same root at the
+  same pass are two different experiments that would otherwise collide.
+- **A PROPORTION'S STANDARD ERROR IS EXACTLY ZERO AT THE CEILING, so the cut uses
+  PLUS-FOUR (Agresti-Coull).** `sqrt(p(1-p)/t)` is 0 when a word wins every game,
+  and at t=100 many do — a 5-SE cut in those units becomes "must also be exactly
+  100%", which MEASURED kept 5 openings of 12972. Adding two wins and two losses
+  (`p~ = (k+2)/(t+4)`) gives an error that is never zero: a perfect word at t=100
+  reads 1.000 +/- 0.0136 instead of +/- 0.0000. **The reported RATE stays raw and
+  so does the ranking** — `p~` is monotone in the win count, so only the ERROR is
+  replaced, which is the only place the zero does damage. Gated on hand-made rows:
+  the raw cut keeps 1 of 4 at the ceiling, plus-four keeps 3.
+- **THE PAIRED COMPARISON HAS NO SUCH PROBLEM**: under `--rank win_rate` the
+  per-game score is the 0/1 indicator, so the difference is a per-game win/lose
+  difference whose error comes from how often the two openings DISAGREE, not from
+  how close the rate is to 1. MEASURED on two blind-triple finalists: 7.3x tighter
+  than their unpaired errors.
 - **TWO NUMBERS MEANS TWO POSSIBLE SHORTLISTS.** Each row carries mean AND win
   rate with their own standard errors, and they need not agree.
   `--shortlist-value mean` (default, lower better) or `win_rate` (higher better)

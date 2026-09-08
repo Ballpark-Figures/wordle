@@ -125,6 +125,8 @@ def read_sweep_settings(path):
                     pass
     blob = "\n".join(head)
     out = {"openings": rows}
+    r = re.search(r"# settings .*rank=(\w+)", blob)
+    out["rank"] = r.group(1) if r else "mean"
     m = re.search(r"# settings follow_up=(\w+) pair_adaptive=(\d+) "
                   r"win_within=(\d+) trials=(\d+) seed=(\d+)", blob)
     if m:
@@ -175,6 +177,7 @@ def parse_args(argv):
     t = None
     seed = None
     top = None
+    rank = None
     sigma_cut = 5.0
     max_openings = 50
     openings = []
@@ -190,6 +193,8 @@ def parse_args(argv):
             top = int(argv[i + 1]); i += 2
         elif a == "--max-openings":
             max_openings = int(argv[i + 1]); i += 2
+        elif a == "--rank":
+            rank = argv[i + 1]; i += 2
         elif a == "--sigma":
             sigma_cut = float(argv[i + 1]); i += 2
         elif a == "--print-stem":
@@ -224,6 +229,9 @@ def parse_args(argv):
             fallback = meta["fallback"]
         if adapt is None:
             adapt = meta["adapt"]
+        if rank is None:
+            # the ranking belongs to the CASCADE, not to one command
+            rank = meta.get("rank", "mean")
         if meta["sigma"]:
             # CHAINING a paired round: cut on the PAIRED sigma.  Everything within
             # --sigma of the leader survives; the leader's own row carries no
@@ -244,6 +252,10 @@ def parse_args(argv):
             seed = meta["seed"] + 1
     if adapt is None:
         adapt = 0
+    if rank is None:
+        rank = "mean"
+    if rank not in ("mean", "win_rate"):
+        raise SystemExit("--rank must be 'mean' or 'win_rate'")
     if seed is None:
         seed = 100
     if top is not None:
@@ -271,16 +283,18 @@ def parse_args(argv):
             fallback, root, meta["pass"] if meta else 0, rnd, t, seed)
         if adapt:
             stem += "_adapt%d" % adapt
+        if rank != "mean":
+            stem += "_win"
         print(stem)
         print(len(openings))
         raise SystemExit(0)
     return (sweep or src, openings, fallback, adapt, t, seed, out, progress,
-            meta, sigma_cut)
+            meta, sigma_cut, rank)
 
 
 def main(argv):
     (src, openings, fallback, adapt, t, seed, out, progress, meta,
-     sigma_cut) = parse_args(argv)
+     sigma_cut, rank) = parse_args(argv)
 
     guesses = load_words("guess")
     answers = load_words("mystery")
@@ -314,13 +328,19 @@ def main(argv):
           flush=True)
     t0 = time.time()
     score = np.zeros(n)
+    win_within = meta.get("win_within", 6) if meta else 6
     for g in range(t):
         a = draw_answer(len(answers), answer_rng)
         for k, rule in enumerate(rules):
             # the SAME stream for every opening in this game: that is the coupling
             rng = np.random.default_rng([seed, g])
             played, _ = _play(pat, ans2g, a, rule, tail, rng)
-            score[k] = len(played)
+            # THE SCORE IS WHATEVER IS BEING RANKED.  Under win_rate it is the
+            # 0/1 indicator, so the paired difference is a per-game win/lose
+            # difference -- which never has the proportion's zero-error problem,
+            # because its error comes from how often the two DISAGREE.
+            score[k] = (len(played) <= win_within if rank == "win_rate"
+                        else len(played))
         ssum += score
         ssq += score * score
         d = score[:, None] - score[None, :]
@@ -335,7 +355,7 @@ def main(argv):
     mean = ssum / t
     sd = np.sqrt(np.maximum(ssq / t - mean * mean, 0.0) * t / (t - 1))
     se = sd / np.sqrt(t)
-    order = np.argsort(mean)
+    order = np.argsort(-mean if rank == "win_rate" else mean)
 
     dmean = dsum / t
     dsd = np.sqrt(np.maximum(dsq / t - dmean * dmean, 0.0) * t / (t - 1))
@@ -344,12 +364,15 @@ def main(argv):
     lead = order[0]
     lines = []
     lines.append("paired comparison of %d openings, %d games, follow-up %s, "
-                 "pair-adaptive %d, seed %d" % (n, t, fallback, adapt, seed))
+                 "pair-adaptive %d, seed %d, ranked on %s"
+                 % (n, t, fallback, adapt, seed,
+                    "WIN RATE" if rank == "win_rate" else "mean guesses"))
     if meta:
         lines.append("settings and finalists taken from %s (root %s, pass %d)"
                      % (os.path.basename(src), meta["root"], meta["pass"]))
-    lines.append("leader %s, mean %.5f +/- %.5f (its own error)"
-                 % (openings[lead], mean[lead], se[lead]))
+    lines.append("leader %s, %s %.5f +/- %.5f (its own error)"
+                 % (openings[lead], "win rate" if rank == "win_rate" else "mean",
+                    mean[lead], se[lead]))
     lines.append("")
     lines.append("%-24s %10s %9s %12s %9s %7s" %
                  ("opening", "mean", "own se", "vs leader", "paired se", "sigma"))
@@ -358,7 +381,8 @@ def main(argv):
             lines.append("%-24s %10.5f %9.5f %12s %9s %7s"
                          % (openings[k], mean[k], se[k], "-", "-", "-"))
             continue
-        diff = dmean[k, lead]
+        # always "how much WORSE than the leader", whichever way better points
+        diff = (dmean[lead, k] if rank == "win_rate" else dmean[k, lead])
         err = dse[k, lead]
         lines.append("%-24s %10.5f %9.5f %12.5f %9.5f %7.1f"
                      % (openings[k], mean[k], se[k], diff, err,
@@ -384,7 +408,8 @@ def main(argv):
         # the same machine-readable lines a sweep writes, so THIS file can be the
         # source of the next round: settings, lineage, and which round it is
         f.write("# settings follow_up=%s pair_adaptive=%d win_within=6 "
-                "trials=%d seed=%d words=%d\n" % (fallback, adapt, t, seed, n))
+                "trials=%d seed=%d words=%d rank=%s\n"
+                % (fallback, adapt, t, seed, n, rank))
         f.write("# lineage root=%s pass=%d round=%d source=%s\n"
                 % (meta["root"] if meta else "openings",
                    meta["pass"] if meta else 0, rnd,
@@ -396,8 +421,10 @@ def main(argv):
         f.write("word,trials,mean,stderr,diff_vs_leader,paired_stderr,sigma\n")
         for k in order:
             f.write("%s,%d,%.6f,%.6f,%.6f,%.6f,%.3f\n"
-                    % (openings[k], t, mean[k], se[k], dmean[k, lead], dse[k, lead],
-                       dmean[k, lead] / dse[k, lead] if dse[k, lead] > 0 else 0.0))
+                    % (openings[k], t, mean[k], se[k],
+                       dmean[lead, k] if rank == "win_rate" else dmean[k, lead],
+                       dse[k, lead],
+                       abs(dmean[k, lead]) / dse[k, lead] if dse[k, lead] > 0 else 0.0))
     print("wrote %s" % out)
 
 

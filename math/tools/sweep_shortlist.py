@@ -54,6 +54,35 @@ import os
 import sys
 
 
+def plus_four(rows, trials):
+    """Agresti-Coull ("plus four") point estimate and error for a PROPORTION.
+
+    A win rate's ordinary standard error is sqrt(p(1-p)/t), which is EXACTLY ZERO
+    when a word wins every game -- and at small -t many do.  A cut in units of
+    that error then means "must also be exactly 100%", which is an equality test
+    wearing a net's clothing: measured on a real t=100 screen it kept 5 openings
+    of 12972.
+
+    Adding two wins and two losses fixes it, the standard remedy: p~ = (k+2)/(t+4)
+    with se~ = sqrt(p~(1-p~)/(t+4)).  The error is never zero, and at the trial
+    counts a cascade ends on the adjustment is far below the noise -- at t=100 a
+    perfect word reads 0.981 +/- 0.0136 instead of 1.000 +/- 0.0000.
+
+    RANKING IS UNAFFECTED, and the REPORTED RATE IS NOT ADJUSTED EITHER: p~ is
+    monotone in the win count at fixed t, so the order is the raw order, and the
+    number a reader sees stays the one that was measured.  Only the ERROR is
+    replaced, which is the only place the zero does damage.
+    """
+    out = []
+    for w, v, _ in rows:
+        k = v * trials.get(w, 0)
+        n = trials.get(w, 0)
+        pt = (k + 2.0) / (n + 4.0) if n else v
+        se = (pt * (1.0 - pt) / (n + 4.0)) ** 0.5 if n else 0.0
+        out.append((w, v, se))
+    return out
+
+
 def read_sweep(path, value="mean"):
     """(word, value, stderr) per row, reading the columns BY NAME from the header.
 
@@ -61,7 +90,7 @@ def read_sweep(path, value="mean"):
     the plain `stderr` every sweep here has always written.
     """
     err = "stderr" if value == "mean" else value + "_stderr"
-    header, rows = None, []
+    header, rows, trials = None, [], {}
     with open(path) as f:
         for line in f:
             if line.startswith("#") or not line.strip():
@@ -74,12 +103,21 @@ def read_sweep(path, value="mean"):
                         raise SystemExit("%s has no %r column (it has: %s)"
                                          % (path, name, ", ".join(header)))
                 iw, iv, ie = (header.index(n) for n in ("word", value, err))
+                it = header.index("trials") if "trials" in header else None
                 continue
             if len(cols) <= max(iw, iv, ie):
                 continue
             rows.append((cols[iw], float(cols[iv]), float(cols[ie])))
+            if it is not None and len(cols) > it:
+                try:
+                    trials[cols[iw]] = int(cols[it])
+                except ValueError:
+                    pass
     if not rows:
         raise SystemExit("no data rows in %s" % path)
+    if value == "win_rate" and trials:
+        # a proportion's own error is zero at the ceiling; see plus_four
+        rows = plus_four(rows, trials)
     return rows
 
 

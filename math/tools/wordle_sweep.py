@@ -93,6 +93,7 @@ def parse_args(argv):
     root = ""
     passno = 1
     source = ""
+    rank = "mean"
     seed = 0
     words = "guess"
     limit = None
@@ -104,6 +105,8 @@ def parse_args(argv):
         a = argv[i]
         if a in ("-t", "--trials"):
             t = int(argv[i + 1]); i += 2
+        elif a == "--rank":
+            rank = argv[i + 1]; i += 2
         elif a == "--root":
             root = argv[i + 1]; i += 2
         elif a == "--pass":
@@ -141,8 +144,10 @@ def parse_args(argv):
         raise SystemExit(
             "--out is required (or --no-out to discard results deliberately).\n"
             "Use the wrapper, which sets it: bash solver/run-wordle-sweep.sh")
+    if rank not in ("mean", "win_rate"):
+        raise SystemExit("--rank must be 'mean' or 'win_rate'")
     return (t, fallback, adapt, seed, words, limit, win_within, out, progress,
-            root, passno, source)
+            root, passno, source, rank)
 
 
 def load_done(path):
@@ -179,7 +184,7 @@ def sweep_word(pat, ans2g, na, t, seed, opening_g, tail, win_within, adapt=0):
 
 def main(argv):
     (t, fallback, adapt, seed, words, limit, win_within, out, progress,
-     root, passno, source) = parse_args(argv)
+     root, passno, source, rank) = parse_args(argv)
 
     guesses = load_words("guess")
     answers = load_words("mystery")
@@ -242,8 +247,9 @@ def main(argv):
             # to reproduce this run's STRATEGY, in one line that no rewording of
             # the paragraphs below can break.
             fh.write("# settings follow_up=%s pair_adaptive=%d win_within=%d "
-                     "trials=%d seed=%d words=%d\n"
-                     % (fallback, adapt, win_within, t, seed, len(sweep_words)))
+                     "trials=%d seed=%d words=%d rank=%s\n"
+                     % (fallback, adapt, win_within, t, seed, len(sweep_words),
+                        rank))
             if adapt:
                 fh.write("# %d-word openings, played in order but ABANDONED once "
                          "the follow-up is down to %d\n# or fewer words "
@@ -266,6 +272,7 @@ def main(argv):
             fh.write(COLUMNS + "\n")
         fh.flush()
 
+    print("ranking on %s" % ("WIN RATE" if rank == "win_rate" else "mean guesses"))
     print("sweep: %d %s x %d trials, follow-up %s, seed %d%s"
           % (len(todo), "openings of %d words" % sizes[0] if sizes[0] > 1 else "words",
              t, fallback, seed,
@@ -291,7 +298,14 @@ def main(argv):
         if progress and (i + 1) % progress == 0:
             elapsed = time.time() - t0
             rate = (i + 1) / elapsed
-            bm, bw, bword = min(best)
+            # the LEADER is whichever the run is ranking on -- the other number is
+            # still recorded, but a run that cuts on win rate must not print a
+            # leader chosen by the mean
+            if rank == "win_rate":
+                bw, bm, bword = max((w_, -m_, x) for m_, w_, x in best)
+                bm = -bm
+            else:
+                bm, bw, bword = min(best)
             print("  %d/%d  %-12s %.4f  %5.1f%%   best %s %.4f  %5.1f%%   "
                   "%.1f/s  eta %.1f min"
                   % (i + 1, len(todo), w, st["mean_guesses"],

@@ -763,6 +763,39 @@ def main(argv):
           % (len(range(0, len(answers), 331)), np.std(sd_, ddof=1),
              np.hypot(np.std(sa, ddof=1), np.std(sb, ddof=1))))
 
+    # --- ranking by WIN RATE, the parallel ranking ---------------------------
+    # A win rate is a PROPORTION, whose ordinary error is exactly zero at the
+    # ceiling -- so a cut in those units becomes an equality test.  The cut uses
+    # the plus-four (Agresti-Coull) estimate instead; these rows are hand-made so
+    # the survivors are known without running anything.
+    import sweep_shortlist as ss
+    perfect = [("perfect", 1.0, 0.0), ("high", 0.99, 0.00995), ("mid", 0.95, 0.0218),
+               ("low", 0.80, 0.04)]
+    trials = {w: 100 for w, _, _ in perfect}
+    adj = ss.plus_four(perfect, trials)
+    if any(e <= 0 for _, _, e in adj):
+        failures.append("plus-four left a zero standard error: %s" % adj)
+    # the VALUE stays raw -- p~ is monotone in the win count, so the ranking is
+    # the raw ranking and only the ERROR is adjusted, which is where zero bites
+    if adj[0][1] != 1.0:
+        failures.append("plus-four changed the reported rate to %.6f; it must "
+                        "adjust the ERROR only" % adj[0][1])
+    want = ((102.0 / 104.0) * (2.0 / 104.0) / 104.0) ** 0.5
+    if abs(adj[0][2] - want) > 1e-12:
+        failures.append("plus-four error is %.6f, not sqrt(p~(1-p~)/(t+4))=%.6f"
+                        % (adj[0][2], want))
+    keep, _ = ss.shortlist(adj, se=5.0, maximise=True)
+    if len(keep) < 3:
+        failures.append("the plus-four win-rate cut kept only %d of 4 rows, so it "
+                        "is still behaving like an equality test" % len(keep))
+    raw_keep, _ = ss.shortlist(perfect, se=5.0, maximise=True)
+    if len(raw_keep) != 1:
+        failures.append("the RAW proportion cut kept %d rows; it should keep only "
+                        "the exact tie, which is why plus-four exists"
+                        % len(raw_keep))
+    print("win-rate cut: the raw proportion error keeps %d of 4 rows at the "
+          "ceiling, plus-four keeps %d" % (len(raw_keep), len(keep)))
+
     # --- the shortlist cut ---------------------------------------------------
     # value, stderr per word; the best is 1.00 with a standard error of 0.10, so
     # a 2-SE cut on the mean keeps everything up to 1.20 and nothing above.
