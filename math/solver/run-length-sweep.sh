@@ -5,6 +5,16 @@
 #     bash solver/run-length-sweep.sh --length 6 --depth 5      # from math/, or anywhere
 #     bash solver/run-length-sweep.sh --length 6 --depth 4
 #     bash solver/run-length-sweep.sh --length 7 --depth 4 --order lb
+#     bash solver/run-length-sweep.sh --length 6 --depth 5 --guesses mystery  # answers only
+#
+# --guesses (default guess) picks the LEGAL GUESS SET, the same flag run-mm-sweep.sh
+# carries: `guess` is the full length-L dictionary, `mystery` restricts every guess
+# to the ANSWER words (answers-only), exactly as run-ans-sweep.sh does at length 5.
+# Answers-only is a DIFFERENT OBJECTIVE, not a knob on this one: with the pure-probe
+# words gone the partitions are coarser, totals are higher, and INFEASIBLE becomes a
+# real, expected outcome -- so it writes to its own `optlen<L>_ansonly` data tree with
+# its own (guess-set-salted) tt.bin and never mixes with the full-dictionary results.
+# `mystery subset-of guess` holds at every length, so no --phantom-final is needed.
 #
 # WHAT THIS SOLVES, precisely:
 #
@@ -67,6 +77,7 @@ ORDER=ssq
 TOPK=0           # 0 = exact. K > 0 restricts branching to the K evenest splits
 THREADS=18
 TTBITS=28
+GUESSES=guess    # guess = full dictionary; mystery = answer words only (answers-only)
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -74,6 +85,7 @@ while [ $# -gt 0 ]; do
         --depth)     DEPTH="$2";    shift 2 ;;
         --depth-max) DEPTHMAX="$2"; shift 2 ;;
         --order)     ORDER="$2";    shift 2 ;;
+        --guesses)   GUESSES="$2";  shift 2 ;;   # guess (full) | mystery (answers only)
         -k|--topk)   TOPK="$2";     shift 2 ;;
         --threads) THREADS="$2"; shift 2 ;;
         --tt-bits) TTBITS="$2";  shift 2 ;;
@@ -93,6 +105,10 @@ case "$ORDER" in
     ssq|lb) ;;
     *) echo "--order must be ssq or lb" >&2; exit 1 ;;
 esac
+case "$GUESSES" in
+    guess|mystery) ;;
+    *) echo "--guesses must be guess (full dictionary) or mystery (answer words only)" >&2; exit 1 ;;
+esac
 
 cd "$MATH" || exit 1
 
@@ -101,6 +117,18 @@ PATS=data/local/patterns/patterns_len$LENGTH.npy
 WORDS=data/shared/words/hello/len$LENGTH/guess.txt
 OUTDIR=data/shared/optlen$LENGTH
 LOC=data/local/optlen$LENGTH
+
+# --guesses mystery restricts the legal guesses to the ANSWER words (answers-only).
+# It is a different objective, so it gets its own _ansonly data tree and its own
+# tt.bin (which is guess-set-salted, so a shared one would fail verification anyway).
+MYSTERY=data/shared/words/hello/len$LENGTH/mystery.txt
+GUESSFLAG=""
+if [ "$GUESSES" = mystery ]; then
+    [ -f "$MYSTERY" ] || { echo "no answer list at $MYSTERY -- run 'python3 build_wordlists.py'" >&2; exit 1; }
+    OUTDIR=${OUTDIR}_ansonly
+    LOC=${LOC}_ansonly
+    GUESSFLAG="--guess-list $MYSTERY"
+fi
 
 [ -x "$BIN" ] || { echo "no $BIN -- run 'sh build.sh $LENGTH' in solver/" >&2; exit 1; }
 [ -f "$WORDS" ] || { echo "no word lists for length $LENGTH -- run 'python3 build_wordlists.py'" >&2; exit 1; }
@@ -168,11 +196,11 @@ if [ "$TOPK" -gt 0 ]; then
     echo "*** fact about the problem, so a discovered depth can come out TOO DEEP." >&2
 fi
 
-echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] length $LENGTH, $MODE, order $ORDER, topk $TOPK $WARM" \
+echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] length $LENGTH, $MODE, order $ORDER, topk $TOPK, guesses $GUESSES $WARM" \
     | tee -a "$LOC/sweep.log"
 
 "$BIN" --length "$LENGTH" --sweep --optimal-only \
-    --order "$ORDER" $KFLAG \
+    --order "$ORDER" $KFLAG $GUESSFLAG \
     --out "$OUT" \
     $DFLAG \
     --tt-bits "$TTBITS" --threads "$THREADS" $WARM \
