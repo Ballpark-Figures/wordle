@@ -43,6 +43,7 @@ tail of a cascade of cuts.
 """
 
 import os
+import re
 import sys
 import time
 
@@ -81,12 +82,58 @@ class CoupledDraw:
         return int(self.tail.ans2g[pick])
 
 
+def read_sweep_settings(path):
+    """A sweep CSV's own account of itself: openings, follow-up, adapt, t, seed.
+
+    The `# settings` line is authoritative where it exists.  Older files predate
+    it, so the follow-up/trials/seed fall back to the first line and `adapt` to
+    the prose ("ABANDONED once the follow-up is down to N or fewer words"), which
+    is the only place it was recorded.  Parsing prose is a fallback, never the
+    plan -- hence the settings line.
+    """
+    head, rows = [], []
+    with open(path) as f:
+        for line in f:
+            if line.startswith("#"):
+                head.append(line.rstrip("\n"))
+                continue
+            cols = [c.strip() for c in line.rstrip("\n").split(",")]
+            if cols[0] == "word" or not cols[0]:
+                continue
+            rows.append(cols[0])
+    blob = "\n".join(head)
+    out = {"openings": rows}
+    m = re.search(r"# settings follow_up=(\w+) pair_adaptive=(\d+) "
+                  r"win_within=(\d+) trials=(\d+) seed=(\d+)", blob)
+    if m:
+        out.update(fallback=m.group(1), adapt=int(m.group(2)),
+                   win_within=int(m.group(3)), trials=int(m.group(4)),
+                   seed=int(m.group(5)))
+    else:
+        m = re.search(r"# wordle opener sweep: (\d+) trials per word, "
+                      r"follow-up (\w+), seed (\d+)", blob)
+        if not m:
+            raise SystemExit("%s does not look like a sweep CSV" % path)
+        out.update(trials=int(m.group(1)), fallback=m.group(2),
+                   seed=int(m.group(3)), win_within=6)
+        a = re.search(r"ABANDONED once the follow-up is down to (\d+)", blob)
+        out["adapt"] = int(a.group(1)) if a else 0
+    m = re.search(r"# lineage root=(\S+) pass=(\d+)", blob)
+    out["root"] = m.group(1) if m else "unknown"
+    out["pass"] = int(m.group(2)) if m else 0
+    if not rows:
+        raise SystemExit("%s has no openings" % path)
+    return out
+
+
 def parse_args(argv):
-    src = out = None
+    src = sweep = out = None
     fallback = None
-    adapt = 0
+    adapt = None
     t = None
-    seed = 100
+    seed = None
+    top = None
+    max_openings = 50
     openings = []
     progress = 20000
     i = 0
@@ -94,6 +141,14 @@ def parse_args(argv):
         a = argv[i]
         if a == "--from":
             src = argv[i + 1]; i += 2
+        elif a == "--from-sweep":
+            sweep = argv[i + 1]; i += 2
+        elif a == "--top":
+            top = int(argv[i + 1]); i += 2
+        elif a == "--max-openings":
+            max_openings = int(argv[i + 1]); i += 2
+        elif a == "--print-stem":
+            out = "--print-stem"; i += 1
         elif a == "--opening":
             openings.append(argv[i + 1]); i += 2
         elif a == "--out":
@@ -113,19 +168,60 @@ def parse_args(argv):
     if src:
         with open(src) as f:
             openings.extend(ln.strip() for ln in f if ln.strip())
+    meta = None
+    if sweep:
+        meta = read_sweep_settings(sweep)
+        openings.extend(meta["openings"])
+        # the sweep's OWN settings are the defaults: comparing finalists under a
+        # different strategy from the one that selected them would be a different
+        # experiment wearing the same filename.
+        if fallback is None:
+            fallback = meta["fallback"]
+        if adapt is None:
+            adapt = meta["adapt"]
+        if t is None:
+            t = meta["trials"]
+        if seed is None:
+            # a FRESH seed by default: the finalists were chosen by the source's
+            # own games, so re-using its seed would judge them on that sample
+            seed = meta["seed"] + 1
+    if adapt is None:
+        adapt = 0
+    if seed is None:
+        seed = 100
+    if top is not None:
+        openings = openings[:top]
     if len(openings) < 2:
-        raise SystemExit("give at least two openings (--from FILE or --opening)")
+        raise SystemExit("give at least two openings "
+                         "(--from-sweep CSV, --from FILE or --opening)")
+    if len(openings) > max_openings:
+        raise SystemExit(
+            "%d openings is more than --max-openings %d: this compares FINALISTS, "
+            "and every pair costs a column.\nCut it with --top N, or raise the "
+            "limit deliberately." % (len(openings), max_openings))
     if fallback not in ("answer", "guess"):
         raise SystemExit("--fallback answer|guess is required")
     if t is None or t < 1:
         raise SystemExit("-t is required")
     if out is None:
         raise SystemExit("--out is required")
-    return src, openings, fallback, adapt, t, seed, out, progress
+    if out == "--print-stem":
+        # The wrapper asks HERE what the file should be called, so the derivation
+        # lives in one place rather than being re-implemented in shell.
+        root = meta["root"] if meta else "openings"
+        stem = "paired_%s_%s_p%d_t%d_s%d" % (fallback, root,
+                                             meta["pass"] if meta else 0, t, seed)
+        if adapt:
+            stem += "_adapt%d" % adapt
+        print(stem)
+        print(len(openings))
+        raise SystemExit(0)
+    return sweep or src, openings, fallback, adapt, t, seed, out, progress, meta
 
 
 def main(argv):
-    src, openings, fallback, adapt, t, seed, out, progress = parse_args(argv)
+    (src, openings, fallback, adapt, t, seed, out, progress,
+     meta) = parse_args(argv)
 
     guesses = load_words("guess")
     answers = load_words("mystery")
@@ -190,6 +286,9 @@ def main(argv):
     lines = []
     lines.append("paired comparison of %d openings, %d games, follow-up %s, "
                  "pair-adaptive %d, seed %d" % (n, t, fallback, adapt, seed))
+    if meta:
+        lines.append("settings and finalists taken from %s (root %s, pass %d)"
+                     % (os.path.basename(src), meta["root"], meta["pass"]))
     lines.append("leader %s, mean %.5f +/- %.5f (its own error)"
                  % (openings[lead], mean[lead], se[lead]))
     lines.append("")
@@ -222,10 +321,14 @@ def main(argv):
     with open(out, "w") as f:
         for line in lines:
             f.write("# " + line + "\n")
-        f.write("opening,mean,own_stderr,diff_vs_leader,paired_stderr,sigma\n")
+        # THE SAME LEADING COLUMNS AS A SWEEP -- word, trials, mean, stderr -- so
+        # tools/sweep_shortlist.py and every reader of a sweep CSV can read this
+        # file too.  The paired columns follow; they are the point, but they do
+        # not get in the way of the format everything else already speaks.
+        f.write("word,trials,mean,stderr,diff_vs_leader,paired_stderr,sigma\n")
         for k in order:
-            f.write("%s,%.6f,%.6f,%.6f,%.6f,%.3f\n"
-                    % (openings[k], mean[k], se[k], dmean[k, lead], dse[k, lead],
+            f.write("%s,%d,%.6f,%.6f,%.6f,%.6f,%.3f\n"
+                    % (openings[k], t, mean[k], se[k], dmean[k, lead], dse[k, lead],
                        dmean[k, lead] / dse[k, lead] if dse[k, lead] > 0 else 0.0))
     print("wrote %s" % out)
 

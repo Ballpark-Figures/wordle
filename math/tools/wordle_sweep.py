@@ -238,6 +238,12 @@ def main(argv):
             # chain is still walkable, one file at a time.
             fh.write("# lineage root=%s pass=%d source=%s\n"
                      % (root or "(first)", passno, source or "(none)"))
+            # MACHINE-READABLE, beside the prose.  Everything a later tool needs
+            # to reproduce this run's STRATEGY, in one line that no rewording of
+            # the paragraphs below can break.
+            fh.write("# settings follow_up=%s pair_adaptive=%d win_within=%d "
+                     "trials=%d seed=%d words=%d\n"
+                     % (fallback, adapt, win_within, t, len(sweep_words)))
             if adapt:
                 fh.write("# %d-word openings, played in order but ABANDONED once "
                          "the follow-up is down to %d\n# or fewer words "

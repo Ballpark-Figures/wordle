@@ -1439,8 +1439,26 @@ differences instead.
   coupling silently decays. One float per draw holds them turn for turn. It is a
   different consumption pattern from the sweep's, so **a paired mean will not match
   a sweep cell to the last digit** — same quantity, different sample.
+- **RUN IT ON A SWEEP FILE DIRECTLY: `bash solver/run-wordle-paired.sh --from
+  <sweep>.csv`.** The finalists, the follow-up, the `--pair-adaptive` threshold,
+  the trial count and the seed are all READ FROM THE SOURCE — comparing finalists
+  under a different strategy from the one that selected them would be a different
+  experiment wearing the same filename. **The seed is the one exception: it
+  advances by one**, since the finalists were chosen by the source's own games.
+  Every one of those overrides on the command line.
+- **A `# settings follow_up=… pair_adaptive=… win_within=… trials=… seed=…` line
+  is now written into every sweep CSV**, machine-readable beside the prose, so a
+  later tool cannot be broken by rewording a paragraph. Older files fall back to
+  the first line plus, for `adapt` alone, the prose — parsing prose is the
+  fallback, never the plan, which is why the settings line exists.
+- **THE OUTPUT IS SWEEP-SHAPED**: `word,trials,mean,stderr` first, then
+  `diff_vs_leader,paired_stderr,sigma`, so `sweep_shortlist.py` and every other
+  reader of a sweep CSV reads it too. The name is derived by the tool itself
+  (`--print-stem`), so the wrapper does not re-implement it in shell.
 - **No per-game storage**: pairwise sums and sums of squares are accumulated, so
-  `-t` can be as large as wanted for any number of finalists.
+  `-t` can be as large as wanted for any number of finalists. It compares
+  FINALISTS, not fields — every opening plays every game, so `--max-openings`
+  refuses more than 50 unless raised, and `--top N` takes the source's best N.
 - Gated: the coupled index reaches every live word across the unit interval,
   coupled games are legal (every guess consistent, ending on the answer),
   `mean(A-B)` equals `mean(A)-mean(B)` exactly, and pairing must actually reduce
