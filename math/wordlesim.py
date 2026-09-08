@@ -265,29 +265,68 @@ def _no_rule(guesses, answers, ans2g, args, name):
     return None
 
 
-class FixedOpener:
-    """Play one fixed word on turn 0, then decline every turn after.
+class FixedOpening:
+    """Play a fixed sequence of words in order, BLIND, then decline.
 
     The smallest rule there is, and the one an OPENER SWEEP varies: it says what
     to open with and nothing else, so the follow-up plays the rest of the game.
     Which follow-up is in use is therefore the whole difference between two runs.
+
+    BLIND MEANS BLIND: the second and later words are played whatever the replies
+    said -- even when the candidates are already down to one, which is exactly
+    what makes a multi-word opening a bet rather than a strategy.  The one thing
+    that stops the sequence is WINNING: an all-green reply ends the game inside
+    `play_game`, so a game the first word wins never plays the second and scores
+    1.  That is the game's rule, not the opening's, and the opening never gets a
+    chance to "waste" a guess after the answer is found.
     """
 
-    def __init__(self, opener_g):
-        self.opener_g = opener_g
+    def __init__(self, opening_g):
+        self.opening_g = [int(g) for g in opening_g]
+        if not self.opening_g:
+            raise ValueError("an opening needs at least one word")
 
     def __call__(self, turn, alive, played, replies, rng):
-        return self.opener_g if turn == 0 else None
+        return self.opening_g[turn] if turn < len(self.opening_g) else None
+
+
+def fixed_opening(opening_g):
+    """The FixedOpening rule for a list of GUESS indices -- what a sweep builds.
+
+    Public so the sweep and the registry share one rule rather than two copies:
+    the sweep resolves its candidates against its own index map and calls this,
+    while `--strategy opening --strategy-arg W1 --strategy-arg W2` goes through
+    the registry.
+    """
+    return FixedOpening(opening_g)
 
 
 def fixed_opener(opener_g):
-    """The FixedOpener rule for a GUESS index -- what a sweep builds per word.
+    """The one-word case, kept as its own name because it is its own experiment."""
+    return FixedOpening([opener_g])
 
-    Public so the sweep and the registry share one rule rather than two copies:
-    the sweep resolves 12972 words against its own index map and calls this,
-    while `--strategy opener --strategy-arg WORD` goes through the registry.
+
+def _resolve_opening(guesses, words, name):
+    """Guess indices for an opening, refusing an illegal or repeated word.
+
+    A repeat is refused because the second copy cannot inform anything: the reply
+    to a word is a function of that word, so playing it twice spends a guess to
+    learn what is already known.  If that is ever the experiment, it needs a name
+    that says so.
     """
-    return FixedOpener(int(opener_g))
+    seen = {}
+    out = []
+    for w in words:
+        try:
+            out.append(guesses.index(w))
+        except ValueError:
+            raise SystemExit("%s word %r is not one of the 12972 legal guesses"
+                             % (name, w))
+        if w in seen:
+            raise SystemExit("the opening repeats %r; a repeated word learns "
+                             "nothing the first one did not" % w)
+        seen[w] = True
+    return out
 
 
 def _make_opener(guesses, answers, ans2g, args, name):
@@ -300,12 +339,20 @@ def _make_opener(guesses, answers, ans2g, args, name):
     if len(args) != 1:
         raise SystemExit("strategy %r needs exactly one word: "
                          "--strategy-arg WORD (got %d arguments)" % (name, len(args)))
-    word = args[0]
-    try:
-        g = guesses.index(word)
-    except ValueError:
-        raise SystemExit("opener %r is not one of the 12972 legal guesses" % word)
-    return fixed_opener(g)
+    return fixed_opening(_resolve_opening(guesses, args, name))
+
+
+def _make_opening(guesses, answers, ans2g, args, name):
+    """Rule: play the given words in order, BLIND, then decline.
+
+    Any number of words, one per --strategy-arg (or space-separated in one).  The
+    words are REQUIRED for the same reason the single opener's is.
+    """
+    words = [w for a in args for w in a.split()]
+    if not words:
+        raise SystemExit("strategy %r needs at least one word: "
+                         "--strategy-arg WORD (repeat it for more)" % name)
+    return fixed_opening(_resolve_opening(guesses, words, name))
 
 
 STRATEGIES = {
@@ -316,6 +363,8 @@ STRATEGIES = {
     # One fixed opener, then the follow-up.  It pins NOTHING: both follow-ups are
     # meaningful under it, they are different strategies, and --fallback says which.
     "opener":       Strategy(_make_opener, None),
+    # The same, for an opening of ANY length played blind -- a pair, a triple.
+    "opening":      Strategy(_make_opening, None),
 }
 
 

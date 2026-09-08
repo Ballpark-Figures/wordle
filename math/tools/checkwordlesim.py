@@ -42,6 +42,11 @@ that the rest of the game matches the reference.  Handing that game to the guess
 follow-up at TURN 1 is also the only place its catch-up is tested: it must build
 its live set from a history it was not present for.
 
+MULTI-WORD OPENINGS ARE DIFFED THE SAME WAY, and their defining property --
+BLIND play, the later words going down even when one candidate is left -- is
+TALLIED and required to have happened, since a run where it never came up would
+say nothing about it.
+
 THE OPENER SWEEP IS DIFFED TOO, against the same reference: its two-stream loop
 is reproduced here from the strings, and the answers each word faced are recorded
 and required to be IDENTICAL across words.  That is the property the whole sweep
@@ -72,7 +77,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 from build_patterns import load_patterns  # noqa: E402
 from wordle import ALL_GREEN, load_words, pattern  # noqa: E402
 from wordlesim import (WIN_WITHIN, answer_to_guess, draw_answer,  # noqa: E402
-                       make_strategy, make_tail, play_game)
+                       fixed_opening, make_strategy, make_tail, play_game)
 from wordle_sim import summarise  # noqa: E402
 from wordle_sweep import PICK_OFFSET, sweep_word  # noqa: E402
 from sweep_shortlist import shortlist  # noqa: E402
@@ -97,7 +102,7 @@ def ref_pattern(guess, answer):
     return code
 
 
-def ref_play(pool, answer, rng, opener=None):
+def ref_play(pool, answer, rng, opening=()):
     """Replay one game from strings alone.  Returns the words played, in order.
 
     `pool` is the list the strategy draws from -- the 2315 answers for `random`,
@@ -107,14 +112,20 @@ def ref_play(pool, answer, rng, opener=None):
     """
     cands = list(pool)
     played = []
+    singleton_blind = 0          # times a later opening word was played anyway
     while True:
-        if opener is not None and not played:
-            g = opener
+        if len(played) < len(opening):
+            # BLIND: the opening's words are played in order whatever the replies
+            # said -- including when one candidate is left, which is the property
+            # a multi-word opening lives or dies by.
+            if played and len(cands) == 1:
+                singleton_blind += 1
+            g = opening[len(played)]
         else:
             g = cands[int(rng.integers(len(cands)))]
         played.append(g)
         if g == answer:
-            return played
+            return played, singleton_blind
         fb = ref_pattern(g, answer)
         cands = [w for w in cands if ref_pattern(g, w) == fb]
         if answer not in cands:
@@ -189,7 +200,7 @@ def main(argv):
         answer = answers[a_fast]
         played, replies = play_game(pat, ans2g, a_fast, None, tail, fast_rng)
         words = [guesses[g] for g in played]
-        ref_words = ref_play(answers, answer, ref_rng)
+        ref_words, _ = ref_play(answers, answer, ref_rng)
         if words != ref_words:
             failures.append("seed %d (%s): fast %s vs reference %s"
                             % (seed, answer, " ".join(words), " ".join(ref_words)))
@@ -232,7 +243,7 @@ def main(argv):
         drawn_outside += answer not in mystery      # the game's own draw, checked
         played, replies = play_game(pat, ans2g, a_fast, grule, gtail, fast_rng)
         words = [guesses[g] for g in played]
-        ref_words = ref_play(guesses, answer, ref_rng)
+        ref_words, _ = ref_play(guesses, answer, ref_rng)
         if words != ref_words:
             failures.append("random-guess seed %d (%s): fast %s vs reference %s"
                             % (seed, answer, " ".join(words), " ".join(ref_words)))
@@ -281,7 +292,7 @@ def main(argv):
             answer = answers[a_fast]
             played, _ = play_game(pat, ans2g, a_fast, prefix, ptail, fast_rng)
             words = [guesses[g] for g in played]
-            ref_words = ref_play(pool, answer, ref_rng, opener=opener)
+            ref_words, _ = ref_play(pool, answer, ref_rng, opening=[opener])
             if words != ref_words:
                 failures.append("prefix/%s seed %d (%s): fast %s vs reference %s"
                                 % (tname, seed, answer, " ".join(words),
@@ -337,7 +348,7 @@ def main(argv):
         ptail = make_tail(tname, guesses, answers, ans2g)
         for w in probe:
             st = sweep_word(pat, ans2g, len(answers), sweep_t, sweep_seed,
-                            guesses.index(w), ptail, WIN_WITHIN)
+                            [guesses.index(w)], ptail, WIN_WITHIN)
             draw_rng = np.random.default_rng(sweep_seed)
             pick_rng = np.random.default_rng(sweep_seed + PICK_OFFSET)
             ref_scores, drew = [], []
@@ -345,7 +356,7 @@ def main(argv):
                 a = int(draw_rng.integers(len(answers)))
                 drew.append(answers[a])
                 ref_scores.append(len(ref_play(pool, answers[a], pick_rng,
-                                               opener=w)))
+                                               opening=[w])[0]))
             ref = summarise(ref_scores, WIN_WITHIN)
             if abs(st["mean_guesses"] - ref["mean_guesses"]) > 1e-12 or \
                     abs(st["win_rate"] - ref["win_rate"]) > 1e-12:
@@ -361,6 +372,80 @@ def main(argv):
     print("opener sweep: %d words x %d games under both follow-ups match the "
           "string reference, and every word faced the identical answers"
           % (len(probe), sweep_t))
+
+    # --- multi-word openings: BLIND play, and the sweep over them ------------
+    # A pair sweep ranks two-word openings, so the same loop is diffed with the
+    # opening the sweep would build.  The property to prove is BLINDNESS: the
+    # second word is played even when the first left ONE candidate, which is what
+    # a multi-word opening is betting on.  It is TALLIED, not assumed -- a run
+    # where it never happened would say nothing about it.
+    pairs = [[guesses[0], guesses[1]],
+             [guesses[len(guesses) // 3], guesses[-1]]]
+    blind_hits, pair_rows = 0, 0
+    for tname, pool in (("answer", answers), ("guess", guesses)):
+        ptail = make_tail(tname, guesses, answers, ans2g)
+        for opening in pairs:
+            gs = [guesses.index(w) for w in opening]
+            st = sweep_word(pat, ans2g, len(answers), sweep_t, sweep_seed, gs,
+                            ptail, WIN_WITHIN)
+            draw_rng = np.random.default_rng(sweep_seed)
+            pick_rng = np.random.default_rng(sweep_seed + PICK_OFFSET)
+            ref_scores = []
+            for _ in range(sweep_t):
+                a = int(draw_rng.integers(len(answers)))
+                words, blind = ref_play(pool, answers[a], pick_rng, opening=opening)
+                ref_scores.append(len(words))
+                blind_hits += blind
+                if words[:len(opening)] != opening and answers[a] not in opening:
+                    failures.append("pair/%s %s: the opening was not played in "
+                                    "order (%s)" % (tname, " ".join(opening),
+                                                    " ".join(words)))
+            ref = summarise(ref_scores, WIN_WITHIN)
+            if abs(st["mean_guesses"] - ref["mean_guesses"]) > 1e-12:
+                failures.append("pair/%s %s: fast mean %.6f vs reference %.6f"
+                                % (tname, " ".join(opening), st["mean_guesses"],
+                                   ref["mean_guesses"]))
+            pair_rows += 1
+    # The blind case CONSTRUCTED rather than waited for: pick a first word and an
+    # answer that word isolates to a SINGLETON, so the state after word 1 is known
+    # to hold exactly one candidate.  A strategy that quietly stopped playing the
+    # opening once it "knew" the answer would score 2 here; blind scores 3.
+    ptail = make_tail("answer", guesses, answers, ans2g)
+    w1 = guesses[0]
+    row = pat[guesses.index(w1)]
+    counts = np.bincount(row, minlength=int(row.max()) + 1)
+    singles = [a for a in range(len(answers))
+               if counts[row[a]] == 1 and answers[a] != w1]
+    if not singles:
+        failures.append("no answer is isolated by %s, so the blind case could not "
+                        "be constructed" % w1)
+    else:
+        a = singles[0]
+        w2 = guesses[1] if guesses[1] != answers[a] else guesses[2]
+        played, _ = play_game(pat, ans2g, a,
+                              fixed_opening([guesses.index(w1), guesses.index(w2)]),
+                              ptail, np.random.default_rng(0))
+        words = [guesses[g] for g in played]
+        alive_after_1 = sum(1 for x in answers
+                            if ref_pattern(w1, x) == ref_pattern(w1, answers[a]))
+        if alive_after_1 != 1:
+            failures.append("the constructed state holds %d candidates, not 1"
+                            % alive_after_1)
+        elif words[:2] != [w1, w2]:
+            failures.append("the opening was not played blind over a single "
+                            "surviving candidate: %s" % " ".join(words))
+        elif len(words) != 3 or words[2] != answers[a]:
+            failures.append("after a blind second word the follow-up should name "
+                            "the one candidate, got %s" % " ".join(words))
+        else:
+            blind_hits += 1
+        print("multi-word openings: %d sweeps of 2-word openings match the "
+              "reference under both follow-ups; with %s isolating %s to one "
+              "candidate, %s is still played and the game costs 3"
+              % (pair_rows, w1, answers[a], w2))
+    if not blind_hits:
+        failures.append("no opening ever played on past a single surviving "
+                        "candidate, so BLIND play is untested")
 
     # --- the shortlist cut ---------------------------------------------------
     # value, stderr per word; the best is 1.00 with a standard error of 0.10, so

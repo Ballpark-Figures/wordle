@@ -1,14 +1,28 @@
-"""Sweep OPENERS: the same fixed number of single-board games for every word.
+"""Sweep OPENINGS: the same fixed number of single-board games for every one.
 
 Run it through the wrapper, which sets --out and tees a log:
 
     bash solver/run-wordle-sweep.sh --fallback answer -t 100      # from math/
     bash solver/run-wordle-sweep.sh --fallback guess  -t 100
 
-Every word of the list opens `-t` games, played out by the FOLLOW-UP named by
---fallback (math/wordlesim.py has the protocol; the rule is `opener`, which plays
-that word on turn 0 and declines thereafter).  Each word gets a row with its mean
-guesses AND its win rate, both with standard errors.
+Every entry of the list opens `-t` games, played out by the FOLLOW-UP named by
+--fallback (math/wordlesim.py has the protocol; the rule is `FixedOpening`, which
+plays the entry's words in order and declines thereafter).  Each gets a row with
+its mean guesses AND its win rate, both with standard errors.
+
+AN ENTRY MAY BE SEVERAL WORDS.  A line of the `--words` file holding more than one
+word is an OPENING played BLIND in order -- so the same sweep ranks single openers
+and two-word openings, and the CSV's `word` column simply holds the whole opening,
+space separated.  The shortlist writes those lines back out verbatim, so every
+later pass reads them the same way and the cascade is identical either way.
+
+WHERE A LIST OF PAIRS COMES FROM, and the blind spot in it.  There are 84,129,906
+pairs, far too many to sweep, so a pair run screens the top N of an EXISTING
+ranking (`tools/opening_list.py`, over data/shared/singletons/*.csv).  That
+ranking answers a DIFFERENT question -- how many answers a blind opening isolates
+to a singleton -- so the best pair for THIS objective need not be near its head,
+and a pair outside the top N is never examined at all.  Say "the best of the N
+screened", never "the best pair".
 
 THE FOLLOW-UP IS PART OF THE QUESTION, not a detail: "which opener is best" has a
 different answer under a random compatible ANSWER than under a random compatible
@@ -42,7 +56,7 @@ by different columns and need not agree, so the cut names which one it used
 (--value on the shortlist tool) and that lands in the stage-2 filename.  Do not
 cut on one and report the other.
 
-ORDER.  Words are visited in the LIST'S OWN ORDER -- alphabetical for the word
+ORDER.  Entries are visited in the LIST'S OWN ORDER -- alphabetical for the word
 lists, best-first for a shortlist -- so --limit takes a prefix of that, never a
 sample.  Nothing about the order favours any word: every one gets the same trials
 and the same games.
@@ -64,7 +78,7 @@ from build_patterns import load_patterns  # noqa: E402
 from wordle import load_words  # noqa: E402
 from wordle_sim import summarise  # noqa: E402
 from wordlesim import (WIN_WITHIN, answer_to_guess, draw_answer,  # noqa: E402
-                       fixed_opener, make_tail, play_game)
+                       fixed_opening, make_tail, play_game)
 
 COLUMNS = ("word,trials,mean,stderr,sd,min,median,max,"
            "win_rate,win_rate_stderr,wins,seconds")
@@ -132,11 +146,16 @@ def load_done(path):
     return done
 
 
-def sweep_word(pat, ans2g, na, t, seed, opener_g, tail, win_within):
-    """One word's t games, against the seed's fixed sequence of answer draws."""
+def sweep_word(pat, ans2g, na, t, seed, opening_g, tail, win_within):
+    """One opening's t games, against the seed's fixed sequence of answer draws.
+
+    `opening_g` is a list of guess indices -- one for a plain opener sweep, more
+    for an opening.  The draw stream is re-seeded here, so every entry of the
+    sweep faces the identical games however many words it plays.
+    """
     draw_rng = np.random.default_rng(seed)
     pick_rng = np.random.default_rng(seed + PICK_OFFSET)
-    rule = fixed_opener(opener_g)
+    rule = fixed_opening(opening_g)
     scores = []
     for _ in range(t):
         answer_idx = draw_answer(na, draw_rng)
@@ -155,11 +174,25 @@ def main(argv):
     else:
         with open(words) as f:
             sweep_words = [ln.strip() for ln in f if ln.strip()]
+    # An entry is an OPENING: one word, or several played blind in order.  Kept as
+    # the space-joined string it arrived as, which is what the CSV records and
+    # what a shortlist writes back, so a pass reads exactly what the last wrote.
+    openings = [w.split() for w in sweep_words]
     pos = {w: i for i, w in enumerate(guesses)}
-    bad = [w for w in sweep_words if w not in pos]
+    bad = [w for o in openings for w in o if w not in pos]
     if bad:
         raise SystemExit("%d swept words are not legal guesses, e.g. %s"
                          % (len(bad), " ".join(bad[:5])))
+    dup = [" ".join(o) for o in openings if len(set(o)) != len(o)]
+    if dup:
+        raise SystemExit("%d openings repeat a word, e.g. %s"
+                         % (len(dup), dup[0]))
+    sizes = sorted({len(o) for o in openings})
+    if len(sizes) > 1:
+        # Mixing them would rank a 1-word opening against a 2-word one, which is
+        # a comparison between two different strategies rather than a sweep.
+        raise SystemExit("the list mixes openings of %s words; a sweep ranks "
+                         "openings of ONE size" % " and ".join(map(str, sizes)))
 
     pat = np.array(load_patterns())
     ans2g = answer_to_guess(answers, guesses)
@@ -169,7 +202,7 @@ def main(argv):
     if limit is not None:
         sweep_words = sweep_words[:limit]
     done = load_done(out)
-    todo = [w for w in sweep_words if w not in done]
+    todo = [w for w in sweep_words if " ".join(w.split()) not in done]
 
     fh = None
     if out:
@@ -179,10 +212,14 @@ def main(argv):
         if fresh:
             fh.write("# wordle opener sweep: %d trials per word, follow-up %s, "
                      "seed %d\n" % (t, fallback, seed))
-            fh.write("# strategy in math/wordlesim.py: the word is played on turn "
-                     "0, the follow-up plays the rest\n")
-            fh.write("# every word faces the SAME %d answers, drawn from the 2315 "
-                     "mystery words (common random numbers)\n" % t)
+            fh.write("# %d-word openings, played BLIND in order; the follow-up "
+                     "plays the rest (math/wordlesim.py)\n" % sizes[0])
+            fh.write("# every opening faces the SAME %d answers, drawn from the "
+                     "2315 mystery words (common random numbers)\n" % t)
+            if sizes[0] > 1:
+                fh.write("# the candidate openings came from %s -- a screen of an "
+                         "existing ranking, so this is\n# the best of those "
+                         "examined, never the best opening\n" % words)
             fh.write("# NO guess cap: win_rate is the fraction of untruncated "
                      "scores at %d guesses or fewer\n" % win_within)
             fh.write("# the head is a SHORTLIST, not a winner -- see the "
@@ -190,8 +227,9 @@ def main(argv):
             fh.write(COLUMNS + "\n")
         fh.flush()
 
-    print("sweep: %d words x %d trials, follow-up %s, seed %d"
-          % (len(todo), t, fallback, seed))
+    print("sweep: %d %s x %d trials, follow-up %s, seed %d"
+          % (len(todo), "openings of %d words" % sizes[0] if sizes[0] > 1 else "words",
+             t, fallback, seed))
     if done:
         print("  resuming: %d words already in %s" % (len(done), out))
 
@@ -199,11 +237,13 @@ def main(argv):
     best = []
     for i, w in enumerate(todo):
         w0 = time.time()
-        st = sweep_word(pat, ans2g, na, t, seed, pos[w], tail, win_within)
+        st = sweep_word(pat, ans2g, na, t, seed, [pos[x] for x in w.split()],
+                        tail, win_within)
         dt = time.time() - w0
         if fh:
             fh.write("%s,%d,%.6f,%.6f,%.6f,%d,%.1f,%d,%.6f,%.6f,%d,%.3f\n"
-                     % (w, t, st["mean_guesses"], st["stderr"], st["sd"],
+                     % (" ".join(w.split()), t,
+                        st["mean_guesses"], st["stderr"], st["sd"],
                         st["min"], st["median"], st["max"],
                         st["win_rate"], st["win_stderr"], st["wins"], dt))
             fh.flush()
@@ -212,7 +252,7 @@ def main(argv):
             elapsed = time.time() - t0
             rate = (i + 1) / elapsed
             bm, bw, bword = min(best)
-            print("  %d/%d  %-8s %.4f  %5.1f%%   best %s %.4f  %5.1f%%   "
+            print("  %d/%d  %-12s %.4f  %5.1f%%   best %s %.4f  %5.1f%%   "
                   "%.1f/s  eta %.1f min"
                   % (i + 1, len(todo), w, st["mean_guesses"],
                      100.0 * st["win_rate"], bword, bm, 100.0 * bw, rate,
@@ -223,11 +263,11 @@ def main(argv):
         print("best %d by mean of the words swept THIS RUN (a shortlist, not a "
               "winner -- see the module docstring):" % min(20, len(best)))
         for mean, wr, w in sorted(best)[:20]:
-            print("  %-8s mean %.4f   win %6.2f%%" % (w, mean, 100.0 * wr))
+            print("  %-12s mean %.4f   win %6.2f%%" % (w, mean, 100.0 * wr))
         print("best %d by win rate (a DIFFERENT ranking of the same games):"
               % min(20, len(best)))
         for mean, wr, w in sorted(best, key=lambda r: (-r[1], r[0]))[:20]:
-            print("  %-8s win %6.2f%%   mean %.4f" % (w, 100.0 * wr, mean))
+            print("  %-12s win %6.2f%%   mean %.4f" % (w, 100.0 * wr, mean))
     if fh:
         fh.close()
         print("wrote %s" % out)

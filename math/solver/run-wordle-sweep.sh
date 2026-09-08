@@ -5,6 +5,10 @@
 #     bash solver/run-wordle-sweep.sh --fallback answer -t 100          # from math/
 #     bash solver/run-wordle-sweep.sh --fallback guess  -t 100
 #
+#     # ... or the top N two-word openings of an existing ranking, same cascade
+#     bash solver/run-wordle-sweep.sh --fallback answer -t 100 \
+#         --openings-from data/shared/singletons/pair_singletons.csv --top 10000
+#
 #     # STAGE 2: re-run only the words the screen left standing, at a FRESH seed
 #     bash solver/run-wordle-sweep.sh --fallback answer -t 1000 --seed 1 \
 #         --shortlist-from data/shared/wordlesim/sweep_answer_t100_s0_guess.csv
@@ -27,6 +31,21 @@
 #   stream), so differences between words are far less noisy than their individual
 #   standard errors suggest.  A sweep cell and a run-wordle-sim.sh run at the same
 #   seed are therefore different samples and will not match to the last digit.
+#
+# TWO-WORD (OR LONGER) OPENINGS: --openings-from RANKING.csv --top N takes the top
+# N openings off an existing ranking and sweeps those, with the same cascade after.
+# The words are played BLIND in order, so the second is played even when the first
+# already narrowed the answer to one -- that is what makes a multi-word opening a
+# bet.  A game the FIRST word wins ends there, so no opening is charged for a guess
+# after the answer is found.
+#
+#   IT IS A SCREEN OF A RANKING BUILT FOR A DIFFERENT QUESTION.  84,129,906 pairs
+#   cannot be simulated, so a pair run examines the head of
+#   data/shared/singletons/pair_singletons.csv, which ranks pairs by how many
+#   answers a blind opening isolates to a SINGLETON.  That ranking is exhaustive
+#   (its head is exact), but it is not this objective: a pair below --top is never
+#   examined at all, and nothing here shows the two agree inside it.  Report such a
+#   run as "the best of the N screened", NEVER "the best pair".
 #
 # THE HEAD OF A SWEEP IS A SHORTLIST, NOT A WINNER.  With 12972 words at -t games
 # each, the best-looking mean belongs to whichever word drew the kindest sample,
@@ -87,6 +106,8 @@ SHORTFROM=""
 SHORTSE=5
 SHORTTOP=""
 SHORTVALUE="mean"
+OPENFROM=""
+OPENTOP=""
 # Which pass this is; a run with no --shortlist-from is the first.
 STAGE=1
 
@@ -103,6 +124,8 @@ while [ $# -gt 0 ]; do
         --se)               SHORTSE="$2";    shift 2 ;;
         --shortlist-top)    SHORTTOP="$2";   shift 2 ;;
         --shortlist-value)  SHORTVALUE="$2"; shift 2 ;;
+        --openings-from)    OPENFROM="$2";   shift 2 ;;
+        --top)              OPENTOP="$2";    shift 2 ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
     esac
 done
@@ -142,6 +165,24 @@ fi
 OUTDIR=data/shared/wordlesim
 LOC=data/local/wordlesim
 mkdir -p "$OUTDIR" "$LOC"
+
+if [ -n "$OPENFROM" ]; then
+    [ -z "$SHORTFROM" ] || {
+        echo "--openings-from starts a new cascade; --shortlist-from continues one." >&2
+        echo "  Pass only one." >&2; exit 1; }
+    [ "$WORDS" = "guess" ] || {
+        echo "--openings-from replaces --words; pass only one" >&2; exit 1; }
+    [ -f "$OPENFROM" ] || { echo "no such ranking: $OPENFROM" >&2; exit 1; }
+    case "$OPENTOP" in
+        ''|*[!0-9]*|0) echo "--openings-from needs --top N: how much of the" >&2
+                       echo "  ranking to examine.  Everything below N is never" >&2
+                       echo "  looked at, so the number is part of the result." >&2
+                       exit 1 ;;
+    esac
+    WORDS="$OUTDIR/openings_$(basename "$OPENFROM" .csv)_top${OPENTOP}.txt"
+    "$PY" tools/opening_list.py --from "$OPENFROM" --top "$OPENTOP" --out "$WORDS" \
+        || exit 1
+fi
 
 if [ -n "$SHORTFROM" ]; then
     [ -f "$SHORTFROM" ] || { echo "no such sweep: $SHORTFROM" >&2; exit 1; }

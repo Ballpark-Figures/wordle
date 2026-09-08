@@ -1229,6 +1229,33 @@ CSV row per word, flushed).
 - **MEASURED (2026-09-08, this machine): ~490 words/s at `-t 100` under the
   `answer` follow-up and ~262/s under `guess`** — so a full 12972-word stage 1 is
   well under two minutes either way.
+- **AN ENTRY MAY BE A MULTI-WORD OPENING, and the same cascade ranks them.**
+  `--openings-from RANKING.csv --top N` takes the top N openings off an existing
+  ranking (`tools/opening_list.py`, any `word*` columns, so pair/triple/quad files
+  all work) and sweeps those; a list line holding several words IS the opening,
+  the CSV's `word` column holds it space-joined, and the shortlist writes it back
+  verbatim, so later passes are identical. A sweep REFUSES a list mixing sizes —
+  ranking a 1-word opening against a 2-word one compares two different strategies.
+- **BLIND MEANS BLIND, and the gate CONSTRUCTS the case rather than waiting for
+  it**: later opening words are played even when one candidate is left (that is
+  what a multi-word opening bets on), while a game the FIRST word wins ends there,
+  so no opening is charged after the answer is found. `checkwordlesim.py` picks a
+  word and an answer it isolates to a singleton, then requires the second word to
+  go down anyway and the game to cost 3 — a strategy that quietly stopped would
+  score 2. A random tally never fired, which is why it is constructed.
+- **A PAIR RUN IS A SCREEN OF A RANKING BUILT FOR A DIFFERENT QUESTION.** 84,129,906
+  pairs cannot be simulated, so it examines the head of
+  `data/shared/singletons/pair_singletons.csv` — which ranks pairs by how many
+  answers a blind opening isolates to a SINGLETON, exhaustively evaluated (its head
+  is exact) but **not this objective**, and itself only the top 1,000,000 rows.
+  A pair below `--top` is never examined at all. **Say "the best of the N
+  screened", never "the best pair"** — the same caveat multiwordle's `--top-n`
+  pair screen carries.
+- **MEASURED (2026-09-08): pair sweeps are FASTER than single-word ones** — ~1448
+  openings/s (`answer`) and ~627/s (`guess`) at `-t 100`, against 490 and 262 for
+  single words, because a two-word opening leaves far fewer candidates and the
+  follow-up does less work. So the whole committed 1M-pair file screens in ~12 min
+  (`answer`) / ~27 min (`guess`).
 - **PROGRESS PRINTING TIGHTENS AS THE FIELD NARROWS (user's call, 2026-09-08)** —
   a line every 100 words on pass 1, every 10 on pass 2, **every word from pass 3
   on**. The wrapper derives the pass from the SOURCE SWEEP'S OWN NAME (each stage's
