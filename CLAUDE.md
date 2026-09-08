@@ -1334,13 +1334,20 @@ CSV row per word, flushed).
   file that parses fine afterwards. Bit us 2026-09-08 mid-sweep; the run's own
   output survived (the tool had already written its CSV) but the wrapper died.
   `pgrep -f wordle_sweep.py` before touching one.
-- **PROGRESS PRINTING TIGHTENS AS THE FIELD NARROWS (user's call, 2026-09-08)** —
-  a line every 100 words on pass 1, every 10 on pass 2, **every word from pass 3
-  on**. The wrapper derives the pass from the SOURCE SWEEP'S OWN NAME (each stage's
+- **PROGRESS PRINTING TIGHTENS ONE RUNG PER PASS (user's call, 2026-09-08)** —
+  100, 50, 30, 20, 10, 5, 3, 2, then every opening from pass 9 on. The wrapper derives the pass from the SOURCE SWEEP'S OWN NAME (each stage's
   word list is a shortlist of the stage before, so the nesting counts the passes),
   and `--progress` overrides it. It gates a print and nothing else, so it changes
   neither the games nor the filename — a run is comparable with one made before the
-  default existed.
+  default existed. (A `case`, not a bash array: macOS ships bash 3.2.)
+- **A STEM NESTS ITS ANCESTORS, so parse it ANCHORED at the front.**
+  `sweep_answer_t10000_s2_shortlist_answer_t1000_s1_shortlist_..._t100_s0_...`
+  holds three `_t` and three `_s`, oldest LAST — so a greedy `.*_t` reads the
+  most distant pass. Bit us the moment the ladder started deriving values: a
+  depth-4 chain derived `-t 200` from a `t=10000` source and reused seed 0 while
+  announcing it had advanced the seed. The current sweep's own figures are the
+  ones immediately after `sweep_<follow-up>_`. Caught by a `--dry-run` across four
+  pass depths — which is exactly what that flag is for.
 - **THE CUT IS 5 STANDARD ERRORS, not multiwordle's 10 (user's call, 2026-09-08),
   and that is MEASURED rather than preferred**: at `t=100` a word's SE is ~0.10, so
   10 SE spans a full guess and kept **12367 of 12972** words (`answer`) / 12911

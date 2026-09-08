@@ -114,11 +114,14 @@
 # on; they need not agree.  It lands in the shortlist's name, so a stage-2 file
 # always records which screen chose its words.
 #
-# PROGRESS PRINTING TIGHTENS AS THE FIELD NARROWS: a line every 100 words on pass
-# 1, every 10 on pass 2, and EVERY WORD from pass 3 on.  The pass is read off the
-# source sweep's own name -- each one is a shortlist of the one before, so the
-# nesting counts them -- and --progress overrides it.  It gates a print only, so
-# it changes neither the games nor the filename.
+# PROGRESS PRINTING TIGHTENS AS THE FIELD NARROWS, one rung per pass:
+#
+#   pass     1    2    3    4    5    6    7    8   9+
+#   every  100   50   30   20   10    5    3    2    1  opening(s)
+#
+# The pass is read off the source sweep's own name -- each one is a shortlist of
+# the one before, so the nesting counts them -- and --progress overrides it.  It
+# gates a print only, so it changes neither the games nor the filename.
 #
 # USE THIS RATHER THAN CALLING tools/wordle_sweep.py DIRECTLY.  It sets --out so
 # the rows outlive the terminal, names the file after every parameter that defines
@@ -338,8 +341,14 @@ if [ -n "$SHORTFROM" ]; then
     STAGE=$((2 + NEST))
     # A later stage at the earlier seed replays the games that chose the
     # shortlist.  Loud, not fatal: it is a judgement about what the run means.
-    SRCSEED=$(echo "$SRCSTEM" | sed -n 's/.*_s\([0-9][0-9]*\)_.*/\1/p')
-    SRCT=$(echo "$SRCSTEM" | sed -n 's/.*_t\([0-9][0-9]*\)_.*/\1/p')
+    # ANCHORED at the front, and that matters: a stem NESTS its ancestors, so
+    # `sweep_answer_t10000_s2_shortlist_answer_t1000_s1_shortlist_..._t100_s0_...`
+    # holds three of each.  A greedy `.*_t` matches the LAST -- the oldest, most
+    # distant pass -- so a deep chain silently derived t=200 from a t=10000 run
+    # and reused seed 0 while claiming to advance it.  The current sweep's own
+    # figures are the ones right after `sweep_<follow-up>_`.
+    SRCT=$(echo "$SRCSTEM" | sed -n 's/^sweep_[a-z][a-z]*_t\([0-9][0-9]*\)_s[0-9].*/\1/p')
+    SRCSEED=$(echo "$SRCSTEM" | sed -n 's/^sweep_[a-z][a-z]*_t[0-9][0-9]*_s\([0-9][0-9]*\)_.*/\1/p')
     # Derive the next pass's trials and seed from the source, unless given.
     if [ -z "$T" ]; then
         [ -n "$SRCT" ] || { echo "cannot read -t from $SRCSTEM; pass -t" >&2; exit 1; }
@@ -358,16 +367,24 @@ if [ -n "$SHORTFROM" ]; then
     fi
 fi
 
-# HOW OFTEN TO PRINT A PROGRESS LINE, by pass (user's call, 2026-09-08).  A wide
-# stage-1 screen would drown the terminal one word at a time, but a later pass is
-# short and each word is worth watching -- so the interval tightens as the field
-# narrows: every 100 words on pass 1, every 10 on pass 2, EVERY WORD from pass 3
-# on.  --progress still overrides it.  This is cosmetic: it gates a print and
-# nothing else, so it touches neither the games nor the filename.
+# HOW OFTEN TO PRINT A PROGRESS LINE, by pass (user's call, 2026-09-08): 100, 50,
+# 30, 20, 10, 5, 3, 2, then every opening.  A wide stage-1 screen would drown the
+# terminal one word at a time, but a later pass is short and slow per opening, and
+# each one is worth watching.  --progress still overrides it.  This is cosmetic:
+# it gates a print and nothing else, so it touches neither the games nor the
+# filename.
 if [ -z "$PROGRESS" ]; then
+    # A `case` rather than an array: macOS ships bash 3.2, and the repo's scripts
+    # have to run identically on both machines.
     case "$STAGE" in
         1) PROGRESS=100 ;;
-        2) PROGRESS=10 ;;
+        2) PROGRESS=50 ;;
+        3) PROGRESS=30 ;;
+        4) PROGRESS=20 ;;
+        5) PROGRESS=10 ;;
+        6) PROGRESS=5 ;;
+        7) PROGRESS=3 ;;
+        8) PROGRESS=2 ;;
         *) PROGRESS=1 ;;
     esac
 fi
