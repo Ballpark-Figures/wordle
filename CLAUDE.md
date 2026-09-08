@@ -232,7 +232,48 @@ detail. Run it with **`bash solver/run-mm-sweep.sh --depth D [-k K]`** (from `ma
   replays every line against `wordle.pattern`, re-derives the hard-mode
   constraint from scratch, and checks answer coverage, guess counts, hint reuse
   and tree-sum-vs-CSV. Exits nonzero, so it works as a gate. Run it after any
-  solver change, alongside `solver/validate.sh`.
+  solver change, alongside `solver/validate.sh`. **It does NOT know the ULTRA
+  rule** (see below) — it checks hard-mode legality, so it cannot fully validate
+  an ultra tree.
+
+## `ultraturns` — ULTRA HARD MODE, stricter than hard mode
+- **`optturns.c` now builds a FOURTH binary, `ultraturns` (`-DULTRA`)** — a legal
+  guess must itself be **CONSISTENT with every clue so far** (a word the answer
+  could still be), not merely hard-mode-legal. So a word you guessed and missed is
+  illegal thereafter, because its own greys/yellows rule it out. The legal set at
+  any node is exactly the 12972 words still consistent. `sh build.sh` builds it.
+- **The objective is `ultra >= hard >= normal`, THREE DIFFERENT GAMES.** A strictly
+  smaller legal set can only raise the total. **Never put an `ultraturns` total in a
+  table with a `hardturns` or `optturns` one** — same trap as a capped optimum beside
+  an expected-guesses one.
+- **The constraint is REAL EXTRA STATE, exactly as hard mode**, so it is hashed into
+  the TT key (a DISTINCT ultra salt, so a foreign `tt.bin` fails verification). It
+  rides as **per-position allowed-letter masks + per-letter `lo`/`hi` counts** — the
+  `strspace.py` representation, which is **EXACT for FILTERING words** (the
+  repeated-letter trap is about ENUMERATING patterns and does not arise; the real
+  answers are still partitioned by the real pattern matrix). `cons_apply`/
+  `cons_legal`/`cons_hash` have an `#if ULT` branch beside hard mode's; the search
+  paths generalize hard mode's `HARD ?` to a shared **`USE_CONS` = `HARD || ULT`**
+  macro (folds to 0 in normal/mm, so those binaries stay bit-identical —
+  `validate.sh` still reproduces all five totals).
+- **Candidates are always legal**, so the `n==1`/`n==2`/`d>n` shortcuts hold unchanged.
+- **`--depth` is REQUIRED and it BINDS** (INFEASIBLE is expected, like hard mode), and
+  it does NOT escalate — pinned to `--depth`, each depth its own CSV.
+- **Run it with `bash solver/run-ultra-sweep.sh --depth D -k K`** (from `math/`),
+  attached — mirrors `run-mm-sweep.sh` (`--optimal-only`, `--print-openers`, per-(depth,K)
+  CSV `optimal_dD_kK.csv` under `data/{shared,local}/ultraturns/`, tt save/load). **topk
+  is the intended mode** (the exact solver is slow — the legal set is large near the
+  root), so the wrapper REQUIRES `-k`; the result is an UPPER BOUND, best of the K openers
+  examined. No trees from the sweep — the winner's tree needs a follow-up
+  `./solver/ultraturns --opener <winner> --depth D --topk K --trees <dir>`.
+- **Like `mmturns`, it is NOT in `paths.py`** — its output is `optimal_*.csv`, read
+  directly, and its tt snapshot is the binary's own `--tt-save`, so `WORDLE_SOLVER=
+  ultraturns` is not a thing.
+- **NO DEDICATED GATE YET.** The ultra legality property to check independently is that
+  **every guess after the opener reproduces every prior clue** (`pattern(g_i,g_j)==p_i`
+  for all `i<j`). A one-off replay verifier confirmed it on `salet`'s full tree (2315
+  answers, all lines legal, tree summed to the reported total) when the mode shipped;
+  building that into `checktrees.py` (or its own `checkultra.py`) is the open follow-up.
 
 - `math/tools/` holds the analysis scripts, all importing `paths.py` for
   locations. **`python3 math/tools/report.py`** is the standing status report
@@ -623,17 +664,41 @@ its state arithmetic against `strspace.py` over a shared deterministic walk — 
   same standing as the Absurdle tie-break rules. Two clauses are INFERRED, not
   observed: that a FAILED game (X/6) with no yellows does not earn it, and that a
   lucky 1/6 does. **A single real badge would settle both.**
-- **THE OBJECTIVE IS LEXICOGRAPHIC (user's call, 2026-09-03), and it is NOT "maximise
-  P(badge)".** Clause 1 is a HARD CONSTRAINT — the strategy must win every one of the
-  2315 answers within 6. Clause 2 maximises the badge count among strategies that
-  never lose. **Once a yellow appears the badge is gone for that answer and the play
-  is only required to FINISH the game** — "we stop checking". So the number is a
-  maximum SUBJECT TO a 6-guess guarantee; never quote it as an unconstrained one, and
-  never put it in a table beside the multiwordle/foximax/adversarial figures, which
-  are expected guesses OUTRIGHT.
-  - **CLAUSE 1 MEASURABLY BINDS** — `checkgreens.py` computes the unconstrained value
-    too, purely to prove it: on the small case `moobs` at d=3 scores 3 constrained
-    against 4 unconstrained. The constraint is not decoration.
+- **TWO OBJECTIVES, AND THEY ARE DIFFERENT QUANTITIES.** Never quote one as the other
+  or put them in one table.
+  - **`--may-lose` — THE BADGE QUESTION** (user's correction 2026-09-04): maximise the
+    answers **WON WITHIN 6 WITH NO YELLOW**. ONE EVENT per answer — it counts iff the play both
+    stays yellow-free AND finishes inside the cap. An answer that draws a yellow is
+    simply LOST and **the strategy owes it nothing afterwards; it may abandon that
+    game.** So yellow branches are never searched, no state is ever INFEASIBLE, and
+    this is much the cheaper of the two.
+  - **THE BINARY HAS NO DEFAULT OBJECTIVE — one of the two flags is REQUIRED**, and
+    that is a scar. It had one, and the wrapper forwarded the flag only in the must-win
+    case, letting the binary's default cover the other; when the default moved,
+    `--may-lose` silently ran a MUST-WIN search and wrote it under a may-lose FILENAME.
+    **Never let two places own one decision.** A defaulted objective is a domain ANSWER
+    hiding in configuration, so refusing to run is the only safe default. The WRAPPER
+    keeps a default (must-win) and forwards it explicitly — a default a human reads, not
+    one a program falls back on. The gate passes it explicitly in both directions too.
+  - **`--must-win` — the WRAPPER's default:** the same maximisation SUBJECT TO still winning EVERY
+    answer within 6. A strictly smaller strategy space, so **its value is always <=
+    `--may-lose`'s**. **IT IS THE DEFAULT ONLY BECAUSE RUNS WERE QUEUED AGAINST IT**
+    (user, 2026-09-04) — not because it is the headline quantity, which it is not. A
+    silent change of meaning under an unchanged command line is the worst thing a flag
+    can do, which is why the polarity went this way and why the gate now passes the
+    objective EXPLICITLY in both directions rather than leaning on the default.
+  - **THE DISTINCTION IN ONE LINE:** `--may-lose` asks "how often can I win in 6 with all
+    greens?"; the default asks "if I refuse to ever lose a game, how often can I win in 6
+    with all greens?". **Only the first is the badge question.**
+  - **HOW THIS WAS GOT WRONG, so it is not repeated:** the user's answer was "Max badge,
+    requiring that we win. Once we get a yellow, we stop checking." That was read as
+    "stop checking for badges but keep checking the win", and the win was made a hard
+    constraint on every answer. It meant stop checking, FULL STOP. When an answer
+    describes what happens after a failure, establish whether the failed cases are still
+    CONSTRAINED or simply OUT OF SCOPE — the two give different numbers.
+  - **THEY MEASURABLY DIFFER**, so neither is dead code: on the small case `moobs` at
+    d=3 scores 4 plain against 3 must-win, and at d=2 every opener is plain-positive but
+    must-win INFEASIBLE.
 - **THE CAP IS THE GAME, not an inherited knob.** `--depth 6` IS clause 1. Each depth
   is still a different quantity and gets its own CSV (`best_opener_d6.csv`).
 - **`if (d > n) d = n` DOES NOT TRANSFER from optturns, and that is the trap.** There,
@@ -742,7 +807,46 @@ its state arithmetic against `strspace.py` over a shared deterministic walk — 
   yellow, a yellow-free line, an infeasible opener, a binding win-constraint or a set of
   tied openers never occurred. Run it alongside `solver/validate.sh` and
   `tools/checkpatterns.py`.
+- **A SWEEP KEEPS THE BEST TREE**, written on every improvement to
+  `shared/greens/trees_<settings>/<opener>.txt.gz` — so an interrupted run leaves the
+  best STRATEGY and not merely its score, which was the gap `optturns --optimal-only`
+  still has. Superseded openers keep their files, making the directory a record of how
+  the incumbent improved; the final report names the winner. It is written OUTSIDE the
+  critical section (per-thread arena, self-verifying table, one file per opener), so a
+  slow tree walk cannot stall the other threads.
+- **WHAT IS IN A TREE DEPENDS ON THE OBJECTIVE.** Under `--may-lose` it is the
+  **badge-alive part only**: a yellow ends the branch, so the file holds exactly one
+  line per BADGED answer and its line count IS the reported score. Under must-win it
+  covers EVERY answer, post-yellow play included — which is what lets `checkgreens.py`
+  verify the guarantee independently. **The tree directory is per (depth, K, objective)**
+  for the same reason the CSV is: one opener's tree differs between them and a shared
+  directory would have them clobbering each other.
+- **THE CSV SELF-DESCRIBES, AND A RESUME REFUSES A FOREIGN ONE.** Its first line is
+  `# greens objective=... topk=... depth=... guesses=... answers=...`, and a run whose
+  stamp disagrees EXITS instead of resuming. **This is a scar**: every result from
+  before the two objectives existed (2026-09-03 evening through 09-04 13:50, k1 to
+  k13000 plus the live k10000) was written under a name that later came to mean the
+  OTHER objective, so a `--may-lose` resume silently continued a MUST-WIN search and
+  reported it as its own — under the correct may-lose banner, which is what made it
+  invisible. Depth was in every row; the objective and K were in the PATH ALONE, and a
+  filename cannot check itself. Those files are renamed `*_mustwin.csv` with the stamp
+  backfilled. **A file with no stamp is REFUSED, not trusted.**
+- **NOTHING SAVES THE TT ANY MORE.** `tt_save` sits at the end of `main`, so it fired
+  only on NORMAL COMPLETION — exactly when the table is worthless, since a finished
+  run's CSV marks every opener done and a resume then exits without reading it. The
+  case that would pay, an interrupted run, saved nothing because Ctrl-C never reaches
+  that line. Backwards, and 8.6 GB per settings combination (~160 GB) to be so. It was
+  copied from `run-ans-sweep.sh`, where a snapshot IS load-bearing. `--tt-load` stays
+  for a table made deliberately.
+- **RUNS WITH DIFFERENT SETTINGS GO SIDE BY SIDE.** The wrapper guards on the OUTPUT
+  FILE, not the process name: two runs appending to one CSV would each resume from it
+  and read the other's rows as work already done, silently skipping openers neither
+  solved. Different (depth, K, objective) means different CSV, table and log, so it is
+  allowed and merely warns about the table GB and threads it adds. The check reads live
+  COMMAND LINES, so it also catches a run started before the guard existed.
 - Data under `math/data/{shared,local}/greens/`; trees in `shared/greens/trees/`.
+  **Depth, K and the objective are all in the filename** — three different quantities
+  must never share a file.
 - **COST IS UNMEASURED as of 2026-09-03.** Price it with one named opener before
   launching the screen.
 
@@ -1200,6 +1304,19 @@ Run it with **`bash solver/run-nerdle-solve.sh [-k K] [--width W] [--rank-only]`
   quadratically and never makes it exhaustive. **The score is split quality, NOT expected
   guesses** — it does not know an answer won by the FIRST guess is cheaper than one won by
   the second.
+  - **THE SCREEN RETURNS ONLY WHAT IT WILL WRITE, and that limit is load-bearing.**
+    Turning every pair into a Python tuple **killed a FINISHED 25-hour sweep** at
+    `--top-n 30000`: 449985000 pairs need ~70 GB of tuples on a 25.8 GB machine, and
+    nothing was written until after that step. `pair_scores(keep=N)` is now the contract;
+    `keep=None` REFUSES above `MAX_MATERIALISE` rather than trying and dying. Scores are
+    int32 (max is NA², 3.1e8) and the kept top-N is maintained AS THE SWEEP RUNS.
+  - **PARTIAL RESULTS ARE CHECKPOINTED every few minutes, atomically**, so a kill never
+    loses a long sweep. `finished=` in the meta says whether the sweep completed;
+    `complete=` still says whether every scored pair was written.
+  - **THE INCUMBENT LOG IS WHAT SAVED THAT RUN.** The tee'd `NEW BEST` lines in
+    `data/local/nerdle/` were the only surviving record — recovered to
+    `pairs_w8_n30000_incumbents.csv`. Best pair `47-11=36 2*029=58` at 37788, **found at
+    5.8% of the sweep, with nothing improving across the remaining 24.5 hours**.
   - **ONLY THE BEST `--write-top` PAIRS ARE RECORDED (100000 default), GZIPPED.** Every
     pair is scored, but `--top-n 10000` is 49995000 of them and writing them all produced
     a **1.67 GB file in the committed tree**. The `.meta` carries `scored`/`written`/
@@ -1224,6 +1341,143 @@ Run it with **`bash solver/run-nerdle-solve.sh [-k K] [--width W] [--rank-only]`
   against an independent argmin, the class-win rule, and a check that no surviving bin
   ever carries the all-green code. It enumerates its small word lists IN MEMORY so it runs
   on a fresh clone. Run it alongside `tools/checknerdle.py`.
+
+## Letroso (letroso.com) — NOT a Wordle variant, and every secondary source is wrong
+`math/letroso.py` states the rules and IS the source of truth; read it before quoting
+anything. Run it with **`bash solver/run-letroso-rank.sh --length-prior lengths`** then
+**`bash solver/run-letroso-solve.sh --length-prior lengths`** (from `math/`).
+- **THE RULES CAME FROM THE SHIPPED BUNDLE, NOT FROM ANY ARTICLE.** Letroso is a
+  **Daydash** game (the Contexto/Conexo/Expresso studio), `lang="pt-br"` with en/es
+  localisations; `letroso.org` and the SEO sites are unaffiliated and describe a
+  DIFFERENT, WRONG game (they claim Wordle green/yellow plus "connection lines"). The
+  real algorithm is `zT`/`BT` in `assets/index-*.js`. **There is no positional
+  green/yellow at all.**
+- **The feedback is a MAXIMUM-SCORING LCS ALIGNMENT** between guess and answer.
+  `head`/`tail` = letters in the alignment (they occur in the answer in that relative
+  order); a maximal run consecutive in BOTH guess and answer draws as one connected
+  block, which is what marketing calls a connection line. `present` = in the answer by
+  multiset count but out of order. `absent` = not there. Plus `start`/`end` flags when
+  the alignment reaches the first/last letter of both. Among maximum-cardinality
+  alignments it maximises `d = 3*sum(position within run) + start + end`, then takes the
+  lexicographically largest pattern.
+- **VERIFIED, not inferred: the port reproduces all TWELVE worked examples in the game's
+  own instructions modal**, across all three shipped languages (en `example`, pt
+  `exemplo`, es `ejemplo`). That is the only external evidence and `tools/checkletroso.py`
+  pins it.
+- **YOU DO NOT KNOW THE ANSWER'S LENGTH.** `Pa=10` caps what you can TYPE (hence answers
+  are ≤10), there is no grid of known width, and **no minimum is stated anywhere in the
+  source** — the 3 in our lists is an ASSUMPTION (user's call). Their own list has 532
+  two-letter words. Unlimited guesses.
+- **A GREEDY LEFT-TO-RIGHT FEEDBACK IS WRONG, and was tried.** An unmatched position
+  resolves to `present` or `absent` depending on what the WHOLE alignment consumed, so
+  the lexicographic comparison is not decidable position by position: `aab` against
+  `babaa` is `(1,0,0,2,3)`, not the greedy's `(0,2,3,1,0)`. The differential test caught
+  it; do not re-derive it.
+- **THE ONE KNOWN AMBIGUITY, and it is MEASURED at zero.** The game's tie-break sort
+  comparator returns "less than" for EQUAL patterns and is therefore inconsistent, so
+  which of two equal-pattern alignments displays is up to V8. We resolve it by preferring
+  the LATEST match (`end` over `start`), matching the reference's enumeration order.
+  **On 5000 real word pairs the top pattern is NEVER tied**, so the tie-break never
+  actually decides; it fires only on toy inputs like `aa`/`a`. Do not report it as a risk
+  without that number.
+- **THE GUESS LIST IS LETROSO'S OWN (changed 2026-09-07; it used to be hello's).** The
+  one thing knowable client-side is what letroso will ACCEPT as a guess: its bundle ships
+  `assets/all-en-<hash>.js`, one JSON array of **93357** lowercase words, lengths **2-10**
+  (`Pa`=10 caps typing; 532 two-letter words). `build_letroso_lists.py` fetches that
+  (discovering the deploy-specific hash from `index-*.js`, caching the raw bundle under
+  `data/local/letroso/`) and writes per-length **guess** lists to
+  `data/shared/words/letroso/len<L>/` — a NEW dir, NOT `hello/` (the Wordle length-sweeps
+  still read hello's guesses and must not be disturbed). So a word we accept is a word
+  letroso accepts, and one it rejects (e.g. **`clarionets`** — in hello's Scrabble
+  dictionary but NOT in letroso's list) we reject too. `MINLEN` is now **2**.
+  - **The earlier decision to guess from hello's lists is REVERSED.** It was the reason we
+    diverged from the live game; the user's call is to match letroso's guess list wherever
+    possible (2026-09-07). letroso's list is a permissive web-corpus set full of proper
+    nouns/initialisms (`aachen`, `kph`, `rss`) — we take it anyway, because it IS the game.
+- **THE ANSWER LIST IS STILL OURS, and NOT letroso's** — its real answer set is
+  server-side and unknown. We model it from hello wordl's curated `mystery.txt` (Norvig
+  frequency, hand-pruned), **INTERSECTED with letroso's guess list** so every answer is a
+  legal guess (`ANS2G` indexes answers into guesses). The intersection drops ~3-14% of
+  hello's answers per length (they are not letroso-legal, so unwinnable anyway). A number
+  here still describes THIS game on THESE lists, never letroso.com — but the guess half
+  now matches the live game exactly.
+- **LENGTHS 2 AND 3 ARE OURS AND ARE A MODELLING DECISION** (`build_letroso_lists.py`).
+  hello's answer curation starts at 4, so those two lengths have no hello answers; we build
+  them with the same rule the len-3 list always used — keep the guess words with
+  `wordfreq zipf >= ZIPF_BAR` (3.0), chosen to put the answers/guesses ratio in line with
+  4-10 (58% at L=4, rising as words shorten). **The pool it now filters is LETROSO's**
+  short-word list, not hello's (len 3 went 1015 -> 3619 words). `--bar` keeps a different,
+  recorded rule open; each `mystery.txt.meta` records which rule built it.
+- **`--length-prior` IS PART OF THE OBJECTIVE AND HAS NO DEFAULT.** `lengths` (uniform over
+  the lengths present — now **9**, lengths 2-10, the user's choice) vs `words` (uniform over
+  the pooled list) are different objectives. The prior derives its length set from the
+  answers, so adding length 2 shifts every length's share automatically.
+- **THE CACHED ROOT RANKING IS FINGERPRINTED OVER BOTH LISTS**, so this change makes
+  `data/shared/letroso/root_rank_lengths.csv.gz` STALE — re-run `run-letroso-rank.sh`
+  before trusting any solve. The old `hello/len3/` dir is now orphaned (only the old
+  letroso path read it); harmless, left in place.
+- **The ranking rule is `topk.py`'s, NOT nerdle's**: `sum over bins != win of n_b * W_b`,
+  ties on lowest guess index — the expected number of candidate WORDS still alive. Sum of
+  squared bin sizes is undefined here because the answers are not equally likely.
+- **`-k K` restricts the ROOT too**, so the opener is the best of the K examined, not of
+  139072. Each K is a different strategy and gets its own file.
+- **COST, measured.** 4.23e9 feedback evaluations for a root scan, each an LCS DP rather
+  than a symbol compare: **15.9 us/pair** in the numba kernel against 981 us in pure
+  python, so ~19 core-hours, under an hour on 20 threads. The root ranking is CACHED
+  behind a fingerprint over both lists and the prior; **a mismatch is REFUSED**, since a
+  foreign ranking would be confidently wrong rather than missing. **It CHECKPOINTS to
+  `data/local/letroso/` every few chunks and RESUMES** — at ~19 core-hours it has to
+  survive a Ctrl-C or a reboot, so re-running the same command picks up where it stopped;
+  a checkpoint whose fingerprint does not match is ignored, never resumed from. (An
+  earlier version saved only on completion, which was fine for nerdle's 110s rank and a
+  defect here.)
+- **`python3 tools/checkletroso.py` is the GATE** — tutorial rows, `feedback` vs the
+  enumerate-every-path reference over 37332 exhaustive pairs, the numba kernel vs that on
+  4000 real pairs, root scoring vs an independent dict-bucketing implementation, both
+  priors summing to 1, a coverage tally that FAILS if any awkward feature never fired, and
+  an independent REPLAY of the solver's strategy answer-by-answer to check the cost
+  accounting. Run it alongside `solver/validate.sh`.
+
+## Lingo (`run-lingo-sweep.sh`) — Wordle with the FIRST LETTER GIVEN, per letter
+Lingo (the game show) reveals the opening letter; we model ONE INDEPENDENT game
+per starting letter. `math/solver/README.md` "Lingo" is the detail; the key facts:
+- **NO NEW SOLVER CODE — it is the validated `optturns` on restricted lists.** For
+  each letter L both the answer pool and the legal guesses are restricted to words
+  starting with L, so position 0 is always green and **the feedback function is
+  Wordle's, UNCHANGED**. The restriction is entirely `--guess-list` (follow-ups AND
+  swept openers) + `--answer-list` (the total's answers) + `--patterns` (a matrix
+  built for exactly those columns). `validate.sh` is untouched and still passes.
+- **THE FEEDBACK RULE IS UNVERIFIED** against the real show — we assume Wordle's
+  green/yellow/grey with Wordle's duplicate-letter handling (the user's modelling
+  call, 2026-09-07). Same standing as the Absurdle / Sea-of-Greens rules; a real
+  Lingo board would settle it. Say so when quoting any number.
+- **THE ANSWER POOL IS THE CURATED mystery LIST** (user's call): length 5 = the
+  2315 NYT answers filtered by letter, guesses from the 12972 — the lists
+  `patterns.npy` is built from. Length 6 has no NYT set, so it falls back to the
+  **hello wordl** len-6 lists like the length sweeps — a different, NOT comparable
+  curation (see "Other word lengths"). A number describes THIS game on THESE lists.
+- **THE CAP IS PART OF THE OBJECTIVE.** Lingo gives five guesses (the given first
+  letter is not one), so `--depth 5` IS the game; `--depth` is REQUIRED and each
+  depth gets its own results dir. `INFEASIBLE` is an expected result (normal
+  Wordle's "follow SALET's tree" escape needs a word that starts with L, so it does
+  not transfer) — report totals as optima SUBJECT TO the guarantee, never as
+  minimum expected guesses. Never table a Lingo total beside an `optturns` one.
+- **`-k K` is a beam (upper bound) and restricts the ROOT too** — same caveat every
+  `--topk` sweep here carries.
+- **Run it with `bash solver/run-lingo-sweep.sh --depth 5 [--length L] [--letter X]`
+  (from `math/`)**, attached, tee'd-log rules as the other sweeps. It auto-builds
+  the per-letter lists (`build_lingo_lists.py`) and per-letter matrix
+  (`build_patterns.py --answer-list`, additive + off the shared matrix paths).
+  Length 5 uses plain `optturns`; other lengths need `sh build.sh <L>` first.
+  Data: committed CSVs in `data/shared/lingo/len<L>_d<D>/<letter>_totals.csv`;
+  matrices/trees/tt/log under `data/local/lingo/`. `python3 tools/lingo_report.py
+  --length L --depth D` prints the best opener per letter.
+- **`python3 tools/checklingo.py` is the GATE.** The one new artifact is the
+  per-letter matrix, so the load-bearing check diffs every column BIT-IDENTICAL
+  against the shared length matrix (`checkpatterns.py` validates that against
+  `wordle.pattern`), proving true feedback AND correct column order; it also pins
+  the lists as exactly the filtered full lists and replays emitted trees
+  length-generally. Run it alongside `solver/validate.sh` and `checkpatterns.py`.
 
 ## Gameplay layout
 - (Describe this video's on-screen layout and the assets in `animations/assets/`.)

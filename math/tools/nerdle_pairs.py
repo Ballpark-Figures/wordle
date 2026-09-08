@@ -90,47 +90,29 @@ def main(argv):
     game = NT.NerdleTopK(width=width, k=1)
     print("\n%d guesses, %d answers, %d classes (built in %.1fs)"
           % (game.NG, game.NA, game.nclasses, time.time() - t0))
-    print("ranking singles, then scoring %d pairs (Ctrl-C stops it within a"
-          " second)." % (top_n * (top_n - 1) // 2))
-    print("Every improvement on the running best is printed as it is met; ties")
-    print("are not, or a plateau would flood the log.")
-    sys.stdout.flush()
-
     NT.attach_ranking(game, progress=NT.progress_printer(10.0))
-    def show_best(score, first, second, done, total, elapsed):
-        print("  NEW BEST %12d  %-11s %-11s   %6.2f%%  %7.1fs"
-              % (score, first, second, 100.0 * done / total, elapsed))
-        sys.stdout.flush()
 
-    t1 = time.time()
-    gs, scored = game.pair_scores(top_n, progress=NT.progress_printer(10.0),
-                                  on_best=show_best)
-    secs = time.time() - t1
-
+    # Everything the output needs is resolved BEFORE the sweep, because a
+    # checkpoint writes the file mid-run and cannot wait for the sweep's return
+    # value.  `gs` is derived exactly as pair_scores derives it, and the assert
+    # below is what keeps that from being a claim rather than a fact.
     scores, order = game.root_ranking()
     single_best = (game.guess_words[int(order[0])], int(scores[order[0]]))
+    gs = order[:top_n]
 
-    print("\nscored %d pairs from the top %d singles in %.1fs"
-          % (len(scored), len(gs), secs))
-    if single_best:
-        print("for scale, the best SINGLE guess: %s at %d"
-              % (single_best[0], single_best[1]))
-    print("\n%4s %-11s %-11s %14s" % ("rank", "first", "second", "sum of squares"))
-    for r, (score, i, j) in enumerate(scored[:show]):
-        print("%4d %-11s %-11s %14d"
-              % (r + 1, game.guess_words[gs[i]], game.guess_words[gs[j]], score))
-
-    if out:
-        keep = len(scored) if write_top <= 0 else min(write_top, len(scored))
+    def write_out(best, n_scored, secs, complete):
+        """Write the results and the meta. ATOMIC: an interrupted checkpoint
+        cannot leave a truncated file where a finished one is expected."""
+        if not out:
+            return
+        tmp = out + ".tmp"
         opener = gzip.open if out.endswith(".gz") else open
-        with opener(out, "wt") as f:
+        with opener(tmp, "wt") as f:
             f.write("rank,first,second,sum_of_squares\n")
-            for r, (score, i, j) in enumerate(scored[:keep]):
+            for r, (score, i, j) in enumerate(best):
                 f.write("%d,%s,%s,%d\n"
                         % (r + 1, game.guess_words[gs[i]], game.guess_words[gs[j]], score))
-        if keep < len(scored):
-            print("\nwrote the best %d of %d pairs (--write-top); the rest are"
-                  " scored but not recorded" % (keep, len(scored)))
+        os.replace(tmp, out)
         with open(out + ".meta", "w") as m:
             m.write("kind=pair-opener-screen\n")
             m.write("width=%d\ntop_n=%d\nrules=%s\n" % (width, top_n, RULES))
@@ -140,16 +122,58 @@ def main(argv):
             m.write("blind=1\n")
             m.write("guesses=%d\nanswers=%d\nclasses=%d\n"
                     % (game.NG, game.NA, game.nclasses))
-            m.write("scored=%d\n" % len(scored))
-            m.write("written=%d\n" % keep)
-            m.write("complete=%d\n" % int(keep == len(scored)))
-            if single_best:
-                m.write("best_single=%s\nbest_single_score=%d\n" % single_best)
-            if scored:
-                s, i, j = scored[0]
+            m.write("scored=%d\n" % n_scored)
+            m.write("written=%d\n" % len(best))
+            m.write("complete=%d\n" % int(complete and len(best) == n_scored))
+            m.write("finished=%d\n" % int(complete))
+            m.write("best_single=%s\nbest_single_score=%d\n" % single_best)
+            if best:
+                s, i, j = best[0]
                 m.write("best_pair=%s %s\nbest_pair_score=%d\n"
                         % (game.guess_words[gs[i]], game.guess_words[gs[j]], s))
             m.write("seconds=%.1f\n" % secs)
+
+    def checkpoint(best, done, total, elapsed):
+        write_out(best, done, elapsed, complete=False)
+        print("  checkpoint: best %s so far, %d of %d pairs scored, written"
+              % (best[0][0] if best else "none", done, total))
+        sys.stdout.flush()
+
+    def show_best(score, first, second, done, total, elapsed):
+        print("  NEW BEST %12d  %-11s %-11s   %6.2f%%  %7.1fs"
+              % (score, first, second, 100.0 * done / total, elapsed))
+        sys.stdout.flush()
+
+    print("\nranking singles, then scoring %d pairs (Ctrl-C stops it within a"
+          " second)." % (top_n * (top_n - 1) // 2))
+    print("Every improvement on the running best is printed as it is met; ties")
+    print("are not, or a plateau would flood the log.  Partial results are")
+    print("written every few minutes, so a kill does not lose the sweep.")
+    sys.stdout.flush()
+
+    # The screen keeps only what it will write.  Handing back every pair is what
+    # killed a finished 25-hour run at --top-n 30000.
+    keep = None if write_top <= 0 else max(write_top, show)
+    t1 = time.time()
+    gs2, scored, n_scored = game.pair_scores(
+        top_n, keep=keep, progress=NT.progress_printer(10.0), on_best=show_best,
+        on_checkpoint=checkpoint if out else None)
+    secs = time.time() - t1
+    assert list(gs2) == list(gs), "the sweep ranked differently from the writer"
+
+    print("\nscored %d pairs from the top %d singles in %.1fs"
+          % (n_scored, top_n, secs))
+    print("for scale, the best SINGLE guess: %s at %d" % single_best)
+    print("\n%4s %-11s %-11s %14s" % ("rank", "first", "second", "sum of squares"))
+    for r, (score, i, j) in enumerate(scored[:show]):
+        print("%4d %-11s %-11s %14d"
+              % (r + 1, game.guess_words[gs[i]], game.guess_words[gs[j]], score))
+
+    if out:
+        write_out(scored, n_scored, secs, complete=True)
+        if len(scored) < n_scored:
+            print("\nwrote the best %d of %d pairs (--write-top); the rest are"
+                  " scored but not recorded" % (len(scored), n_scored))
         print("\nwrote %s (+ .meta)" % out)
     return 0
 

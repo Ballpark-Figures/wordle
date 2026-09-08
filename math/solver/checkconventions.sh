@@ -97,6 +97,34 @@ for w in solver/run-*.sh; do
 done
 echo "   ok   $(ls solver/run-*.sh | wc -l | tr -d ' ') wrappers parse"
 
+# ------------------------------------------------- 6. every solver is parallel
+# A new solver written by copying a sibling's shape inherits its wrapper, its --out
+# insistence and its comment style -- and then quietly does NOT inherit the one
+# thing that is a compile FLAG rather than code. antiexpect shipped as the only one
+# of nine built without $OMP, ran the full problem on one of eighteen cores, and was
+# handed over as "ready" with nobody noticing until it was asked about directly.
+#
+# Nothing in the source shows it: the file looks like its siblings. Only the build
+# line differs, so only a check on the build line catches it.
+#
+# A genuinely single-threaded tool is allowed -- mark its line `# NO-OMP:` with the
+# reason, and this passes. What is not allowed is silence.
+echo "6. every solver is built with OpenMP, or says why not"
+ompfail=0
+while IFS= read -r line; do
+    case "$line" in
+        *'$OMP'*) continue ;;                 # parallel: fine
+        *'NO-OMP:'*) continue ;;              # deliberate and stated: fine
+    esac
+    b=$(echo "$line" | grep -o '\-o [a-z0-9]*' | awk '{print $2}')
+    [ -n "$b" ] || continue
+    bad "$b is built without \$OMP and without a '# NO-OMP: <reason>' note"
+    ompfail=1
+done <<EOF
+$(sed -n '/^if \[ \$# -eq 0 \]/,/^fi/p' solver/build.sh | grep '^ *gcc ')
+EOF
+[ "$ompfail" -eq 0 ] && echo "   ok   every solver in build.sh is parallel or explains itself"
+
 echo
 if [ "$fail" -eq 0 ]; then echo "all solver conventions hold"; else echo "CONVENTION FAILURES -- see above"; fi
 exit $fail

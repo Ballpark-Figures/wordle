@@ -54,12 +54,24 @@ it has the reds in place, and a yellow on square i means the answer does not hav
 that letter there.  So play never dead-ends, and the game ends exactly when the
 answer is the ONLY legal word left.
 
-WHAT THIS MODULE DOES *NOT* COVER.  The uncertainty phase (several candidates
-alive, so the guess partitions them and the objective averages over answers) is a
-max-expectimax and is not here.  What IS here is the endgame after the candidate
-set collapses to one word: all feedback becomes predictable, every guess has ONE
-child, and "play as long as possible" is a LONGEST PATH in the DAG above.  See
-`longest_stall`.
+WHAT THIS COMPUTES, AND WHAT IT ASSUMES.  The search fixes an answer and finds the
+LONGEST GAME for it, choosing the whole line from an empty board — so it plays
+clairvoyantly, knowing the answer from move one.  A real player does not, and must
+hedge, so these are UPPER BOUNDS on real play, never achievable scores.
+
+IT IS NOT AN "ENDGAME AFTER THE CANDIDATES COLLAPSE", which is how this was
+described until 2026-09-04.  The stalling does not wait for the answer to be pinned
+down: measured on `bully`'s optimal 16-guess line, the possible answers run
+27 16 12 7 7 6 6 5 4 4 3 2 2 2 1 1 — the answer is not pinned until guess 15.  The
+length comes from playing words that are LEGAL but are not possible answers (11 of
+those 16 plays are guess-only words like `bunjy` and `biccy`), which is why the
+GUESS list and the ANSWER list have to stay separate objects.  Legality and
+answer-consistency are close but not equal: the legal set is a superset, differing
+on repeated letters in about 3% of states, and the answer is pinned while several
+plays remain in roughly a third of the states where it is pinned at all.
+
+With the answer fixed every reply is determined, so the search is a LONGEST PATH
+over the DAG above rather than anything probabilistic.  See `longest_stall`.
 
 WORD LISTS ARE OURS, NOT ANTIWORDLE'S.  Guesses are the 12972 `guess.txt`,
 answers the 2315 `mystery.txt` — the original Wordle lists the rest of this video

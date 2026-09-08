@@ -1,8 +1,9 @@
 #!/bin/sh
 # Build the solvers from the single optturns.c.  Run from math/solver/.
 #
-#   sh build.sh           -- optturns (normal Wordle), hardturns (hard mode)
-#                            and mmturns (Mastermind peg feedback)
+#   sh build.sh           -- optturns (normal Wordle), hardturns (hard mode),
+#                            mmturns (Mastermind peg feedback) and ultraturns
+#                            (ultra hard mode: guesses must stay consistent)
 #   sh build.sh 7         -- optturns7, the 7-letter solver
 #   sh build.sh 4 6 7 8   -- several lengths at once
 #
@@ -46,6 +47,12 @@ if [ $# -eq 0 ]; then
   # remap of the SAME pattern matrix, so it is a third compile-time mode of this
   # one source rather than a program of its own. 20 outcomes, not 238.
   gcc $BASE $OMP -DMASTERMIND -o mmturns optturns.c
+  # ultraturns is "ultra hard mode": a legal guess must itself be CONSISTENT with
+  # every clue so far -- stricter than hard mode, which only forces greens in
+  # place and yellows somewhere.  Another compile-time mode of this one source
+  # (-DULTRA), carrying the accumulated consistency constraint as extra TT state
+  # exactly as hard mode carries its own.
+  gcc $BASE $OMP -DULTRA -o ultraturns optturns.c
   # pairsplit is the PAIR-OPENER screen: no search, no TT, just the joint-split
   # score for every unordered pair of guesses. Separate program because it shares
   # nothing with the solver but the .npy loader.
@@ -74,7 +81,11 @@ if [ $# -eq 0 ]; then
   # --longest parallelises over ANSWERS, which are independent searches sharing
   # only the incumbent and the (self-verifying) table, so it wants OpenMP.
   gcc $BASE $OMP -o antistall antistall.c
-  echo "built ./optturns, ./hardturns, ./mmturns, ./pairsplit, ./strturns, ./strguess, ./greens and ./antistall  (5 letters)"
+  # antiexpect maximises EXPECTED turns: a strategy played without knowing the
+  # answer, so its state carries BOTH the legal set and the still-possible answers.
+  # A different objective from antistall's per-answer maximum, hence its own program.
+  gcc $BASE $OMP -o antiexpect antiexpect.c
+  echo "built ./optturns, ./hardturns, ./mmturns, ./ultraturns, ./pairsplit, ./strturns, ./strguess, ./greens ./antistall and ./antiexpect  (5 letters)"
   exit 0
 fi
 
@@ -82,8 +93,8 @@ WORDS_DIR="../data/shared/words/hello"
 
 for L in "$@"; do
   case "$L" in
-    4|5|6|7|8|9|10|11) ;;
-    *) echo "build.sh: unsupported length '$L' (4..11; NPAT table in optturns.c)" >&2
+    3|4|5|6|7|8|9|10|11) ;;
+    *) echo "build.sh: unsupported length '$L' (3..11; a new length needs a P3_<L> entry in optturns.c)" >&2
        exit 1 ;;
   esac
 

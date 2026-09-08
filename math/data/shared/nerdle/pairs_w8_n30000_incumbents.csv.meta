@@ -1,0 +1,15 @@
+kind=pair-opener-incumbents
+width=8
+top_n=30000
+rules=2026-09-03
+scored=449985000
+written=34
+complete=0
+is_ranking=0
+recovered_from=data/local/nerdle/pairs_w8_n30000.log
+recovery_reason=the run exhausted memory building its result list; the sweep itself completed and only these incumbents survive
+caveat=strict improvements only -- pairs TIED with the best were never logged, and no runner-up ordering survives
+best_pair=47-11=36 2*029=58
+best_pair_score=37788
+best_found_at_seconds=1797.5
+sweep_seconds=90336.5

@@ -1,0 +1,4 @@
+word,total,expected,depth,seconds
+centralist,9948,2.46849,10,0.2
+centralism,9835,2.44045,10,0.2
+mercantile,9802,2.43226,10,0.2

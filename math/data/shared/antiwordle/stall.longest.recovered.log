@@ -1,0 +1,13 @@
+
+[exited with code 144]
+[2026-09-03T10:43:18-0400] antistall sweep -> data/shared/antiwordle/stall.longest.csv
+TT: 2^28 entries, 6.44 GB
+answers 2315 to solve, guess list 12972 words
+phase A: greedy playout for 2315 answers
+phase A done in 9.5s: best greedy 14 (bully), worst 7
+phase B: testing against a rising incumbent, best greedy first
+[1/2315] bully greedy=14 record  nodes=32956920 1713.95s
+        NEW LONGEST: 16  abaya bevvy biccy boomy bubby buddy buffy buggy bunjy buppy burry bushy butty buzzy bulky bully
+[2/2315] burly greedy=14 no  nodes=27144851 1242.39s
+[3/2315] furry greedy=14 no  nodes=31200463 2081.43s
+        ... brace still trying for 17: 140000000 nodes, 9068s

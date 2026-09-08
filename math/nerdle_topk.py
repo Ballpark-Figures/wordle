@@ -63,6 +63,10 @@ from nerdle import SYMBOLS, WIDTH, commutative_key
 
 MAXD = 32          # recursion guard; see the docstring -- NOT a modelling cap
 
+# How many pairs pair_scores will hand back in full.  Each becomes a Python
+# tuple of three ints, about 148 bytes, so this caps that list near 0.7 GB.
+MAX_MATERIALISE = 5000000
+
 NSYM = len(SYMBOLS)
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _DATA = os.path.join(_HERE, "data", "shared", "nerdle")
@@ -741,7 +745,8 @@ class NerdleTopK:
         return best_cost, best_g
 
     # ---- pair openers ------------------------------------------------------
-    def pair_scores(self, top_n, progress=None, on_best=None):
+    def pair_scores(self, top_n, keep=None, progress=None, on_best=None,
+                    on_checkpoint=None, checkpoint_every=300.0):
         """Every pair drawn from the top_n single guesses, by joint sum of squares.
 
         Returns (the top_n guess indices, [(score, i, j)] sorted best first),
@@ -758,11 +763,22 @@ class NerdleTopK:
         that an answer won by the first guess is cheaper than one won by the
         second -- both simply leave the partition.
 
+        Returns (guess indices, the best `keep` pairs, how many were SCORED).
+        Only the best `keep` are returned, and that is a hard limit rather than
+        a convenience: turning all of them into Python tuples is what killed a
+        finished 25-hour sweep at --top-n 30000, where the 449,985,000 pairs
+        needed about 70 GB on a 25.8 GB machine.  `keep=None` asks for all of
+        them and REFUSES above MAX_MATERIALISE, rather than trying and dying.
+
         `on_best(score, first, second, done, total, elapsed)` is called for every
         STRICT improvement on the running best, in the order the search meets
         them, so a long run shows its incumbent rather than only its percentage.
-        Ties are not reported -- a plateau would otherwise flood the log -- but
-        they are still kept in the returned list, which the final sort orders.
+        Ties are not reported -- a plateau would otherwise flood the log.
+
+        `on_checkpoint(best, done, total, elapsed)` is called every
+        `checkpoint_every` seconds with the best pairs SO FAR, so a long run can
+        write partial results and survive being killed.  The running best is
+        maintained as it goes, so a checkpoint costs nothing to produce.
         """
         S = np.arange(self.NA, dtype=np.int64)
         _, order = self.root_ranking()
@@ -771,11 +787,20 @@ class NerdleTopK:
 
         # int16 holds every pattern code (6560 at width 8) and the -1 marker, and
         # halves what is a 354 MB table at --top-n 10000.
+        npairs = nk * (nk - 1) // 2
+        if keep is None:
+            if npairs > MAX_MATERIALISE:
+                raise ValueError(
+                    "%d pairs is too many to return in full (the limit is %d). "
+                    "Pass keep=N for the best N -- materialising them all needs "
+                    "roughly %.0f GB." % (npairs, MAX_MATERIALISE, npairs * 148 / 1e9))
+            keep = npairs
+        keep = min(keep, npairs)
+
         rows = np.empty((nk, self.NA), dtype=np.int16)
         if self.use_numba:
             import time
             t0 = time.time()
-            npairs = nk * (nk - 1) // 2
             for lo in range(0, nk, 256):
                 hi = min(lo + 256, nk)
                 _rows(self.G, gs[lo:hi], self.A, S, self.gclass, self.aclass,
@@ -783,7 +808,17 @@ class NerdleTopK:
                 if progress is not None:
                     progress(0, npairs, time.time() - t0,
                              "feedback rows %d/%d" % (hi, nk))
-            out = np.zeros(npairs, dtype=np.int64)
+            # int32 is enough: the largest possible score is NA squared, and
+            # 17723**2 is 3.1e8 against int32's 2.1e9.  It halves what is a
+            # 3.6 GB array at --top-n 30000.
+            out = np.zeros(npairs, dtype=np.int32)
+            # Flat pair index -> row, for turning a kept index back into (i, j).
+            row_start = (np.arange(nk + 1, dtype=np.int64)
+                         * (2 * nk - np.arange(nk + 1, dtype=np.int64) - 1)) // 2
+            best_s = np.empty(0, dtype=np.int64)
+            best_t = np.empty(0, dtype=np.int64)
+            threshold = None
+            last_ckpt = 0.0
             # npat*npat counters -- 172 MB at width 8.  Allocated once for the
             # whole sweep, not per pair.
             buf = np.zeros(self.NPAT * self.NPAT, dtype=np.int32)
@@ -810,9 +845,32 @@ class NerdleTopK:
                                 self.guess_words[gs[j]], lo_off + int(k) + 1,
                                 npairs, time.time() - t0)
                     best = int(run[-1])
+                # The running best `keep`, maintained as we go rather than
+                # selected at the end.  Once it is full, a row only contributes
+                # the entries that beat its worst member, which is nearly none
+                # late in a sweep -- so this costs one comparison pass per row
+                # and makes a checkpoint free.
+                seg = out[lo_off:off]
+                if seg.size:
+                    if threshold is None:
+                        sel = np.arange(seg.size, dtype=np.int64)
+                    else:
+                        sel = np.flatnonzero(seg < threshold).astype(np.int64)
+                    if sel.size:
+                        best_s = np.concatenate([best_s, seg[sel].astype(np.int64)])
+                        best_t = np.concatenate([best_t, lo_off + sel])
+                        keepidx = np.lexsort((best_t, best_s))[:keep]
+                        best_s, best_t = best_s[keepidx], best_t[keepidx]
+                        if best_s.size >= keep:
+                            threshold = int(best_s[-1])
+                now = time.time() - t0
                 if progress is not None:
-                    progress(off, npairs, time.time() - t0,
-                             "first guess %d/%d" % (i + 1, nk))
+                    progress(off, npairs, now, "first guess %d/%d" % (i + 1, nk))
+                if on_checkpoint is not None and now - last_ckpt >= checkpoint_every:
+                    last_ckpt = now
+                    on_checkpoint(self._pairs_from(best_s, best_t, row_start, gs),
+                                  off, npairs, now)
+            return gs, self._pairs_from(best_s, best_t, row_start, gs), npairs
         else:
             for r, g in enumerate(gs):
                 rows[r] = self._root_codes(int(g), S)
@@ -824,7 +882,15 @@ class NerdleTopK:
                 scored.append((int(out[t]), i, j))
                 t += 1
         scored.sort()
-        return gs, scored
+        return gs, scored[:keep], npairs
+
+    @staticmethod
+    def _pairs_from(best_s, best_t, row_start, gs):
+        """[(score, i, j)] for the kept flat indices, best first."""
+        rows = np.searchsorted(row_start, best_t, side="right") - 1
+        cols = rows + 1 + (best_t - row_start[rows])
+        return [(int(s), int(i), int(j))
+                for s, i, j in zip(best_s, rows, cols)]
 
     def _ref_pair_scores(self, rows):
         """The pair scores again, from numpy -- the oracle for _pair_scores."""

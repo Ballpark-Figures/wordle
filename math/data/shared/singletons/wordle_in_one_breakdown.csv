@@ -1,0 +1,21 @@
+# Wordle-in-One games by tile composition (grays = 5 - greens - yellows); games=all singletons, games_nowin excludes the all-green self-answer
+greens,yellows,grays,games,games_nowin
+0,1,4,13,13
+0,2,3,465,465
+0,3,2,2529,2529
+0,4,1,1846,1846
+0,5,0,90,90
+1,0,4,137,137
+1,1,3,3415,3415
+1,2,2,11234,11234
+1,3,1,4211,4211
+1,4,0,170,170
+2,0,3,2236,2236
+2,1,2,11228,11228
+2,2,1,3836,3836
+2,3,0,90,90
+3,0,2,4459,4459
+3,1,1,2109,2109
+3,2,0,120,120
+4,0,1,2106,2106
+5,0,0,2315,0

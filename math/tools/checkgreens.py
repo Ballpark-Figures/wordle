@@ -55,7 +55,7 @@ OPTTURNS = os.path.join(MATH, "solver", "optturns")
 
 FAILS = []
 COVER = {"yellow line": 0, "yellow-free line": 0, "infeasible opener": 0,
-         "badge-vs-win conflict": 0, "tied openers": 0, "beam below exact": 0}
+         "must-win below plain": 0, "tied openers": 0, "beam below exact": 0}
 
 
 def fail(msg):
@@ -141,12 +141,16 @@ def build_case(tmp, answers, guesses, tag):
 _LINE = re.compile(r"^(\w+)\s+badges=(\d+) of (\d+)")
 
 
-def run_greens(apath, gpath, ppath, depth, openers, treedir=None, topk=0):
+def run_greens(apath, gpath, ppath, depth, openers, treedir=None, topk=0,
+               must_win=False):
     cmd = [SOLVER, "--answer-list", apath, "--guess-list", gpath,
            "--patterns", ppath, "--depth", str(depth), "--no-out",
            "--tt-bits", "20", "--threads", "1"]
     if topk:
         cmd += ["--topk", str(topk)]
+    # ALWAYS explicit, in both directions: the default has moved once already and
+    # a gate that leans on it would silently start checking the other objective.
+    cmd += ["--must-win"] if must_win else ["--may-lose"]
     for w in openers:
         cmd += ["--opener", w]
     if treedir:
@@ -187,32 +191,50 @@ def run_optturns(apath, gpath, ppath, depth, openers):
 
 
 def check_values(tmp, answers, guesses, depths, openers, values):
-    print("2. the badge count, C against the Python reference")
+    """Both objectives, against the reference, at every depth and opener.
+
+    They are different quantities, so each is diffed on its own -- and the pair
+    is checked for the one relation that must always hold: must-win searches a
+    strictly smaller strategy space, so it can never EXCEED plain.
+    """
+    print("2. both objectives, C against the Python reference")
     apath, gpath, ppath = build_case(tmp, answers, guesses, "v")
     cands = tuple(sorted(answers))
     gtuple = tuple(guesses)
     for depth in depths:
-        got = run_greens(apath, gpath, ppath, depth, openers)
+        plain = run_greens(apath, gpath, ppath, depth, openers)
+        mustw = run_greens(apath, gpath, ppath, depth, openers, must_win=True)
         for w in openers:
-            want = greens.solve_opener(w, cands, gtuple, depth)
-            have = got.get(w)
-            if have is None:
-                fail("greens printed nothing for %s at depth %d" % (w, depth))
-            elif have != want:
-                fail("depth %d opener %s: C says %s, reference says %s"
-                     % (depth, w, have, want))
-            if want == greens.INFEASIBLE:
+            wp = greens.solve_opener(w, cands, gtuple, depth, must_win=False)
+            wm = greens.solve_opener(w, cands, gtuple, depth, must_win=True)
+            if plain.get(w) != wp:
+                fail("plain d=%d %s: C says %s, reference says %s"
+                     % (depth, w, plain.get(w), wp))
+            if mustw.get(w) != wm:
+                fail("must-win d=%d %s: C says %s, reference says %s"
+                     % (depth, w, mustw.get(w), wm))
+            if wm > wp:
+                fail("d=%d %s: must-win %d EXCEEDS plain %d -- a smaller strategy "
+                     "space cannot do better" % (depth, w, wm, wp))
+            if wm < wp:
+                COVER["must-win below plain"] += 1
+            if wm == greens.INFEASIBLE:
                 COVER["infeasible opener"] += 1
-            values[(depth, w)] = want
-            print("   d=%d %-6s badges=%-4s reference=%-4s %s"
-                  % (depth, w, have, want, "ok" if have == want else "MISMATCH"))
+            if wp == greens.INFEASIBLE:
+                fail("plain d=%d %s came back INFEASIBLE -- plain can always "
+                     "abandon a game, so nothing is ever infeasible" % (depth, w))
+            values[(depth, w)] = wm
+            print("   d=%d %-6s plain=%-4s must-win=%-4s  (C: %s / %s)"
+                  % (depth, w, wp, wm, plain.get(w), mustw.get(w)))
     return apath, gpath, ppath
 
 
 def check_feasibility(apath, gpath, ppath, depths, openers):
-    print("3. clause 1 (the win constraint), against optturns")
+    print("3. the must-win guarantee, against optturns")
     for depth in depths:
-        mine = run_greens(apath, gpath, ppath, depth, openers)
+        # MUST-WIN only: under the plain objective nothing is ever infeasible,
+        # because the strategy is free to abandon a game it cannot win.
+        mine = run_greens(apath, gpath, ppath, depth, openers, must_win=True)
         theirs = run_optturns(apath, gpath, ppath, depth, openers)
         if theirs is None:
             print("   optturns not built -- skipped")
@@ -229,8 +251,14 @@ def check_feasibility(apath, gpath, ppath, depths, openers):
 
 # ------------------------------------------------------------------ 4. trees
 
-def check_tree(path, answers, guesses, depth, badges, opener):
-    """Replay one emitted tree against the strings; return nothing, record fails."""
+def check_tree(path, answers, guesses, depth, badges, opener, must_win=True):
+    """Replay one emitted tree against the strings; record fails.
+
+    The COVERAGE rule differs by objective, and that difference is the point:
+    under MUST-WIN the tree must cover EVERY answer, which is what verifies the
+    guarantee independently; under PLAIN it must cover exactly the BADGED ones,
+    a yellow ends the branch, and a line carrying a yellow would be a bug.
+    """
     seen = {}
     strategy = {}
     yellow_free = 0
@@ -286,32 +314,45 @@ def check_tree(path, answers, guesses, depth, badges, opener):
                 COVER["yellow-free line"] += 1
             else:
                 COVER["yellow line"] += 1
-    missing = set(answers) - set(seen)
-    if missing:
-        fail("%s: %d answers never appear (%s...)"
-             % (path, len(missing), sorted(missing)[:3]))
+                if not must_win:
+                    fail("%s line %d (%s): a line carrying a yellow under the "
+                         "plain objective -- that branch is owed no strategy"
+                         % (path, lineno, answer))
+    if must_win:
+        missing = set(answers) - set(seen)
+        if missing:
+            fail("%s: %d answers never appear (%s...)"
+                 % (path, len(missing), sorted(missing)[:3]))
+    elif len(seen) != badges:
+        fail("%s: %d lines under the plain objective but %d badges reported -- "
+             "the file should hold exactly the badged answers"
+             % (path, len(seen), badges))
     if yellow_free != badges:
         fail("%s: tree has %d yellow-free lines, solver reported %d badges"
              % (path, yellow_free, badges))
     else:
-        print("   %s: %d answers, all within %d, %d yellow-free -- matches"
-              % (os.path.basename(path), len(seen), depth, yellow_free))
+        print("   %-9s %-16s %d lines, all within %d, %d yellow-free -- matches"
+              % ("must-win" if must_win else "plain", os.path.basename(path),
+                 len(seen), depth, yellow_free))
 
 
 def check_trees(tmp, answers, guesses, depth, openers):
     print("4. the emitted tree, replayed from the strings")
     apath, gpath, ppath = build_case(tmp, answers, guesses, "t")
-    treedir = os.path.join(tmp, "trees")
-    os.makedirs(treedir, exist_ok=True)
-    got = run_greens(apath, gpath, ppath, depth, openers, treedir=treedir)
-    for w in openers:
-        if got.get(w, greens.INFEASIBLE) == greens.INFEASIBLE:
-            continue
-        p = os.path.join(treedir, w + ".txt.gz")
-        if not os.path.exists(p):
-            fail("no tree written for %s" % w)
-            continue
-        check_tree(p, answers, guesses, depth, got[w], w)
+    for must_win in (True, False):
+        treedir = os.path.join(tmp, "trees_%s" % ("mw" if must_win else "plain"))
+        os.makedirs(treedir, exist_ok=True)
+        got = run_greens(apath, gpath, ppath, depth, openers, treedir=treedir,
+                         must_win=must_win)
+        for w in openers:
+            if got.get(w, greens.INFEASIBLE) == greens.INFEASIBLE:
+                continue
+            p = os.path.join(treedir, w + ".txt.gz")
+            if not os.path.exists(p):
+                fail("no tree written for %s (%s)"
+                     % (w, "must-win" if must_win else "plain"))
+                continue
+            check_tree(p, answers, guesses, depth, got[w], w, must_win)
 
 
 # ------------------------------------------------- 5. does clause 1 BIND?
@@ -356,15 +397,20 @@ def solve_nowin(cands, guesses, depth, memo):
 
 
 def check_binds(answers, guesses, depths, openers, values):
-    print("5. does the win constraint actually bind?")
+    """The plain objective, recomputed by a THIRD implementation.
+
+    `solve_nowin` predates the flag: it existed to prove the win constraint was
+    load-bearing, by computing the objective the constrained solver was NOT
+    solving. That is now a first-class mode, so the same function becomes an
+    independent check on it -- written separately, with no must_win branch
+    anywhere in it, so one bug cannot hide in both.
+    """
+    print("5. the plain objective, against a third implementation")
     cands = tuple(sorted(answers))
     gtuple = tuple(guesses)
     memo = {}
     for depth in depths:
         for w in openers:
-            have = values.get((depth, w))
-            if have is None:
-                continue
             parts = greens.partition(w, cands)
             free = 0
             for code, sub in parts.items():
@@ -372,13 +418,12 @@ def check_binds(answers, guesses, depths, openers, values):
                     free += 1
                 elif not greens.has_yellow(code):
                     free += solve_nowin(sub, gtuple, depth - 1, memo)
-            if have > free:
-                fail("d=%d %s: constrained %d exceeds the unconstrained bound %d"
-                     % (depth, w, have, free))
-            if have < free:
-                COVER["badge-vs-win conflict"] += 1
-                print("   d=%d %-6s constrained %-4s vs unconstrained %-4s -- binds"
-                      % (depth, w, have, free))
+            mine = greens.solve_opener(w, cands, gtuple, depth, must_win=False)
+            if mine != free:
+                fail("d=%d %s: plain says %d, the independent version says %d"
+                     % (depth, w, mine, free))
+    print("   %d cells agree with an implementation that has no must_win branch"
+          % (len(depths) * len(openers)))
 
 
 # ------------------------------------------------------- 6. the SWEEP itself
@@ -386,7 +431,7 @@ def check_binds(answers, guesses, depths, openers, values):
 _BEST = re.compile(r"^badges = (\d+) of (\d+)")
 
 
-def run_sweep(apath, gpath, ppath, depth, outpath=None, topk=0):
+def run_sweep(apath, gpath, ppath, depth, outpath=None, topk=0, must_win=False):
     cmd = [SOLVER, "--sweep", "--answer-list", apath, "--guess-list", gpath,
            "--patterns", ppath, "--depth", str(depth),
            "--out", outpath] if outpath else [
@@ -395,6 +440,7 @@ def run_sweep(apath, gpath, ppath, depth, outpath=None, topk=0):
     cmd += ["--tt-bits", "20", "--threads", "2"]
     if topk:
         cmd += ["--topk", str(topk)]
+    cmd += ["--must-win"] if must_win else ["--may-lose"]
     p = subprocess.run(cmd, capture_output=True, text=True, cwd=MATH)
     if p.returncode != 0:
         fail("greens --sweep exited %d: %s" % (p.returncode, p.stderr.strip()[-400:]))
@@ -413,7 +459,7 @@ def run_sweep(apath, gpath, ppath, depth, outpath=None, topk=0):
     return best, ties
 
 
-def check_sweep(tmp, answers, guesses, depth):
+def check_sweep(tmp, answers, guesses, depth, must_win=False):
     """The bounded screen must find the same winner an exhaustive scan does.
 
     This is the check that covers the PRUNING: the root bound, the incumbent, the
@@ -425,10 +471,11 @@ def check_sweep(tmp, answers, guesses, depth):
     apath, gpath, ppath = build_case(tmp, answers, guesses, "s")
     cands = tuple(sorted(answers))
     gtuple = tuple(guesses)
-    every = {w: greens.solve_opener(w, cands, gtuple, depth) for w in guesses}
+    every = {w: greens.solve_opener(w, cands, gtuple, depth, must_win=must_win)
+             for w in guesses}
     want = max(every.values())
     want_ties = sorted(w for w, v in every.items() if v == want)
-    best, ties = run_sweep(apath, gpath, ppath, depth)
+    best, ties = run_sweep(apath, gpath, ppath, depth, must_win=must_win)
     if len(want_ties) > 1:
         COVER["tied openers"] += 1
     if best != want:
@@ -437,8 +484,9 @@ def check_sweep(tmp, answers, guesses, depth):
     elif sorted(ties) != want_ties:
         fail("screen ties %s, exhaustive ties %s" % (sorted(ties), want_ties))
     else:
-        print("   %d openers scanned: best %d, %d tied, screen agrees exactly"
-              % (len(guesses), want, len(want_ties)))
+        print("   %-9s %d openers scanned: best %d, %d tied, agrees exactly"
+              % ("must-win" if must_win else "plain", len(guesses), want,
+                 len(want_ties)))
 
 
 # --------------------------------------------------------------- 7. resume
@@ -472,7 +520,7 @@ def check_resume(tmp, answers, guesses, depth):
 
 # --------------------------------------------------------------- 8. the beam
 
-def check_beam(tmp, answers, guesses, depth, openers):
+def check_beam(tmp, answers, guesses, depth, openers, must_win=False):
     """--topk is an APPROXIMATION, so it cannot be checked by "is it optimal?".
     Three things can be checked, and together they pin it:
 
@@ -486,34 +534,40 @@ def check_beam(tmp, answers, guesses, depth, openers):
     """
     print("8. the --topk beam, against the same rule in the reference")
     apath, gpath, ppath = build_case(tmp, answers, guesses, "k")
+    tag = "must-win" if must_win else "plain"
     cands = tuple(sorted(answers))
     gtuple = tuple(guesses)
     for topk in (1, 3, 10):
-        got = run_greens(apath, gpath, ppath, depth, openers, topk=topk)
+        got = run_greens(apath, gpath, ppath, depth, openers, topk=topk,
+                         must_win=must_win)
         for w in openers:
-            want = greens.solve_opener(w, cands, gtuple, depth, topk=topk)
+            want = greens.solve_opener(w, cands, gtuple, depth, topk=topk,
+                                       must_win=must_win)
             have = got.get(w)
             if have != want:
                 fail("--topk %d opener %s: C says %s, reference says %s"
                      % (topk, w, have, want))
-            exact = greens.solve_opener(w, cands, gtuple, depth)
+            exact = greens.solve_opener(w, cands, gtuple, depth, must_win=must_win)
             if want > exact:
                 fail("--topk %d opener %s: beam %s EXCEEDS the exact %s -- a beam "
                      "can only find strategies, never invent them" % (topk, w, want, exact))
             if want < exact:
                 COVER["beam below exact"] += 1
-        print("   K=%-3d %s" % (topk, " ".join("%s=%s" % (w, got.get(w)) for w in openers)))
+        print("   %-9s K=%-3d %s"
+              % (tag, topk, " ".join("%s=%s" % (w, got.get(w)) for w in openers)))
     big = len(guesses) + 1
-    got = run_greens(apath, gpath, ppath, depth, openers, topk=big)
+    got = run_greens(apath, gpath, ppath, depth, openers, topk=big,
+                     must_win=must_win)
     for w in openers:
-        exact = greens.solve_opener(w, cands, gtuple, depth)
+        exact = greens.solve_opener(w, cands, gtuple, depth, must_win=must_win)
         if got.get(w) != exact:
             fail("--topk %d (past the guess count) gives %s for %s, exact is %s"
                  % (big, got.get(w), w, exact))
-    print("   K=%d (vacuous): reproduces the exact value for every opener" % big)
+    print("   %-9s K=%d (vacuous): reproduces the exact value for every opener"
+          % (tag, big))
 
 
-def check_beam_sweep(tmp, answers, guesses, depth, topk):
+def check_beam_sweep(tmp, answers, guesses, depth, topk, must_win=False):
     """The beam picks the OPENERS too, so the winner must be the best of exactly
     the K the rule selects -- not of all of them, and not of some other K."""
     print("9. the beamed opener screen")
@@ -521,18 +575,20 @@ def check_beam_sweep(tmp, answers, guesses, depth, topk):
     cands = tuple(sorted(answers))
     gtuple = tuple(guesses)
     examined = greens.opener_order(cands, gtuple)[:topk]
-    vals = {w: greens.solve_opener(w, cands, gtuple, depth, topk=topk) for w in examined}
+    vals = {w: greens.solve_opener(w, cands, gtuple, depth, topk=topk,
+                                   must_win=must_win) for w in examined}
     want = max(vals.values())
     want_ties = sorted(w for w, v in vals.items() if v == want)
-    best, ties = run_sweep(apath, gpath, ppath, depth, topk=topk)
+    best, ties = run_sweep(apath, gpath, ppath, depth, topk=topk, must_win=must_win)
     if best != want:
         fail("beamed screen reports %s, the same rule over its %d openers says %s"
              % (best, len(examined), want))
     elif sorted(ties) != want_ties:
         fail("beamed screen ties %s, reference ties %s" % (sorted(ties), want_ties))
     else:
-        print("   K=%d: %d openers examined, best %d, %d tied -- agrees exactly"
-              % (topk, len(examined), want, len(want_ties)))
+        print("   %-9s K=%d: %d openers examined, best %d, %d tied -- agrees exactly"
+              % ("must-win" if must_win else "plain", topk, len(examined), want,
+                 len(want_ties)))
 
 
 def main():
@@ -574,14 +630,16 @@ def main():
     check_feasibility(apath, gpath, ppath, depths, openers)
     check_trees(tmp, answers, guesses, max(args.depth), openers)
     check_binds(answers, guesses, depths, openers, values)
-    check_sweep(tmp, answers, guesses, max(depths))
-    # A second, deliberately SMALLER answer set: ties between openers are common
-    # there and rare above, and the tie list is its own code path -- every cut in
-    # the screen is strict precisely so a tie survives it.
-    check_sweep(tmp, answers[: max(6, len(answers) // 2)], guesses, max(depths))
-    check_resume(tmp, answers[: max(6, len(answers) // 2)], guesses, max(depths))
-    check_beam(tmp, answers, guesses, max(depths), openers)
-    check_beam_sweep(tmp, answers, guesses, max(depths), 5)
+    small = answers[: max(6, len(answers) // 2)]
+    for mw in (False, True):
+        check_sweep(tmp, answers, guesses, max(depths), must_win=mw)
+        # A deliberately SMALLER answer set too: ties between openers are common
+        # there and rare above, and the tie list is its own code path -- every
+        # cut in the screen is strict precisely so a tie survives it.
+        check_sweep(tmp, small, guesses, max(depths), must_win=mw)
+        check_beam(tmp, answers, guesses, max(depths), openers, must_win=mw)
+        check_beam_sweep(tmp, answers, guesses, max(depths), 5, must_win=mw)
+    check_resume(tmp, small, guesses, max(depths))
 
     print("\ncoverage: " + ", ".join("%s %d" % (k, v) for k, v in COVER.items()))
     for k, v in COVER.items():

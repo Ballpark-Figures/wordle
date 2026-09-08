@@ -178,6 +178,36 @@ static double   REPORT_EVERY = 60.0;
  * direction from every other bound in this file. */
 static int      TOPK = 0;
 
+/* --must-win: the OTHER objective, and they are different quantities.
+ *
+ *   PLAIN (default) -- maximise the answers WON WITHIN --depth WITH NO YELLOW.
+ *     One event per answer.  An answer that draws a yellow is simply LOST and
+ *     the strategy owes it nothing afterwards; it may abandon that game.  So
+ *     yellow branches are never searched at all, and no state is ever
+ *     INFEASIBLE -- the value is a count and counts start at zero.
+ *
+ *   MUST-WIN -- the same maximisation SUBJECT TO still resolving EVERY answer
+ *     within --depth, yellow ones included.  A strictly smaller strategy space,
+ *     so its value is always <= the plain one.
+ *
+ * Plain asks "how often can I win in 6 with all greens?".  Must-win asks "if I
+ * refuse to ever lose a game, how often can I win in 6 with all greens?".  Only
+ * the first is the badge question.
+ *
+ * THERE IS NO DEFAULT HERE -- one of --must-win or --may-lose is REQUIRED.
+ *
+ * It had a default, and that is precisely how `--may-lose` once ran a MUST-WIN
+ * search under a may-lose FILENAME: the wrapper forwarded the flag only in the
+ * must-win case and let this default cover the other, so when the default moved,
+ * the two disagreed silently and the file name lied about its contents.  A
+ * defaulted objective is a domain ANSWER hiding in configuration.  Refusing to
+ * run is the only default that cannot quietly bias a result.
+ *
+ * The wrapper still has a default -- must-win, because runs were queued against
+ * it -- and forwards it explicitly.  That is the right place for a default: one
+ * that a human reads, not one a program falls back on. */
+static int      MUSTWIN = -1;
+
 static int      BRANCH = NPAT - 1;   /* measured: non-winning bins, any guess */
 static int      GBRANCH = 31;        /* measured: yellow-free non-green bins */
 
@@ -602,7 +632,7 @@ static int eval_badge(const uint16_t *S, int n, int d, int g, int floor, Ctx *ct
     int badges = 0, rest = 0;
     for (int k = 0; k < nb; k++) {
         if (bp[k] == ALL_GREEN) { badges = 1; continue; }   /* won, yellow-free */
-        if (!FEASOK[d - 1][bcnt[k]]) return INFEAS;
+        if (MUSTWIN && !FEASOK[d - 1][bcnt[k]]) return INFEAS;
         if (!YEL[bp[k]]) rest += UBTAB[d - 1][bcnt[k]];
     }
     if (badges + rest < floor) return PRUNED;
@@ -610,9 +640,13 @@ static int eval_badge(const uint16_t *S, int n, int d, int g, int floor, Ctx *ct
     /* clause 1 proper, on the YELLOW buckets: they score nothing, so this is all
      * that is ever asked of them -- "once we get a yellow, we stop checking". */
     int trace = (TRACE_ROOT && d == ROOT_D), ndone_b = 0, nyel = 0;
-    if (trace)
+    if (trace && MUSTWIN)
         for (int k = 0; k < nb; k++) if (bp[k] != ALL_GREEN && YEL[bp[k]]) nyel++;
-    for (int k = 0; k < nb; k++)
+    /* Under the PLAIN objective this loop does not run at all: a yellow bucket
+     * is worth nothing and is owed nothing, so it is never examined.  That is
+     * the whole difference between the two objectives, and it is also why plain
+     * is much the cheaper -- feas() is never called. */
+    for (int k = 0; MUSTWIN && k < nb; k++)
         if (bp[k] != ALL_GREEN && YEL[bp[k]]) {
             if (!feas(buf + bstart[k], bcnt[k], d - 1, ctx)) return INFEAS;
             if (trace && (++ndone_b % 16 == 0 || ndone_b == nyel)) {
@@ -650,9 +684,15 @@ static int eval_badge(const uint16_t *S, int n, int d, int g, int floor, Ctx *ct
 }
 
 static int solve_badge(const uint16_t *S, int n, int d, Ctx *ctx) {
-    if (n == 1) return d >= 1 ? 1 : INFEAS;
-    if (d <= 1) return INFEAS;                   /* n >= 2 cannot be guaranteed */
-    if (!FEASOK[d][n]) return INFEAS;
+    if (d <= 0) return MUSTWIN ? INFEAS : 0;
+    if (n == 1) return 1;                        /* play it: green, no yellow */
+    if (d == 1) {
+        /* One guess left, more than one candidate.  No guarantee is possible,
+         * so must-win fails; plain plays a candidate and badges it if right. */
+        if (MUSTWIN) return INFEAS;
+        return 1;
+    }
+    if (MUSTWIN && !FEASOK[d][n]) return INFEAS;
     /* NO depth normalisation here -- see the porting audit at the top of the
      * file.  Extra budget buys safe probes, so f(S, d) keeps rising past d = n. */
 
@@ -704,7 +744,7 @@ static int solve_badge(const uint16_t *S, int n, int d, Ctx *ctx) {
             int p = bp[k], c = cnt[p];
             if (TOPK > 0) ss += (int64_t)c * c;
             if (p == ALL_GREEN) ub += 1;
-            else if (!FEASOK[d - 1][c]) hopeless = 1;
+            else if (MUSTWIN && !FEASOK[d - 1][c]) hopeless = 1;
             else if (!YEL[p]) ub += UBTAB[d - 1][c];
             cnt[p] = 0;
         }
@@ -802,7 +842,7 @@ static int root_ub(int g, int depth) {
     for (int p = 0; p < NPAT; p++) {
         if (!cnt[p]) continue;
         if (p == ALL_GREEN) ub += 1;
-        else if (!FEASOK[depth - 1][cnt[p]]) return INFEAS;
+        else if (MUSTWIN && !FEASOK[depth - 1][cnt[p]]) return INFEAS;
         else if (!YEL[p]) ub += UBTAB[depth - 1][cnt[p]];
     }
     return ub;
@@ -851,7 +891,7 @@ static int root_ub2(int g, int depth, Ctx *ctx) {
     for (int p = 0; p < NPAT; p++) {
         if (cnt[p] == 0) continue;
         if (p == ALL_GREEN) { total += 1; continue; }   /* the opener wins outright */
-        if (!FEASOK[depth - 1][cnt[p]]) return INFEAS;  /* clause 1, as in root_ub */
+        if (MUSTWIN && !FEASOK[depth - 1][cnt[p]]) return INFEAS;
         if (YEL[p]) continue;                           /* badge already gone here */
         if (cnt[p] == 1) { total += 1; continue; }      /* name it: green, no yellow */
 
@@ -868,7 +908,7 @@ static int root_ub2(int g, int depth, Ctx *ctx) {
             for (int k = 0; k < nb; k++) {
                 int q = bp[k], c = c2[q];
                 if (q == ALL_GREEN) v += 1;
-                else if (!FEASOK[depth - 2][c]) dead = 1;
+                else if (MUSTWIN && !FEASOK[depth - 2][c]) dead = 1;
                 else if (!YEL[q]) v += UBTAB[depth - 2][c];
                 c2[q] = 0;
             }
@@ -965,10 +1005,18 @@ static int feas_move(const uint16_t *S, int n, int d, Ctx *ctx) {
 
 /* One line per answer: "<answer> <nguesses> <g1> <p1> <g2> <p2> ... <answer>",
  * the same format optturns emits, so a line replays end to end and a yellow is
- * literally a 'y' in one of its pattern fields.  The tree covers ALL answers,
- * post-yellow play included -- that is what lets a replay check clause 1. */
+ * literally a 'y' in one of its pattern fields.
+ *
+ * WHAT IT COVERS DIFFERS BY OBJECTIVE, and that is not a knob:
+ *   - PLAIN: the badge-alive subtree only.  A yellow ends that branch -- the
+ *     strategy owes those answers nothing -- so the file holds exactly one line
+ *     per BADGED answer and its line count equals the reported badge count.
+ *   - MUST-WIN: every one of the answers, post-yellow play included, because
+ *     there the strategy really does have to finish those games and a replay
+ *     covering all of them is what lets checkgreens.py verify it independently. */
 static int emit_tree(FILE *out, const uint16_t *S, int n, int d, int alive,
                      char *path, int plen, int ply, Ctx *ctx) {
+    if (d <= 0) return 0;                  /* out of guesses: nothing to record */
     int g = alive ? best_move_badge(S, n, d, ctx) : feas_move(S, n, d, ctx);
     if (g < 0) return -1;
     const char *gw = GWORD[g];
@@ -990,6 +1038,7 @@ static int emit_tree(FILE *out, const uint16_t *S, int n, int d, int alive,
     }
     for (int p = 0; p < NPAT; p++) {
         if (p == ALL_GREEN || cnt[p] == 0) continue;
+        if (!MUSTWIN && YEL[p]) continue;  /* badge lost, and nothing is owed */
         char ps[PATSTR_BUF];
         pat_str(p, ps);
         int add = snprintf(path + plen, 8192 - plen, "%s %s ", gw, ps);
@@ -1024,6 +1073,7 @@ static int write_tree(const char *dir, int g, int depth, Ctx *ctx) {
     if (cnt[ALL_GREEN] > 0) fprintf(out, "%s 1 %s\n", GWORD[g], GWORD[g]);
     for (int p = 0; p < NPAT && rc == 0; p++) {
         if (p == ALL_GREEN || cnt[p] == 0) continue;
+        if (!MUSTWIN && YEL[p]) continue;  /* badge lost, and nothing is owed */
         char ps[PATSTR_BUF];
         pat_str(p, ps);
         int plen = snprintf(path, 8192, "%s %s ", GWORD[g], ps);
@@ -1034,6 +1084,29 @@ static int write_tree(const char *dir, int g, int depth, Ctx *ctx) {
     pclose(out);
     return rc;
 }
+
+/* Write the tree of an opener that has just become the incumbent.
+ *
+ * WHY ON EVERY IMPROVEMENT rather than once at the end: a screen this long gets
+ * interrupted, and a run that kept only the winning NUMBER would leave the
+ * strategy behind -- which is the part anyone actually wants to play.  Files are
+ * named for the opener, so superseded ones stay too and the sequence is a free
+ * record of how the incumbent improved; the final report names the winner.
+ *
+ * Improvements are rare -- measured, 30 openers solved and a handful of
+ * improvements over 8400 processed -- so the cost is noise against the search. */
+static void write_best_tree(const char *dir, int g, int depth, Ctx *ctx, double t0) {
+    if (!dir) return;
+    double s1 = now_s();
+    if (write_tree(dir, g, depth, ctx) != 0)
+        fprintf(stderr, "%s: TREE FAILED to write\n", GWORD[g]);
+    else {
+        printf("[%7.0fs]   tree: %s/%s.txt.gz  (%.1fs)\n",
+               now_s() - t0, dir, GWORD[g], now_s() - s1);
+        fflush(stdout);
+    }
+}
+
 
 /* ------------------------------------------------------------------ main */
 
@@ -1051,6 +1124,12 @@ static void usage(void) {
       "  --tt-load/--tt-save FILE      warm start / snapshot\n"
       "  --threads N       OpenMP threads for the sweep\n"
       "  --report SECS     heartbeat interval during the walk (default 60, 0 off)\n"
+      "  --may-lose        THE BADGE QUESTION: maximise the answers won within the\n"
+      "                    cap with no yellow.  An answer that draws a yellow is\n"
+      "                    lost and the strategy may abandon that game.\n"
+      "  --must-win        the same maximisation SUBJECT TO winning EVERY answer\n"
+      "                    within the cap.  Always <= --may-lose.  ONE OF THESE\n"
+      "                    TWO IS REQUIRED -- there is no default objective.\n"
       "  --topk K, -k K    beam: recurse into the K evenest splitters at every\n"
       "                    branching point, the ROOT included -- so it examines K\n"
       "                    OPENERS too, and reports the best of THOSE, not of 12972.\n"
@@ -1082,11 +1161,22 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--report") && i + 1 < argc) REPORT_EVERY = atof(argv[++i]);
         else if ((!strcmp(argv[i], "--topk") || !strcmp(argv[i], "-k")) && i + 1 < argc)
             TOPK = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--must-win")) MUSTWIN = 1;   /* the default */
+        else if (!strcmp(argv[i], "--may-lose")) MUSTWIN = 0;
         else if (!strcmp(argv[i], "--data") && i + 1 < argc) datadir = argv[++i];
         else if (!strcmp(argv[i], "--guess-list") && i + 1 < argc) guesslist = argv[++i];
         else if (!strcmp(argv[i], "--answer-list") && i + 1 < argc) answerlist = argv[++i];
         else if (!strcmp(argv[i], "--patterns") && i + 1 < argc) patpath = argv[++i];
         else { fprintf(stderr, "unknown arg: %s\n\n", argv[i]); usage(); return 1; }
+    }
+    if (MUSTWIN < 0) {
+        fprintf(stderr,
+                "greens: the OBJECTIVE is required -- pass --may-lose or --must-win.\n"
+                "  --may-lose  maximise the answers won within the cap with NO YELLOW;\n"
+                "              an answer that draws a yellow is lost and may be abandoned\n"
+                "  --must-win  the same, SUBJECT TO winning EVERY answer within the cap\n"
+                "They are different quantities. Use solver/run-greens.sh, which passes one.\n");
+        return 1;
     }
     if (depth < 1 || depth > MAXD - 1) {
         fprintf(stderr, "--depth must be 1..%d (MAXD is %d)\n", MAXD - 1, MAXD);
@@ -1171,7 +1261,8 @@ int main(int argc, char **argv) {
     GSALT = 0x5EA0F69EE45ULL
           ^ ((uint64_t)NG * 0xD6E8FEB86659FD93ULL)
           ^ ((uint64_t)NA * 0x9E3779B97F4A7C15ULL)
-          ^ ((uint64_t)(unsigned)TOPK * 0xA24BAED4963EE407ULL);
+          ^ ((uint64_t)(unsigned)TOPK * 0xA24BAED4963EE407ULL)
+          ^ ((uint64_t)(unsigned)MUSTWIN * 0xF1EA5EED7A9C1B4DULL);
     for (int i = 0; i < NG; i++)
         for (int j = 0; GWORD[i][j]; j++)
             GSALT = (GSALT ^ (uint8_t)GWORD[i][j]) * 0x100000001B3ULL;
@@ -1196,8 +1287,13 @@ int main(int argc, char **argv) {
     fprintf(stderr, "branching: %d non-winning bins, %d of them yellow-free "
                     "(measured over %d guesses; %d yellow-free codes of %d)\n",
             BRANCH, GBRANCH, NG, 32, NPAT);
-    fprintf(stderr, "objective: max answers won with NO YELLOW, subject to winning "
-                    "all %d within %d guesses\n", NA, depth);
+    if (MUSTWIN)
+        fprintf(stderr, "objective: MUST-WIN -- max answers won with NO YELLOW, "
+                        "SUBJECT TO winning all %d within %d guesses\n", NA, depth);
+    else
+        fprintf(stderr, "objective: max answers WON WITHIN %d GUESSES WITH NO "
+                        "YELLOW (of %d); an answer that draws a yellow is lost and "
+                        "the strategy may abandon it\n", depth, NA);
     fprintf(stderr, "root badge UB(d=%d, n=%d) = %d\n", depth, NA, UBTAB[depth][NA]);
     tt_init(ttbits, ttload);
     if (treedir) mkdir(treedir, 0755);
@@ -1206,14 +1302,51 @@ int main(int argc, char **argv) {
     fprintf(stderr, "threads: %d\n", omp_get_max_threads());
 #endif
 
+    /* THE CSV SELF-DESCRIBES, because a FILENAME CANNOT CHECK ITSELF.
+     *
+     * This is a scar.  Every result from before the two objectives existed was
+     * written under a name that later came to mean the OTHER objective, and a
+     * resume then continued that search and reported it as its own -- with the
+     * right banner printed above it, which is what made it invisible.  Depth was
+     * in every row; the objective and K were in the path alone.
+     *
+     * So the first line records the whole identity of the run, and a resume
+     * REFUSES a file whose line disagrees.  Same discipline as the TT salt: a
+     * foreign file must fail verification rather than answer. */
+    char stamp[320];
+    snprintf(stamp, sizeof stamp,
+             "# greens objective=%s topk=%d depth=%d guesses=%d answers=%d",
+             MUSTWIN ? "must-win" : "may-lose", TOPK, depth, NG, NA);
+
     FILE *out = NULL;
     if (outpath) {
         int fresh = 1;
         FILE *rf = fopen(outpath, "r");
         if (rf) { char ch; fresh = (fread(&ch, 1, 1, rf) != 1); fclose(rf); }
+        if (!fresh) {
+            char line[512] = "";
+            FILE *vf = fopen(outpath, "r");
+            if (vf) { if (!fgets(line, sizeof line, vf)) line[0] = 0; fclose(vf); }
+            char *nl = strchr(line, '\n');
+            if (nl) *nl = 0;
+            if (line[0] != '#') {
+                fprintf(stderr,
+                        "%s has no objective stamp, so it predates them and its\n"
+                        "contents cannot be told from its name.  Rename it to what it\n"
+                        "actually holds and prepend this line:\n  %s\n", outpath, stamp);
+                return 1;
+            }
+            if (strcmp(line, stamp) != 0) {
+                fprintf(stderr,
+                        "%s was written by a DIFFERENT run:\n  file: %s\n  this: %s\n"
+                        "Resuming it would continue that search and report it as this one's.\n",
+                        outpath, line, stamp);
+                return 1;
+            }
+        }
         out = fopen(outpath, "a");
         if (!out) { fprintf(stderr, "cannot append to %s\n", outpath); return 1; }
-        if (fresh) fprintf(out, "word,badges,prob,depth,status,seconds\n");
+        if (fresh) fprintf(out, "%s\nword,badges,prob,depth,status,seconds\n", stamp);
     }
 
     if (nopen > 0) {
@@ -1348,6 +1481,7 @@ int main(int argc, char **argv) {
     if (rf) {
         char line[256];
         while (fgets(line, sizeof line, rf)) {
+            if (line[0] == '#') continue;          /* the objective stamp */
             char w[64]; int b;
             int nf = sscanf(line, "%63[^,],%d", w, &b);
             if (nf < 1) continue;
@@ -1396,6 +1530,7 @@ int main(int argc, char **argv) {
             bestlist[nbest++] = g;
             printf("[%7.0fs] %s  badges=%d of %d  prob=%.5f  FIRST  %6.1fs\n",
                    now_s() - t0, GWORD[g], v, NA, (double)v / NA, dt);
+            write_best_tree(treedir, g, depth, c0, t0);
         } else if (v == INFEAS) infeas++;
         else cut++;
         if (out) {
@@ -1446,6 +1581,7 @@ int main(int argc, char **argv) {
             double s0 = now_s();
             int v = solve_opener(g, depth, inc, ctx);
             double dt = now_s() - s0;
+            int newbest = 0;
 #ifdef _OPENMP
 #pragma omp critical
 #endif
@@ -1473,6 +1609,7 @@ int main(int argc, char **argv) {
                         incumbent = v;
                         nbest = 0;
                         bestlist[nbest++] = g;
+                        newbest = 1;
                         printf("[%7.0fs] %s  badges=%d of %d  prob=%.5f  NEW BEST  %6.1fs\n",
                                now_s() - t0, GWORD[g], v, NA, (double)v / NA, dt);
                         fflush(stdout);
@@ -1489,6 +1626,12 @@ int main(int argc, char **argv) {
                     fflush(out);
                 }
             }
+            /* OUTSIDE the critical section deliberately: a tree walk can take a
+             * while and there is no reason to stall 17 other threads for it.
+             * Nothing is shared -- the arena is per-thread, the table is
+             * self-verifying, and the file is named for the opener, so two
+             * threads improving at once write two different files. */
+            if (newbest) write_best_tree(treedir, g, depth, ctx, t0);
         }
         free(ctx);
     }

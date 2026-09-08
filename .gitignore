@@ -33,11 +33,13 @@ animations/**/cache/
 math/solver/optturns
 math/solver/hardturns
 math/solver/mmturns
+math/solver/ultraturns
 # one binary per word length (sh build.sh 7 -> optturns7); same reasoning
 math/solver/optturns[0-9]
 math/solver/optturns[0-9][0-9]
 math/solver/pairsplit
 math/solver/antistall
+math/solver/antiexpect
 math/solver/cover
 math/solver/greens
 math/solver/strguess

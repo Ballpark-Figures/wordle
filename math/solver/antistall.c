@@ -1,17 +1,21 @@
 /* antistall.c -- the antiwordle STALLING ENDGAME, exactly, for every answer.
  *
  * THE PROBLEM.  Antiwordle reverses Wordle: the word is fixed, you lose the turn
- * you play it, and the score is how long you survived.  Once the candidate set
- * has collapsed to one word you KNOW the answer, so every reply is already
- * determined and the game stops being probabilistic.  What is left is: how long
- * can you keep playing LEGAL words that are not the answer?  That is a longest
- * path, and this program computes it exactly -- no depth cap, because antiwordle
- * has none, and no beam, because a restricted search would not be the maximum.
+ * you play it, and the score is how long you survived.  This program FIXES an
+ * answer and finds the LONGEST GAME for it, choosing the whole line from an empty
+ * board -- exactly, with no depth cap (antiwordle has none) and no beam (a
+ * restricted search would not be the maximum).
  *
- * THIS IS THE |S| = 1 ENDGAME ONLY.  A player who does not yet know the word
- * cannot in general achieve these lengths, so a number here is an UPPER BOUND on
- * what that answer yields in real play.  Never average them and call the result
- * "expected guesses in antiwordle".
+ * IT PLAYS CLAIRVOYANTLY, knowing the answer from move one.  A real player does
+ * not and must hedge, so these are UPPER BOUNDS on real play, never achievable
+ * scores.  Never average them and call the result "expected guesses in antiwordle".
+ *
+ * IT IS NOT AN "ENDGAME AFTER THE CANDIDATES COLLAPSE" -- that was the description
+ * here until 2026-09-04 and it was wrong.  On `bully`'s optimal 16-guess line the
+ * possible answers run 27 16 12 7 7 6 6 5 4 4 3 2 2 2 1 1: the answer is not pinned
+ * until guess 15.  The length comes from playing words that are LEGAL but are not
+ * possible ANSWERS -- 11 of those 16 plays are guess-only words such as `bunjy` --
+ * which is why the guess list and the answer list are separate objects here.
  *
  * -------------------------------------------------------------- the model
  *
@@ -279,6 +283,16 @@ typedef struct {
     uint8_t  *gmask;              /* NG -- squares this guess turns green */
     uint64_t  arena[MAXD][BSW];   /* the legal set at each recursion level */
     uint64_t  scratch[BSW];       /* one child, built then measured */
+    /* LIVE WORDS. A legal set is a bitset over all NG guesses, but once play has
+     * narrowed it, almost every 64-bit word of that bitset is empty -- measured
+     * medians are 203 words live at the root, 15 by depth 2 and 3 by depth 3. So
+     * each set also carries the INDICES of its non-empty words, and every scan
+     * walks that list instead of all BSW. A child is a subset of its parent, so
+     * its live words are a subset too, and the lists only ever shrink. */
+    uint16_t  widx[MAXD][BSW];    /* live word indices, per recursion level */
+    int       nwid[MAXD];
+    uint16_t  swidx[BSW];         /* ...for `scratch` */
+    int       snwid;
     Cand     *cand;               /* MAXD * NG -- children awaiting pass 2 */
     uint64_t *dedup;              /* one node's child hashes; see below */
     uint32_t *dstamp;             /* which node wrote each slot */
@@ -459,23 +473,46 @@ static inline uint64_t mix64(uint64_t z) {
  *
  * Cost is one mix64 per NON-ZERO word, and the sets are sparse everywhere except
  * near the root, so it lands where the node counts are smallest. */
-static inline int intersect(const uint64_t *parent, const uint64_t *d,
-                            uint64_t *out, uint64_t *h0, uint64_t *h1) {
+/* Intersect the parent's legal set with DELTA[g], returning the popcount and
+ * fingerprinting the result in the same pass.
+ *
+ * ONLY THE PARENT'S LIVE WORDS ARE TOUCHED, and the child's live list is built as
+ * we go. Scanning all BSW = 203 words instead meant a depth-3 state with six legal
+ * words paying for a 12972-bit vector on every child, on the hot path, in the deep
+ * nodes where nearly all the time goes.
+ *
+ * `out` is therefore left STALE at words outside the child's live list -- correct
+ * only because every reader goes through that list, never over the raw bitset.
+ *
+ * The fingerprint is over the bitset WORDS, not the member indices: O(live words)
+ * rather than O(members). ITS TWO HALVES MUST STAY INDEPENDENT -- the fingerprint
+ * IS the memo key, since the true key (a 12972-bit set) is far too big to store, so
+ * a collision silently returns another position's value. An earlier version folded
+ * both halves from the same per-word quantity with near-identical FNV steps, which
+ * left them correlated and collided on a real search. Each word is avalanched once,
+ * then accumulated by DIFFERENT operations, and both are finalized. */
+static inline int intersect(const uint64_t *parent, const uint16_t *pw, int pnw,
+                            const uint64_t *d, uint64_t *out,
+                            uint16_t *cw, int *cnw,
+                            uint64_t *h0, uint64_t *h1) {
     uint64_t a = 0x243F6A8885A308D3ULL, b = 0x13198A2E03707344ULL;
-    int n = 0;
-    for (int w = 0; w < BSW; w++) {
+    int n = 0, m = 0;
+    for (int k = 0; k < pnw; k++) {
+        int w = pw[k];
         uint64_t x = parent[w] & d[w];
-        out[w] = x;
         if (x) {
+            out[w] = x;
+            cw[m++] = (uint16_t)w;
             n += __builtin_popcountll(x);
-            uint64_t m = mix64(x ^ (0x9E3779B97F4A7C15ULL * (uint64_t)(w + 1)));
-            a ^= m;
+            uint64_t mm = mix64(x ^ (0x9E3779B97F4A7C15ULL * (uint64_t)(w + 1)));
+            a ^= mm;
             a = a * 0x100000001B3ULL + 0x9E3779B97F4A7C15ULL;
-            b += m;
+            b += mm;
             b ^= b >> 29;
             b *= 0xBF58476D1CE4E5B9ULL;
         }
     }
+    *cnw = m;
     *h0 = mix64(a);
     *h1 = mix64(b ^ 0xC2B2AE3D27D4EB4FULL);
     return n;
@@ -514,6 +551,8 @@ static int value(Ctx *c, int depth, int nL, uint64_t h0, uint64_t h1,
 
     c->nodes++;
     const uint64_t *L = c->arena[depth];
+    const uint16_t *LW = c->widx[depth];
+    int LNW = c->nwid[depth];
     int ceiling = nL;
     if (PRUNE) {
         if (pool + 1 < ceiling) ceiling = pool + 1;
@@ -530,15 +569,17 @@ static int value(Ctx *c, int depth, int nL, uint64_t h0, uint64_t h1,
     Cand *cand = c->cand + (size_t)depth * NG;
     int ncand = 0;
     uint32_t stamp = ++c->stamp;
-    for (int w = 0; w < BSW; w++) {
-        uint64_t bits = L[w];
+    for (int kk = 0; kk < LNW; kk++) {
+        int wbase = LW[kk] << 6;
+        uint64_t bits = L[LW[kk]];
         while (bits) {
-            int g = (w << 6) + __builtin_ctzll(bits);
+            int g = wbase + __builtin_ctzll(bits);
             bits &= bits - 1;
             if (g == c->answer_g) continue;
 
             uint64_t ch0, ch1;
-            int nC = intersect(L, c->delta + (size_t)g * BSW, c->scratch, &ch0, &ch1);
+            int nC = intersect(L, LW, LNW, c->delta + (size_t)g * BSW,
+                               c->scratch, c->swidx, &c->snwid, &ch0, &ch1);
             int slot = (int)(ch0 & c->dedup_mask), seen = 0;
             for (int probe = 0; probe < DEDUP_SIZE; probe++) {
                 if (c->dstamp[slot] != stamp) {
@@ -573,8 +614,9 @@ static int value(Ctx *c, int depth, int nL, uint64_t h0, uint64_t h1,
         if (PRUNE && 1 + cand[i].bound <= best) { c->pruned += ncand - i; break; }
         int g = cand[i].g;
         uint64_t ch0, ch1;
-        int nC = intersect(L, c->delta + (size_t)g * BSW, c->arena[depth + 1],
-                           &ch0, &ch1);
+        int nC = intersect(L, LW, LNW, c->delta + (size_t)g * BSW,
+                           c->arena[depth + 1], c->widx[depth + 1],
+                           &c->nwid[depth + 1], &ch0, &ch1);
         c->edges++;
         int v = value(c, depth + 1, nC, ch0 ^ c->salt, ch1 ^ c->salt,
                       pool - c->spent[g], used | c->lmask[g], grn | c->gmask[g]);
@@ -628,28 +670,36 @@ static int value(Ctx *c, int depth, int nL, uint64_t h0, uint64_t h1,
 
 /* Longest line greedy play finds, and an achievable lower bound on the answer's
  * true value.  Ties on the lowest guess index, as everywhere else. */
-static int greedy_len(Ctx *c, int nL, const uint64_t *start) {
+static int greedy_len(Ctx *c, int nL, const uint64_t *start,
+                      const uint16_t *startw, int startnw) {
     uint64_t cur[BSW];
+    uint16_t curw[BSW], tmpw[BSW];
+    int curnw = startnw, tmpnw = 0;
     memcpy(cur, start, sizeof cur);
+    memcpy(curw, startw, (size_t)startnw * sizeof(uint16_t));
     int len = 1;                              /* the forced naming move */
     for (int step = 0; step < MAXD - 2; step++) {
         int bestg = -1, bestn = -1;
-        for (int w = 0; w < BSW; w++) {
-            uint64_t bits = cur[w];
+        for (int kk = 0; kk < curnw; kk++) {
+            int wbase = curw[kk] << 6;
+            uint64_t bits = cur[curw[kk]];
             while (bits) {
-                int g = (w << 6) + __builtin_ctzll(bits);
+                int g = wbase + __builtin_ctzll(bits);
                 bits &= bits - 1;
                 if (g == c->answer_g) continue;
                 uint64_t d0, d1;
-                int nC = intersect(cur, c->delta + (size_t)g * BSW, c->scratch,
-                                   &d0, &d1);
+                int nC = intersect(cur, curw, curnw, c->delta + (size_t)g * BSW,
+                                   c->scratch, tmpw, &tmpnw, &d0, &d1);
                 if (nC > bestn) { bestn = nC; bestg = g; }
             }
         }
         if (bestg < 0) return len;            /* only the answer is playable */
         uint64_t d0, d1;
-        nL = intersect(cur, c->delta + (size_t)bestg * BSW, c->scratch, &d0, &d1);
+        nL = intersect(cur, curw, curnw, c->delta + (size_t)bestg * BSW,
+                       c->scratch, tmpw, &tmpnw, &d0, &d1);
         memcpy(cur, c->scratch, sizeof cur);
+        memcpy(curw, tmpw, (size_t)tmpnw * sizeof(uint16_t));
+        curnw = tmpnw;
         len++;
     }
     return len;
@@ -684,17 +734,21 @@ static int can_reach(Ctx *c, int depth, int nL, uint64_t h0, uint64_t h1,
 
     c->nodes++;
     const uint64_t *L = c->arena[depth];
+    const uint16_t *LW = c->widx[depth];
+    int LNW = c->nwid[depth];
     Cand *cand = c->cand + (size_t)depth * NG;
     int ncand = 0;
     uint32_t stamp = ++c->stamp;
-    for (int w = 0; w < BSW; w++) {
-        uint64_t bits = L[w];
+    for (int kk = 0; kk < LNW; kk++) {
+        int wbase = LW[kk] << 6;
+        uint64_t bits = L[LW[kk]];
         while (bits) {
-            int g = (w << 6) + __builtin_ctzll(bits);
+            int g = wbase + __builtin_ctzll(bits);
             bits &= bits - 1;
             if (g == c->answer_g) continue;
             uint64_t ch0, ch1;
-            int nC = intersect(L, c->delta + (size_t)g * BSW, c->scratch, &ch0, &ch1);
+            int nC = intersect(L, LW, LNW, c->delta + (size_t)g * BSW,
+                               c->scratch, c->swidx, &c->snwid, &ch0, &ch1);
             int slot = (int)(ch0 & c->dedup_mask), seen = 0;
             for (int probe = 0; probe < DEDUP_SIZE; probe++) {
                 if (c->dstamp[slot] != stamp) {
@@ -719,8 +773,9 @@ static int can_reach(Ctx *c, int depth, int nL, uint64_t h0, uint64_t h1,
         if (cand[i].bound < need - 1) { c->pruned += ncand - i; break; }
         int g = cand[i].g;
         uint64_t ch0, ch1;
-        int nC = intersect(L, c->delta + (size_t)g * BSW, c->arena[depth + 1],
-                           &ch0, &ch1);
+        int nC = intersect(L, LW, LNW, c->delta + (size_t)g * BSW,
+                           c->arena[depth + 1], c->widx[depth + 1],
+                           &c->nwid[depth + 1], &ch0, &ch1);
         c->edges++;
         if (can_reach(c, depth + 1, nC, ch0 ^ c->salt, ch1 ^ c->salt,
                       pool - c->spent[g], need - 1,
@@ -742,7 +797,11 @@ static int can_reach(Ctx *c, int depth, int nL, uint64_t h0, uint64_t h1,
 static int start_state(Ctx *c, int ai, char **after, int nafter,
                        uint64_t *h0, uint64_t *h1, int *pool,
                        uint32_t *used, uint8_t *grn) {
-    int nL = intersect(BS_ALL, BS_ALL, c->arena[0], h0, h1);
+    /* Root: every word of BS_ALL is non-empty, so the root live list is all BSW. */
+    for (int w = 0; w < BSW; w++) c->widx[0][w] = (uint16_t)w;
+    c->nwid[0] = BSW;
+    int nL = intersect(BS_ALL, c->widx[0], BSW, BS_ALL, c->arena[0],
+                       c->widx[0], &c->nwid[0], h0, h1);
     *pool = pool_start(ai);
     *used = 0;
     *grn = 0;
@@ -754,8 +813,12 @@ static int start_state(Ctx *c, int ai, char **after, int nafter,
             fprintf(stderr, "%s is not legal at that point in the line\n", after[k]);
             exit(1);
         }
-        nL = intersect(c->arena[0], c->delta + (size_t)g * BSW, c->scratch, h0, h1);
+        nL = intersect(c->arena[0], c->widx[0], c->nwid[0],
+                       c->delta + (size_t)g * BSW, c->scratch,
+                       c->swidx, &c->snwid, h0, h1);
         memcpy(c->arena[0], c->scratch, sizeof BS_ALL);
+        memcpy(c->widx[0], c->swidx, (size_t)c->snwid * sizeof(uint16_t));
+        c->nwid[0] = c->snwid;
         *pool -= c->spent[g];
         *used |= c->lmask[g];
         *grn  |= c->gmask[g];
@@ -787,8 +850,9 @@ static int line_of(Ctx *c, int ai, char **after, int nafter,
         }
         used += (size_t)snprintf(out + used, outsz - used, "%s%s",
                                  used ? " " : "", GWORD[move]);
-        nL = intersect(c->arena[depth], c->delta + (size_t)move * BSW,
-                       c->arena[depth + 1], &h0, &h1);
+        nL = intersect(c->arena[depth], c->widx[depth], c->nwid[depth],
+                       c->delta + (size_t)move * BSW, c->arena[depth + 1],
+                       c->widx[depth + 1], &c->nwid[depth + 1], &h0, &h1);
         pool -= c->spent[move];
         umask |= c->lmask[move];
         gmk   |= c->gmask[move];
@@ -843,15 +907,19 @@ static void longest_line(Ctx *c, int ai, int need, char *out, size_t outsz) {
         int chosen = -1, chosen_n = 0;
         uint64_t ch0 = 0, ch1 = 0;
         const uint64_t *L = c->arena[depth];
-        for (int w = 0; w < BSW && chosen < 0; w++) {
-            uint64_t bits = L[w];
+        const uint16_t *LW = c->widx[depth];
+        int LNW = c->nwid[depth];
+        for (int kk = 0; kk < LNW && chosen < 0; kk++) {
+            int wbase = LW[kk] << 6;
+            uint64_t bits = L[LW[kk]];
             while (bits) {
-                int g = (w << 6) + __builtin_ctzll(bits);
+                int g = wbase + __builtin_ctzll(bits);
                 bits &= bits - 1;
                 if (g == c->answer_g) continue;
                 uint64_t t0, t1;
-                int nC = intersect(L, c->delta + (size_t)g * BSW,
-                                   c->arena[depth + 1], &t0, &t1);
+                int nC = intersect(L, LW, LNW, c->delta + (size_t)g * BSW,
+                                   c->arena[depth + 1], c->widx[depth + 1],
+                                   &c->nwid[depth + 1], &t0, &t1);
                 if (can_reach(c, depth + 1, nC, t0 ^ c->salt, t1 ^ c->salt,
                               pool - c->spent[g], budget - 1,
                               umask | c->lmask[g], gmk | c->gmask[g])) {
@@ -863,8 +931,9 @@ static void longest_line(Ctx *c, int ai, int need, char *out, size_t outsz) {
         if (chosen < 0) break;
         used += (size_t)snprintf(out + used, outsz - used, "%s%s",
                                  used ? " " : "", GWORD[chosen]);
-        intersect(c->arena[depth], c->delta + (size_t)chosen * BSW,
-                  c->arena[depth + 1], &h0, &h1);
+        intersect(c->arena[depth], c->widx[depth], c->nwid[depth],
+                  c->delta + (size_t)chosen * BSW, c->arena[depth + 1],
+                  c->widx[depth + 1], &c->nwid[depth + 1], &h0, &h1);
         (void)ch0; (void)ch1;
         nL = chosen_n;
         pool -= c->spent[chosen];
@@ -927,8 +996,11 @@ static int run_longest(Ctx *proto, FILE *out, int *todo, int ntodo,
         Ctx *c = ctxs[tid];
         ctx_load_answer(c, todo[k]);
         uint64_t h0, h1;
-        int nL = intersect(BS_ALL, BS_ALL, c->arena[0], &h0, &h1);
-        order[k].bound = greedy_len(c, nL, c->arena[0]);
+        for (int w = 0; w < BSW; w++) c->widx[0][w] = (uint16_t)w;
+        c->nwid[0] = BSW;
+        int nL = intersect(BS_ALL, c->widx[0], BSW, BS_ALL, c->arena[0],
+                           c->widx[0], &c->nwid[0], &h0, &h1);
+        order[k].bound = greedy_len(c, nL, c->arena[0], c->widx[0], c->nwid[0]);
         order[k].g = todo[k];
     }
     qsort(order, ntodo, sizeof(Cand), cand_cmp);

@@ -6,10 +6,12 @@
 #     bash solver/run-antistall-sweep.sh --tt-bits 28       # a bigger table
 #     bash solver/run-antistall-sweep.sh --guess-list data/shared/words/mystery.txt
 #
-# WHAT THIS COMPUTES, precisely: for each of the 2315 answers, the longest run of
-# legal guesses before the answer must be named, played by someone who knew the
-# word from move one. Exact -- no depth cap (antiwordle has none) and no beam.
-# The count INCLUDES the final forced naming move.
+# WHAT THIS COMPUTES, precisely: for each of the 2315 answers, the LONGEST GAME for
+# that answer -- the whole line from an empty board, played by someone who knew the
+# word from move one. Exact: no depth cap (antiwordle has none) and no beam. The
+# count INCLUDES the final forced naming move. The length comes from playing words
+# that are legal but are not possible ANSWERS, so the guess list (12972) and the
+# answer list (2315) are separate objects.
 #
 #     bash solver/run-antistall-sweep.sh --longest      # a DIFFERENT question
 #
@@ -30,6 +32,13 @@
 # Each (guess list, --after) pair is a DIFFERENT quantity and gets its own CSV.
 # Resumable: one row per answer, flushed as it lands, and a re-run skips what is
 # already there. Ctrl-C costs at most the answer in flight.
+#
+# COMMIT THE CSV. It lands in data/shared/, which is the committed, synced location
+# by convention -- but writing there does not commit it, and until it is committed a
+# multi-hour result is one `git clean` or one tidy-up away from gone with no history
+# to recover it from. That has already happened once: a 3h24m run's rows were
+# deleted during a cleanup and survived only because the terminal output had been
+# captured elsewhere.
 #
 # The Python implementation (tools/antiwordle_stall.py) is the same search and
 # stays the REFERENCE -- tools/checkantistall.py diffs the two. It is ~90x slower,

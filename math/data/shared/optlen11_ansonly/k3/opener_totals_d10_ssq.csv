@@ -1,0 +1,4 @@
+word,total,expected,depth,seconds
+materialise,7039,2.32925,10,0.1
+replication,7084,2.34414,10,0.1
+neuroticism,7082,2.34348,10,0.1

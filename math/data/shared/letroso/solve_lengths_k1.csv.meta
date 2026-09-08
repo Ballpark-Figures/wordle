@@ -1,0 +1,10 @@
+# letroso top-K solve
+built: 2026-09-06
+objective: expected guesses OUTRIGHT, no cap (unlimited guesses); NOT comparable with any optturns/hardturns/ansall total
+ranking rule: sum over bins != win of n_b * W_b, ties on lowest guess index
+length prior: lengths
+k: 1  (a BEAM -- the opener is the best of the k examined, not of all 139072)
+guesses: 139072  answers: 30403
+fingerprint: 40ec70aa8bd79ec5
+lists: hello wordl len3-10; len3 answers are OURS (see data/shared/words/hello/len3/README.md)
+seconds: 39794.7
