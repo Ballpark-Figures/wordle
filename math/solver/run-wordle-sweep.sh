@@ -356,18 +356,31 @@ if [ -n "$SHORTFROM" ]; then
     # WHICH PASS THIS IS, read off the source's own name: a stage-1 sweep is over a
     # word list, and every later one is over a shortlist cut from the stage before,
     # so the nesting in the stem counts the passes.  Stage 1 has no source at all.
-    NEST=$(echo "$SRCSTEM" | grep -o shortlist | wc -l | tr -d ' ')
-    STAGE=$((2 + NEST))
+    # ONE pass number, not two.  This used to count `shortlist_` occurrences in
+    # the source's name, which the bounded stems no longer contain -- so a pass-9
+    # run announced "pass 2" and printed on the pass-2 interval while writing p9.
+    # PASSNO is derived once, above, from the source's lineage header.
+    STAGE=$PASSNO
     # A later stage at the earlier seed replays the games that chose the
     # shortlist.  Loud, not fatal: it is a judgement about what the run means.
-    # ANCHORED at the front, and that matters: a stem NESTS its ancestors, so
-    # `sweep_answer_t10000_s2_shortlist_answer_t1000_s1_shortlist_..._t100_s0_...`
-    # holds three of each.  A greedy `.*_t` matches the LAST -- the oldest, most
-    # distant pass -- so a deep chain silently derived t=200 from a t=10000 run
-    # and reused seed 0 while claiming to advance it.  The current sweep's own
-    # figures are the ones right after `sweep_<follow-up>_`.
-    SRCT=$(echo "$SRCSTEM" | sed -n 's/^sweep_[a-z][a-z]*_t\([0-9][0-9]*\)_s[0-9].*/\1/p')
-    SRCSEED=$(echo "$SRCSTEM" | sed -n 's/^sweep_[a-z][a-z]*_t[0-9][0-9]*_s\([0-9][0-9]*\)_.*/\1/p')
+    # FROM THE FILE'S OWN HEADER, not its name.  Its first line reads
+    #   # wordle opener sweep: 5000 trials per word, follow-up answer, seed 7
+    # which is true whatever the naming scheme happens to be this week -- and the
+    # naming scheme HAS changed twice, breaking a name-parser both times.  The
+    # stem fallbacks below cover files written before the header existed: first
+    # the current `..._p<pass>_t<T>_s<SEED>` tail, then the old nested form, whose
+    # figures sit right after `sweep_<follow-up>_` (anchored, because a nested
+    # stem holds one `_t` per ancestor and the oldest is LAST).
+    SRCT=$(sed -n 's/^# wordle opener sweep: \([0-9][0-9]*\) trials.*/\1/p' "$SHORTFROM" | head -1)
+    SRCSEED=$(sed -n 's/^# wordle opener sweep: .*seed \([0-9][0-9]*\).*/\1/p' "$SHORTFROM" | head -1)
+    if [ -z "$SRCT" ]; then
+        SRCT=$(echo "$SRCSTEM" | sed -n 's/.*_p[0-9][0-9]*_t\([0-9][0-9]*\)_s[0-9][0-9]*$/\1/p')
+        SRCSEED=$(echo "$SRCSTEM" | sed -n 's/.*_p[0-9][0-9]*_t[0-9][0-9]*_s\([0-9][0-9]*\)$/\1/p')
+    fi
+    if [ -z "$SRCT" ]; then
+        SRCT=$(echo "$SRCSTEM" | sed -n 's/^sweep_[a-z][a-z]*_t\([0-9][0-9]*\)_s[0-9].*/\1/p')
+        SRCSEED=$(echo "$SRCSTEM" | sed -n 's/^sweep_[a-z][a-z]*_t[0-9][0-9]*_s\([0-9][0-9]*\)_.*/\1/p')
+    fi
     # Derive the next pass's trials and seed from the source, unless given.
     if [ -z "$T" ]; then
         [ -n "$SRCT" ] || { echo "cannot read -t from $SRCSTEM; pass -t" >&2; exit 1; }

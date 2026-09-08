@@ -1378,6 +1378,15 @@ CSV row per word, flushed).
   first write, and recovers `root`/`pass` from an old nested stem (everything
   after `openings_`, trailing `_se<N>`/`_adapt<N>` stripped; passes counted by
   `shortlist_` occurrences) so cascades already in flight continue unbroken.
+- **READ A RUN'S PARAMETERS FROM ITS HEADER, NOT ITS NAME.** Every sweep CSV's
+  first line states its own trials, follow-up and seed, and that stays true across
+  naming schemes — which have now changed twice, breaking a name-parser BOTH
+  times (the nesting fix broke `-t`/`--seed` derivation, since the bounded stem
+  puts `_t..._s...` at the END). Stem parsing survives only as a fallback for
+  files written before the header existed. Same lesson one level down: the pass
+  number is derived ONCE from the lineage header — it used to be counted a second
+  time from `shortlist_` occurrences in the name, so a pass-9 run announced
+  "pass 2" and printed on the wrong interval while correctly writing `p9`.
 - **A STEM NESTS ITS ANCESTORS, so parse it ANCHORED at the front.**
   `sweep_answer_t10000_s2_shortlist_answer_t1000_s1_shortlist_..._t100_s0_...`
   holds three `_t` and three `_s`, oldest LAST — so a greedy `.*_t` reads the
