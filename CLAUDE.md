@@ -1185,6 +1185,51 @@ source of truth. Run it with **`bash solver/run-wordle-sim.sh --strategy NAME -t
   full guess sequence + the win flag) with the summary as trailing `#` lines; log
   under `data/local/wordlesim/`. Rows flush per game, so a Ctrl-C keeps the games
   played. Re-running the same three reproduces the file exactly.
+### Opener sweep (`run-wordle-sweep.sh`) — a two-stage SCREEN, not a winner
+The `wordlesim` analogue of the multiwordle opener sweep, reusing that sweep's
+doctrine and its cut. **`bash solver/run-wordle-sweep.sh --fallback answer|guess
+-t T [--seed S]`** (from `math/`), attached, tee'd log, RESUMABLE per word (one
+CSV row per word, flushed).
+- **The swept thing is the `opener` RULE** — play this word on turn 1, decline
+  after — so the sweep and a single `--strategy opener --strategy-arg WORD` run
+  build the SAME rule (`wordlesim.fixed_opener`), one source of truth. There is no
+  default opener anywhere: which word to open with is what the sweep asks.
+- **`--fallback` IS REQUIRED HERE TOO, and the two sweeps are two different
+  screens** — the opener is feeding a different player, so "which opener is best"
+  has a different answer under each. It is in the filename, and **the wrapper
+  REFUSES a `--shortlist-from` whose source was swept under the OTHER follow-up**,
+  which would screen one player and test another.
+- **COMMON RANDOM NUMBERS, and they are the point.** The answer-draw stream is
+  re-seeded per word and kept SEPARATE from the follow-up's pick stream
+  (`PICK_OFFSET = 1 << 20`), so every opener faces the identical games and the
+  DIFFERENCE between two words is far less noisy than their individual SEs. Flip
+  side: **a sweep cell will not match a `run-wordle-sim.sh` run at the same seed**
+  — `wordle_sim.py` draws both from one stream, so they are different samples.
+- **THE HEAD OF A SWEEP IS A SHORTLIST, NOT A WINNER.** At 12972 words the best
+  mean belongs to whichever word drew the kindest sample. Stage it: screen wide and
+  cheap, cut generously, re-run the survivors larger at a **FRESH `--seed`** (the
+  wrapper WARNS on a repeat — the same seed replays the games that chose the
+  shortlist), repeat. `--shortlist-from SWEEP.csv` does a stage in one command.
+- **TWO NUMBERS MEANS TWO POSSIBLE SHORTLISTS.** Each row carries mean AND win
+  rate with their own standard errors, and they need not agree.
+  `--shortlist-value mean` (default, lower better) or `win_rate` (higher better)
+  says which the cut ranked on, and it lands in the shortlist's name. **Never cut
+  on one and report the other.**
+- **`tools/sweep_shortlist.py` IS THE CUT, SHARED WITH MULTIWORDLE.** The logic
+  moved there when this became the second caller; `tools/multiwordle_shortlist.py`
+  is now a thin front end over it and its CLI is unchanged (verified: the `se10`,
+  `top` and `own-se` cuts of the committed multiwordle sweeps are byte-identical
+  before and after, and `checkmultiwordle.py` still passes). Columns are found by
+  NAME in the header, so any sweep CSV here works. **`--own-se` is a DIFFERENT
+  question, not a looser one** — measuring each word in its own noise can drop a
+  word a fixed cut keeps.
+- Data under `data/shared/wordlesim/sweep_<fallback>_t<T>_s<SEED>_<list>.csv`,
+  shortlists beside them as `shortlist_<source stem>_<cut>.txt`, logs under
+  `data/local/wordlesim/`.
+- **MEASURED (2026-09-08, this machine): ~490 words/s at `-t 100` under the
+  `answer` follow-up and ~262/s under `guess`** — so a full 12972-word stage 1 is
+  well under two minutes either way.
+
 - **`python3 tools/checkwordlesim.py` is the GATE**: it replays the same seeds
   through an independent implementation that keeps candidates as LISTS OF WORDS and
   recomputes every reply from the STRINGS by the **multiset rule** (a different
@@ -1200,8 +1245,13 @@ source of truth. Run it with **`bash solver/run-wordle-sim.sh --strategy NAME -t
   per-game state reset (a leaked bitmap diverges from game two on); it FAILS if
   `random-guess` never played a non-mystery word, and it re-checks that every
   hidden answer came from the 2315. `--guess-games` sizes that half (the
-  reference filters 12972 strings per turn, so it is the slow one). Run it
-  alongside `solver/validate.sh` and `tools/checkpatterns.py`.
+  reference filters 12972 strings per turn, so it is the slow one). **It also
+  diffs the SWEEP** — reproducing its two-stream loop from the strings and
+  requiring the answers each word faced to be IDENTICAL across words, the property
+  the whole sweep rests on (a shared stream would still report unbiased means
+  while destroying the comparison between words) — and checks the shortlist cut on
+  hand-made rows in both directions. Run it alongside `solver/validate.sh` and
+  `tools/checkpatterns.py`.
 
 ## Nerdle (8-symbol equations) — the GUESS enumeration, pass one
 A different game living beside the wordle variants. `math/nerdle.py` states the rules
