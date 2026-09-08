@@ -1453,6 +1453,12 @@ differences instead.
   experiment wearing the same filename. **The seed is the one exception: it
   advances by one**, since the finalists were chosen by the source's own games.
   Every one of those overrides on the command line.
+- **THE SWEEP'S OUTPUT PATH IS GATED END TO END, and that is a scar**: every
+  other check called `sweep_word` directly, so nothing exercised the header
+  WRITING, and a format string with six placeholders and five arguments shipped —
+  crashing every first pass AFTER the file was created, whose existence then
+  suppresses the header on the re-run. The gate now runs the real `main()` into a
+  temp file and reads it back with the parser that consumes it.
 - **A `# settings follow_up=… pair_adaptive=… win_within=… trials=… seed=…` line
   is now written into every sweep CSV**, machine-readable beside the prose, so a
   later tool cannot be broken by rewording a paragraph. Older files fall back to

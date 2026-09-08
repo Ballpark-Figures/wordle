@@ -99,7 +99,7 @@ from wordle_sweep import PICK_OFFSET, sweep_word  # noqa: E402
 from sweep_shortlist import shortlist  # noqa: E402
 from order_openings import (best_order, best_order_reference,  # noqa: E402
                              order_cost)
-from paired_compare import CoupledDraw, _play  # noqa: E402
+from paired_compare import CoupledDraw, _play, read_sweep_settings  # noqa: E402
 
 
 def ref_pattern(guess, answer):
@@ -687,6 +687,34 @@ def main(argv):
         # by the CLI refusing --pair-adaptive 3
     except Exception:
         pass
+
+    # --- the sweep's own OUTPUT PATH, end to end ------------------------------
+    # Everything above calls sweep_word directly, so the header-writing path had
+    # nothing exercising it -- and a format string with six placeholders and five
+    # arguments shipped, crashing every first pass AFTER creating the file (whose
+    # existence then suppresses the header on a re-run).  This runs the real main()
+    # into a temp file and reads it back with the parser that consumes it.
+    import tempfile
+    import wordle_sweep as ws
+    with tempfile.TemporaryDirectory() as td:
+        lst = os.path.join(td, "openings.txt")
+        with open(lst, "w") as f:
+            f.write("%s %s\n%s %s\n" % (guesses[0], guesses[1],
+                                          guesses[2], guesses[3]))
+        csv = os.path.join(td, "sweep.csv")
+        ws.main(["-t", "5", "--fallback", "answer", "--pair-adaptive", "2",
+                 "--seed", "3", "--words", lst, "--out", csv,
+                 "--root", "gatecheck", "--pass", "2", "--progress", "0"])
+        meta = read_sweep_settings(csv)
+        want = dict(fallback="answer", adapt=2, trials=5, seed=3, root="gatecheck")
+        for k, v in want.items():
+            if meta[k] != v:
+                failures.append("the sweep header round-trip lost %s: %r not %r"
+                                % (k, meta[k], v))
+        if meta["pass"] != 2 or len(meta["openings"]) != 2:
+            failures.append("the sweep header round-trip lost the pass or the rows")
+    print("sweep output: a real run's header round-trips through the parser that "
+          "reads it (follow-up, adapt, trials, seed, root, pass, rows)")
 
     # --- the paired comparison ------------------------------------------------
     # It replaces two independent means with one difference, so the two things

@@ -243,7 +243,7 @@ def main(argv):
             # the paragraphs below can break.
             fh.write("# settings follow_up=%s pair_adaptive=%d win_within=%d "
                      "trials=%d seed=%d words=%d\n"
-                     % (fallback, adapt, win_within, t, len(sweep_words)))
+                     % (fallback, adapt, win_within, t, seed, len(sweep_words)))
             if adapt:
                 fh.write("# %d-word openings, played in order but ABANDONED once "
                          "the follow-up is down to %d\n# or fewer words "
