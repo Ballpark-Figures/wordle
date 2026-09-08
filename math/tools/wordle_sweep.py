@@ -78,7 +78,7 @@ from build_patterns import load_patterns  # noqa: E402
 from wordle import load_words  # noqa: E402
 from wordle_sim import summarise  # noqa: E402
 from wordlesim import (WIN_WITHIN, answer_to_guess, draw_answer,  # noqa: E402
-                       fixed_opening, make_tail, play_game)
+                       make_opening_rule, make_tail, play_game)
 
 COLUMNS = ("word,trials,mean,stderr,sd,min,median,max,"
            "win_rate,win_rate_stderr,wins,seconds")
@@ -89,6 +89,7 @@ PICK_OFFSET = 1 << 20
 def parse_args(argv):
     t = None
     fallback = None
+    adapt = 0
     seed = 0
     words = "guess"
     limit = None
@@ -100,6 +101,8 @@ def parse_args(argv):
         a = argv[i]
         if a in ("-t", "--trials"):
             t = int(argv[i + 1]); i += 2
+        elif a == "--pair-adaptive":
+            adapt = int(argv[i + 1]); i += 2
         elif a == "--fallback":
             fallback = argv[i + 1]; i += 2
         elif a == "--seed":
@@ -129,7 +132,7 @@ def parse_args(argv):
         raise SystemExit(
             "--out is required (or --no-out to discard results deliberately).\n"
             "Use the wrapper, which sets it: bash solver/run-wordle-sweep.sh")
-    return t, fallback, seed, words, limit, win_within, out, progress
+    return t, fallback, adapt, seed, words, limit, win_within, out, progress
 
 
 def load_done(path):
@@ -146,7 +149,7 @@ def load_done(path):
     return done
 
 
-def sweep_word(pat, ans2g, na, t, seed, opening_g, tail, win_within):
+def sweep_word(pat, ans2g, na, t, seed, opening_g, tail, win_within, adapt=0):
     """One opening's t games, against the seed's fixed sequence of answer draws.
 
     `opening_g` is a list of guess indices -- one for a plain opener sweep, more
@@ -155,7 +158,7 @@ def sweep_word(pat, ans2g, na, t, seed, opening_g, tail, win_within):
     """
     draw_rng = np.random.default_rng(seed)
     pick_rng = np.random.default_rng(seed + PICK_OFFSET)
-    rule = fixed_opening(opening_g)
+    rule = make_opening_rule(opening_g, tail=tail, adapt=adapt)
     scores = []
     for _ in range(t):
         answer_idx = draw_answer(na, draw_rng)
@@ -165,7 +168,8 @@ def sweep_word(pat, ans2g, na, t, seed, opening_g, tail, win_within):
 
 
 def main(argv):
-    t, fallback, seed, words, limit, win_within, out, progress = parse_args(argv)
+    (t, fallback, adapt, seed, words, limit, win_within, out,
+     progress) = parse_args(argv)
 
     guesses = load_words("guess")
     answers = load_words("mystery")
@@ -194,6 +198,10 @@ def main(argv):
         raise SystemExit("the list mixes openings of %s words; a sweep ranks "
                          "openings of ONE size" % " and ".join(map(str, sizes)))
 
+    if adapt and sizes[0] < 2:
+        raise SystemExit("--pair-adaptive needs an opening of at least 2 words: "
+                         "there is no later word to abandon")
+
     pat = np.array(load_patterns())
     ans2g = answer_to_guess(answers, guesses)
     tail = make_tail(fallback, guesses, answers, ans2g)
@@ -212,8 +220,15 @@ def main(argv):
         if fresh:
             fh.write("# wordle opener sweep: %d trials per word, follow-up %s, "
                      "seed %d\n" % (t, fallback, seed))
-            fh.write("# %d-word openings, played BLIND in order; the follow-up "
-                     "plays the rest (math/wordlesim.py)\n" % sizes[0])
+            if adapt:
+                fh.write("# %d-word openings, played in order but ABANDONED once "
+                         "the follow-up is down to %d\n# or fewer words "
+                         "(--pair-adaptive, the rule in data/shared/PAIRS.md); "
+                         "ORDER MATTERS, so\n# a b and b a are different rows\n"
+                         % (sizes[0], adapt))
+            else:
+                fh.write("# %d-word openings, played BLIND in order; the follow-up "
+                         "plays the rest (math/wordlesim.py)\n" % sizes[0])
             fh.write("# every opening faces the SAME %d answers, drawn from the "
                      "2315 mystery words (common random numbers)\n" % t)
             if sizes[0] > 1:
@@ -227,9 +242,10 @@ def main(argv):
             fh.write(COLUMNS + "\n")
         fh.flush()
 
-    print("sweep: %d %s x %d trials, follow-up %s, seed %d"
+    print("sweep: %d %s x %d trials, follow-up %s, seed %d%s"
           % (len(todo), "openings of %d words" % sizes[0] if sizes[0] > 1 else "words",
-             t, fallback, seed))
+             t, fallback, seed,
+             ", pair-adaptive %d" % adapt if adapt else ", blind"))
     if done:
         print("  resuming: %d words already in %s" % (len(done), out))
 
@@ -238,7 +254,7 @@ def main(argv):
     for i, w in enumerate(todo):
         w0 = time.time()
         st = sweep_word(pat, ans2g, na, t, seed, [pos[x] for x in w.split()],
-                        tail, win_within)
+                        tail, win_within, adapt)
         dt = time.time() - w0
         if fh:
             fh.write("%s,%d,%.6f,%.6f,%.6f,%d,%.1f,%d,%.6f,%.6f,%d,%.3f\n"

@@ -42,6 +42,13 @@ that the rest of the game matches the reference.  Handing that game to the guess
 follow-up at TURN 1 is also the only place its catch-up is tested: it must build
 its live set from a history it was not present for.
 
+`--pair-adaptive` GETS ITS OWN CONSTRUCTED CASES, since every branch of it is
+rare in random play: a bucket of exactly 1 and of exactly 2 (the opening must be
+abandoned and the follow-up must name the answer), a big bucket (it must still be
+played), the same position judged by both follow-ups (the guess pool is larger, so
+the rule can fire under one and not the other), and a pair whose two ORDERINGS
+score differently -- which is the entire reason --both-orders exists.
+
 MULTI-WORD OPENINGS ARE DIFFED THE SAME WAY, and their defining property --
 BLIND play, the later words going down even when one candidate is left -- is
 TALLIED and required to have happened, since a run where it never came up would
@@ -77,7 +84,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 from build_patterns import load_patterns  # noqa: E402
 from wordle import ALL_GREEN, load_words, pattern  # noqa: E402
 from wordlesim import (WIN_WITHIN, answer_to_guess, draw_answer,  # noqa: E402
-                       fixed_opening, make_strategy, make_tail, play_game)
+                       fixed_opening, make_opening_rule, make_strategy,
+                       make_tail, play_game)
 from wordle_sim import summarise  # noqa: E402
 from wordle_sweep import PICK_OFFSET, sweep_word  # noqa: E402
 from sweep_shortlist import shortlist  # noqa: E402
@@ -446,6 +454,91 @@ def main(argv):
     if not blind_hits:
         failures.append("no opening ever played on past a single surviving "
                         "candidate, so BLIND play is untested")
+
+    # --- --pair-adaptive: the opening abandoned once the field is tiny -------
+    # The rule ports optturns' --pair-adaptive (data/shared/PAIRS.md).  Three
+    # things are checked, each CONSTRUCTED rather than waited for, because all
+    # three are rare in random play:
+    #   1. at N or fewer the later word is NOT played and the follow-up names one
+    #   2. above N it IS played, so the rule has not simply become "stop early"
+    #   3. the count comes from the FOLLOW-UP's pool, so the same position can be
+    #      adaptive under `answer` and blind under `guess`
+    w1 = guesses[0]
+    row = pat[guesses.index(w1)]
+    counts = np.bincount(row, minlength=int(row.max()) + 1)
+    by_size = {}
+    for a in range(len(answers)):
+        by_size.setdefault(int(counts[row[a]]), []).append(a)
+    atail = make_tail("answer", guesses, answers, ans2g)
+    for size in (1, 2):
+        if size not in by_size:
+            failures.append("no g1 bucket of size %d, so the adaptive branch "
+                            "could not be constructed" % size)
+            continue
+        a = by_size[size][0]
+        w2 = next(g for g in guesses if g not in (w1, answers[a]))
+        gs = [guesses.index(w1), guesses.index(w2)]
+        played, _ = play_game(pat, ans2g, a,
+                              make_opening_rule(gs, tail=atail, adapt=2),
+                              atail, np.random.default_rng(3))
+        words = [guesses[g] for g in played]
+        if w2 in words:
+            failures.append("pair-adaptive played the second word over a bucket "
+                            "of %d: %s" % (size, " ".join(words)))
+        elif words[-1] != answers[a]:
+            failures.append("pair-adaptive did not end on the answer: %s"
+                            % " ".join(words))
+        elif len(words) > 1 + size:
+            failures.append("pair-adaptive spent %d guesses on a bucket of %d"
+                            % (len(words), size))
+    # above the threshold the blind word must still go down
+    big = max(by_size)
+    if big <= 2:
+        failures.append("no g1 bucket bigger than 2, so 'above the threshold' "
+                        "was never tested")
+    else:
+        a = by_size[big][0]
+        w2 = next(g for g in guesses if g not in (w1, answers[a]))
+        gs = [guesses.index(w1), guesses.index(w2)]
+        played, _ = play_game(pat, ans2g, a,
+                              make_opening_rule(gs, tail=atail, adapt=2),
+                              atail, np.random.default_rng(3))
+        if [guesses[g] for g in played][:2] != [w1, w2]:
+            failures.append("pair-adaptive skipped the second word over a bucket "
+                            "of %d, well above the threshold" % big)
+    # the same position, judged by the two follow-ups: the guess pool is larger,
+    # so a bucket that is adaptive under `answer` can be blind under `guess`
+    gtail = make_tail("guess", guesses, answers, ans2g)
+    a = by_size[1][0] if 1 in by_size else by_size[min(by_size)][0]
+    fb = int(pat[guesses.index(w1)][a])
+    n_ans = int((pat[guesses.index(w1)] == fb).sum())
+    n_gss = gtail.live_count(None, [guesses.index(w1)], [fb])
+    if n_gss < n_ans:
+        failures.append("the guess pool (%d) cannot be smaller than the answer "
+                        "pool (%d) in the same position" % (n_gss, n_ans))
+    print("pair-adaptive: at 1 and 2 the opening is abandoned and the follow-up "
+          "names the answer; at %d it is still played; the same position holds %d "
+          "answers but %d legal words, so the two follow-ups judge it differently"
+          % (big, n_ans, n_gss))
+
+    # ORDER MATTERS under the rule, and that is the reason --both-orders exists.
+    # Constructed: a pair whose two orderings score differently on one answer.
+    swapped = 0
+    for a in list(by_size.get(1, []))[:40]:
+        w2 = next(g for g in guesses if g not in (w1, answers[a]))
+        fwd = play_game(pat, ans2g, a, make_opening_rule(
+            [guesses.index(w1), guesses.index(w2)], tail=atail, adapt=2),
+            atail, np.random.default_rng(5))[0]
+        rev = play_game(pat, ans2g, a, make_opening_rule(
+            [guesses.index(w2), guesses.index(w1)], tail=atail, adapt=2),
+            atail, np.random.default_rng(5))[0]
+        swapped += len(fwd) != len(rev)
+    if not swapped:
+        failures.append("no pair scored differently in its two orderings, so the "
+                        "reason --both-orders exists is untested")
+    else:
+        print("order: %d of the constructed pairs score differently when reversed"
+              % swapped)
 
     # --- the shortlist cut ---------------------------------------------------
     # value, stderr per word; the best is 1.00 with a standard error of 0.10, so

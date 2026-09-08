@@ -1243,6 +1243,37 @@ CSV row per word, flushed).
   word and an answer it isolates to a singleton, then requires the second word to
   go down anyway and the game to cost 3 — a strategy that quietly stopped would
   score 2. A random tally never fired, which is why it is constructed.
+- **`--pair-adaptive N` IS THE EXACT SOLVER'S RULE, PORTED — not a new one.**
+  `optturns --pair-list --pair-adaptive N` already implements it and
+  **`math/data/shared/PAIRS.md`** states it and holds the exact results (best pair
+  `parse`+`clint`, total 8269 at N=2 over 100k screened; `crane`+`spilt` 8299
+  exhaustive over answer pairs). N=0 is pure blind, N=1 names the lone survivor,
+  N=2 settles a two-way split. **N is part of the objective** — three different
+  games, not comparable — so it is in the filename, and PAIRS.md explains why it
+  stops mattering at 3 (three named in order cost 6; so does a perfect three-way
+  split). **At the threshold the simulator's "name one at random" and the solver's
+  "guess them in order" are the SAME expected cost** (a 2-set totals 3 either way),
+  so this is the same rule, not an approximation of it — only the deeper
+  continuation differs (random-compatible here, optimal there), and the solver's
+  totals are capped at depth 6 while these are unconstrained, so **never table them
+  together**.
+- **ORDER MATTERS UNDER IT, and `--both-orders` is REQUIRED for that reason.** A
+  blind opening's partition cannot depend on play order, so `pairsplit.c`
+  enumerates each pair ONCE (verified: 1,000,000 rows, zero reversed duplicates);
+  this rule keys on what the FIRST word alone leaves, so `a b` and `b a` are
+  different strategies. The wrapper **REFUSES** `--pair-adaptive` on a ranking
+  without `--both-orders` rather than examine one ordering silently — the same
+  trap `optturns`' pair driver avoids by expanding every listed pair to two
+  candidates. MEASURED here at t=100: 45 of 50 pairs scored differently reversed.
+  PAIRS.md found the same shape exactly — the winning PAIR never moved with N, the
+  winning ORDER did.
+- **THE COUNT COMES FROM THE FOLLOW-UP, and that is the one deliberate departure
+  from the exact solver**, which only ever counts answers. Under `answer` they
+  agree; under `guess` it counts live LEGAL WORDS, so the rule fires less often —
+  a player drawing from the 12972 cannot know only two ANSWERS remain, and giving
+  them that knowledge for the stopping rule while denying it for the guess would
+  be two different players inside one strategy. The gate exhibits a position
+  holding 1 answer but 3 legal words, where the two follow-ups genuinely differ.
 - **A PAIR RUN IS A SCREEN OF A RANKING BUILT FOR A DIFFERENT QUESTION.** 84,129,906
   pairs cannot be simulated, so it examines the head of
   `data/shared/singletons/pair_singletons.csv` — which ranks pairs by how many

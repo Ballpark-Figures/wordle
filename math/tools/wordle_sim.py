@@ -58,6 +58,7 @@ COLUMNS = "game,guesses,won,answer,sequence"
 def parse_args(argv):
     strategy = None
     fallback = None
+    adapt = 0
     sargs = []
     t = None
     seed = 0
@@ -70,6 +71,8 @@ def parse_args(argv):
         a = argv[i]
         if a in ("-s", "--strategy"):
             strategy = argv[i + 1]; i += 2
+        elif a == "--pair-adaptive":
+            adapt = int(argv[i + 1]); i += 2
         elif a == "--fallback":
             fallback = argv[i + 1]; i += 2
         elif a == "--strategy-arg":
@@ -111,7 +114,7 @@ def parse_args(argv):
         raise SystemExit(
             "--out is required (or --no-out to discard results deliberately).\n"
             "Use the wrapper, which sets it: bash solver/run-wordle-sim.sh")
-    return strategy, fallback, sargs, t, seed, win_within, out, progress
+    return strategy, fallback, adapt, sargs, t, seed, win_within, out, progress
 
 
 def summarise(scores, win_within):
@@ -138,13 +141,15 @@ def summarise(scores, win_within):
 
 
 def main(argv):
-    (strategy_name, fallback, sargs, t, seed, win_within, out,
+    (strategy_name, fallback, adapt, sargs, t, seed, win_within, out,
      progress) = parse_args(argv)
 
     guesses = load_words("guess")
     answers = load_words("mystery")
     ans2g = answer_to_guess(answers, guesses)
     # resolved first, and before anything heavy is loaded, so --resolve is cheap
+    # The follow-up is built FIRST when the rule is adaptive: the rule asks it how
+    # many words it would be choosing between, so it cannot exist without it.
     rule, tail_name = make_strategy(strategy_name, guesses, answers, ans2g,
                                     sargs, fallback)
     if out == "--resolve":
@@ -152,9 +157,14 @@ def main(argv):
         return
     pat = np.array(load_patterns())          # 12972 x 2315, ~30 MB, wants RAM
     tail = make_tail(tail_name, guesses, answers, ans2g)
+    if adapt:
+        rule, tail_name = make_strategy(strategy_name, guesses, answers, ans2g,
+                                        sargs, fallback, tail=tail, adapt=adapt)
     rng = np.random.default_rng(seed)
 
     label = " ".join([strategy_name] + list(sargs))
+    if adapt:
+        label += " (pair-adaptive %d)" % adapt
     fh = None
     if out:
         os.makedirs(os.path.dirname(out) or ".", exist_ok=True)

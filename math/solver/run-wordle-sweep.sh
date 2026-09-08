@@ -9,6 +9,11 @@
 #     bash solver/run-wordle-sweep.sh --fallback answer -t 100 \
 #         --openings-from data/shared/singletons/pair_singletons.csv --top 10000
 #
+#     # ... or that rule with the opening ABANDONED once 2 or fewer words remain
+#     bash solver/run-wordle-sweep.sh --fallback answer -t 100 --pair-adaptive 2 \
+#         --openings-from data/shared/singletons/pair_singletons.csv --top 10000 \
+#         --both-orders
+#
 #     # STAGE 2: re-run only the words the screen left standing, at a FRESH seed
 #     bash solver/run-wordle-sweep.sh --fallback answer -t 1000 --seed 1 \
 #         --shortlist-from data/shared/wordlesim/sweep_answer_t100_s0_guess.csv
@@ -46,6 +51,31 @@
 #   (its head is exact), but it is not this objective: a pair below --top is never
 #   examined at all, and nothing here shows the two agree inside it.  Report such a
 #   run as "the best of the N screened", NEVER "the best pair".
+#
+# --pair-adaptive N ABANDONS THE OPENING once the follow-up is down to N or fewer
+# words, and it is the SAME RULE the exact solver already carries
+# (optturns --pair-list --pair-adaptive N; math/data/shared/PAIRS.md states it and
+# holds the exact results).  N = 0 is pure blind, N = 1 names the one survivor,
+# N = 2 settles a two-way split by naming one -- which costs 1.5 guesses on
+# average against the blind word's 2, so it is a strict gain per bucket.
+#
+#   N IS PART OF THE OBJECTIVE, not a knob: 0, 1 and 2 are three different games
+#   whose numbers are not comparable, so N is in the filename.  PAIRS.md explains
+#   why it stops being interesting at 3 (three named in order cost 6, and so does
+#   a perfect three-way split).
+#
+#   ORDER MATTERS UNDER IT, which is the whole reason --both-orders exists.  A
+#   blind opening's partition cannot depend on play order, so the pair rankings
+#   enumerate each pair ONCE; this rule keys on what the FIRST word alone leaves,
+#   so `a b` and `b a` are different strategies.  PAIRS.md measured it: the
+#   winning pair never moved with N, but the winning ORDER did.  Starting a
+#   cascade with --pair-adaptive and without --both-orders is therefore REFUSED --
+#   it would examine one ordering of each pair and never say so.
+#
+#   The COUNT is the follow-up's own: live answers under --fallback answer, live
+#   legal words under --fallback guess.  That is the one place this differs from
+#   the exact solver, which only ever counts answers -- a player drawing from the
+#   12972 cannot know that two ANSWERS remain.
 #
 # THE HEAD OF A SWEEP IS A SHORTLIST, NOT A WINNER.  With 12972 words at -t games
 # each, the best-looking mean belongs to whichever word drew the kindest sample,
@@ -108,6 +138,8 @@ SHORTTOP=""
 SHORTVALUE="mean"
 OPENFROM=""
 OPENTOP=""
+BOTHORDERS=0
+ADAPT=0
 # Which pass this is; a run with no --shortlist-from is the first.
 STAGE=1
 
@@ -126,6 +158,8 @@ while [ $# -gt 0 ]; do
         --shortlist-value)  SHORTVALUE="$2"; shift 2 ;;
         --openings-from)    OPENFROM="$2";   shift 2 ;;
         --top)              OPENTOP="$2";    shift 2 ;;
+        --both-orders)      BOTHORDERS=1;    shift 1 ;;
+        --pair-adaptive)    ADAPT="$2";      shift 2 ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
     esac
 done
@@ -142,6 +176,10 @@ case "$FALLBACK" in
 esac
 case "$SEED" in
     ''|*[!0-9]*) echo "--seed must be a non-negative number" >&2; exit 1 ;;
+esac
+case "$ADAPT" in
+    ''|*[!0-9]*) echo "--pair-adaptive must be a non-negative number of words" >&2
+                 exit 1 ;;
 esac
 case "$SHORTVALUE" in
     mean|win_rate) ;;
@@ -179,9 +217,24 @@ if [ -n "$OPENFROM" ]; then
                        echo "  looked at, so the number is part of the result." >&2
                        exit 1 ;;
     esac
-    WORDS="$OUTDIR/openings_$(basename "$OPENFROM" .csv)_top${OPENTOP}.txt"
-    "$PY" tools/opening_list.py --from "$OPENFROM" --top "$OPENTOP" --out "$WORDS" \
-        || exit 1
+    # An adaptive rule keys on what the FIRST word alone leaves, so the two
+    # orderings of a pair are different strategies.  The rankings list each pair
+    # once (correctly, for a blind opening), so sweeping them as-is would examine
+    # one ordering and never say which.  Refuse rather than do that quietly.
+    if [ "$ADAPT" != 0 ] && [ "$BOTHORDERS" = 0 ]; then
+        echo "REFUSING: --pair-adaptive makes the ORDER part of the strategy, but" >&2
+        echo "  $OPENFROM lists each pair once." >&2
+        echo "  Add --both-orders to sweep both, or drop --pair-adaptive." >&2
+        exit 1
+    fi
+    OPENFLAGS="--from $OPENFROM --top $OPENTOP"
+    LISTNAME="openings_$(basename "$OPENFROM" .csv)_top${OPENTOP}"
+    if [ "$BOTHORDERS" = 1 ]; then
+        OPENFLAGS="$OPENFLAGS --both-orders"
+        LISTNAME="${LISTNAME}_bothorders"
+    fi
+    WORDS="$OUTDIR/$LISTNAME.txt"
+    "$PY" tools/opening_list.py $OPENFLAGS --out "$WORDS" || exit 1
 fi
 
 if [ -n "$SHORTFROM" ]; then
@@ -242,6 +295,9 @@ fi
 echo "pass $STAGE: a progress line every $PROGRESS word(s)"
 
 STEM="sweep_${FALLBACK}_t${T}_s${SEED}_$(basename "$WORDS" .txt)"
+# N is part of the objective, so it is in the name; 0 keeps the blind stem every
+# earlier sweep already used.
+[ "$ADAPT" = 0 ] || STEM="${STEM}_adapt${ADAPT}"
 [ -n "$LIMIT" ] && STEM="${STEM}_lim${LIMIT}"
 [ "$WIN" = 6 ] || STEM="${STEM}_w${WIN}"
 OUT="$OUTDIR/$STEM.csv"
@@ -252,6 +308,7 @@ OUT="$OUTDIR/$STEM.csv"
 guard_output wordle_sweep.py "$OUT" || exit 1
 
 FLAGS="-t $T --fallback $FALLBACK --seed $SEED --words $WORDS --win-within $WIN --out $OUT"
+[ "$ADAPT" = 0 ] || FLAGS="$FLAGS --pair-adaptive $ADAPT"
 [ -n "$LIMIT" ] && FLAGS="$FLAGS --limit $LIMIT"
 FLAGS="$FLAGS --progress $PROGRESS"
 

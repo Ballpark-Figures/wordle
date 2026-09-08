@@ -58,6 +58,7 @@ def read_openings(path, top=None):
 def main(argv):
     src = out = None
     top = None
+    both = False
     i = 0
     while i < len(argv):
         a = argv[i]
@@ -67,6 +68,8 @@ def main(argv):
             out = argv[i + 1]; i += 2
         elif a == "--top":
             top = int(argv[i + 1]); i += 2
+        elif a == "--both-orders":
+            both = True; i += 1
         else:
             raise SystemExit("unknown argument: %s" % a)
     if src is None:
@@ -82,6 +85,18 @@ def main(argv):
                          "never looked at")
 
     rows = read_openings(src, top=top)
+    if both:
+        # The ranking enumerates each set ONCE, because a BLIND opening's joint
+        # partition cannot depend on play order (solver/pairsplit.c says so).  A
+        # rule that abandons the opening early breaks that, so every ordering
+        # becomes its own strategy and has to be listed.  Pairs give two; larger
+        # sets would give more, so only pairs are expanded here rather than
+        # silently emitting a number of permutations nobody asked for.
+        if any(len(r) != 2 for r in rows):
+            raise SystemExit("--both-orders expands PAIRS; %s holds openings of "
+                             "another size, whose orderings are a bigger set "
+                             "than this flag should decide" % src)
+        rows = [w for r in rows for w in (r, [r[1], r[0]])]
     sizes = sorted({len(r) for r in rows})
     if len(sizes) > 1:
         raise SystemExit("%s mixes openings of %s words"
@@ -90,7 +105,8 @@ def main(argv):
     with open(out, "w") as f:
         for r in rows:
             f.write(" ".join(r) + "\n")
-    print("%s: %d openings of %d words" % (out, len(rows), sizes[0]))
+    print("%s: %d openings of %d words%s"
+          % (out, len(rows), sizes[0], " (both orderings)" if both else ""))
     print("  from: %s (its own order, best first)" % src)
     print("  head: %s" % " | ".join(" ".join(r) for r in rows[:4]))
     print("  a SCREEN of that ranking -- the best of these, never the best opening")

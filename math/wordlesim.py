@@ -111,6 +111,14 @@ class RandomAnswer:
 
     pool_size = property(lambda self: len(self.ans2g))
 
+    def live_count(self, alive, played, replies):
+        """How many words this follow-up would be choosing between right now.
+
+        A rule that hands over early needs this, and it must be THIS pool's
+        count: what a player can see depends on which list they are playing from.
+        """
+        return int(alive.sum())
+
     def __init__(self, ans2g):
         self.ans2g = ans2g
 
@@ -144,7 +152,8 @@ class RandomGuess:
         self.hist = []            # the (guess, reply) prefix `live` was built from
         self.live = None
 
-    def __call__(self, turn, alive, played, replies, rng):
+    def _refresh(self, played, replies):
+        """Bring the live set up to date with the history, rebuilding if needed."""
         seen = list(zip(played, replies))
         if self.live is None or seen[:len(self.hist)] != self.hist:
             self.live = np.ones(self.full.shape[0], dtype=bool)
@@ -152,7 +161,19 @@ class RandomGuess:
         for g, fb in seen[len(self.hist):]:
             self.live &= self.full[g] == fb
             self.hist.append((g, fb))
-        idx = np.flatnonzero(self.live)
+        return self.live
+
+    def live_count(self, alive, played, replies):
+        """How many words this follow-up would be choosing between right now.
+
+        Counted over the 12972, NOT the answers: a player drawing from the legal
+        guesses cannot see that only two ANSWERS remain -- knowing that would mean
+        knowing the curated list they are defined as not having.
+        """
+        return int(self._refresh(played, replies).sum())
+
+    def __call__(self, turn, alive, played, replies, rng):
+        idx = np.flatnonzero(self._refresh(played, replies))
         if not len(idx):
             raise AssertionError("no legal word is consistent with the replies so far")
         return int(idx[int(rng.integers(len(idx)))])
@@ -253,7 +274,7 @@ def draw_answer(na, rng):
 Strategy = namedtuple("Strategy", "factory fallback")
 
 
-def _no_rule(guesses, answers, ans2g, args, name):
+def _no_rule(guesses, answers, ans2g, args, name, tail=None, adapt=0):
     """No rule at all: the follow-up plays the whole game.
 
     On turn one every word in its pool is still live, so the opening word is
@@ -306,6 +327,86 @@ def fixed_opener(opener_g):
     return FixedOpening([opener_g])
 
 
+class AdaptiveOpening:
+    """Play the opening in order, but ABANDON it once the field is tiny.
+
+    THIS IS `optturns --pair-adaptive N`, ported to the simulator -- same rule,
+    same name, same meaning, measured under a different continuation.
+    math/data/shared/PAIRS.md states it and carries the exact results:
+
+        N = 0   pure blind: the later words are always played
+        N = 1   one candidate left after g1: name it
+        N = 2   two left: guess them (in order there, at random here -- same cost)
+
+    Before each word after the first, the rule asks the FOLLOW-UP how many words
+    it would be choosing between; at N or fewer it declines and the follow-up
+    names one.
+
+    THE ARITHMETIC IT BETS ON.  With two left, naming one costs 1.5 guesses on
+    average -- half the time it is right -- while playing the blind word first
+    costs 2, since that word identifies the answer without being it.  With one
+    left it is 1 against 2.  So the early-out is a strict improvement per bucket,
+    never a trade.  **At the threshold, "guess them in order" and "guess one at
+    random" are the SAME expected cost** (a 2-set totals 3 either way), which is
+    why this matches the exact solver's rule rather than approximating it.
+
+    N STOPS BEING INTERESTING AT 3, and PAIRS.md says why: three candidates named
+    in order cost 1+2+3 = 6, and a perfect three-way split also costs 6, so the
+    objective goes indifferent and only variance separates them.  Nothing here
+    forbids a larger N; it is simply a different game, and it is in the filename.
+
+    N IS PART OF THE OBJECTIVE, not a tuning knob.  0, 1 and 2 are three
+    different strategies whose numbers are not comparable with each other.
+
+    THE COUNT COMES FROM THE FOLLOW-UP, and this is the ONE place the simulator
+    must differ from the exact solver, which only ever counts answers.  Under the
+    `answer` follow-up the two agree.  Under `guess` the count is over the live
+    LEGAL WORDS, which is larger, so the early-out fires less often -- and it has
+    to be that way: a player drawing from the 12972 cannot know that only two
+    ANSWERS remain, and giving them that knowledge here while denying it when
+    they guess would be two different players inside one strategy.
+
+    ORDER MATTERS NOW, unlike a blind opening.  Whether the field is down to N
+    after ONE word depends on WHICH word went first, so `a b` and `b a` are
+    different strategies and both must be swept.  Blind openings are
+    order-independent by construction -- solver/pairsplit.c enumerates only
+    unordered pairs for exactly that reason -- and this rule is what breaks it.
+    PAIRS.md measures the consequence: the winning PAIR never moved with N, but
+    the winning ORDER did.
+    """
+
+    def __init__(self, opening_g, tail, adapt):
+        self.opening_g = [int(g) for g in opening_g]
+        self.tail = tail
+        self.adapt = int(adapt)
+        if not self.opening_g:
+            raise ValueError("an opening needs at least one word")
+        if self.adapt < 1:
+            raise ValueError("an adaptive opening needs a threshold of at least 1")
+        if tail is None:
+            raise ValueError("the adaptive rule needs the follow-up it hands to")
+
+    def __call__(self, turn, alive, played, replies, rng):
+        if turn >= len(self.opening_g):
+            return None
+        if turn and self.tail.live_count(alive, played, replies) <= self.adapt:
+            return None
+        return self.opening_g[turn]
+
+
+def make_opening_rule(opening_g, tail=None, adapt=0):
+    """Build an opening rule from GUESS INDICES: the sweep's entry point.
+
+    `adapt` is `--pair-adaptive N`: 0 plays the opening blind (the rule every
+    earlier sweep here used), and N >= 1 abandons it once the follow-up is down
+    to N or fewer words.  One place decides what that means, so the sweep and the
+    registry cannot drift -- both end here.
+    """
+    if adapt:
+        return AdaptiveOpening(opening_g, tail, adapt)
+    return FixedOpening(opening_g)
+
+
 def _resolve_opening(guesses, words, name):
     """Guess indices for an opening, refusing an illegal or repeated word.
 
@@ -329,7 +430,7 @@ def _resolve_opening(guesses, words, name):
     return out
 
 
-def _make_opener(guesses, answers, ans2g, args, name):
+def _make_opener(guesses, answers, ans2g, args, name, tail=None, adapt=0):
     """Rule: open with the word given as --strategy-arg, then decline.
 
     The word is REQUIRED -- there is no default opener here, and there could not
@@ -339,10 +440,11 @@ def _make_opener(guesses, answers, ans2g, args, name):
     if len(args) != 1:
         raise SystemExit("strategy %r needs exactly one word: "
                          "--strategy-arg WORD (got %d arguments)" % (name, len(args)))
-    return fixed_opening(_resolve_opening(guesses, args, name))
+    return make_opening_rule(_resolve_opening(guesses, args, name),
+                             tail=tail, adapt=adapt)
 
 
-def _make_opening(guesses, answers, ans2g, args, name):
+def _make_opening(guesses, answers, ans2g, args, name, tail=None, adapt=0):
     """Rule: play the given words in order, BLIND, then decline.
 
     Any number of words, one per --strategy-arg (or space-separated in one).  The
@@ -352,7 +454,8 @@ def _make_opening(guesses, answers, ans2g, args, name):
     if not words:
         raise SystemExit("strategy %r needs at least one word: "
                          "--strategy-arg WORD (repeat it for more)" % name)
-    return fixed_opening(_resolve_opening(guesses, words, name))
+    return make_opening_rule(_resolve_opening(guesses, words, name),
+                             tail=tail, adapt=adapt)
 
 
 STRATEGIES = {
@@ -368,12 +471,19 @@ STRATEGIES = {
 }
 
 
-def make_strategy(name, guesses, answers, ans2g, args=(), fallback=None):
-    """Resolve a named strategy into (rule, follow-up name).
+def make_strategy(name, guesses, answers, ans2g, args=(), fallback=None,
+                  tail=None, adapt=0):
+    """Resolve a named strategy into (rule, follow-up NAME).
 
     The follow-up is never defaulted.  A strategy whose NAME pins one refuses a
     conflicting --fallback rather than running something its own filename would
     misdescribe; any other strategy requires the flag.
+
+    `tail` is the BUILT follow-up OBJECT, and it is only needed by a rule that
+    asks how many words the follow-up is choosing between (--pair-adaptive).  It
+    is deliberately a separate argument from the NAME this returns: a caller
+    resolves the name first (which is cheap), builds the follow-up, and calls
+    again with it -- so a --resolve dry run never loads a 168 MB matrix.
     """
     if name not in STRATEGIES:
         raise SystemExit("unknown strategy %r; known: %s"
@@ -388,7 +498,7 @@ def make_strategy(name, guesses, answers, ans2g, args=(), fallback=None):
                 % (name, entry.fallback, fallback, fallback,
                    next(n for n, e in STRATEGIES.items()
                         if e.fallback == fallback and e.factory is _no_rule)))
-        tail = entry.fallback
+        tail_name = entry.fallback
     else:
         if fallback is None:
             raise SystemExit(
@@ -398,6 +508,13 @@ def make_strategy(name, guesses, answers, ans2g, args=(), fallback=None):
         if fallback not in TAILS:
             raise SystemExit("unknown follow-up %r; known: %s"
                              % (fallback, ", ".join(sorted(TAILS))))
-        tail = fallback
-    rule = entry.factory(guesses, answers, ans2g, list(args), name)
-    return rule, tail
+        tail_name = fallback
+    if adapt:
+        if entry.factory is _no_rule:
+            raise SystemExit("--pair-adaptive needs an opening to abandon; "
+                             "strategy %r has no rule" % name)
+        if tail is None:
+            raise SystemExit("--pair-adaptive needs the follow-up object: build "
+                             "it with make_tail and pass tail=")
+    rule = entry.factory(guesses, answers, ans2g, list(args), name, tail, adapt)
+    return rule, tail_name
