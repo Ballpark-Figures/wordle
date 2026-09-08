@@ -36,78 +36,16 @@ the same trials and the same games, so nothing about it favours a word.
 import os
 import sys
 
-_MATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from sweep_shortlist import main, read_sweep, shortlist  # noqa: E402,F401
 
-def read_sweep(path):
-    """(word, mean, stderr) per row of a sweep CSV, in file order."""
-    rows = []
-    with open(path) as f:
-        for line in f:
-            if line.startswith("#") or line.startswith("word,"):
-                continue
-            c = line.rstrip("\n").split(",")
-            if len(c) < 4:
-                continue
-            rows.append((c[0], float(c[2]), float(c[3])))
-    if not rows:
-        raise SystemExit("no data rows in %s" % path)
-    return rows
-
-
-def shortlist(rows, se=None, top=None, own_se=False):
-    """The surviving words, best mean first, plus a description of the cut."""
-    rows = sorted(rows, key=lambda r: r[1])
-    best_mean, best_se = rows[0][1], rows[0][2]
-    if top is not None:
-        return rows[:top], "top %d by stage-1 mean" % top
-    if own_se:
-        keep = [r for r in rows if r[1] <= best_mean + se * r[2]]
-        how = "within %g x EACH word's own standard error of %s (%.4f)" % (
-            se, rows[0][0], best_mean)
-    else:
-        cut = best_mean + se * best_se
-        keep = [r for r in rows if r[1] <= cut]
-        how = "within %g x %s's standard error %.4f of %.4f, i.e. mean <= %.4f" % (
-            se, rows[0][0], best_se, best_mean, cut)
-    return keep, how
-
-
-def main(argv):
-    src = out = None
-    se, top, own_se = 10.0, None, False
-    i = 0
-    while i < len(argv):
-        a = argv[i]
-        if a == "--from":
-            src = argv[i + 1]; i += 2
-        elif a == "--out":
-            out = argv[i + 1]; i += 2
-        elif a == "--se":
-            se = float(argv[i + 1]); i += 2
-        elif a == "--top":
-            top = int(argv[i + 1]); i += 2
-        elif a == "--own-se":
-            own_se = True; i += 1
-        else:
-            raise SystemExit("unknown argument: %s" % a)
-    if src is None:
-        raise SystemExit("--from SWEEP.csv is required")
-    if out is None:
-        raise SystemExit("--out LIST.txt is required")
-
-    rows = read_sweep(src)
-    keep, how = shortlist(rows, se=se, top=top, own_se=own_se)
-    os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
-    with open(out, "w") as f:
-        for w, _, _ in keep:
-            f.write(w + "\n")
-    print("%s: %d words of %d kept" % (out, len(keep), len(rows)))
-    print("  cut: %s" % how)
-    print("  from: %s" % src)
-    print("  head: %s" % " ".join(w for w, _, _ in keep[:8]))
-    return 0
-
+# The cut logic moved to tools/sweep_shortlist.py when the single-board sweep
+# became a second caller of it -- one implementation, two front ends.  This CLI
+# is unchanged: --from/--out/--se/--top/--own-se all behave exactly as before,
+# and the columns are now found by NAME in the header rather than by position,
+# which every sweep CSV here already satisfies.  `read_sweep` and `shortlist` are
+# re-exported so an importer of this module keeps working.
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    sys.exit(main(sys.argv[1:], prog="tools/multiwordle_shortlist.py"))

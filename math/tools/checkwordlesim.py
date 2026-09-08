@@ -42,6 +42,14 @@ that the rest of the game matches the reference.  Handing that game to the guess
 follow-up at TURN 1 is also the only place its catch-up is tested: it must build
 its live set from a history it was not present for.
 
+THE OPENER SWEEP IS DIFFED TOO, against the same reference: its two-stream loop
+is reproduced here from the strings, and the answers each word faced are recorded
+and required to be IDENTICAL across words.  That is the property the whole sweep
+rests on -- a sweep sharing one stream would still report unbiased means, and
+would quietly destroy the comparison between words that is the point of it.  The
+shortlist cut is checked on hand-made rows whose survivors are known by hand, in
+both directions (minimising a mean, maximising a win rate).
+
 COVERAGE IS TALLIED, not assumed.  The run FAILS if no game ever ran past the
 six-guess threshold, or if none came in at or under it, since the win-rate
 accounting would then be untested in one direction -- and, for `random-guess`,
@@ -66,6 +74,8 @@ from wordle import ALL_GREEN, load_words, pattern  # noqa: E402
 from wordlesim import (WIN_WITHIN, answer_to_guess, draw_answer,  # noqa: E402
                        make_strategy, make_tail, play_game)
 from wordle_sim import summarise  # noqa: E402
+from wordle_sweep import PICK_OFFSET, sweep_word  # noqa: E402
+from sweep_shortlist import shortlist  # noqa: E402
 
 
 def ref_pattern(guess, answer):
@@ -313,6 +323,69 @@ def main(argv):
               "longest %d guesses" % (st["mean_guesses"], 100.0 * st["win_rate"],
                                       len(scores), longest))
 
+    # --- the opener sweep: the two streams, and common random numbers --------
+    # Reproduced here from the strings, including the stream discipline: the
+    # ANSWERS come from one generator seeded per word and the follow-up's picks
+    # from another, so every word must see the SAME games.  A sweep that shared
+    # one stream would still look reasonable -- each word's mean would be
+    # unbiased -- while quietly destroying the whole point of the sweep, which is
+    # that DIFFERENCES between words are compared on identical games.
+    sweep_t, sweep_seed = 8, 4
+    probe = [guesses[0], guesses[len(guesses) // 2], guesses[-1]]
+    seen_answers = {}
+    for tname, pool in (("answer", answers), ("guess", guesses)):
+        ptail = make_tail(tname, guesses, answers, ans2g)
+        for w in probe:
+            st = sweep_word(pat, ans2g, len(answers), sweep_t, sweep_seed,
+                            guesses.index(w), ptail, WIN_WITHIN)
+            draw_rng = np.random.default_rng(sweep_seed)
+            pick_rng = np.random.default_rng(sweep_seed + PICK_OFFSET)
+            ref_scores, drew = [], []
+            for _ in range(sweep_t):
+                a = int(draw_rng.integers(len(answers)))
+                drew.append(answers[a])
+                ref_scores.append(len(ref_play(pool, answers[a], pick_rng,
+                                               opener=w)))
+            ref = summarise(ref_scores, WIN_WITHIN)
+            if abs(st["mean_guesses"] - ref["mean_guesses"]) > 1e-12 or \
+                    abs(st["win_rate"] - ref["win_rate"]) > 1e-12:
+                failures.append("sweep/%s %s: fast mean %.6f win %.6f vs reference "
+                                "%.6f / %.6f" % (tname, w, st["mean_guesses"],
+                                                 st["win_rate"], ref["mean_guesses"],
+                                                 ref["win_rate"]))
+            seen_answers.setdefault(tname, []).append(drew)
+    for tname, seqs in seen_answers.items():
+        if any(seq != seqs[0] for seq in seqs):
+            failures.append("sweep/%s: the swept words did not face the same "
+                            "answers -- common random numbers are broken" % tname)
+    print("opener sweep: %d words x %d games under both follow-ups match the "
+          "string reference, and every word faced the identical answers"
+          % (len(probe), sweep_t))
+
+    # --- the shortlist cut ---------------------------------------------------
+    # value, stderr per word; the best is 1.00 with a standard error of 0.10, so
+    # a 2-SE cut on the mean keeps everything up to 1.20 and nothing above.
+    rows = [("best", 1.00, 0.10), ("in", 1.19, 0.50), ("edge", 1.20, 0.01),
+            ("out", 1.21, 0.90), ("far", 2.00, 0.10)]
+    keep, _ = shortlist(rows, se=2.0)
+    if [w for w, _, _ in keep] != ["best", "in", "edge"]:
+        failures.append("the mean cut kept %s" % [w for w, _, _ in keep])
+    # maximising, the same numbers read as win rates: best is 2.00, keep >= 1.80
+    keep, _ = shortlist([(w, v, e) for w, v, e in rows], se=2.0, maximise=True)
+    if [w for w, _, _ in keep] != ["far"]:
+        failures.append("the maximising cut kept %s" % [w for w, _, _ in keep])
+    keep, _ = shortlist(rows, top=2)
+    if [w for w, _, _ in keep] != ["best", "in"]:
+        failures.append("--top did not take the best two")
+    # --own-se measures each word in ITS OWN noise, so `edge` -- 0.20 above the
+    # best on a standard error of 0.01 -- now falls OUT, while the noisier `out`
+    # survives.  The two cuts are different questions, not one loosened.
+    keep, _ = shortlist(rows, se=2.0, own_se=True)
+    if [w for w, _, _ in keep] != ["best", "in", "out"]:
+        failures.append("--own-se kept %s" % [w for w, _, _ in keep])
+    print("shortlist: the 2-SE cut, its maximising form, --top and --own-se all "
+          "keep exactly the right words")
+
     # --- the follow-up is an input, and the registry defends that -------------
     try:
         make_strategy("random", guesses, answers, ans2g, (), "guess")
@@ -329,7 +402,23 @@ def main(argv):
         failures.append("an unknown follow-up name was accepted")
     except SystemExit:
         pass
-    print("refusals: a conflicting --fallback, a stray argument and an unknown "
+    try:
+        make_strategy("opener", guesses, answers, ans2g, (), "answer")
+        failures.append("the opener strategy accepted no word")
+    except SystemExit:
+        pass
+    try:
+        make_strategy("opener", guesses, answers, ans2g, ("zzzzz",), "answer")
+        failures.append("the opener strategy accepted a word that is not a legal guess")
+    except SystemExit:
+        pass
+    try:
+        make_strategy("opener", guesses, answers, ans2g, (guesses[0],))
+        failures.append("the opener strategy ran without a follow-up")
+    except SystemExit:
+        pass
+    print("refusals: a conflicting --fallback, a stray argument, an unknown "
+          "follow-up, and an opener with no word / an illegal word / no "
           "follow-up are all rejected")
 
     # --- coverage: a pass must not mean the branches never fired -------------

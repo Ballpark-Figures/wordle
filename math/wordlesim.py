@@ -265,11 +265,57 @@ def _no_rule(guesses, answers, ans2g, args, name):
     return None
 
 
+class FixedOpener:
+    """Play one fixed word on turn 0, then decline every turn after.
+
+    The smallest rule there is, and the one an OPENER SWEEP varies: it says what
+    to open with and nothing else, so the follow-up plays the rest of the game.
+    Which follow-up is in use is therefore the whole difference between two runs.
+    """
+
+    def __init__(self, opener_g):
+        self.opener_g = opener_g
+
+    def __call__(self, turn, alive, played, replies, rng):
+        return self.opener_g if turn == 0 else None
+
+
+def fixed_opener(opener_g):
+    """The FixedOpener rule for a GUESS index -- what a sweep builds per word.
+
+    Public so the sweep and the registry share one rule rather than two copies:
+    the sweep resolves 12972 words against its own index map and calls this,
+    while `--strategy opener --strategy-arg WORD` goes through the registry.
+    """
+    return FixedOpener(int(opener_g))
+
+
+def _make_opener(guesses, answers, ans2g, args, name):
+    """Rule: open with the word given as --strategy-arg, then decline.
+
+    The word is REQUIRED -- there is no default opener here, and there could not
+    honestly be one: which word to open with is the question a sweep exists to
+    ask, so writing one down would be an answer hiding in configuration.
+    """
+    if len(args) != 1:
+        raise SystemExit("strategy %r needs exactly one word: "
+                         "--strategy-arg WORD (got %d arguments)" % (name, len(args)))
+    word = args[0]
+    try:
+        g = guesses.index(word)
+    except ValueError:
+        raise SystemExit("opener %r is not one of the 12972 legal guesses" % word)
+    return fixed_opener(g)
+
+
 STRATEGIES = {
     # The two baselines: the same empty rule under the two follow-ups.  Each
     # PINS its follow-up, because the name is what says which one it used.
     "random":       Strategy(_no_rule, "answer"),
     "random-guess": Strategy(_no_rule, "guess"),
+    # One fixed opener, then the follow-up.  It pins NOTHING: both follow-ups are
+    # meaningful under it, they are different strategies, and --fallback says which.
+    "opener":       Strategy(_make_opener, None),
 }
 
 
