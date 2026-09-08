@@ -132,7 +132,7 @@ def draw_answer(na, rng):
 
 
 def _make_random(guesses, answers, ans2g, args):
-    """Guess a random compatible answer, from the first guess to the last.
+    """Guess a random compatible ANSWER, from the first guess to the last.
 
     The whole strategy is the shared tail, so it defers on every turn.  On turn
     one every answer is still alive, which means the opening word is itself a
@@ -143,8 +143,81 @@ def _make_random(guesses, answers, ans2g, args):
     return None
 
 
+class RandomCompatibleGuess:
+    """Guess a random compatible WORD, drawn from all 12972 legal guesses.
+
+    The sibling of the shared tail, differing in ONE thing: which list the draw
+    comes from.  `random` draws from the answers still consistent with every
+    reply (2315 words, the curated mystery list); this draws from the LEGAL
+    GUESSES still consistent with them (12972 words, the list a player can
+    actually type).  Everything else -- the game, the answer's uniform draw from
+    the 2315, the scoring -- is identical, so the two ARE comparable with each
+    other, unlike a comparison across games.
+
+    "Compatible" means exactly what it means in `ultraturns`: a word that could
+    still BE the answer, i.e. one reproducing every reply seen so far.  A word
+    already played and missed is therefore never played again -- its own greys
+    and yellows rule it out.
+
+    IT PLAYS WORDS THAT CANNOT BE THE ANSWER.  10657 of the 12972 are not in the
+    mystery list, so most of the draws are words this game would never choose as
+    an answer.  That is the point of the strategy, not a defect: it is what a
+    player who does not know the curated answer list can do.
+
+    WHY IT TERMINATES.  The word played is consistent, so if the reply is not
+    all-green that word is eliminated from its own live set (its reply against
+    itself is all-green), while the true answer -- always a legal guess -- stays
+    in it.  So the set shrinks by at least one per turn and always still holds
+    the answer.
+
+    IT KEEPS ITS OWN STATE, over the GUESS list, because `play_game`'s `alive`
+    bitmap is over the ANSWER list and cannot express this.  The state resets on
+    `turn == 0`, so one instance replays across every game of a run; a strategy
+    that composed this one after a prefix would have to reset it itself.
+    """
+
+    def __init__(self, full):
+        self.full = full          # 12972 x 12972: full[g][w] = reply of g against w
+        self.live = None
+
+    def __call__(self, turn, alive, played, replies, rng):
+        if turn == 0:
+            self.live = np.ones(self.full.shape[0], dtype=bool)
+        else:
+            self.live &= self.full[played[-1]] == replies[-1]
+        idx = np.flatnonzero(self.live)
+        if not len(idx):
+            raise AssertionError("no legal word is consistent with the replies so far")
+        return int(idx[int(rng.integers(len(idx)))])
+
+
+def _make_random_guess(guesses, answers, ans2g, args):
+    """Build RandomCompatibleGuess, loading the matrix it needs.
+
+    The SQUARE 12972x12972 matrix (~168 MB) is a separate artifact from the
+    12972x2315 one every other tool here reads, and it is gitignored like all of
+    data/local/, so it will be missing on a fresh clone -- refuse with the build
+    command rather than dying inside numpy.
+    """
+    if args:
+        raise SystemExit("strategy 'random-guess' takes no arguments, got: %s"
+                         % " ".join(args))
+    from build_patterns import load_patterns
+    try:
+        full = np.array(load_patterns(full=True))
+    except FileNotFoundError:
+        raise SystemExit(
+            "strategy 'random-guess' needs the SQUARE guess x guess pattern matrix.\n"
+            "Build it with 'python3 build_patterns.py --full' (about 18s, 168 MB).")
+    if full.shape[0] != len(guesses) or full.shape[1] != len(guesses):
+        raise SystemExit("patterns_full.npy is %s, not %d x %d -- rebuild it"
+                         % (full.shape, len(guesses), len(guesses)))
+    return RandomCompatibleGuess(full)
+
+
 STRATEGIES = {
     "random": _make_random,
+    "random-guess": _make_random_guess,
 }
 
 

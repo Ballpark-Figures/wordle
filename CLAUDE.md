@@ -1152,6 +1152,19 @@ source of truth. Run it with **`bash solver/run-wordle-sim.sh --strategy NAME -t
 - **`random` is the baseline and defers on EVERY turn** — it is the tail and
   nothing else. On turn one every answer is alive, so its opening word is itself a
   uniform draw: **no opener is an input and no word is hardcoded anywhere.**
+- **`random-guess` is the SAME draw over the 12972-word GUESS list** — the only
+  difference is which list it draws from, so unlike a cross-game comparison these
+  two ARE comparable with each other. **THE HIDDEN ANSWER IS STILL DRAWN FROM THE
+  2315 EITHER WAY** — the pool is the STRATEGY's, never the game's. "Compatible"
+  is `ultraturns`' legality notion (a word that could still BE the answer), so a
+  word played and missed is never played again. It deliberately plays words that
+  can never be the answer (10657 of the 12972 are not mystery words) — that is
+  what a player without the curated answer list can do, not a defect. It keeps its
+  OWN bitmap over the guess list (`play_game`'s `alive` is over the answers and
+  cannot express it), **reset on `turn == 0`** — a strategy composing it after a
+  prefix must reset it itself. **It needs the SQUARE 12972x12972 matrix**
+  (`python3 build_patterns.py --full`, ~18s/168 MB, gitignored under `local/` so
+  it is missing on a fresh clone); the wrapper checks and refuses with that command.
 - **THE STRATEGY IS AN INPUT AND IS NEVER DEFAULTED** (the greens scar) — the
   simulator and the wrapper both refuse without `--strategy`, and it names the
   output file. Each (strategy, t, seed) is a different sample with its own file,
@@ -1167,7 +1180,13 @@ source of truth. Run it with **`bash solver/run-wordle-sim.sh --strategy NAME -t
   it also checks, from the strings, that every tail guess really was compatible
   with every earlier reply, exercises the prefix-then-`None` path with a synthetic
   opener, and tallies coverage — FAILING if no game ran past six or none came in
-  under it. Run it alongside `solver/validate.sh` and `tools/checkpatterns.py`.
+  under it. **BOTH strategies are diffed against that one reference, differing
+  only in the POOL it draws from**, which is also what pins `random-guess`'s
+  per-game state reset (a leaked bitmap diverges from game two on); it FAILS if
+  `random-guess` never played a non-mystery word, and it re-checks that every
+  hidden answer came from the 2315. `--guess-games` sizes that half (the
+  reference filters 12972 strings per turn, so it is the slow one). Run it
+  alongside `solver/validate.sh` and `tools/checkpatterns.py`.
 
 ## Nerdle (8-symbol equations) — the GUESS enumeration, pass one
 A different game living beside the wordle variants. `math/nerdle.py` states the rules

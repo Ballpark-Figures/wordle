@@ -24,6 +24,13 @@ guess the tail plays must be CONSISTENT with every reply so far (a word the
 answer could still be), recomputed from the strings.  A shared bug that made
 both sides pick the same wrong word would still fail this.
 
+BOTH REGISTERED STRATEGIES ARE DIFFED, against the same reference driven from a
+different POOL -- the 2315 answers for `random`, the 12972 legal guesses for
+`random-guess`.  That one parameter is the entire difference between them.
+`random-guess` also keeps its OWN state (a bitmap over the guess list, reset on
+turn 0), and replaying it across many games is what tests that the reset really
+happens: a leaked bitmap shows up as a diverging sequence from the second game on.
+
 THE PREFIX-THEN-TAIL PATH IS EXERCISED TOO.  Almost every strategy the video will
 try is "something specific for a while, then guess a random compatible answer",
 which in code is a callable returning a guess and then None.  So the run also
@@ -34,7 +41,13 @@ candidate, and that the rest of the game matches the reference.
 
 COVERAGE IS TALLIED, not assumed.  The run FAILS if no game ever ran past the
 six-guess threshold, or if none came in at or under it, since the win-rate
-accounting would then be untested in one direction.
+accounting would then be untested in one direction -- and, for `random-guess`,
+if it never played a word outside the mystery list, since it would then be
+indistinguishable from `random`.
+
+IT IS NOT INSTANT.  The reference filters its pool word by word in Python, so a
+`random-guess` game costs a pass over 12972 strings per turn; --guess-games keeps
+that to a few seconds by default.
 """
 
 import os
@@ -71,9 +84,15 @@ def ref_pattern(guess, answer):
     return code
 
 
-def ref_play(answers, answer, rng, opener=None):
-    """Replay one game from strings alone.  Returns the words played, in order."""
-    cands = list(answers)          # answer-list order, as the bitmap's flatnonzero is
+def ref_play(pool, answer, rng, opener=None):
+    """Replay one game from strings alone.  Returns the words played, in order.
+
+    `pool` is the list the strategy draws from -- the 2315 answers for `random`,
+    the 12972 legal guesses for `random-guess` -- in list order, which is the
+    order the fast path's flatnonzero produces.  The hidden ANSWER is drawn from
+    the mystery words either way; only this pool changes.
+    """
+    cands = list(pool)
     played = []
     while True:
         if opener is not None and not played:
@@ -85,8 +104,10 @@ def ref_play(answers, answer, rng, opener=None):
             return played
         fb = ref_pattern(g, answer)
         cands = [w for w in cands if ref_pattern(g, w) == fb]
-        if not cands:
-            raise AssertionError("reference eliminated every candidate")
+        if answer not in cands:
+            # the answer reproduces every reply it produced, so it can only be
+            # filtered out by a broken feedback rule
+            raise AssertionError("reference eliminated the answer %s" % answer)
 
 
 def consistent_prefix(played, answer):
@@ -106,6 +127,10 @@ def main(argv):
     games = 200
     if "--games" in argv:
         games = int(argv[argv.index("--games") + 1])
+    # the reference filters 12972 strings per turn here, so this one is smaller
+    guess_games = 12
+    if "--guess-games" in argv:
+        guess_games = int(argv[argv.index("--guess-games") + 1])
 
     guesses = load_words("guess")
     answers = load_words("mystery")
@@ -171,6 +196,49 @@ def main(argv):
     print("replayed %d games of the bare tail against the string reference: "
           "identical sequences, every guess compatible" % len(scores))
 
+    # --- differential: the same draw, from the 12972-word GUESS list ----------
+    # Only the pool differs.  The hidden answer is still drawn from the 2315.
+    mystery = set(answers)
+    gstrategy = make_strategy("random-guess", guesses, answers, ans2g)
+    gscores, gover, gunder, off_list, drawn_outside = [], 0, 0, 0, 0
+    for seed in range(guess_games):
+        fast_rng = np.random.default_rng(500000 + seed)
+        ref_rng = np.random.default_rng(500000 + seed)
+        a_fast = draw_answer(len(answers), fast_rng)
+        a_ref = int(ref_rng.integers(len(answers)))
+        if a_fast != a_ref:
+            failures.append("random-guess seed %d: the two sides drew different answers" % seed)
+            break
+        answer = answers[a_fast]
+        drawn_outside += answer not in mystery      # the game's own draw, checked
+        played, replies = play_game(pat, ans2g, a_fast, gstrategy, fast_rng)
+        words = [guesses[g] for g in played]
+        ref_words = ref_play(guesses, answer, ref_rng)
+        if words != ref_words:
+            failures.append("random-guess seed %d (%s): fast %s vs reference %s"
+                            % (seed, answer, " ".join(words), " ".join(ref_words)))
+            break
+        if words[-1] != answer or answer in words[:-1]:
+            failures.append("random-guess seed %d (%s): the game did not end on the "
+                            "answer" % (seed, answer))
+            break
+        bad_at = consistent_prefix(words, answer)
+        if bad_at is not None:
+            failures.append("random-guess seed %d (%s): guess %d (%s) was not "
+                            "compatible with the replies so far"
+                            % (seed, answer, bad_at + 1, words[bad_at]))
+            break
+        gscores.append(len(words))
+        gover += len(words) > WIN_WITHIN
+        gunder += len(words) <= WIN_WITHIN
+        off_list += sum(1 for w in words if w not in mystery)
+    print("replayed %d games of random-guess against the same reference over the "
+          "12972-word pool: identical sequences, %d guesses played that are NOT "
+          "mystery words" % (len(gscores), off_list))
+    if drawn_outside:
+        failures.append("%d hidden answers came from outside the 2315 mystery words"
+                        % drawn_outside)
+
     # --- differential: a prefix strategy that then defers to the tail ---------
     # The opener is taken BY INDEX, so no word is written down in this gate.
     opener_g = 0
@@ -227,11 +295,17 @@ def main(argv):
     if not under:
         failures.append("no game finished within %d guesses -- the win branch was "
                         "never exercised" % WIN_WITHIN)
+    if not gscores:
+        failures.append("no random-guess game completed, so nothing was compared")
+    if not off_list:
+        failures.append("random-guess never played a word outside the mystery list, "
+                        "so it was indistinguishable from random (raise --guess-games)")
     if not non_candidate:
         failures.append("the synthetic opener was itself a mystery word, so playing "
                         "a NON-candidate was never exercised")
-    print("coverage: %d games ran past %d guesses, %d came in within it"
-          % (over, WIN_WITHIN, under))
+    print("coverage: %d games ran past %d guesses, %d came in within it; "
+          "random-guess %d past / %d within"
+          % (over, WIN_WITHIN, under, gover, gunder))
 
     if failures:
         print("\nFAIL")

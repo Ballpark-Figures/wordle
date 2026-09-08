@@ -28,13 +28,23 @@
 # how a result file says which experiment produced it.  The strategies live in
 # math/wordlesim.py's registry; `--strategy list` prints them.  Today:
 #
-#   random    guess a word drawn UNIFORMLY AT RANDOM from the answers still
-#             consistent with every reply so far, from the first guess to the
-#             last.  Nothing is hardcoded and no opener is an input: on turn one
-#             every answer is alive, so the opening word is itself a uniform draw.
-#             It is the shared TAIL every other strategy here falls through to
-#             once its own part is over, so it is also the baseline they are
-#             measured against.
+#   random         guess a word drawn UNIFORMLY AT RANDOM from the ANSWERS still
+#                  consistent with every reply so far (the 2315 mystery words),
+#                  from the first guess to the last.  Nothing is hardcoded and no
+#                  opener is an input: on turn one every answer is alive, so the
+#                  opening word is itself a uniform draw.  It is the shared TAIL
+#                  every other strategy falls through to once its own part is
+#                  over, so it is also the baseline they are measured against.
+#
+#   random-guess   the same, drawn instead from the LEGAL GUESSES still consistent
+#                  with every reply (the 12972 typeable words).  Only the list the
+#                  draw comes from differs -- the game, the answer's draw from the
+#                  2315 and the scoring are identical, so the two ARE comparable
+#                  with each other.  It plays words that can never be the answer
+#                  (10657 of the 12972 are not mystery words); that is the point,
+#                  it is what a player without the curated answer list can do.
+#                  NEEDS the SQUARE guess x guess matrix: build it once with
+#                  'python3 build_patterns.py --full' (~18s, 168 MB).
 #
 # USE THIS RATHER THAN CALLING tools/wordle_sim.py DIRECTLY.  It sets --out so the
 # games outlive the terminal, names the file after every parameter that defines
@@ -93,6 +103,15 @@ esac
 [ -f data/local/patterns/patterns.npy ] || {
     echo "no data/local/patterns/patterns.npy -- run '$PY build_patterns.py' first" >&2
     exit 1; }
+# A strategy drawing from the whole guess list needs the SQUARE matrix, which is
+# a separate artifact and gitignored like the rest of data/local/.
+case "$STRATEGY" in
+    random-guess)
+        [ -f data/local/patterns/patterns_full.npy ] || {
+            echo "strategy $STRATEGY needs the square guess x guess matrix." >&2
+            echo "  Build it with '$PY build_patterns.py --full' (~18s, 168 MB)." >&2
+            exit 1; } ;;
+esac
 
 OUTDIR=data/shared/wordlesim
 LOC=data/local/wordlesim
