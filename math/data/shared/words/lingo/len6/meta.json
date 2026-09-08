@@ -1,0 +1,112 @@
+{
+  "length": 6,
+  "word_source": "hello",
+  "letters": {
+    "a": {
+      "answers": 267,
+      "guesses": 854
+    },
+    "b": {
+      "answers": 309,
+      "guesses": 1113
+    },
+    "c": {
+      "answers": 435,
+      "guesses": 1335
+    },
+    "d": {
+      "answers": 255,
+      "guesses": 835
+    },
+    "e": {
+      "answers": 142,
+      "guesses": 465
+    },
+    "f": {
+      "answers": 212,
+      "guesses": 723
+    },
+    "g": {
+      "answers": 186,
+      "guesses": 697
+    },
+    "h": {
+      "answers": 161,
+      "guesses": 592
+    },
+    "i": {
+      "answers": 109,
+      "guesses": 294
+    },
+    "j": {
+      "answers": 43,
+      "guesses": 219
+    },
+    "k": {
+      "answers": 47,
+      "guesses": 295
+    },
+    "l": {
+      "answers": 193,
+      "guesses": 661
+    },
+    "m": {
+      "answers": 289,
+      "guesses": 825
+    },
+    "n": {
+      "answers": 78,
+      "guesses": 304
+    },
+    "o": {
+      "answers": 82,
+      "guesses": 341
+    },
+    "p": {
+      "answers": 336,
+      "guesses": 1085
+    },
+    "q": {
+      "answers": 19,
+      "guesses": 88
+    },
+    "r": {
+      "answers": 265,
+      "guesses": 961
+    },
+    "s": {
+      "answers": 538,
+      "guesses": 1849
+    },
+    "t": {
+      "answers": 259,
+      "guesses": 929
+    },
+    "u": {
+      "answers": 97,
+      "guesses": 359
+    },
+    "v": {
+      "answers": 88,
+      "guesses": 286
+    },
+    "w": {
+      "answers": 122,
+      "guesses": 472
+    },
+    "x": {
+      "answers": 2,
+      "guesses": 15
+    },
+    "y": {
+      "answers": 9,
+      "guesses": 103
+    },
+    "z": {
+      "answers": 18,
+      "guesses": 87
+    }
+  },
+  "total_answers": 4561,
+  "total_guesses": 15787
+}
