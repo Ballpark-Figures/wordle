@@ -1229,6 +1229,13 @@ CSV row per word, flushed).
 - **MEASURED (2026-09-08, this machine): ~490 words/s at `-t 100` under the
   `answer` follow-up and ~262/s under `guess`** — so a full 12972-word stage 1 is
   well under two minutes either way.
+- **PROGRESS PRINTING TIGHTENS AS THE FIELD NARROWS (user's call, 2026-09-08)** —
+  a line every 100 words on pass 1, every 10 on pass 2, **every word from pass 3
+  on**. The wrapper derives the pass from the SOURCE SWEEP'S OWN NAME (each stage's
+  word list is a shortlist of the stage before, so the nesting counts the passes),
+  and `--progress` overrides it. It gates a print and nothing else, so it changes
+  neither the games nor the filename — a run is comparable with one made before the
+  default existed.
 - **THE CUT IS 5 STANDARD ERRORS, not multiwordle's 10 (user's call, 2026-09-08),
   and that is MEASURED rather than preferred**: at `t=100` a word's SE is ~0.10, so
   10 SE spans a full guess and kept **12367 of 12972** words (`answer`) / 12911

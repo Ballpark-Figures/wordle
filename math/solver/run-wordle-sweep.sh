@@ -47,6 +47,12 @@
 # on; they need not agree.  It lands in the shortlist's name, so a stage-2 file
 # always records which screen chose its words.
 #
+# PROGRESS PRINTING TIGHTENS AS THE FIELD NARROWS: a line every 100 words on pass
+# 1, every 10 on pass 2, and EVERY WORD from pass 3 on.  The pass is read off the
+# source sweep's own name -- each one is a shortlist of the one before, so the
+# nesting counts them -- and --progress overrides it.  It gates a print only, so
+# it changes neither the games nor the filename.
+#
 # USE THIS RATHER THAN CALLING tools/wordle_sweep.py DIRECTLY.  It sets --out so
 # the rows outlive the terminal, names the file after every parameter that defines
 # the sweep, and tees a log.  The sweep is RESUMABLE per word, so a Ctrl-C costs
@@ -81,6 +87,8 @@ SHORTFROM=""
 SHORTSE=5
 SHORTTOP=""
 SHORTVALUE="mean"
+# Which pass this is; a run with no --shortlist-from is the first.
+STAGE=1
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -161,6 +169,11 @@ if [ -n "$SHORTFROM" ]; then
     WORDS="$OUTDIR/shortlist_${SRCSTEM#sweep_}_$CUTNAME.txt"
     "$PY" tools/sweep_shortlist.py --from "$SHORTFROM" $CUT --out "$WORDS" \
         || exit 1
+    # WHICH PASS THIS IS, read off the source's own name: a stage-1 sweep is over a
+    # word list, and every later one is over a shortlist cut from the stage before,
+    # so the nesting in the stem counts the passes.  Stage 1 has no source at all.
+    NEST=$(echo "$SRCSTEM" | grep -o shortlist | wc -l | tr -d ' ')
+    STAGE=$((2 + NEST))
     # A later stage at the earlier seed replays the games that chose the
     # shortlist.  Loud, not fatal: it is a judgement about what the run means.
     SRCSEED=$(echo "$SRCSTEM" | sed -n 's/.*_s\([0-9][0-9]*\)_.*/\1/p')
@@ -171,6 +184,21 @@ if [ -n "$SHORTFROM" ]; then
         echo "  shortlist.  Pass a fresh --seed for an independent test." >&2
     fi
 fi
+
+# HOW OFTEN TO PRINT A PROGRESS LINE, by pass (user's call, 2026-09-08).  A wide
+# stage-1 screen would drown the terminal one word at a time, but a later pass is
+# short and each word is worth watching -- so the interval tightens as the field
+# narrows: every 100 words on pass 1, every 10 on pass 2, EVERY WORD from pass 3
+# on.  --progress still overrides it.  This is cosmetic: it gates a print and
+# nothing else, so it touches neither the games nor the filename.
+if [ -z "$PROGRESS" ]; then
+    case "$STAGE" in
+        1) PROGRESS=100 ;;
+        2) PROGRESS=10 ;;
+        *) PROGRESS=1 ;;
+    esac
+fi
+echo "pass $STAGE: a progress line every $PROGRESS word(s)"
 
 STEM="sweep_${FALLBACK}_t${T}_s${SEED}_$(basename "$WORDS" .txt)"
 [ -n "$LIMIT" ] && STEM="${STEM}_lim${LIMIT}"
@@ -184,7 +212,7 @@ guard_output wordle_sweep.py "$OUT" || exit 1
 
 FLAGS="-t $T --fallback $FALLBACK --seed $SEED --words $WORDS --win-within $WIN --out $OUT"
 [ -n "$LIMIT" ] && FLAGS="$FLAGS --limit $LIMIT"
-[ -n "$PROGRESS" ] && FLAGS="$FLAGS --progress $PROGRESS"
+FLAGS="$FLAGS --progress $PROGRESS"
 
 # BSD date has no -Is; this form works on both macOS and Linux.
 echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] wordle opener sweep $STEM" \
