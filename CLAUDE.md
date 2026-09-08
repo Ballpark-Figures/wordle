@@ -1417,6 +1417,35 @@ CSV row per word, flushed).
   Fixing it needs an interval that stays finite at p=1 (Wilson, say); until then
   the mean is the only sound column to cut on.
 
+### `paired_compare.py` — settling finalists by DIFFERENCES, not by two means
+At the end of a cascade the gaps between finalists are far smaller than their own
+standard errors, and doubling the trials just reshuffles them. **`python3
+tools/paired_compare.py --from FINALISTS.txt --fallback answer|guess
+[--pair-adaptive N] -t T --seed S --out FILE`** compares them by paired
+differences instead.
+- **THE ESTIMATOR:** every opening plays the SAME game, `d_i = score_A - score_B`,
+  reported as `mean(d) +/- sd(d)/sqrt(t)`. No new modelling — the same games, read
+  as differences. **It sharpens COMPARISONS WITHIN the set only**; the absolute
+  means keep their own errors, and it says nothing about openings outside the set.
+- **TWO COUPLINGS, and the second was the user's call (2026-09-08) and the bigger
+  half.** MEASURED on `dance horst blimp` vs `chant dorse blimp`, t=20000:
+  unpaired error 0.00413; sharing the ANSWER 0.00310 (1.3x); sharing the answer
+  AND the follow-up's COIN FLIPS **0.00175 (2.4x)** — i.e. ~5.8x fewer games for
+  the same precision. Unbiased either way: a uniform draw from an opening's own
+  live set is still uniform over that set, so only the correlation changes.
+- **THE COUPLED DRAW USES `random()` AND AN INDEX, NOT `integers(n)`** — `integers`
+  consumes a variable number of bits (rejection sampling), so two openings whose
+  live sets differ in SIZE fall out of step after the first differing draw and the
+  coupling silently decays. One float per draw holds them turn for turn. It is a
+  different consumption pattern from the sweep's, so **a paired mean will not match
+  a sweep cell to the last digit** — same quantity, different sample.
+- **No per-game storage**: pairwise sums and sums of squares are accumulated, so
+  `-t` can be as large as wanted for any number of finalists.
+- Gated: the coupled index reaches every live word across the unit interval,
+  coupled games are legal (every guess consistent, ending on the answer),
+  `mean(A-B)` equals `mean(A)-mean(B)` exactly, and pairing must actually reduce
+  the spread.
+
 - **`python3 tools/checkwordlesim.py` is the GATE**: it replays the same seeds
   through an independent implementation that keeps candidates as LISTS OF WORDS and
   recomputes every reply from the STRINGS by the **multiset rule** (a different

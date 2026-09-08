@@ -99,6 +99,7 @@ from wordle_sweep import PICK_OFFSET, sweep_word  # noqa: E402
 from sweep_shortlist import shortlist  # noqa: E402
 from order_openings import (best_order, best_order_reference,  # noqa: E402
                              order_cost)
+from paired_compare import CoupledDraw, _play  # noqa: E402
 
 
 def ref_pattern(guess, answer):
@@ -686,6 +687,53 @@ def main(argv):
         # by the CLI refusing --pair-adaptive 3
     except Exception:
         pass
+
+    # --- the paired comparison ------------------------------------------------
+    # It replaces two independent means with one difference, so the two things
+    # that must hold are: the coupled draw is still a UNIFORM draw from the live
+    # set (or every mean it reports is biased), and the difference arithmetic is
+    # the difference of the means (or the sharper error is measuring nothing).
+    ctail = CoupledDraw(make_tail("answer", guesses, answers, ans2g))
+    # the index mapping, checked against the whole unit interval on a small set
+    for m in (1, 2, 3, 7, 100):
+        seen = {min(int(u * m), m - 1) for u in np.linspace(0, 1, 10001)[:-1]}
+        if seen != set(range(m)):
+            failures.append("the coupled draw cannot reach every one of %d live "
+                            "words: %s" % (m, sorted(seen)))
+    # a coupled game is still a legal game
+    crule = make_opening_rule([guesses.index(guesses[0])], tail=ctail, adapt=0)
+    bad = 0
+    for ai in range(0, len(answers), 331):
+        played, _ = _play(pat, ans2g, ai, crule, ctail,
+                          np.random.default_rng([7, ai]))
+        words = [guesses[g] for g in played]
+        if words[-1] != answers[ai] or consistent_prefix(words, answers[ai]) is not None:
+            bad += 1
+    if bad:
+        failures.append("%d coupled games played an inconsistent guess or did not "
+                        "end on the answer" % bad)
+    # mean(A - B) must equal mean(A) - mean(B), exactly -- the accumulators' identity
+    ops = [[guesses[0]], [guesses[len(guesses) // 2]]]
+    rules = [make_opening_rule([guesses.index(o[0])], tail=ctail, adapt=0) for o in ops]
+    sa, sb, sd_ = [], [], []
+    ar = np.random.default_rng(21)
+    for i in range(150):
+        ai = draw_answer(len(answers), ar)
+        sc = []
+        for r in rules:
+            sc.append(len(_play(pat, ans2g, ai, r, ctail,
+                                np.random.default_rng([21, i]))[0]))
+        sa.append(sc[0]); sb.append(sc[1]); sd_.append(sc[0] - sc[1])
+    if abs(np.mean(sd_) - (np.mean(sa) - np.mean(sb))) > 1e-12:
+        failures.append("the paired difference is not the difference of the means")
+    if np.std(sd_, ddof=1) > np.std(sa, ddof=1) + np.std(sb, ddof=1):
+        failures.append("pairing did not reduce the spread at all, so the coupling "
+                        "is not doing what it claims")
+    print("paired comparison: the coupled draw reaches every live word, %d coupled "
+          "games are legal, and mean(A-B) == mean(A)-mean(B) with the paired "
+          "spread %.3f against %.3f unpaired"
+          % (len(range(0, len(answers), 331)), np.std(sd_, ddof=1),
+             np.hypot(np.std(sa, ddof=1), np.std(sb, ddof=1))))
 
     # --- the shortlist cut ---------------------------------------------------
     # value, stderr per word; the best is 1.00 with a standard error of 0.10, so
