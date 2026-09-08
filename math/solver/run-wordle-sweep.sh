@@ -165,6 +165,8 @@ ALLORDERS=0
 BESTORDER=-1        # -1 = decide from --pair-adaptive; 0/1 = the user said so
 ADAPT=0
 DRYRUN=0
+ROOT=""
+PASSNO=1
 # Which pass this is; a run with no --shortlist-from is the first.
 STAGE=1
 
@@ -298,6 +300,8 @@ if [ -n "$OPENFROM" ]; then
     fi
     WORDS="$OUTDIR/$LISTNAME.txt"
     "$PY" tools/opening_list.py $OPENFLAGS --out "$WORDS" || exit 1
+    ROOT=$(basename "$WORDS" .txt | sed 's/^openings_//')
+    PASSNO=1
     if [ "$BESTORDER" = 1 ]; then
         # The best ordering depends on the follow-up (which pool the switch counts)
         # and on N, so both are in the name: these are different questions.
@@ -305,7 +309,10 @@ if [ -n "$OPENFROM" ]; then
         "$PY" tools/order_openings.py --from "$WORDS" --fallback "$FALLBACK" \
             --pair-adaptive "$ADAPT" --out "$ORDERED" || exit 1
         WORDS="$ORDERED"
+        ROOT=$(basename "$WORDS" .txt | sed 's/^openings_//')
     fi
+    # the stem records adapt separately, so strip it (and any cut suffix) here
+    ROOT=$(echo "$ROOT" | sed -E 's/(_se[0-9]+|_adapt[0-9]+)+$//')
 fi
 
 if [ -n "$SHORTFROM" ]; then
@@ -322,6 +329,18 @@ if [ -n "$SHORTFROM" ]; then
         echo "  another; the ranking does not carry between them." >&2
         exit 1
     fi
+    # Prefer the source's own lineage header; fall back to unpicking its stem.
+    ROOT=$(sed -n 's/^# lineage root=\([^ ]*\) .*/\1/p' "$SHORTFROM" | head -1)
+    SRCPASS=$(sed -n 's/^# lineage .*pass=\([0-9][0-9]*\) .*/\1/p' "$SHORTFROM" | head -1)
+    if [ -z "$ROOT" ]; then
+        ROOT=$(echo "$SRCSTEM" | sed -n 's/.*_openings_//p' \
+               | sed -E 's/(_se[0-9]+|_adapt[0-9]+)+$//')
+        # an old nested stem counts its own passes: one per `shortlist_`, plus one
+        SRCPASS=$(echo "$SRCSTEM" | grep -o shortlist | wc -l | tr -d " ")
+        SRCPASS=$((SRCPASS + 1))
+    fi
+    [ -n "$ROOT" ] || { echo "cannot work out the lineage root of $SRCSTEM" >&2; exit 1; }
+    PASSNO=$((SRCPASS + 1))
     CUTNAME="se${SHORTSE}"
     CUT="--se ${SHORTSE}"
     if [ -n "$SHORTTOP" ]; then
@@ -331,7 +350,7 @@ if [ -n "$SHORTFROM" ]; then
         CUT="$CUT --value $SHORTVALUE --maximise"
         CUTNAME="${CUTNAME}-win"
     fi
-    WORDS="$OUTDIR/shortlist_${SRCSTEM#sweep_}_$CUTNAME.txt"
+    WORDS="$OUTDIR/shortlist_${FALLBACK}_${ROOT}_p${PASSNO}_$CUTNAME.txt"
     "$PY" tools/sweep_shortlist.py --from "$SHORTFROM" $CUT --out "$WORDS" \
         || exit 1
     # WHICH PASS THIS IS, read off the source's own name: a stage-1 sweep is over a
@@ -390,13 +409,36 @@ if [ -z "$PROGRESS" ]; then
 fi
 echo "pass $STAGE: a progress line every $PROGRESS word(s)"
 
-STEM="sweep_${FALLBACK}_t${T}_s${SEED}_$(basename "$WORDS" .txt)"
+# THE NAME IS BOUNDED, and this is a scar: every pass used to nest its entire
+# ancestry, so by pass 6 the stem was over 255 bytes and macOS refused to create
+# the file -- after the shortlist had been cut and the run had started.  A stem
+# now carries the LINEAGE ROOT plus the pass number, which is constant size, and
+# the full chain lives in each CSV's own `# lineage` header line: root, pass, and
+# the immediate source, whose header names its own source in turn.
+#
+# The root is read from the source's header when it has one, and otherwise
+# RECOVERED from an old nested stem -- everything after `openings_`, with the
+# accumulated `_se<N>`/`_adapt<N>` suffixes stripped -- so the cascades already in
+# flight under the old names continue without being restarted.
+STEM="sweep_${FALLBACK}_${ROOT}_p${PASSNO}_t${T}_s${SEED}"
 # N is part of the objective, so it is in the name; 0 keeps the blind stem every
 # earlier sweep already used.
 [ "$ADAPT" = 0 ] || STEM="${STEM}_adapt${ADAPT}"
 [ -n "$LIMIT" ] && STEM="${STEM}_lim${LIMIT}"
 [ "$WIN" = 6 ] || STEM="${STEM}_w${WIN}"
 OUT="$OUTDIR/$STEM.csv"
+
+# A name that cannot be created is worse than a name that is ugly: the old scheme
+# got all the way through cutting the shortlist and starting the run before the
+# open() failed.  255 bytes is the macOS/Linux per-component limit; refuse early
+# and say so, rather than discover it at the first write.
+NAMELEN=${#STEM}
+if [ "$NAMELEN" -gt 200 ]; then
+    echo "REFUSING: the output name is $NAMELEN characters, near the 255-byte" >&2
+    echo "  filename limit: $STEM" >&2
+    echo "  The lineage should be root+pass, so something is accumulating." >&2
+    exit 1
+fi
 
 # --dry-run stops HERE: everything above is resolution (which list, which trials,
 # which seed, which file), and everything below starts a run.  It exists because
@@ -406,6 +448,7 @@ OUT="$OUTDIR/$STEM.csv"
 if [ "$DRYRUN" = 1 ]; then
     echo "dry run: would write $OUT"
     echo "  words   $WORDS"
+    echo "  lineage root $ROOT, pass $PASSNO"
     echo "  trials  $T   seed $SEED   follow-up $FALLBACK   pair-adaptive $ADAPT"
     echo "  progress every $PROGRESS opening(s)"
     exit 0
@@ -417,6 +460,8 @@ fi
 guard_output wordle_sweep.py "$OUT" || exit 1
 
 FLAGS="-t $T --fallback $FALLBACK --seed $SEED --words $WORDS --win-within $WIN --out $OUT"
+FLAGS="$FLAGS --root $ROOT --pass $PASSNO"
+[ -n "$SHORTFROM" ] && FLAGS="$FLAGS --source $(basename "$SHORTFROM")"
 [ "$ADAPT" = 0 ] || FLAGS="$FLAGS --pair-adaptive $ADAPT"
 [ -n "$LIMIT" ] && FLAGS="$FLAGS --limit $LIMIT"
 FLAGS="$FLAGS --progress $PROGRESS"

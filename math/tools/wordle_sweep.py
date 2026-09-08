@@ -90,6 +90,9 @@ def parse_args(argv):
     t = None
     fallback = None
     adapt = 0
+    root = ""
+    passno = 1
+    source = ""
     seed = 0
     words = "guess"
     limit = None
@@ -101,6 +104,12 @@ def parse_args(argv):
         a = argv[i]
         if a in ("-t", "--trials"):
             t = int(argv[i + 1]); i += 2
+        elif a == "--root":
+            root = argv[i + 1]; i += 2
+        elif a == "--pass":
+            passno = int(argv[i + 1]); i += 2
+        elif a == "--source":
+            source = argv[i + 1]; i += 2
         elif a == "--pair-adaptive":
             adapt = int(argv[i + 1]); i += 2
         elif a == "--fallback":
@@ -132,7 +141,8 @@ def parse_args(argv):
         raise SystemExit(
             "--out is required (or --no-out to discard results deliberately).\n"
             "Use the wrapper, which sets it: bash solver/run-wordle-sweep.sh")
-    return t, fallback, adapt, seed, words, limit, win_within, out, progress
+    return (t, fallback, adapt, seed, words, limit, win_within, out, progress,
+            root, passno, source)
 
 
 def load_done(path):
@@ -168,8 +178,8 @@ def sweep_word(pat, ans2g, na, t, seed, opening_g, tail, win_within, adapt=0):
 
 
 def main(argv):
-    (t, fallback, adapt, seed, words, limit, win_within, out,
-     progress) = parse_args(argv)
+    (t, fallback, adapt, seed, words, limit, win_within, out, progress,
+     root, passno, source) = parse_args(argv)
 
     guesses = load_words("guess")
     answers = load_words("mystery")
@@ -220,6 +230,14 @@ def main(argv):
         if fresh:
             fh.write("# wordle opener sweep: %d trials per word, follow-up %s, "
                      "seed %d\n" % (t, fallback, seed))
+            # THE LINEAGE, in the file rather than in the filename.  Each pass
+            # used to nest its whole ancestry into the name, which grew without
+            # bound and died at macOS's 255-byte limit on pass 6.  Root plus pass
+            # number is the same information in constant size, and `source` names
+            # the immediate parent, whose own header names ITS parent -- so the
+            # chain is still walkable, one file at a time.
+            fh.write("# lineage root=%s pass=%d source=%s\n"
+                     % (root or "(first)", passno, source or "(none)"))
             if adapt:
                 fh.write("# %d-word openings, played in order but ABANDONED once "
                          "the follow-up is down to %d\n# or fewer words "

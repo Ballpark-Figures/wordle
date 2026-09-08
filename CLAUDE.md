@@ -1366,6 +1366,18 @@ CSV row per word, flushed).
   and `--progress` overrides it. It gates a print and nothing else, so it changes
   neither the games nor the filename — a run is comparable with one made before the
   default existed. (A `case`, not a bash array: macOS ships bash 3.2.)
+- **THE STEM IS `sweep_<follow-up>_<root>_p<PASS>_t<T>_s<SEED>[_adapt<N>]`, and the
+  LINEAGE LIVES IN THE FILE, not the name.** Each CSV's header carries
+  `# lineage root=… pass=… source=…`, naming its immediate parent, whose own
+  header names ITS parent — the chain is walkable one file at a time, in constant
+  name length. **This is a scar**: the original scheme nested the whole ancestry
+  into the name, which grew ~40 characters per pass and **died at macOS's 255-byte
+  filename limit on pass 6** — after the shortlist had been cut and the run had
+  started, so the failure came from `open()` with everything already done. The
+  wrapper now REFUSES a stem over 200 characters rather than discover it at the
+  first write, and recovers `root`/`pass` from an old nested stem (everything
+  after `openings_`, trailing `_se<N>`/`_adapt<N>` stripped; passes counted by
+  `shortlist_` occurrences) so cascades already in flight continue unbroken.
 - **A STEM NESTS ITS ANCESTORS, so parse it ANCHORED at the front.**
   `sweep_answer_t10000_s2_shortlist_answer_t1000_s1_shortlist_..._t100_s0_...`
   holds three `_t` and three `_s`, oldest LAST — so a greedy `.*_t` reads the
