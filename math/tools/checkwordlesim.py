@@ -31,13 +31,16 @@ different POOL -- the 2315 answers for `random`, the 12972 legal guesses for
 turn 0), and replaying it across many games is what tests that the reset really
 happens: a leaked bitmap shows up as a diverging sequence from the second game on.
 
-THE PREFIX-THEN-TAIL PATH IS EXERCISED TOO.  Almost every strategy the video will
-try is "something specific for a while, then guess a random compatible answer",
-which in code is a callable returning a guess and then None.  So the run also
-plays a synthetic strategy that opens with a fixed word (the guess list's first
-entry, taken BY INDEX so no word is written down here) and then defers, and
-checks the opener really is played first, that it is played even when it is not a
-candidate, and that the rest of the game matches the reference.
+THE RULE-THEN-FOLLOW-UP PATH IS EXERCISED TOO, under BOTH follow-ups.  Almost
+every strategy the video will try is "something specific for a while, then a
+random compatible word", which in code is a rule returning a guess and then None.
+So the run also plays a synthetic rule that opens with a fixed word (the guess
+list's first entry, taken BY INDEX so no word is written down here) and then
+declines, and checks the opener really is played first, that it is played even
+though it is not a candidate, that no follow-up ever replays it once missed, and
+that the rest of the game matches the reference.  Handing that game to the guess
+follow-up at TURN 1 is also the only place its catch-up is tested: it must build
+its live set from a history it was not present for.
 
 COVERAGE IS TALLIED, not assumed.  The run FAILS if no game ever ran past the
 six-guess threshold, or if none came in at or under it, since the win-rate
@@ -61,7 +64,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 from build_patterns import load_patterns  # noqa: E402
 from wordle import ALL_GREEN, load_words, pattern  # noqa: E402
 from wordlesim import (WIN_WITHIN, answer_to_guess, draw_answer,  # noqa: E402
-                       make_strategy, play_game)
+                       make_strategy, make_tail, play_game)
 from wordle_sim import summarise  # noqa: E402
 
 
@@ -160,7 +163,10 @@ def main(argv):
         failures.append("ans2g maps %d answers to the wrong guess word" % len(bad))
 
     # --- differential: the bare tail -----------------------------------------
-    strategy = make_strategy("random", guesses, answers, ans2g)
+    rule, tail_name = make_strategy("random", guesses, answers, ans2g)
+    tail = make_tail(tail_name, guesses, answers, ans2g)
+    if tail_name != "answer":
+        failures.append("strategy 'random' resolved to the %r follow-up" % tail_name)
     scores, over, under, longest = [], 0, 0, 0
     for seed in range(games):
         fast_rng = np.random.default_rng(seed)
@@ -171,7 +177,7 @@ def main(argv):
             failures.append("seed %d: the two sides drew different answers" % seed)
             break
         answer = answers[a_fast]
-        played, replies = play_game(pat, ans2g, a_fast, strategy, fast_rng)
+        played, replies = play_game(pat, ans2g, a_fast, None, tail, fast_rng)
         words = [guesses[g] for g in played]
         ref_words = ref_play(answers, answer, ref_rng)
         if words != ref_words:
@@ -199,7 +205,10 @@ def main(argv):
     # --- differential: the same draw, from the 12972-word GUESS list ----------
     # Only the pool differs.  The hidden answer is still drawn from the 2315.
     mystery = set(answers)
-    gstrategy = make_strategy("random-guess", guesses, answers, ans2g)
+    grule, gtail_name = make_strategy("random-guess", guesses, answers, ans2g)
+    gtail = make_tail(gtail_name, guesses, answers, ans2g)
+    if gtail_name != "guess":
+        failures.append("strategy 'random-guess' resolved to the %r follow-up" % gtail_name)
     gscores, gover, gunder, off_list, drawn_outside = [], 0, 0, 0, 0
     for seed in range(guess_games):
         fast_rng = np.random.default_rng(500000 + seed)
@@ -211,7 +220,7 @@ def main(argv):
             break
         answer = answers[a_fast]
         drawn_outside += answer not in mystery      # the game's own draw, checked
-        played, replies = play_game(pat, ans2g, a_fast, gstrategy, fast_rng)
+        played, replies = play_game(pat, ans2g, a_fast, grule, gtail, fast_rng)
         words = [guesses[g] for g in played]
         ref_words = ref_play(guesses, answer, ref_rng)
         if words != ref_words:
@@ -247,28 +256,46 @@ def main(argv):
     def prefix(turn, alive, played, replies, rng):
         return opener_g if turn == 0 else None
 
-    opened, non_candidate = 0, 0
-    for seed in range(min(games, 60)):
-        fast_rng = np.random.default_rng(1000 + seed)
-        ref_rng = np.random.default_rng(1000 + seed)
-        a_fast = draw_answer(len(answers), fast_rng)
-        int(ref_rng.integers(len(answers)))
-        answer = answers[a_fast]
-        played, _ = play_game(pat, ans2g, a_fast, prefix, fast_rng)
-        words = [guesses[g] for g in played]
-        ref_words = ref_play(answers, answer, ref_rng, opener=opener)
-        if words != ref_words:
-            failures.append("prefix seed %d (%s): fast %s vs reference %s"
-                            % (seed, answer, " ".join(words), " ".join(ref_words)))
-            break
-        if words[0] != opener:
-            failures.append("prefix seed %d: the opener was not played first" % seed)
-            break
-        opened += 1
-        non_candidate += opener not in answers
-    print("replayed %d games of opener-then-tail: the opener leads every game "
-          "(%s a mystery word, so the non-candidate path is exercised)"
-          % (opened, "not" if opener not in answers else "IS"))
+    # BOTH follow-ups are handed the same rule, so the composition is tested
+    # against each -- and the guess follow-up is then FIRST CALLED AT TURN 1,
+    # which is what exercises its catch-up from a history it did not watch.
+    opened, non_candidate, handed = 0, 0, {}
+    for tname, pool in (("answer", answers), ("guess", guesses)):
+        ptail = make_tail(tname, guesses, answers, ans2g)
+        n = 0
+        for seed in range(min(games, 60 if tname == "answer" else guess_games)):
+            fast_rng = np.random.default_rng(1000 + seed)
+            ref_rng = np.random.default_rng(1000 + seed)
+            a_fast = draw_answer(len(answers), fast_rng)
+            int(ref_rng.integers(len(answers)))
+            answer = answers[a_fast]
+            played, _ = play_game(pat, ans2g, a_fast, prefix, ptail, fast_rng)
+            words = [guesses[g] for g in played]
+            ref_words = ref_play(pool, answer, ref_rng, opener=opener)
+            if words != ref_words:
+                failures.append("prefix/%s seed %d (%s): fast %s vs reference %s"
+                                % (tname, seed, answer, " ".join(words),
+                                   " ".join(ref_words)))
+                break
+            if words[0] != opener:
+                failures.append("prefix/%s seed %d: the opener was not played first"
+                                % (tname, seed))
+                break
+            if len(words) > 1 and words[1] == opener:
+                failures.append("prefix/%s seed %d: the follow-up replayed the "
+                                "missed opener" % (tname, seed))
+                break
+            n += 1
+            opened += 1
+            non_candidate += opener not in answers
+        handed[tname] = n
+    print("replayed opener-then-follow-up under both follow-ups (%s): the opener "
+          "leads every game (%s a mystery word, so playing a NON-candidate is "
+          "exercised) and no follow-up replayed it"
+          % (", ".join("%s %d" % (k, v) for k, v in handed.items()),
+             "not" if opener not in answers else "IS"))
+    if not all(handed.values()):
+        failures.append("a follow-up was never handed a game in progress")
 
     # --- the reported numbers ------------------------------------------------
     if scores:
@@ -285,6 +312,25 @@ def main(argv):
         print("summary arithmetic: mean %.4f, win rate %.2f%% over %d games, "
               "longest %d guesses" % (st["mean_guesses"], 100.0 * st["win_rate"],
                                       len(scores), longest))
+
+    # --- the follow-up is an input, and the registry defends that -------------
+    try:
+        make_strategy("random", guesses, answers, ans2g, (), "guess")
+        failures.append("a --fallback conflicting with the strategy name was accepted")
+    except SystemExit:
+        pass
+    try:
+        make_strategy("random", guesses, answers, ans2g, ("extra",))
+        failures.append("a strategy taking no arguments accepted one")
+    except SystemExit:
+        pass
+    try:
+        make_tail("neither", guesses, answers, ans2g)
+        failures.append("an unknown follow-up name was accepted")
+    except SystemExit:
+        pass
+    print("refusals: a conflicting --fallback, a stray argument and an unknown "
+          "follow-up are all rejected")
 
     # --- coverage: a pass must not mean the branches never fired -------------
     if not scores:

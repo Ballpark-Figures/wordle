@@ -24,35 +24,49 @@
 #   come with a standard error.  Two runs differing by less than a couple of SEs
 #   have not measured a difference.
 #
-# THE STRATEGY IS AN INPUT, NOT A RESULT, and there is NO DEFAULT -- naming it is
-# how a result file says which experiment produced it.  The strategies live in
-# math/wordlesim.py's registry; `--strategy list` prints them.  Today:
+# A STRATEGY IS A RULE PLUS A FOLLOW-UP, and BOTH are inputs with NO DEFAULT --
+# naming them is how a result file says which experiment produced it.  The rule is
+# what the strategy does while it has something to say; the FOLLOW-UP fills in
+# every position the rule has no rule for, and the two available are:
 #
-#   random         guess a word drawn UNIFORMLY AT RANDOM from the ANSWERS still
-#                  consistent with every reply so far (the 2315 mystery words),
-#                  from the first guess to the last.  Nothing is hardcoded and no
-#                  opener is an input: on turn one every answer is alive, so the
-#                  opening word is itself a uniform draw.  It is the shared TAIL
-#                  every other strategy falls through to once its own part is
-#                  over, so it is also the baseline they are measured against.
+#   --fallback answer   a word drawn UNIFORMLY AT RANDOM from the ANSWERS still
+#                       consistent with every reply (the 2315 mystery words)
+#   --fallback guess    the same draw from the LEGAL GUESSES still consistent with
+#                       them (the 12972 typeable words).  NEEDS the SQUARE guess x
+#                       guess matrix: build it once with
+#                       'python3 build_patterns.py --full' (~18s, 168 MB).
 #
-#   random-guess   the same, drawn instead from the LEGAL GUESSES still consistent
-#                  with every reply (the 12972 typeable words).  Only the list the
-#                  draw comes from differs -- the game, the answer's draw from the
-#                  2315 and the scoring are identical, so the two ARE comparable
-#                  with each other.  It plays words that can never be the answer
-#                  (10657 of the 12972 are not mystery words); that is the point,
-#                  it is what a player without the curated answer list can do.
-#                  NEEDS the SQUARE guess x guess matrix: build it once with
-#                  'python3 build_patterns.py --full' (~18s, 168 MB).
+# They are different strategies with different numbers, so the follow-up is part
+# of the run's identity and lands in the filename.  THE HIDDEN ANSWER IS DRAWN
+# FROM THE 2315 EITHER WAY -- the pool is the STRATEGY's, never the GAME's -- so
+# two runs differing only in their follow-up are directly comparable.
+#
+# The strategies live in math/wordlesim.py's registry; `--strategy list` prints
+# them.  Today they are the two baselines, which are the same EMPTY rule under the
+# two follow-ups -- so each PINS its own and takes no --fallback:
+#
+#   random         no rule: the ANSWER follow-up plays the whole game.  Nothing is
+#                  hardcoded and no opener is an input -- on turn one every answer
+#                  is alive, so the opening word is itself a uniform draw.
+#
+#   random-guess   no rule: the GUESS follow-up plays the whole game.  It plays
+#                  words that can never be the answer (10657 of the 12972 are not
+#                  mystery words); that is the point, it is what a player without
+#                  the curated answer list can do.
+#
+# A future strategy that DOES have a rule takes --fallback to say which of the two
+# fills in the rest; the flag is required there, and refused for these two, whose
+# names already say it.
 #
 # USE THIS RATHER THAN CALLING tools/wordle_sim.py DIRECTLY.  It sets --out so the
 # games outlive the terminal, names the file after every parameter that defines
 # the experiment, and tees a log.  The script refuses to start without --out and
 # --strategy for the same reason.
 #
-# Each (strategy, t, seed) is a different sample and gets its OWN file; re-running
-# the same three reproduces that file exactly.  A --win-within other than 6 is a
+# Each (strategy, follow-up, t, seed) is a different sample and gets its OWN file;
+# re-running the same four reproduces that file exactly.  The follow-up appears in
+# the stem only when the flag supplied it, so the two baselines keep the plain
+# names their own registry entries already pin.  A --win-within other than 6 is a
 # different reported quantity, so it lands in its own file too.
 
 set -u
@@ -60,6 +74,7 @@ set -u
 MATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 STRATEGY=""
+FALLBACK=""
 SARGS=""
 T=""
 SEED=0
@@ -69,6 +84,7 @@ PROGRESS=""
 while [ $# -gt 0 ]; do
     case "$1" in
         -s|--strategy)     STRATEGY="$2";                       shift 2 ;;
+        --fallback)        FALLBACK="$2";                       shift 2 ;;
         --strategy-arg)    SARGS="${SARGS:+$SARGS }$2";         shift 2 ;;
         -t|--trials)       T="$2";                              shift 2 ;;
         --seed)            SEED="$2";                           shift 2 ;;
@@ -105,18 +121,32 @@ esac
     exit 1; }
 # A strategy drawing from the whole guess list needs the SQUARE matrix, which is
 # a separate artifact and gitignored like the rest of data/local/.
-case "$STRATEGY" in
-    random-guess)
+case "$FALLBACK" in
+    ''|answer|guess) ;;
+    *) echo "--fallback must be 'answer' or 'guess' (which random word fills in" >&2
+       echo "  wherever the strategy's own rule declines)" >&2; exit 1 ;;
+esac
+# Either the strategy's own name or an explicit --fallback can put the guess-list
+# follow-up in play, and it needs the SQUARE matrix -- a separate artifact,
+# gitignored like the rest of data/local/.
+case "$STRATEGY $FALLBACK" in
+    *random-guess*|*guess)
         [ -f data/local/patterns/patterns_full.npy ] || {
-            echo "strategy $STRATEGY needs the square guess x guess matrix." >&2
+            echo "the guess follow-up needs the square guess x guess matrix." >&2
             echo "  Build it with '$PY build_patterns.py --full' (~18s, 168 MB)." >&2
             exit 1; } ;;
 esac
 
+# Resolve the strategy BEFORE creating a log or a CSV, so a run that will be
+# refused leaves nothing behind.  The registry stays the one place that decides:
+# this just asks it, and prints the follow-up it settled on.
+RESOLVED=$("$PY" tools/wordle_sim.py --strategy "$STRATEGY" ${FALLBACK:+--fallback $FALLBACK} $(for a in $SARGS; do echo "--strategy-arg $a"; done) --resolve) || exit 1
+echo "strategy $STRATEGY${SARGS:+ $SARGS}, follow-up $RESOLVED"
+
 OUTDIR=data/shared/wordlesim
 LOC=data/local/wordlesim
 # strategy args join the name with '-', so a plain run keeps a clean stem
-STEM="$(echo "$STRATEGY $SARGS" | sed 's/  *$//' | tr ' ' '-')_t${T}_s${SEED}"
+STEM="$(echo "$STRATEGY $SARGS $FALLBACK" | sed 's/  *$//' | tr ' ' '-')_t${T}_s${SEED}"
 [ "$WIN" = 6 ] || STEM="${STEM}_w${WIN}"
 OUT="$OUTDIR/$STEM.csv"
 mkdir -p "$OUTDIR" "$LOC"
@@ -127,6 +157,7 @@ mkdir -p "$OUTDIR" "$LOC"
 guard_output wordle_sim.py "$OUT" || exit 1
 
 FLAGS="--strategy $STRATEGY -t $T --seed $SEED --win-within $WIN --out $OUT"
+[ -n "$FALLBACK" ] && FLAGS="$FLAGS --fallback $FALLBACK"
 for a in $SARGS; do FLAGS="$FLAGS --strategy-arg $a"; done
 [ -n "$PROGRESS" ] && FLAGS="$FLAGS --progress $PROGRESS"
 

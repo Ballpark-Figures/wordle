@@ -1138,37 +1138,50 @@ source of truth. Run it with **`bash solver/run-wordle-sim.sh --strategy NAME -t
 - **NO CAP IS NEEDED FOR TERMINATION** — a tail guess is always a live candidate,
   so an all-green ends the game and any other reply eliminates the word just played.
   `_MAX_TURNS` is a runaway ASSERTION derived from that, not a modelling cap.
-- **THE STRATEGY PROTOCOL IS THE POINT, because almost every strategy here is
-  "something specific for a while, then guess a random compatible answer".** A
-  strategy is a callable `strategy(turn, alive, played, replies, rng) -> guess
-  index or None`, and **returning `None` means "my part is over — fall through to
-  the shared random-compatible tail"**. So a new strategy writes only its own part.
-  Register it in `wordlesim.STRATEGIES` (name -> factory taking the lists + its own
-  `--strategy-arg`s); `--strategy list` prints the registry.
-- **THE TAIL, exactly: guess a word drawn UNIFORMLY AT RANDOM from the answers
-  still consistent with every reply so far.** Candidates are the 2315 mystery
-  words; a guess may be any of the 12972 (so a strategy's own part can play a
-  non-candidate probe). A board is solved only when the answer is actually PLAYED.
-- **`random` is the baseline and defers on EVERY turn** — it is the tail and
-  nothing else. On turn one every answer is alive, so its opening word is itself a
-  uniform draw: **no opener is an input and no word is hardcoded anywhere.**
-- **`random-guess` is the SAME draw over the 12972-word GUESS list** — the only
-  difference is which list it draws from, so unlike a cross-game comparison these
-  two ARE comparable with each other. **THE HIDDEN ANSWER IS STILL DRAWN FROM THE
-  2315 EITHER WAY** — the pool is the STRATEGY's, never the game's. "Compatible"
-  is `ultraturns`' legality notion (a word that could still BE the answer), so a
-  word played and missed is never played again. It deliberately plays words that
-  can never be the answer (10657 of the 12972 are not mystery words) — that is
-  what a player without the curated answer list can do, not a defect. It keeps its
-  OWN bitmap over the guess list (`play_game`'s `alive` is over the answers and
-  cannot express it), **reset on `turn == 0`** — a strategy composing it after a
-  prefix must reset it itself. **It needs the SQUARE 12972x12972 matrix**
-  (`python3 build_patterns.py --full`, ~18s/168 MB, gitignored under `local/` so
-  it is missing on a fresh clone); the wrapper checks and refuses with that command.
-- **THE STRATEGY IS AN INPUT AND IS NEVER DEFAULTED** (the greens scar) — the
-  simulator and the wrapper both refuse without `--strategy`, and it names the
-  output file. Each (strategy, t, seed) is a different sample with its own file,
-  `data/shared/wordlesim/<strategy>_t<T>_s<SEED>.csv`, one row per game (answer +
+- **A STRATEGY IS A RULE PLUS A FOLLOW-UP, and BOTH are inputs.** The rule is
+  `rule(turn, alive, played, replies, rng) -> guess index or None`, asked EVERY
+  turn; **`None` means "I have no rule for this position"** and the FOLLOW-UP
+  fills it in. So a new strategy writes only its own part, and may hand back and
+  take over again. Register it in `wordlesim.STRATEGIES` (name -> `Strategy(factory,
+  pinned follow-up or None)`); `--strategy list` prints the registry.
+- **TWO FOLLOW-UPS, and which one is part of the strategy** — different strategies,
+  different numbers, so `--fallback` is REQUIRED for any rule that does not pin one
+  and it lands in the filename. **`answer`**: a word drawn UNIFORMLY AT RANDOM from
+  the ANSWERS still consistent with every reply (2315). **`guess`**: the same draw
+  from the LEGAL GUESSES still consistent with them (12972). "Consistent" is
+  `ultraturns`' legality notion (a word that could still BE the answer), so a word
+  played and missed is never played again. A game ends only when the answer is
+  actually PLAYED.
+- **THE HIDDEN ANSWER IS DRAWN FROM THE 2315 WHICHEVER FOLLOW-UP IS IN USE — the
+  pool is the STRATEGY's, never the GAME's.** That is what makes two runs differing
+  only in their follow-up directly comparable with each other, unlike a
+  cross-game comparison.
+- **`random` and `random-guess` are the SAME EMPTY RULE under the two follow-ups**,
+  and each PINS its own (the name is what records it), so they take no `--fallback`
+  and a conflicting one is refused rather than run under a name that hides it. On
+  turn one every word in the pool is live, so the opening word is itself a uniform
+  draw: **no opener is an input and no word is hardcoded anywhere.** `guess`
+  deliberately plays words that can never be the answer (10657 of the 12972 are not
+  mystery words) — what a player without the curated answer list can do, not a defect.
+- **The `guess` follow-up keeps its OWN live set over the guess list** (`play_game`'s
+  `alive` is over the answers and cannot express it), **cached on the (guess, reply)
+  HISTORY it was built from** — an extension is folded in incrementally, anything
+  else is rebuilt. That is what makes it safe AS a follow-up: it can be handed a
+  game already several turns old, or a fresh game whose opening happens to repeat
+  the last one, and carries no stale state into either. **It needs the SQUARE
+  12972x12972 matrix** (`python3 build_patterns.py --full`, ~18s/168 MB, gitignored
+  under `local/` so it is missing on a fresh clone); the wrapper checks and refuses
+  with that command.
+- **The wrapper RESOLVES the strategy before it creates a log or a CSV** (`--resolve`
+  on the simulator), so a run that will be refused leaves nothing behind — and the
+  refusal still comes from the registry, the one place that owns it, rather than
+  from a second copy of the rule in the shell.
+- **THE STRATEGY AND ITS FOLLOW-UP ARE INPUTS AND ARE NEVER DEFAULTED** (the greens
+  scar) — the simulator and the wrapper both refuse without `--strategy`, and it
+  names the output file. Each (strategy, follow-up, t, seed) is a different sample
+  with its own file, `data/shared/wordlesim/<strategy>[-<fallback>]_t<T>_s<SEED>.csv`
+  — the follow-up appears in the stem only when the FLAG supplied it, so a strategy
+  that pins its own keeps the plain name, one row per game (answer +
   full guess sequence + the win flag) with the summary as trailing `#` lines; log
   under `data/local/wordlesim/`. Rows flush per game, so a Ctrl-C keeps the games
   played. Re-running the same three reproduces the file exactly.
@@ -1177,9 +1190,11 @@ source of truth. Run it with **`bash solver/run-wordle-sim.sh --strategy NAME -t
   recomputes every reply from the STRINGS by the **multiset rule** (a different
   algorithm from `wordle.pattern`'s consuming left-to-right scan, so a
   repeated-letter mistake cannot be shared), demanding identical guess sequences;
-  it also checks, from the strings, that every tail guess really was compatible
-  with every earlier reply, exercises the prefix-then-`None` path with a synthetic
-  opener, and tallies coverage — FAILING if no game ran past six or none came in
+  it also checks, from the strings, that every follow-up guess really was compatible
+  with every earlier reply, exercises the rule-then-`None` path with a synthetic
+  opener **under BOTH follow-ups** (which is the only place the `guess` follow-up's
+  catch-up from a history it did not watch gets tested), checks no follow-up
+  replays the missed opener, pins the registry's refusals, and tallies coverage — FAILING if no game ran past six or none came in
   under it. **BOTH strategies are diffed against that one reference, differing
   only in the POOL it draws from**, which is also what pins `random-guess`'s
   per-game state reset (a leaked bitmap diverges from game two on); it FAILS if
