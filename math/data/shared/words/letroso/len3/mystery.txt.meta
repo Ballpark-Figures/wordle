@@ -1,0 +1,7 @@
+# length-3 ANSWER list.  See ../README.md.
+built: 2026-09-07
+guess source: letroso bundle (https://letroso.com/assets/all-en-CFYUaEb1.js)
+answer rule: OURS -- wordfreq zipf_frequency(w,'en') >= 3.00 over letroso's length-3 guesses
+guesses: 3619
+answers: 1293
+ratio: 35.7%
