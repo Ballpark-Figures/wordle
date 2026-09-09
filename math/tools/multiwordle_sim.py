@@ -212,7 +212,7 @@ def main(argv):
         if strategy != MINAVG:
             return play_game(pat, ans2g, answer_idx, openers_g, rng, rule)
         played, vals, cur, best = scratch
-        n = mf.play_minavg(pat, np.asarray(answer_idx, dtype=np.int64), og,
+        n = mf.play_minavg(pat, ans2g, np.asarray(answer_idx, dtype=np.int64), og,
                            pool, turn2 if turn2 is not None else np.zeros((1, 1)),
                            turn2 is not None, played, vals, cur, best)
         return [int(g) for g in played[:n]]

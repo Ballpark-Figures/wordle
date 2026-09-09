@@ -125,6 +125,7 @@ def main(argv):
         return
 
     pat = np.array(load_patterns())
+    ans2g = mw.answer_to_guess(answers, guesses)
     pool = np.arange(len(guesses), dtype=np.int64)
     # every answer, once each: the whole population, in answer-list order
     every = np.arange(na, dtype=np.int64).reshape(na, 1)
@@ -157,7 +158,7 @@ def main(argv):
         w0 = time.time()
         og = np.array([guesses.index(o[0])], dtype=np.int64)
         t2 = mf.turn2_table(pat, int(og[0]), pool)
-        mf.run_minavg_games(pat, every, og, pool, t2, True, scores)
+        mf.run_minavg_games(pat, ans2g, every, og, pool, t2, True, scores)
         assert (scores > 0).all(), "a game returned no score"
         total = int(scores.sum())
         dt = time.time() - w0

@@ -270,7 +270,7 @@ def main(argv):
     check_minavg(guesses, mystery, pat, ans2g)
     check_kernels(guesses, mystery, pat, ans2g)
     check_race(guesses, mystery)
-    check_exact_vs_optimum(guesses, mystery, pat)
+    check_exact_vs_optimum(guesses, mystery, pat, ans2g)
 
     print()
     if FAILS:
@@ -582,17 +582,21 @@ def check_kernels(guesses, mystery, pat, ans2g):
     check("the turn-2 table equals average_remaining on the opener's bucket",
           np.array_equal(t2[p], mw.average_remaining(pat, pool, idx)))
     agree = True
-    for k in (1, 2, 4):
-        for gi in range(3):
+    fired = searched = 0
+    for k in (1, 2, 4, 8):
+        for gi in range(2 if k >= 8 else 3):
             a = draw_answers(len(mystery), k, np.random.default_rng([13, gi]))
+            searched_g, fired_g = _singleton_turns(pat, a, og)
+            searched += searched_g
+            fired += fired_g
             a64 = np.asarray(a, dtype=np.int64)
             played = np.empty(mf.turn_bound(k, 1), dtype=np.int64)
             vals = np.empty((k, len(pool)))
             cur, best = np.empty(k), np.empty(k)
-            n1 = mf.play_minavg(pat, a64, og, pool, t2, True, played, vals,
+            n1 = mf.play_minavg(pat, ans2g, a64, og, pool, t2, True, played, vals,
                                 cur, best)
             with_memo = list(played[:n1])
-            n2 = mf.play_minavg(pat, a64, og, pool, t2, False, played, vals,
+            n2 = mf.play_minavg(pat, ans2g, a64, og, pool, t2, False, played, vals,
                                 cur, best)
             without = list(played[:n2])
             ref = play_game(pat, ans2g, a, og, None,
@@ -602,6 +606,15 @@ def check_kernels(guesses, mystery, pat, ans2g):
                 agree = False
     check("minavg agrees three ways: memoised kernel, bare kernel, reference",
           agree)
+    # The kernel takes an EXACT shortcut whenever a board is down to one word (the
+    # winner can then only be a singleton board's own word).  The reference has no
+    # such path, so the agreement above IS the differential -- but only if the
+    # shortcut actually fired, so that is counted rather than hoped for.  It also
+    # caught a real bug: collected in board order the candidates tie-broke by
+    # BOARD, where the full scan tie-breaks by lowest guess index.
+    check("the minavg singleton fast path fired in that differential",
+          fired > 0, "%d of %d searched turns (%.0f%%)"
+          % (fired, searched, 100.0 * fired / max(searched, 1)))
 
 
 def check_race(guesses, mystery):
@@ -714,7 +727,47 @@ def check_race(guesses, mystery):
     os.remove(field)
 
 
-def check_exact_vs_optimum(guesses, mystery, pat):
+def _singleton_turns(pat, answer_idx, openers_g):
+    """(searched turns, turns with a singleton board) for one minavg game.
+
+    A COVERAGE tally, not an oracle: it replays the candidate counts to say how
+    often the kernel's exact fast path applies, so a passing differential cannot
+    silently mean it never ran.
+    """
+    k = len(answer_idx)
+    na = pat.shape[1]
+    alive = np.ones((k, na), dtype=bool)
+    solved = np.zeros(k, dtype=bool)
+    pool = np.arange(pat.shape[0])
+    rule = mw.make_rule(mw.MINAVG, pool=pool,
+                        answers_g=np.arange(na))     # identity: counts only
+    searched = fired = 0
+    pending = [int(g) for g in openers_g]
+    g = pending.pop(0)
+    played = []
+    while True:
+        played.append(g)
+        row = pat[g]
+        for j in range(k):
+            if solved[j]:
+                continue
+            fb = int(row[answer_idx[j]])
+            if fb == ALL_GREEN:
+                solved[j] = True
+                continue
+            alive[j] &= row == fb
+        if solved.all():
+            return searched, fired
+        if pending:
+            g = pending.pop(0)
+            continue
+        searched += 1
+        if min(int(alive[j].sum()) for j in range(k) if not solved[j]) == 1:
+            fired += 1
+        g = rule.choose(pat, None, alive, solved, None, played, None)
+
+
+def check_exact_vs_optimum(guesses, mystery, pat, ans2g):
     """minavg at k=1 must never beat the exact optimum -- an outside cross-check.
 
     At k=1 `minavg` is a one-ply heuristic over ordinary Wordle, and this file can
@@ -752,7 +805,7 @@ def check_exact_vs_optimum(guesses, mystery, pat):
             continue
         og = np.array([guesses.index(w)], dtype=np.int64)
         t2 = mf.turn2_table(pat, int(og[0]), pool)
-        mf.run_minavg_games(pat, every, og, pool, t2, True, scores)
+        mf.run_minavg_games(pat, ans2g, every, og, pool, t2, True, scores)
         rows.append((w, int(scores.sum()), int(scores.max()), opt[w]))
     ok = all(tot >= o for _, tot, mx, o in rows if mx <= 6)
     used = [r for r in rows if r[2] <= 6]

@@ -253,8 +253,8 @@ class Player:
                 # one-word opening; with a longer opening guess 2 is still blind
                 use = op.shape[0] == 1
                 t2 = self._turn2_for(int(op[0])) if use else self._empty_turn2()
-                mf.run_minavg_games(self.pat, ans, op, self.pool, t2, use,
-                                    out[c])
+                mf.run_minavg_games(self.pat, self.ans2g, ans, op, self.pool,
+                                    t2, use, out[c])
             return out
         out = np.empty((len(openings), len(ans)), dtype=np.int64)
         mf.run_pick_block(self.pat, self.ans2g, ans, openings, self.mode,
