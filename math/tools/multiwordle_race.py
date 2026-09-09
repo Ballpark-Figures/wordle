@@ -74,13 +74,19 @@ ELIM_COLUMNS = "opening,games,mean,diff_vs_leader,paired_stderr,sigma,leader"
 # shift another opening's answers.  Same constant, same reason, as the sweeps.
 PICK_OFFSET = 1 << 20
 
+# A game chunk should do at least this much work, so that checkpointing and the
+# Python round trip are never the job.  Only a floor: the real driver of the chunk
+# size is amortising per-opening setup (see Player.calibrate).
+MIN_CHUNK_SECONDS = 1.0
+
 
 def parse_args(argv):
     a = {
         "strategy": None, "k": None, "seed": 0, "sigma": 5.0,
         "block": 100, "growth": 2.0, "openings": "guess", "top": None,
-        "out": None, "max_games": None, "pair_at": 2000, "chunk": 256,
+        "out": None, "max_games": None, "pair_at": 2000, "chunk": 0,
         "max_mem": 2.0, "report": 60.0, "dry_run": False,
+        "memo_overhead": 0.10, "checkpoint": 30.0,
     }
     i = 0
     while i < len(argv):
@@ -113,6 +119,10 @@ def parse_args(argv):
             a["pair_at"] = int(argv[i + 1]); i += 2
         elif f == "--chunk":
             a["chunk"] = int(argv[i + 1]); i += 2
+        elif f == "--memo-overhead":
+            a["memo_overhead"] = float(argv[i + 1]); i += 2
+        elif f == "--checkpoint":
+            a["checkpoint"] = float(argv[i + 1]); i += 2
         elif f == "--max-mem":
             a["max_mem"] = float(argv[i + 1]); i += 2
         elif f == "--report":
@@ -207,6 +217,31 @@ class Player:
 
     def needs_floats(self):
         return self.strategy != mw.MINAVG
+
+    def calibrate(self, opening, ans, fl):
+        """(per-opening SETUP seconds, per-opening PER-GAME seconds).
+
+        The race plays GAMES in the outer loop so that a halt always leaves every
+        live opening level, which is the state you can actually rank and cut.
+        That costs one pass of per-opening SETUP per game chunk -- for `minavg`,
+        rebuilding each opening's 25 MB turn-2 table -- so the chunk has to be big
+        enough to amortise it.  How big depends on the strategy AND on k, so it is
+        MEASURED on one opening rather than guessed: `srank` has no setup at all
+        and can chunk as finely as it likes, while `minavg` at k=2 has to take a
+        whole block at a time and at k=16 can afford about twenty chunks.
+        """
+        op = np.asarray(opening, dtype=np.int64).reshape(1, -1)
+        n = max(1, min(len(ans), 8))
+        self._turn2.pop("key", None)               # force a real build, not a hit
+        t0 = time.time()
+        if self.strategy == mw.MINAVG and op.shape[1] == 1:
+            self._turn2_for(int(op[0, 0]))
+        setup = time.time() - t0
+        t0 = time.time()
+        # the table just built is cached, so this times the GAMES alone
+        self.play(op, ans[:n], fl[:n])
+        play = (time.time() - t0) / n
+        return max(setup, 0.0), max(play, 1e-9)
 
     def play(self, openings, ans, fl):
         """(n_openings, n_games) scores; -1 where the float array ran out."""
@@ -398,8 +433,6 @@ def main(argv):
 
     live = np.arange(len(field))
     n_games = 0                # games every live opening has completed
-    target = 0                 # the block in flight, 0 if none
-    filled = 0                 # openings of that block already played
     hist = np.zeros((len(field), 0), dtype=np.int16)
     paired = None              # (sum_d, sumsq_d, tot, sq) once switched
     status = ["live"] * len(field)
@@ -415,18 +448,23 @@ def main(argv):
                 "this one" % (ck_path, int(z["field"]), len(field)))
         live = z["live"]
         n_games = int(z["n_games"])
-        target = int(z["target"])
-        filled = int(z["filled"])
         status = [s.decode() for s in z["status"]]
         elim_at = z["elim_at"]
         if bool(z["paired"]):
             paired = (z["sum_d"], z["sumsq_d"], z["tot"], z["sq"])
         else:
             hist = z["hist"]
-        print("\nresuming: %d live at %d games%s"
-              % (len(live), n_games,
-                 ", block to %d is %d/%d done" % (target, filled, len(live))
-                 if target else ""))
+        if "filled" in z and int(z["filled"]):
+            # written by the openings-outer version, which could leave a block
+            # part-played: those extra games belong to some openings and not
+            # others, so they are DISCARDED rather than mixed into a comparison
+            print("  (checkpoint holds a part-played block from the older "
+                  "openings-outer loop; discarding it and resuming from %d "
+                  "complete games)" % n_games)
+        if hist.shape[1] > n_games:
+            hist = hist[:, :n_games].copy()
+        print("\nresuming: %d live, every one level at %d games"
+              % (len(live), n_games))
 
     os.makedirs(os.path.join("data", "local", "multiwordle"), exist_ok=True)
     if out:
@@ -437,11 +475,18 @@ def main(argv):
                         % stem)
                 f.write(ELIM_COLUMNS + "\n")
 
-    def checkpoint():
+    def checkpoint(force=False):
+        """Save the race state.  Cheap to call: it writes at most every
+        --checkpoint seconds, because the history grows with the game count and
+        the chunks are deliberately short.  The state is consistent at EVERY
+        chunk boundary (all live openings level at n_games), so a skipped write
+        costs at most that many seconds of games, never correctness."""
         if not ck_path:
             return
-        kw = dict(field=len(field), live=live, n_games=n_games, target=target,
-                  filled=filled, elim_at=elim_at,
+        if not force and time.time() - last_ck[0] < a["checkpoint"]:
+            return
+        last_ck[0] = time.time()
+        kw = dict(field=len(field), live=live, n_games=n_games, elim_at=elim_at,
                   status=np.array([s.encode() for s in status]),
                   paired=paired is not None)
         if paired is None:
@@ -454,66 +499,80 @@ def main(argv):
         os.replace(ck_path + ".tmp.npz", ck_path)
 
     last_report = time.time()
-    for nxt in block_targets(a["block"], a["growth"], a["max_games"]):
+    said_step = [0]
+    warmed = [False]
+    last_ck = [0.0]
+    for target in block_targets(a["block"], a["growth"], a["max_games"]):
         if len(live) <= 1:
             break
-        if target and filled:
-            nxt = target                    # finish the block we were part-way through
-        elif nxt <= n_games:
+        if target <= n_games:
             continue
-        target = nxt
 
-        if paired is None:
-            if hist.shape[1] < target:
-                grown = np.zeros((len(live), target), dtype=np.int16)
-                grown[:, :hist.shape[1]] = hist
-                hist = grown
-            ans, fl = make_games(na, a["k"], a["seed"], n_games, target, nf)
-            while filled < len(live):
-                hi = min(len(live), filled + max(1, a["chunk"]))
-                sc = player.play(openings[live[filled:hi]], ans, fl)
-                while (sc < 0).any():
-                    nf *= 2
-                    print("  (coin-flip array regrown to %d)" % nf)
-                    ans, fl = make_games(na, a["k"], a["seed"], n_games,
-                                         target, nf)
-                    sc = player.play(openings[live[filled:hi]], ans, fl)
-                hist[filled:hi, n_games:target] = sc
-                filled = hi
-                checkpoint()
-                if time.time() - last_report > a["report"]:
-                    print("  to %d games: %d/%d openings played"
-                          % (target, filled, len(live)))
-                    last_report = time.time()
-            n_games = target
+        # GAMES ARE THE OUTER LOOP, so every live opening is always level: stop
+        # whenever you like and the standings are a real ranking of the whole
+        # field at n_games, not a complete answer for an alphabetical prefix and
+        # nothing for the rest.  The chunk is sized from a measured calibration so
+        # that per-opening setup (minavg's turn-2 table) stays a small share of
+        # the work -- see Player.calibrate.
+        if paired is None and hist.shape[1] < target:
+            grown = np.zeros((len(live), target), dtype=np.int16)
+            grown[:, :hist.shape[1]] = hist
+            hist = grown
+        # Calibrated ONCE per block, not per chunk: the measurement itself costs a
+        # setup, and the per-game cost barely moves.  The first one is preceded by
+        # a throwaway call because otherwise it times numba's JIT and asks for a
+        # one-game chunk.
+        if a["chunk"]:
+            step = a["chunk"]
         else:
-            sum_d, sumsq_d, tot, sq = paired
-            step = game_chunk(len(live))
-            while n_games < target:
-                hi = min(target, n_games + step)
+            probe_a, probe_f = make_games(na, a["k"], a["seed"], n_games,
+                                          min(target, n_games + 8), nf)
+            if not warmed[0]:
+                player.play(openings[live[:1]], probe_a[:1], probe_f[:1])
+                warmed[0] = True
+            setup, per_game = player.calibrate(openings[live[0]], probe_a,
+                                               probe_f)
+            # big enough that setup stays under --memo-overhead of the work, and
+            # that a chunk is at least a second so checkpointing is not the job
+            step = max(1,
+                       int(np.ceil(setup / (a["memo_overhead"] * per_game))),
+                       int(np.ceil(MIN_CHUNK_SECONDS
+                                   / (per_game * len(live)))))
+            if step != said_step[0]:
+                said_step[0] = step
+                print("  game chunk %d for %d openings (setup %.4gs, %.4gs per "
+                      "game per opening, so setup is %.0f%% of a chunk)"
+                      % (step, len(live), setup, per_game,
+                         100 * setup / (setup + step * per_game)))
+        while n_games < target:
+            hi = min(target, n_games + step)
+            ans, fl = make_games(na, a["k"], a["seed"], n_games, hi, nf)
+            sc = player.play(openings[live], ans, fl)
+            while (sc < 0).any():
+                nf *= 2
+                print("  (coin-flip array regrown to %d)" % nf)
                 ans, fl = make_games(na, a["k"], a["seed"], n_games, hi, nf)
                 sc = player.play(openings[live], ans, fl)
-                while (sc < 0).any():
-                    nf *= 2
-                    ans, fl = make_games(na, a["k"], a["seed"], n_games, hi, nf)
-                    sc = player.play(openings[live], ans, fl)
-                s = sc.astype(np.float64)
-                rs = s.sum(axis=1)
-                rq = (s * s).sum(axis=1)
+            if paired is None:
+                hist[:, n_games:hi] = sc
+            else:
+                sum_d, sumsq_d, tot, sq = paired
+                f = sc.astype(np.float64)
+                rs = f.sum(axis=1)
+                rq = (f * f).sum(axis=1)
                 tot += rs
                 sq += rq
                 sum_d += rs[:, None] - rs[None, :]
-                sumsq_d += rq[:, None] + rq[None, :] - 2.0 * (s @ s.T)
-                # n_games advances WITH the accumulators, so a resume never
-                # replays a chunk into them twice
-                n_games = hi
+                sumsq_d += rq[:, None] + rq[None, :] - 2.0 * (f @ f.T)
                 paired = (sum_d, sumsq_d, tot, sq)
-                checkpoint()
-                if time.time() - last_report > a["report"]:
-                    print("  %d/%d games of this block" % (n_games, target))
-                    last_report = time.time()
-        target = 0
-        filled = 0
+            # n_games advances WITH the scores, in both phases, so a resume never
+            # replays a chunk and never leaves the field ragged
+            n_games = hi
+            checkpoint()
+            if time.time() - last_report > a["report"]:
+                print("  %d/%d games of this block, %d openings each"
+                      % (n_games, target, len(live)))
+                last_report = time.time()
 
         # --- the cut, on the paired difference against the leader
         if paired is None:
@@ -586,7 +645,7 @@ def main(argv):
                 hist = np.zeros((0, 0), dtype=np.int16)
                 print("  (switched to pairwise sums over %d openings -- memory "
                       "is now independent of the game count)" % len(live))
-        checkpoint()
+        checkpoint(force=True)
         write_standings(out, stem, a, names, status, elim_at, live, mean, ose,
                         md, se, is_answer, n_games, lead)
         if len(live) <= 1:
