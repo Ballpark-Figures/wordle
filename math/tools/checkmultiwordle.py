@@ -31,8 +31,11 @@ about tie-breaking).  The tally is over the whole run rather than per k, since
 whether a particular k and seed happens to produce a tie is luck.
 """
 
+import contextlib
+import io
 import os
 import sys
+from fractions import Fraction
 
 import numpy as np
 
@@ -41,9 +44,13 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 from build_patterns import load_patterns  # noqa: E402
 from multiwordle import answer_to_guess, draw_answers, play_game  # noqa: E402
 from wordle import ALL_GREEN, load_words, pattern  # noqa: E402
+import multiwordle as mw  # noqa: E402
+import multiwordle_fast as mf  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import multiwordle_race as race  # noqa: E402
 from multiwordle_sim import openers_from, summarise  # noqa: E402
+from tree_states import state_from_strings  # noqa: E402
 from multiwordle_shortlist import shortlist  # noqa: E402
 from multiwordle_sweep import PICK_OFFSET, load_done, sweep_word  # noqa: E402
 
@@ -258,12 +265,452 @@ def main(argv):
           load_done(tmp) == {"laten", "clint"})
     os.remove(tmp)
 
+    check_ranking()
+    check_srank(guesses, mystery, pat, ans2g, games)
+    check_minavg(guesses, mystery, pat, ans2g)
+    check_kernels(guesses, mystery, pat, ans2g)
+    check_race(guesses, mystery)
+
     print()
     if FAILS:
         print("FAILED: " + ", ".join(FAILS))
         return 1
     print("all checks passed")
     return 0
+
+
+# --- srank and minavg: the same discipline, from the strings ---------------
+#
+# Everything below follows the rule the greedy differential above follows: the
+# oracle must share no machinery with the thing it checks.  For `srank` that
+# means the colour composition is re-derived by `tree_states.state_from_strings`,
+# which never looks at a tile -- greens are positions where some guess matched the
+# answer, and a letter's known count is the most any guess proved by
+# min(copies in guess, copies in answer).  For `minavg` it means bucketing
+# candidate WORDS with `wordle.pattern` in a dict.
+
+
+def reference_srank(mystery, answer_words, opening, rng, ranking, ties):
+    """`srank` from strings only: no matrix, no bitmaps, no tile decoding."""
+    k = len(answer_words)
+    cands = [list(mystery) for _ in range(k)]
+    seen = [[] for _ in range(k)]                # guesses played on each board
+    solved = [False] * k
+    played = []
+    pending = list(opening)
+    g = pending.pop(0)
+    while True:
+        played.append(g)
+        for j in range(k):
+            if solved[j]:
+                continue
+            seen[j].append(g)
+            fb = pattern(g, answer_words[j])
+            if fb == ALL_GREEN:
+                solved[j] = True
+                continue
+            cands[j] = [w for w in cands[j] if pattern(g, w) == fb]
+        if all(solved):
+            return played
+        if pending:
+            g = pending.pop(0)
+            continue
+        live = [j for j in range(k) if not solved[j]]
+        vals = [ranking.get(state_from_strings(answer_words[j], seen[j]),
+                            Fraction(-1)) for j in live]
+        best = max(vals)
+        tied = [j for j, v in zip(live, vals) if v == best]
+        if len(tied) > 1:
+            ties.append(len(played))
+        j = tied[int(rng.integers(len(tied)))]    # always drawn, tie or not
+        g = cands[j][int(rng.integers(len(cands[j])))]
+
+
+def ref_avg_remaining(pool_words, cand_words):
+    """`a(g)` for each pool word, by bucketing candidate WORDS from strings.
+
+    The all-green bucket is skipped rather than squared, which is the same thing:
+    `pattern(g, w)` is all-green only when w IS g, so that bucket never holds more
+    than one word.  The denominator is still every candidate.
+    """
+    m = len(cand_words)
+    out = []
+    for g in pool_words:
+        buckets = {}
+        for w in cand_words:
+            p = pattern(g, w)
+            if p != ALL_GREEN:
+                buckets[p] = buckets.get(p, 0) + 1
+        out.append(sum(n * n for n in buckets.values()) / m)
+    return out
+
+
+def ref_lex_choice(vals_by_board):
+    """The lexicographically smallest sorted column, ties on the lowest index."""
+    best = None
+    besti = -1
+    for i in range(len(vals_by_board[0])):
+        col = sorted(v[i] for v in vals_by_board)
+        if best is None or col < best:
+            best, besti = col, i
+    return besti
+
+
+def reference_minavg(mystery, answer_words, opening, pool_words, lex_ties):
+    """`minavg` from strings only, over whatever pool it is handed."""
+    k = len(answer_words)
+    cands = [list(mystery) for _ in range(k)]
+    solved = [False] * k
+    played = []
+    pending = list(opening)
+    g = pending.pop(0)
+    while True:
+        played.append(g)
+        for j in range(k):
+            if solved[j]:
+                continue
+            fb = pattern(g, answer_words[j])
+            if fb == ALL_GREEN:
+                solved[j] = True
+                continue
+            cands[j] = [w for w in cands[j] if pattern(g, w) == fb]
+        if all(solved):
+            return played
+        if pending:
+            g = pending.pop(0)
+            continue
+        vals = [ref_avg_remaining(pool_words, cands[j])
+                for j in range(k) if not solved[j]]
+        lo = min(min(v) for v in vals)
+        firsts = sum(1 for i in range(len(pool_words))
+                     if min(v[i] for v in vals) == lo)
+        if firsts > 1:
+            lex_ties.append(firsts)          # the smallest value did not decide
+        g = pool_words[ref_lex_choice(vals)]
+
+
+def check_ranking():
+    ranking = mw.load_singleton_ranking()
+    hand_s = hand_c = 0
+    rows = 0
+    with open(mw.RANKING_CSV) as f:
+        head = None
+        for line in f:
+            if line.startswith("#") or not line.strip():
+                continue
+            cols = [c.strip() for c in line.split(",")]
+            if head is None:
+                head = {c: i for i, c in enumerate(cols)}
+                continue
+            rows += 1
+            if (int(cols[head["greens"]]), int(cols[head["yellows"]])) == (0, 0):
+                hand_s += int(cols[head["singles"]])
+                hand_c += int(cols[head["cases"]])
+    check("the ranking pools LEVELS by summing singles and cases",
+          ranking[(0, 0)] == Fraction(hand_s, hand_c),
+          "all-gray: %d/%d over %d rows" % (hand_s, hand_c, rows))
+    check("the ranking is an exact Fraction, so a tie is a real tie",
+          all(isinstance(v, Fraction) for v in ranking.values())
+          and ranking[(4, 1)] == ranking[(5, 0)] == 1,
+          "(4,1) and (5,0) both exactly 1")
+
+    # the float table the kernel uses must not merge or split any pair
+    tab = mf.ranking_table(ranking)
+    keys = sorted(ranking)
+    bad = []
+    for i, x in enumerate(keys):
+        for y in keys[i + 1:]:
+            e = (ranking[x] > ranking[y]) - (ranking[x] < ranking[y])
+            fx, fy = float(tab[x]), float(tab[y])
+            if (int(fx > fy) - int(fx < fy)) != e:
+                bad.append((x, y))
+    check("the kernel's float ranking has the same order AND ties as the exact one",
+          not bad, "%d compositions, %d pairs compared"
+          % (len(keys), len(keys) * (len(keys) - 1) // 2))
+
+
+def check_srank(guesses, mystery, pat, ans2g, games):
+    ranking = mw.load_singleton_ranking()
+    ties = []
+    unranked = 0
+    for k in (2, 4, 8):
+        for opening in (["laten"], ["clint", "soare"]):
+            og = [guesses.index(w) for w in opening]
+            seed = 20260909 + k + 10 * len(opening)
+            rule = mw.make_rule(mw.SRANK, guesses=guesses, ranking=ranking)
+            rng = np.random.default_rng(seed)
+            fast = []
+            for _ in range(games):
+                a = draw_answers(len(mystery), k, rng)
+                fast.append([guesses[g] for g in
+                             play_game(pat, ans2g, a, og, rng, rule)])
+            unranked += rule.unranked
+            rng = np.random.default_rng(seed)
+            ref = []
+            for _ in range(games):
+                a = draw_answers(len(mystery), k, rng)
+                ref.append(reference_srank(mystery, [mystery[i] for i in a],
+                                           opening, rng, ranking, ties))
+            check("srank k=%d, %d-word opening: %d games identical to the "
+                  "string replay" % (k, len(opening), games), fast == ref)
+    check("srank's random board tie-break was exercised",
+          len(ties) > 0, "%d tied turns" % len(ties))
+    check("no board ever reached a composition the ranking does not carry",
+          unranked == 0, "%d unranked states" % unranked)
+
+    # At k=1 srank IS greedy AS A STRATEGY: the only board is trivially both the
+    # fewest-candidate board and the best-ranked one, and no tie can arise.  They
+    # are NOT the same sample path under one coin-flip stream, though, because
+    # srank spends two draws per turn (tie-break then pick) and greedy one -- so
+    # the comparison feeds greedy exactly srank's PICK draws, the odd-indexed
+    # ones.  Getting that wrong is what this check caught the first time it ran.
+    og = np.array([guesses.index("laten")], dtype=np.int64)
+    rankval = mf.ranking_table(ranking)
+    letters = mf.guess_letter_table(guesses)
+    same = odd_used = True
+    for gi in range(30):
+        a = np.asarray(draw_answers(len(mystery), 1,
+                                    np.random.default_rng([77, gi])),
+                       dtype=np.int64)
+        fl = np.random.default_rng([77, gi, 1]).random(512)
+        buf = np.empty(mf.turn_bound(1, 1), dtype=np.int64)
+        n1 = mf.play_pick(pat, ans2g, a, og, mf.PICK_SRANK, rankval, letters,
+                          fl, buf)
+        srank_seq = list(buf[:n1])
+        n2 = mf.play_pick(pat, ans2g, a, og, mf.PICK_GREEDY, rankval, letters,
+                          np.ascontiguousarray(fl[1::2]), buf)
+        if srank_seq != list(buf[:n2]):
+            same = False
+    check("at k=1 srank is greedy, once its extra tie-break draw is accounted "
+          "for (30 games)", same and odd_used)
+
+
+def check_minavg(guesses, mystery, pat, ans2g):
+    # A POOL THAT DOES NOT COVER THE ANSWERS IS REFUSED, not run: the rule is
+    # deterministic, so a board no pool word splits would make it replay one
+    # guess forever.  This is a constructed case -- the pool we ship is all 12972
+    # guesses, which contain every answer, so it could never arise on its own.
+    refused = False
+    try:
+        mw.make_rule(mw.MINAVG, pool=np.arange(0, len(guesses), 37),
+                     answers_g=ans2g)
+    except ValueError:
+        refused = True
+    check("minavg refuses a pool that omits answer words (it could not "
+          "terminate)", refused)
+
+    # whole games against the string replay, on the ANSWERS as the pool: covers
+    # the answers so it terminates, is a legitimate pool, and is 5.6x cheaper for
+    # the O(pool x candidates) string reference than the full guess list.
+    pool_idx = np.sort(np.asarray(ans2g, dtype=np.int64))
+    pool_words = [guesses[i] for i in pool_idx]
+    lex_ties = []
+    for k in (1, 2):
+        og = [guesses.index("laten")]
+        rule = mw.make_rule(mw.MINAVG, pool=pool_idx, answers_g=ans2g)
+        fast, ref = [], []
+        for gi in range(2):
+            a = draw_answers(len(mystery), k, np.random.default_rng([31, gi]))
+            fast.append([guesses[g] for g in
+                         play_game(pat, ans2g, a, og, None, rule)])
+            ref.append(reference_minavg(mystery, [mystery[i] for i in a],
+                                        ["laten"], pool_words, lex_ties))
+        check("minavg k=%d: 2 games identical to the string replay" % k,
+              fast == ref, "" if fast == ref else "%s vs %s" % (fast[0], ref[0]))
+    check("minavg's lexicographic tie-break was exercised (the smallest value "
+          "alone did not decide)", len(lex_ties) > 0,
+          "%d such turns, up to %d words tied on the minimum"
+          % (len(lex_ties), max(lex_ties) if lex_ties else 0))
+
+    # average_remaining itself, on the FULL 12972 pool, recomputed from strings
+    full = np.arange(len(guesses))
+    row = pat[guesses.index("laten")]
+    for p in (int(row[11]), int(row[404])):
+        idx = np.flatnonzero(row == p)
+        got = mw.average_remaining(pat, full, idx)
+        want = ref_avg_remaining(guesses, [mystery[i] for i in idx])
+        check("average_remaining matches a from-strings bucket count "
+              "(pattern %d, %d candidates, all %d guesses)"
+              % (p, len(idx), len(guesses)),
+              np.allclose(got, want, rtol=0, atol=1e-12))
+
+    # a singleton board's own word scores 0 and nothing else scores less: that is
+    # what stops minavg stalling on a board it has already pinned down
+    one = np.array([7])
+    vals = mw.average_remaining(pat, full, one)
+    w = int(ans2g[7])
+    check("a singleton board scores 0 for its own word and 1 for every other",
+          vals[w] == 0.0 and set(np.delete(vals, w)) == {1.0},
+          "answer %s" % mystery[7])
+
+
+def check_kernels(guesses, mystery, pat, ans2g):
+    ranking = mw.load_singleton_ranking()
+    rankval = mf.ranking_table(ranking)
+    letters = mf.guess_letter_table(guesses)
+    bad = 0
+    n = 0
+    for mode, name in ((mf.PICK_GREEDY, mw.GREEDY), (mf.PICK_SRANK, mw.SRANK)):
+        for k in (1, 2, 4, 8, 16):
+            og = np.array([guesses.index("laten")], dtype=np.int64)
+            for gi in range(4):
+                a = draw_answers(len(mystery), k, np.random.default_rng([5, gi]))
+                a64 = np.asarray(a, dtype=np.int64)
+                fl = np.random.default_rng([5, gi, race.PICK_OFFSET]).random(512)
+                played = np.empty(mf.turn_bound(k, 1), dtype=np.int64)
+                nn = mf.play_pick(pat, ans2g, a64, og, mode, rankval, letters,
+                                  fl, played)
+                rule = None if name == mw.GREEDY else \
+                    mw.make_rule(mw.SRANK, guesses=guesses, ranking=ranking)
+                ref = play_game(pat, ans2g, a, og,
+                                mw.CoupledRng(np.random.default_rng(
+                                    [5, gi, race.PICK_OFFSET])), rule)
+                n += 1
+                if list(played[:nn]) != ref:
+                    bad += 1
+    check("the numba kernels match the reference guess for guess (%d games, "
+          "greedy and srank, k=1..16)" % n, bad == 0, "%d mismatches" % bad)
+
+    # the turn-2 memo is memoisation and nothing else
+    pool = np.arange(len(guesses), dtype=np.int64)
+    og = np.array([guesses.index("laten")], dtype=np.int64)
+    t2 = mf.turn2_table(pat, int(og[0]), pool)
+    row = pat[og[0]]
+    p = int(row[3])
+    idx = np.flatnonzero(row == p)
+    check("the turn-2 table equals average_remaining on the opener's bucket",
+          np.array_equal(t2[p], mw.average_remaining(pat, pool, idx)))
+    agree = True
+    for k in (1, 2, 4):
+        for gi in range(3):
+            a = draw_answers(len(mystery), k, np.random.default_rng([13, gi]))
+            a64 = np.asarray(a, dtype=np.int64)
+            played = np.empty(mf.turn_bound(k, 1), dtype=np.int64)
+            vals = np.empty((k, len(pool)))
+            cur, best = np.empty(k), np.empty(k)
+            n1 = mf.play_minavg(pat, a64, og, pool, t2, True, played, vals,
+                                cur, best)
+            with_memo = list(played[:n1])
+            n2 = mf.play_minavg(pat, a64, og, pool, t2, False, played, vals,
+                                cur, best)
+            without = list(played[:n2])
+            ref = play_game(pat, ans2g, a, og, None,
+                            mw.make_rule(mw.MINAVG, pool=pool,
+                                         answers_g=ans2g))
+            if not (with_memo == without == ref):
+                agree = False
+    check("minavg agrees three ways: memoised kernel, bare kernel, reference",
+          agree)
+
+
+def check_race(guesses, mystery):
+    # the elimination arithmetic, on rows made by hand
+    n = 100
+    # opening 1 is +0.5 in EVERY game: sum(d)=50 and sum(d^2)=n*mean^2=25, so the
+    # variance is exactly 0.  Opening 2 is +0.5 on average with real spread.
+    # Opening 3 is ahead of the leader.
+    sum_d = np.array([0.0, 50.0, 50.0, -10.0])
+    sumsq_d = np.array([0.0, 25.0, 500.0, 20.0])
+    md, se = race.paired_error(sum_d, sumsq_d, n)
+    # opening 1 is +0.5 with no spread at all -> infinitely many sigma behind;
+    # opening 2 is +0.5 with real spread; opening 3 is ahead of the leader
+    check("a paired difference with zero variance has zero standard error",
+          md[1] == 0.5 and se[1] < 1e-12 and md[0] == 0.0 and se[0] == 0.0,
+          "an opening worse in every game leaves on the mean alone")
+    check("the 5-sigma cut drops the noiseless laggard and keeps the noisy one",
+          bool((md - 5 * se > 0)[1]) and not bool((md - 5 * se > 0)[2])
+          and not bool((md - 5 * se > 0)[3]),
+          "se: %.4f vs %.4f" % (se[1], se[2]))
+
+    # every opening must face the SAME games and the SAME coin flips
+    a1, f1 = race.make_games(len(mystery), 3, 7, 0, 5, 64)
+    a2, f2 = race.make_games(len(mystery), 3, 7, 0, 5, 64)
+    check("the race's games are a function of (seed, game index) alone",
+          np.array_equal(a1, a2) and np.array_equal(f1, f2))
+    a3, f3 = race.make_games(len(mystery), 3, 7, 0, 9, 128)
+    check("regrowing the coin-flip array extends the same stream",
+          np.array_equal(f1, f3[:5, :64]) and np.array_equal(a1, a3[:5]))
+
+    # pairing must actually be tighter than not pairing, or it buys nothing
+    # row 1 tracks row 0 without shadowing it (the difference varies), so the
+    # paired error is smaller than the unpaired one WITHOUT being trivially zero;
+    # row 2 is uncorrelated, which is what pairing cannot help with.
+    hist = np.array([[5, 6, 7, 6, 5, 8, 6, 7],
+                     [6, 7, 9, 7, 6, 10, 7, 8],
+                     [9, 4, 8, 5, 9, 6, 4, 9]], dtype=np.int16)
+    tot, sq, sd, ssd = race.history_paired(hist, 8, 0)
+    md, se = race.paired_error(sd, ssd, 8)
+    mean, ose = race.own_error(tot, sq, 8)
+    check("pairing is tighter than the unpaired error for a correlated opening, "
+          "without being degenerately zero",
+          0 < se[1] < ose[1] and abs(md[1] - (mean[1] - mean[0])) < 1e-12,
+          "paired se %.4f vs own se %.4f; uncorrelated row %.4f vs %.4f"
+          % (se[1], ose[1], se[2], ose[2]))
+    check("the pairwise sums equal the history they replace",
+          abs(sd[2] - (hist[2].astype(float) - hist[0]).sum()) < 1e-9
+          and abs(ssd[2] - ((hist[2].astype(float) - hist[0]) ** 2).sum()) < 1e-9)
+
+    # a race resumed, and a race switched to pairwise sums, must both be exact
+    loc = os.path.join("data", "local", "multiwordle")
+    os.makedirs(loc, exist_ok=True)
+    field = os.path.join(loc, "_checkfield.txt")
+    with open(field, "w") as f:
+        f.write("\n".join(guesses[i] for i in range(0, len(guesses), 500)) + "\n")
+
+
+    def paths(tag):
+        out = os.path.join(loc, "_checkrace_%s.csv" % tag)
+        return (out, out[:-4] + "_eliminations.csv",
+                os.path.join(loc, "_checkrace_%s.npz" % tag))
+
+    def wipe(tag):
+        for q in paths(tag):
+            if os.path.exists(q):
+                os.remove(q)
+
+    def run(tag, max_games, pair_at):
+        """One race, with its console output captured so the gate can assert on
+        what it says as well as what it writes."""
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            race.main(["--strategy", "srank", "-k", "3", "--openings", field,
+                       "--max-games", str(max_games), "--pair-at", str(pair_at),
+                       "--chunk", "5", "--report", "1e9", "--seed", "3",
+                       "--out", paths(tag)[0]])
+        return buf.getvalue()
+
+    def body(tag):
+        return [ln for ln in open(paths(tag)[0]) if not ln.startswith("# race_")]
+
+    for tag in ("whole", "split", "switch"):
+        wipe(tag)
+    said = {}
+    said["whole"] = run("whole", 800, 0)
+    run("split", 400, 0)                       # stop early ...
+    said["split"] = run("split", 800, 0)       # ... then resume into the same file
+    said["switch"] = run("switch", 800, 9999)
+
+    check("a race resumed from its checkpoint equals an uninterrupted one",
+          body("split") == body("whole"),
+          "resumed at %s" % ("yes" if "resuming" in said["split"] else "NO -- "
+                             "it started over, so this proves nothing"))
+    check("the resumed run really did resume rather than start again",
+          "resuming" in said["split"])
+    check("switching to pairwise sums changes no result",
+          body("switch") == body("whole"))
+    # ... and the switch must actually have happened, or the check above is
+    # comparing two identical code paths and says nothing
+    check("the pairwise switch fired in the switch run and not in the other",
+          "switched to pairwise" in said["switch"]
+          and "switched to pairwise" not in said["whole"])
+    elim = open(paths("whole")[1]).read().strip().split("\n")
+    check("the race eliminated openings and logged every one of them",
+          len(elim) > 2 and elim[1].startswith("opening,"),
+          "%d rows in the eliminations log" % (len(elim) - 2))
+
+    for tag in ("whole", "split", "switch"):
+        wipe(tag)
+    os.remove(field)
 
 
 if __name__ == "__main__":

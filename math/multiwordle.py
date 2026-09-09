@@ -92,10 +92,17 @@ DIFFERENT REASONS and the argument does not transfer, so both are written out.
   own reply against itself is all-green).
 
   `minavg`: nothing guarantees the played word is anybody's candidate, so that
-  argument is GONE.  What replaces it: let `m_j` be board j's candidate count and
-  `b` a board attaining the smallest of them.  Playing any candidate `h` of board
-  b gives `a_b(h) < m_b`, so the chosen `g*`, which minimises the smallest
-  average-remaining, satisfies `min_j a_j(g*) <= min_j a_j(h) < m_b = min_j m_j`.
+  argument is GONE, and what replaces it HAS A PRECONDITION -- the pool must
+  contain every answer word.  That holds for the pool we ship (all 12972 legal
+  guesses, which contain all 2315 answers) but it is not free, and a restricted
+  pool really can hang: if no pool word splits any board, every board keeps its
+  candidates, the state is unchanged, and a DETERMINISTIC rule then plays the same
+  word forever.  `MinAvg` refuses such a pool rather than looping.  Given the
+  precondition: let `m_j` be board j's candidate count and `b` a board attaining
+  the smallest of them.  Board b's own candidates are answers, hence in the pool,
+  and playing any candidate `h` of board b gives `a_b(h) < m_b`, so the chosen
+  `g*`, which minimises the smallest average-remaining, satisfies
+  `min_j a_j(g*) <= min_j a_j(h) < m_b = min_j m_j`.
   The board `j*` attaining that minimum therefore has `a_{j*}(g*) < m_{j*}`,
   which happens only when `g*` splits board j* into at least two buckets
   (counting the all-green one) -- so board j* is either solved or left a PROPER
@@ -368,15 +375,29 @@ class MinAvg:
     than once per game.  It is pure memoisation: `multiwordle_fast.turn2_table`
     builds it with the same `average_remaining`, and the gate diffs a run using
     it against a run without.
+
+    `answers_g` is the guess index of every answer word (`answer_to_guess`), and
+    it is REQUIRED because it is the termination precondition: a pool missing an
+    answer can leave a board that no pool word splits, and the rule -- being
+    deterministic -- then replays the same word forever rather than failing.  So
+    an uncovered pool is refused here, where the message can say why, instead of
+    hanging thousands of games later.
     """
 
     name = MINAVG
     needs_composition = False
 
-    def __init__(self, pool, turn2=None):
+    def __init__(self, pool, answers_g, turn2=None):
         self.pool = np.asarray(pool, dtype=np.int64)
         if np.any(np.diff(self.pool) <= 0):
             raise ValueError("the minavg pool must be ascending guess indices")
+        missing = np.setdiff1d(np.asarray(answers_g, dtype=np.int64), self.pool)
+        if len(missing):
+            raise ValueError(
+                "the minavg pool omits %d answer words, so a board none of its "
+                "words splits would never shrink and the rule would replay one "
+                "guess forever -- see the termination argument in the module "
+                "docstring" % len(missing))
         self.turn2 = turn2
 
     def choose(self, pat, ans2g, alive, solved, states, played, rng):
@@ -393,7 +414,8 @@ class MinAvg:
         return int(self.pool[lexicographic_argmin(vals)])
 
 
-def make_rule(name, guesses=None, ranking=None, pool=None, turn2=None):
+def make_rule(name, guesses=None, ranking=None, pool=None, answers_g=None,
+              turn2=None):
     """Build a rule by name.  Never defaulted by a caller: the name is the
     experiment, and a run whose file does not say which rule produced it is
     ambiguous forever."""
@@ -405,9 +427,10 @@ def make_rule(name, guesses=None, ranking=None, pool=None, turn2=None):
         letters = [[ord(c) - 97 for c in w] for w in guesses]
         return SingletonRank(letters, ranking or load_singleton_ranking())
     if name == MINAVG:
-        if pool is None:
-            raise ValueError("minavg needs a pool of guess indices")
-        return MinAvg(pool, turn2)
+        if pool is None or answers_g is None:
+            raise ValueError("minavg needs a pool of guess indices and the "
+                             "answers' guess indices (the pool must cover them)")
+        return MinAvg(pool, answers_g, turn2)
     raise ValueError("unknown strategy %r (have %s)"
                      % (name, ", ".join(STRATEGIES)))
 
