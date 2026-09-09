@@ -236,6 +236,55 @@ detail. Run it with **`bash solver/run-mm-sweep.sh --depth D [-k K]`** (from `ma
   rule** (see below) — it checks hard-mode legality, so it cannot fully validate
   an ultra tree.
 
+## `--order` — the opener DISPATCH ORDER, and why bisection is OPT-IN
+Three values, and they change **WHEN** a result lands, never **WHAT** it is —
+every opener is examined either way and the totals are identical. What the order
+decides is what a STOPPED run holds and how early the incumbent starts pruning.
+- **`ssq` — the DEFAULT everywhere: ascending split score, best splitters first.**
+  In `wturns` that score is the WEIGHTED one (`sum over LOSING bins of bin size x
+  bin weight`, win excluded); elsewhere it is the sum of squared bin sizes. **The
+  flag NAME is inherited and is wrong in the weighted binary** — it is not a sum
+  of squares there — but the behaviour is as documented in the `wturns` section.
+- **`lb` — ascending root lower bound. `--optimal-only` ONLY.** It is the one
+  order under which the first opener bounding above the incumbent proves the
+  whole TAIL is worse. On the plain `--sweep` there is no such walk, so `lb` is a
+  no-op and the binary now SAYS SO rather than accepting it silently.
+- **`bisect` — the ssq sort with a BISECTION dispatch** (ends, median, quartiles,
+  odd eighths), so a stopped run is a stratified sample of the whole difficulty
+  range instead of a prefix of the easy end. **That is the only thing it buys,
+  and it is worth buying only while somebody is READING the partial distribution
+  as the run goes.** It costs real time: the SECOND opener dispatched is the
+  worst-partitioned word in the list (`immix` on the full guess list), so the
+  incumbent driving every lower-bound cutoff arrives late.
+- **IT IS OPT-IN AND MUST STAY OPT-IN — `run-hard-sweep.sh` is the ONLY wrapper
+  that passes it** (user's call, 2026-09-09). It was written FOR the hard sweep,
+  where the in-flight distribution is the thing being watched, and then hardcoded
+  into BOTH `sweep_order()` call sites — so from 2026-08-26 every other sweep
+  silently paid its cost, and `run-wturns-sweep.sh`, `run-length-sweep.sh` and
+  the solver's own `optimal-only:` banner all went on describing ascending order
+  while the code bisected. **Textbook § shared-helper failure: one caller's need
+  became every caller's behaviour**, and it is the same shape as the `--tt-save`
+  sweep. Do NOT hardcode `sweep_order(1)` again; pass the caller's own choice.
+- **It is REFUSED alongside `--topk`**, which means the K BEST splitters —
+  bisection would hand it a spread across the difficulty range instead. That
+  exact combination shipped once and at `-k 2` examined the single WORST opener.
+- **The run STATES its order in the log (`order: NAME`, beside `threads:`), and
+  the name is the order that will actually RUN, not the flag as typed** (the two
+  paths do not offer the same choice). `inflight.py` and `passes.py` READ that
+  line, because they reproduce the dispatch to name which opener each thread is
+  on — a divergence there reports the wrong WORDS rather than failing. **A log
+  with no `order:` line predates the flag and WAS bisected**; both tools assume
+  that and say so, and `passes.py` (which is entirely bisection levels) refuses a
+  straight-sorted run instead of inventing levels for it.
+- **`python3 math/tools/checkorder.py` is the GATE** — runs the mini `--data`
+  problem single-threaded, so the CSV append order IS the dispatch order, and
+  checks: the DEFAULT is not the bisection, `ssq` walks the re-derived sort,
+  the C bisection matches `inflight.py`'s Python mirror index for index, the
+  logged `order:` name matches the sequence actually produced, and — the free
+  oracle — that all three orders give byte-identical totals for every opener and
+  the same `--optimal-only` winner. **Coverage is asserted**: it FAILS if the
+  orders never actually differed. Run it alongside `solver/validate.sh`.
+
 ## `ultraturns` — ULTRA HARD MODE, stricter than hard mode
 - **`optturns.c` now builds a FOURTH binary, `ultraturns` (`-DULTRA`)** — a legal
   guess must itself be **CONSISTENT with every clue so far** (a word the answer
@@ -1023,6 +1072,12 @@ search under a different COST, not a program of its own. `sh build.sh` builds it
     (`--order lb`) lets the first opener bounding above the incumbent prove the whole
     TAIL is worse. Under `ssq` a stopped run holds **"the best of those examined so
     far"** — probably the optimum, never proved to be. Say it that way.
+  - **THIS WAS NOT TRUE UNTIL 2026-09-09**: the shared `sweep_order()` bisected
+    unconditionally, so the sweep dispatched {easiest, HARDEST, median, ...} while
+    this bullet and the wrapper header both claimed ascending. Nothing was wrong
+    with any TOTAL — the order cannot change one — but "a halted run probably
+    already holds the optimum" was false, and the second opener examined was the
+    worst splitter in the list. See § `--order`.
 - **Run it with `bash solver/run-wturns-sweep.sh --weights <stem> --depth D`** (from
   `math/`), attached, tee'd log. `--opener W` (repeatable) prices ONE opener exactly
   instead of sweeping — much cheaper, exact for that opener, an upper bound on the

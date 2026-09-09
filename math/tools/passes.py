@@ -1,10 +1,16 @@
 """How far the sweep has got through each PASS of the dispatch bisection.
 
-The solver does not walk the opener list end to end. `sweep_order()` sorts the
-12972 openers by fewest expected survivors and then DISPATCHES them by bisecting
-that sorted list: both ends first, then the median, then the quartiles, then the
-octiles, and so on down. Each of those is a "pass" -- a level of the bisection
-that samples the whole list at twice the previous resolution.
+ONLY MEANINGFUL FOR A SWEEP RUN UNDER `--order bisect`, which is opt-in and
+today means the hard-mode sweep alone. A sweep walking the sort straight down
+has no passes to be at -- its progress IS the headline count -- so this refuses
+such a run rather than printing levels it invented. Check with `report.py`.
+
+Under bisection the solver does not walk the opener list end to end.
+`sweep_order()` sorts the 12972 openers by fewest expected survivors and then
+DISPATCHES them by bisecting that sorted list: both ends first, then the median,
+then the quartiles, then the octiles, and so on down. Each of those is a "pass"
+-- a level of the bisection that samples the whole list at twice the previous
+resolution.
 
 That makes progress two-dimensional. The headline count says how many openers
 are done; this says WHERE they are. A level that is 100% complete means the
@@ -25,7 +31,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from inflight import run_header, sweep_order
+from inflight import log_order, order_was_logged, run_header, sweep_order
 from paths import CSV_PATH, read_rows
 
 
@@ -86,7 +92,7 @@ def passes():
     done = set(rows)
     _, resumed, _, _ = run_header()
     this_run = set(rows[resumed:])
-    order = sweep_order()
+    order = sweep_order("bisect")
     labels = emit_levels(len(order))
     out, seen = [], {}
     for word, label in zip(order, labels):
@@ -114,7 +120,7 @@ def check():
     that distinguishes the two cases.
     """
     done = {r["word"] for r in read_rows(CSV_PATH)}
-    order = sweep_order()
+    order = sweep_order("bisect")
     n, d = len(order), len(done)
     print("done=%d of %d (%.1f%%)  -- expect ~100%% inside a prefix of %d"
           % (d, n, 100.0 * d / n, d))
@@ -150,7 +156,30 @@ def check():
               % (name, " ".join(line)))
 
 
+def require_bisection():
+    """Refuse a sweep that was not dispatched by bisection.
+
+    Every number this tool prints is a position in the bisection, so running it
+    on a straight-sorted sweep would attribute words to levels that had nothing
+    to do with the dispatch -- wrong, and wrong in a way that reads as a normal
+    table.  A log with no `order:` line predates the flag, when every sweep was
+    bisected; that is accepted, and said out loud.
+    """
+    order = log_order()
+    if order != "bisect":
+        print("this sweep ran with --order %s, not --order bisect." % order)
+        print("There are no bisection passes to report -- its dispatch is the")
+        print("sort walked straight down, so the headline count IS the position.")
+        print("Use report.py.")
+        sys.exit(1)
+    if not order_was_logged():
+        print("NOTE: this log states no `order:` line, so it predates the flag;")
+        print("      every sweep was bisected then and that is what is assumed.")
+        print()
+
+
 def main():
+    require_bisection()
     if "--check" in sys.argv:
         check()
         return

@@ -132,7 +132,20 @@ WARM=""
 echo "[$(date -Is)] resuming wordle HARD sweep ($PHASE, threads=$THREADS, tt-bits=$TTBITS, depth=$DEPTH..$DEPTHMAX) $WARM" \
     | tee -a "$LOC/sweep.log"
 
-"${NICE[@]}" ./solver/hardturns --sweep \
+# --order bisect: THIS SWEEP IS THE ONE THAT WANTS IT, and it is now the only
+# one that gets it.  The opener list is still sorted by split score; bisection
+# changes the DISPATCH to ends, median, quartiles, odd eighths, so the solved
+# subset is a stratified sample of the whole difficulty range at every moment
+# rather than a prefix of the easy end.  That is what makes this run's in-flight
+# percentiles, histogram and worst-list mean anything -- and reading the partial
+# distribution while it runs is the point of the hard sweep.
+#
+# It COSTS early throughput (the second opener dispatched is the worst-
+# partitioned word in the list, so the incumbent that drives the lower-bound
+# cutoffs arrives late), which is exactly why it must be asked for and never
+# inherited.  It was hardcoded into both sweep call sites for a while, so every
+# other sweep silently paid that cost for reporting nobody was reading.
+"${NICE[@]}" ./solver/hardturns --sweep --order bisect \
     --out "$OUT" \
     --trees "$LOC/trees" \
     --depth "$DEPTH" --depth-max "$DEPTHMAX" \

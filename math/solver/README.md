@@ -703,15 +703,39 @@ LB skip live. In normal mode `--depth-max` defaults to `--depth`, and the
 escalation probe is skipped entirely when they are equal — without that skip, an
 infeasible FIRST opener would abort the whole run at a pinned cap.
 
-### `--order ssq` vs `--order lb`
+### `--order ssq` vs `--order lb` vs `--order bisect`
 
-Both examine every opener, so both are exact; only the visit order differs, and
-with it what a STOPPED run is worth.
+All three examine every opener, so all three are exact and give IDENTICAL totals;
+only the visit order differs, and with it what a STOPPED run is worth and how
+early the incumbent starts pruning.
 
 - `lb` — ascending root lower bound. Buys one extra thing: when an opener's bound
   exceeds the incumbent, every opener AFTER it is worse too, so the tail is free.
-- `ssq` — ascending sum of squared bin sizes, the evenest splitters first. No tail
-  proof, but it front-loads the openers that can actually win.
+  **`--optimal-only` only** — the plain `--sweep` has no such walk, and says so
+  rather than silently ignoring the flag.
+- `ssq` — ascending split score, the evenest splitters first. **The default.** No
+  tail proof, but it front-loads the openers that can actually win. In `wturns`
+  the score is the WEIGHTED one, so the flag name is a misnomer there.
+- `bisect` — the `ssq` sort with the dispatch BISECTED (ends, median, quartiles,
+  odd eighths), so a stopped run is a stratified sample of the whole difficulty
+  range rather than a prefix of the easy end. **Opt-in, and only the hard-mode
+  sweep asks for it.** It costs real throughput — the SECOND opener dispatched is
+  the worst-partitioned word in the list (`immix`) — so it is worth having only
+  while somebody is reading the partial distribution as the run goes. Refused
+  alongside `--topk`, which wants the K best rather than a spread.
+
+**It was not always opt-in, and that is the reason this section is explicit.**
+From 2026-08-26 the bisection was hardcoded into both `sweep_order()` call sites
+for the hard sweep's benefit, so every other sweep silently paid for it while
+this section, `run-wturns-sweep.sh` and `run-length-sweep.sh` all described
+ascending order. Totals were never affected; the claim about what a halted run
+holds was. `tools/checkorder.py` now gates the whole thing — including that the
+DEFAULT is not the bisection.
+
+Every run states its own order in the log (`order: NAME`, beside `threads:`), and
+`inflight.py` / `passes.py` read it: they reproduce the dispatch to name which
+opener each thread is on, so an assumed order would name the WRONG WORDS rather
+than fail. A log without that line predates the flag and was bisected.
 
 **Why `ssq` is the wrapper's default.** The tail proof is only worth having if the
 bound fires, and it does not: it is a counting bound running 8–14% under the true

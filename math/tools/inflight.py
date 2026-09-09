@@ -50,6 +50,44 @@ def log_threads(default=THREADS):
     return n
 
 
+def log_order(default="bisect"):
+    """The DISPATCH order the running sweep actually used: "bisect", "ssq" or "lb".
+
+    The bisection is no longer wired into every sweep -- it is `--order bisect`,
+    which only the hard-mode sweep passes -- so this can no longer be assumed.
+    Getting it wrong is silent and total: bisect() and the straight sort agree on
+    the SET and on almost nothing else, so the in-flight window would name the
+    wrong openers rather than fail.
+
+    The solver prints `order: NAME` at startup beside `threads:`, and that is
+    tee'd into sweep.log.  Last occurrence wins, as with the thread count.
+
+    A log with NO `order:` line predates the flag, and every sweep was bisected
+    then -- so the default reproduces those runs.  Callers that show the order to
+    a human should say when it was assumed rather than read.
+    """
+    order = default
+    try:
+        with open(LOG) as f:
+            for line in f:
+                if line.startswith("order:"):
+                    name = line.split(":", 1)[1].strip()
+                    if name in ("bisect", "ssq", "lb"):
+                        order = name
+    except OSError:
+        pass
+    return order
+
+
+def order_was_logged():
+    """True if the log states its dispatch order -- i.e. it is not a guess."""
+    try:
+        with open(LOG) as f:
+            return any(line.startswith("order:") for line in f)
+    except OSError:
+        return False
+
+
 def bisect(seq):
     """Ends, median, quartiles, odd eighths, ... -- mirror of bisect_emit() plus
     the level loop in optturns.c.
@@ -85,12 +123,17 @@ def bisect(seq):
     return out
 
 
-def sweep_order():
+def sweep_order(order=None):
     """Mirror of `sweep_order()` in optturns.c: the opener list sorted by fewest
     expected survivors (sum of squared pattern-class sizes, ties by index in
-    guess.txt), then DISPATCHED by bisection over that sorted list.
+    guess.txt), then dispatched in the order THIS RUN asked for.
 
-    Already-solved openers keep their slot in this order -- the bisection is over
+    `order` defaults to whatever the log says (log_order()): "bisect" walks ends,
+    median, quartiles, odd eighths; anything else walks the sort straight down,
+    best splitters first, which is the solver's default.  Passing it explicitly
+    is for the checks, which compare the two.
+
+    Already-solved openers keep their slot in this order -- the dispatch is over
     the whole list, so the sequence does not shift as the CSV fills; the solver
     skips them at dispatch via done[].
     """
@@ -110,7 +153,10 @@ def sweep_order():
     for g in range(len(words)):
         cnt = np.bincount(pat[g], minlength=NPAT).astype(np.int64)
         ss[g] = (cnt * cnt).sum()
-    return bisect([words[g] for g in np.lexsort((np.arange(len(words)), ss))])
+    srt = [words[g] for g in np.lexsort((np.arange(len(words)), ss))]
+    if order is None:
+        order = log_order()
+    return bisect(srt) if order == "bisect" else srt
 
 
 def csv_rows_in_order():

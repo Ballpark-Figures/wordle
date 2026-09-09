@@ -773,6 +773,26 @@ static pat_t *load_npy(const char *path, int *rows, int *cols) {
  * most when the run will be stopped before it finishes. */
 static int ORDER_SSQ = 0;
 
+/* --order bisect: DISPATCH order only -- the list is still sorted by the split
+ * score, but it is then walked ends, median, quartiles, odd eighths and so on,
+ * so a STOPPED run holds a stratified sample of the whole difficulty range
+ * instead of a prefix of the easy end.  That is what makes a partial sweep's
+ * percentiles and histogram mean something, and it is the ONLY thing it buys.
+ *
+ * IT IS OPT-IN, AND MUST STAY OPT-IN.  It costs real time: cheap openers are no
+ * longer front-loaded and the SECOND opener dispatched is the worst-partitioned
+ * word in the list, so the incumbent that drives every lower-bound cutoff
+ * arrives late.  It was written for the HARD-MODE sweep, where the partial
+ * distribution is the thing being read while the run is in flight; it was then
+ * hardcoded into every sweep path, which quietly made every other run slower
+ * and made three separate headers describe an order the code was not using.
+ * Default OFF: ascending split score, best splitters first. */
+static int ORDER_BISECT = 0;
+
+/* Was --order given at all?  Only used to decide whether to warn about a value
+ * the chosen path cannot honour -- never to change what runs. */
+static int order_set = 0;
+
 /* --print-openers: print a line for EVERY opener --optimal-only examines, not
  * only the ones that improve on the incumbent.  Off by default, so the existing
  * allwords / ansall logs stay byte-identical -- and because at 12972 openers in
@@ -2051,14 +2071,15 @@ static void bisect_emit(int64_t *out, int *m, unsigned char *seen,
     out[(*m)++] = sorted[idx];
 }
 
-/* Sweep order: BISECTION over the difficulty-sorted opener list.
+/* Sweep order: the difficulty-sorted opener list, dispatched straight down by
+ * DEFAULT, or BISECTED when a caller asks for it (`--order bisect`).
  *
- * The list is still sorted by fewest expected survivors (sum of squared
- * pattern-class sizes, ties by guess index) -- that part is unchanged. What
- * changed is the order the sorted list is DISPATCHED in: ends first, then the
- * median, then the quartiles, then the odd eighths, and so on.
+ * The list is sorted by fewest expected survivors (sum of squared pattern-class
+ * sizes, ties by guess index) either way; the option changes only the order that
+ * sorted list is DISPATCHED in -- ends first, then the median, then the
+ * quartiles, then the odd eighths, and so on.
  *
- * WHY. Straight best-first order makes every partial result biased: the solved
+ * WHY ANYONE WOULD WANT IT. Straight best-first order makes every partial result biased: the solved
  * subset is always the easy end, so percentiles over it are meaningless, the
  * histogram's hard tail stays empty until the run is nearly over, and the worst
  * list churns constantly because the bad openers all arrive last. Bisection
@@ -2082,14 +2103,24 @@ static void bisect_emit(int64_t *out, int *m, unsigned char *seen,
  * by less than 1 and every index has been emitted; the trailing loop is a
  * belt-and-braces fill in case that ever stops holding. */
 /* `bisect`: dispatch order for the difficulty-sorted opener list.
- *   1 -- BISECTION (ends, median, quartiles ...), for the EXHAUSTIVE sweeps that
- *        examine every opener: a stopped run then holds a stratified sample of
- *        the whole difficulty range (see the block comment above).
- *   0 -- straight ASCENDING sum of squares (best splitters first), for --topk,
- *        which examines only the first K and therefore wants the K BEST, not the
- *        bisection's {easiest, HARDEST, ...}.  Reusing the bisection order here
- *        was a bug: at K=2 it dispatched the single WORST-partitioned opener as
- *        the second word (e.g. immix), the opposite of "top K by sum of squares".
+ *   1 -- BISECTION (ends, median, quartiles ...), OPT-IN via `--order bisect`
+ *        and today asked for by the hard-mode sweep alone: a stopped run then
+ *        holds a stratified sample of the whole difficulty range rather than a
+ *        prefix of the easy end (see the block comment above).  Only worth its
+ *        cost while somebody is READING that partial distribution as the run
+ *        goes.  Refused alongside --topk.
+ *   0 -- straight ASCENDING sum of squares (best splitters first).  THIS IS THE
+ *        DEFAULT for every caller; the bisection is requested with --order
+ *        bisect and nowhere assumes it.  It is what --topk needs (it examines
+ *        only the first K and therefore wants the K BEST, not the bisection's
+ *        {easiest, HARDEST, ...}), and it is what any run that will be judged on
+ *        its incumbent needs, since it finds a good bound first.
+ *
+ * A CALLER MUST PASS ITS OWN CHOICE THROUGH -- do NOT hardcode 1 here again.
+ * Bisection was added for the hard-mode sweep and then wired into both call
+ * sites unconditionally, so every other sweep silently got a dispatch order
+ * chosen for somebody else's reporting problem while three wrapper headers went
+ * on describing ascending order.  One caller's need is one caller's flag.
  */
 static int64_t *sweep_order(int bisect) {
     int64_t *ord = malloc(sizeof(int64_t) * NG);
@@ -2183,9 +2214,15 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--phantom-final")) PHANTOM = 1;
         else if (!strcmp(argv[i], "--order") && i + 1 < argc) {
             const char *o = argv[++i];
-            if (!strcmp(o, "ssq")) ORDER_SSQ = 1;
-            else if (!strcmp(o, "lb")) ORDER_SSQ = 0;
-            else { fprintf(stderr, "--order must be lb or ssq\n"); return 1; }
+            order_set = 1;
+            if (!strcmp(o, "ssq")) { ORDER_SSQ = 1; ORDER_BISECT = 0; }
+            else if (!strcmp(o, "lb")) { ORDER_SSQ = 0; ORDER_BISECT = 0; }
+            /* `bisect` is the ssq SORT with the bisection DISPATCH on top -- one
+             * name for the pair, because bisecting the lower-bound order would
+             * throw away the one thing that order is for (the first opener
+             * bounding above the incumbent proves the whole tail is worse). */
+            else if (!strcmp(o, "bisect")) { ORDER_SSQ = 1; ORDER_BISECT = 1; }
+            else { fprintf(stderr, "--order must be lb, ssq or bisect\n"); return 1; }
         }
         /* --length L selects the hello wordl lists and the matching pattern
          * matrix for that length.  It does NOT change WORDLEN -- that is fixed
@@ -2213,6 +2250,27 @@ int main(int argc, char **argv) {
     if (PRINT_OPENERS && !optonly)
         fprintf(stderr, "note: --print-openers only affects --optimal-only; "
                 "the plain sweep already prints every opener\n");
+
+    /* --order lb selects a SORT that only the --optimal-only path has (it is
+     * what lets a cutoff prove the whole tail is worse).  The plain sweep always
+     * walks the split-score sort, so `lb` there is a silent no-op -- name it,
+     * rather than let a run believe it asked for something. */
+    if (sweep && !optonly && ORDER_SSQ == 0 && !ORDER_BISECT && order_set)
+        fprintf(stderr, "note: --order lb has no effect on the plain --sweep "
+                "(no lower-bound walk there); dispatching in split-score order\n");
+
+    /* --topk keeps the K BEST splitters; bisection deliberately dispatches
+     * {easiest, HARDEST, median, ...}.  Combining them would examine K openers
+     * spread across the difficulty range and report the winner as though it were
+     * the best of the K best -- a wrong claim under a right-looking flag.  This
+     * exact combination shipped once, and at K=2 it examined the single WORST
+     * opener in the list. */
+    if (ORDER_BISECT && TOPK > 0) {
+        fprintf(stderr, "--order bisect cannot be combined with --topk: bisection "
+                "dispatches {easiest, hardest, median, ...} while --topk means the "
+                "K BEST splitters, so the K examined would not be the top K\n");
+        return 1;
+    }
 
 #ifdef MASTERMIND
     /* THE CAP IS PART OF THE OBJECTIVE, AND HERE IT BINDS.  Peg feedback has 20
@@ -2511,6 +2569,25 @@ int main(int argc, char **argv) {
     if (threads > 0) omp_set_num_threads(threads);
     fprintf(stderr, "threads: %d\n", omp_get_max_threads());
 #endif
+
+    /* STATE THE DISPATCH ORDER IN THE LOG.  inflight.py and passes.py have to
+     * reconstruct which opener each thread is on, which means reproducing this
+     * order exactly -- so it has to be readable from the run's own output rather
+     * than assumed.  A log with no `order:` line predates the flag and was
+     * bisected; the tools treat it that way and say so.
+     *
+     * IT NAMES THE ORDER THAT WILL ACTUALLY RUN, not the flag as typed.  The two
+     * paths do not offer the same choice: the plain sweep always sorts by split
+     * score (only the dispatch varies), while --optimal-only sorts by root lower
+     * bound unless asked otherwise.  Printing the raw flag would have reported
+     * `lb` for a plain sweep that was about to walk the split-score order --
+     * caught by tools/checkorder.py, which is the whole reason it compares the
+     * logged name against the sequence the run then produced. */
+    if (sweep) {
+        const char *oname = ORDER_BISECT ? "bisect"
+                          : (optonly ? (ORDER_SSQ || TOPK > 0 ? "ssq" : "lb") : "ssq");
+        fprintf(stderr, "order: %s\n", oname);
+    }
 
     if (nopen > 0) {
         Ctx *ctx = calloc(1, sizeof(Ctx));
@@ -2917,10 +2994,11 @@ int main(int argc, char **argv) {
              * openers EXAMINED, not the best of all NG. That is a weaker claim
              * than the exact sweep makes, and it is the point -- it is what lets
              * a small K finish. */
-            /* --topk wants the K BEST splitters (ascending ss, bisect=0); the
-             * exact --order ssq path examines every opener, so it keeps the
-             * bisection dispatch order for a stratified stopped-run sample. */
-            int64_t *so = sweep_order(TOPK > 0 ? 0 : 1);
+            /* The dispatch order is whatever was ASKED for: ascending split
+             * score by default (--order ssq, and the only thing --topk can mean),
+             * bisected only under --order bisect, which is refused alongside
+             * --topk above. */
+            int64_t *so = sweep_order(ORDER_BISECT);
             /* --order ssq is the SAME ordering with no truncation: every opener
              * is still examined, so the result is exact -- only the visit order
              * changes.  --topk is what makes the claim weaker, not this. */
@@ -2982,9 +3060,13 @@ int main(int argc, char **argv) {
         if (TOPK > 0)
             printf("optimal-only: top %d openers by sum of squared bins (of %d); best of these K, not of all %d\n",
                    nord, NG, NG);
+        else if (ORDER_BISECT)
+            printf("optimal-only: %d openers, split-score sort DISPATCHED BY BISECTION "
+                   "(all %d examined; exact; a stopped run is a stratified sample, "
+                   "NOT the best openers first)\n", nord, NG);
         else if (ORDER_SSQ)
-            printf("optimal-only: %d openers in ascending sum-of-squares order (all %d examined; exact)\n",
-                   nord, NG);
+            printf("optimal-only: %d openers in ascending split-score order, best splitters first "
+                   "(all %d examined; exact)\n", nord, NG);
         else
             printf("optimal-only: %d openers by ascending root LB (min %d = %.5f avg)\n",
                    nord, nord ? (int)(ord[0] >> 20) : 0,
@@ -3305,7 +3387,11 @@ int main(int argc, char **argv) {
     if (!out) { fprintf(stderr, "cannot append to %s\n", outpath); return 1; }
     if (ndone == 0) fprintf(out, "word,total,expected,depth,seconds\n");
 
-    int64_t *ord = sweep_order(1);   /* full sweep: bisection dispatch order */
+    /* Default ascending split score (best splitters first); bisection only when
+     * --order bisect asked for it.  The order cannot change a total -- every
+     * opener is examined either way -- it decides WHEN each lands, and therefore
+     * what a stopped run holds and how early the incumbent prunes. */
+    int64_t *ord = sweep_order(ORDER_BISECT);
     double t0 = now_s();
     int completed = 0;
 

@@ -95,16 +95,25 @@ done
 
 case "$LENGTH" in
     3|4|5|6|7|8|9|10|11) ;;
-    "") echo "usage: bash solver/run-length-sweep.sh --length <3..11> --depth <d> [--order ssq|lb]" >&2; exit 1 ;;
+    "") echo "usage: bash solver/run-length-sweep.sh --length <3..11> --depth <d> [--order ssq|lb|bisect]" >&2; exit 1 ;;
     *)  echo "unsupported length '$LENGTH' (3..11)" >&2; exit 1 ;;
 esac
 case "$DEPTH" in
     ''|*[!0-9]*) echo "--depth is required and must be a number (the cap IS the objective)" >&2; exit 1 ;;
 esac
 case "$ORDER" in
-    ssq|lb) ;;
-    *) echo "--order must be ssq or lb" >&2; exit 1 ;;
+    # bisect = the ssq sort with a BISECTION dispatch (ends, median, quartiles).
+    # Opt-in only: it trades early throughput for a stratified stopped-run
+    # sample, which is worth it only when the partial distribution is being read
+    # while the run is in flight.  It is refused alongside -k, since --topk means
+    # the K BEST splitters and bisection would hand it a spread instead.
+    ssq|lb|bisect) ;;
+    *) echo "--order must be ssq, lb or bisect" >&2; exit 1 ;;
 esac
+if [ "$ORDER" = bisect ] && [ "$TOPK" -gt 0 ]; then
+    echo "--order bisect cannot be combined with -k (topk wants the K BEST splitters)" >&2
+    exit 1
+fi
 case "$GUESSES" in
     guess|mystery) ;;
     *) echo "--guesses must be guess (full dictionary) or mystery (answer words only)" >&2; exit 1 ;;
