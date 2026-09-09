@@ -1,0 +1,12 @@
+# 2 free-standing green letters that PIN a single word.
+# uniqueness judged over the 2315 mystery answers; rows kept: only those whose word is a mystery answer.
+# the other 3 positions are UNCONSTRAINED -- the template says nothing about them, and no guess, grey or yellow is involved.
+# green letters: vowels only: a e i o u y (y counts as a vowel).
+# positions: 1-3. rows sorted by template (position then letter).
+# zipf is log10(occurrences per billion) from the committed guess_by_freq.txt; 0.00 means absent from wordfreq's list.
+# settings greens=2 pool=answers require=answer letters=vowels positions=1-3 sort=template pool_size=2315 rows=4
+template,positions,letters,word,zipf
+a.y..,1-3,ay,abyss,3.40
+i.y..,1-3,iy,idyll,2.44
+u.a..,1-3,ua,usage,4.23
+y.e..,1-3,ye,yield,4.16

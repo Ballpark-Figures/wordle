@@ -1,0 +1,65 @@
+# 3 free-standing green letters that PIN a single word.
+# uniqueness judged over the 12972 legal guess words; rows kept: only those whose word is a mystery answer.
+# the other 2 positions are UNCONSTRAINED -- the template says nothing about them, and no guess, grey or yellow is involved.
+# green letters: consonants only: b c d f g h j k l m n p q r s t v w x z (y is NOT among them -- it is a vowel here).
+# positions: 1-3-4. rows sorted by zipf DESCENDING, most common word first.
+# zipf is log10(occurrences per billion) from the committed guess_by_freq.txt; 0.00 means absent from wordfreq's list.
+# settings greens=3 pool=guesses require=answer letters=consonants positions=1-3-4 sort=zipf pool_size=12972 rows=57
+template,positions,letters,word,zipf
+r.gh.,1-3-4,rgh,right,5.96
+w.rl.,1-3-4,wrl,world,5.89
+m.gh.,1-3-4,mgh,might,5.66
+l.gh.,1-3-4,lgh,light,5.33
+f.gh.,1-3-4,fgh,fight,5.23
+t.tl.,1-3-4,ttl,title,5.10
+f.ls.,1-3-4,fls,false,4.63
+t.gh.,1-3-4,tgh,tight,4.57
+d.pt.,1-3-4,dpt,depth,4.55
+b.bl.,1-3-4,bbl,bible,4.54
+n.rs.,1-3-4,nrs,nurse,4.40
+r.gb.,1-3-4,rgb,rugby,4.40
+w.ls.,1-3-4,wls,welsh,4.15
+r.lp.,1-3-4,rlp,ralph,4.10
+n.nt.,1-3-4,nnt,ninth,4.07
+l.bb.,1-3-4,lbb,lobby,4.03
+m.ds.,1-3-4,mds,midst,3.89
+n.nj.,1-3-4,nnj,ninja,3.87
+m.pl.,1-3-4,mpl,maple,3.86
+v.dk.,1-3-4,vdk,vodka,3.83
+t.rb.,1-3-4,trb,turbo,3.74
+s.sh.,1-3-4,ssh,sushi,3.68
+m.nl.,1-3-4,mnl,manly,3.66
+c.ch.,1-3-4,cch,cache,3.63
+c.mf.,1-3-4,cmf,comfy,3.63
+s.vv.,1-3-4,svv,savvy,3.56
+s.gm.,1-3-4,sgm,sigma,3.51
+l.ps.,1-3-4,lps,lapse,3.49
+r.ns.,1-3-4,rns,rinse,3.48
+d.zz.,1-3-4,dzz,dizzy,3.43
+m.cc.,1-3-4,mcc,mecca,3.38
+f.sh.,1-3-4,fsh,fishy,3.28
+d.gm.,1-3-4,dgm,dogma,3.27
+l.wl.,1-3-4,lwl,lowly,3.27
+g.dl.,1-3-4,gdl,godly,3.26
+d.nd.,1-3-4,dnd,dandy,3.25
+w.gh.,1-3-4,wgh,wight,3.23
+n.dg.,1-3-4,ndg,nudge,3.22
+r.wd.,1-3-4,rwd,rowdy,3.21
+m.gm.,1-3-4,mgm,magma,3.19
+f.bl.,1-3-4,fbl,fable,3.16
+d.lv.,1-3-4,dlv,delve,3.14
+d.wr.,1-3-4,dwr,dowry,3.13
+h.wd.,1-3-4,hwd,howdy,3.08
+m.rp.,1-3-4,mrp,morph,3.07
+j.zz.,1-3-4,jzz,jazzy,3.00
+h.tl.,1-3-4,htl,hotly,2.93
+t.ps.,1-3-4,tps,tipsy,2.87
+s.rl.,1-3-4,srl,surly,2.85
+d.ml.,1-3-4,dml,dimly,2.79
+g.lc.,1-3-4,glc,gulch,2.78
+p.ns.,1-3-4,pns,pansy,2.77
+c.ct.,1-3-4,cct,cacti,2.75
+l.dl.,1-3-4,ldl,ladle,2.66
+d.cr.,1-3-4,dcr,decry,2.60
+b.lc.,1-3-4,blc,belch,2.27
+t.ld.,1-3-4,tld,tilde,2.19

@@ -1,0 +1,22 @@
+# 2 free-standing green letters that PIN a single word.
+# uniqueness judged over the 12972 legal guess words; rows kept: only those whose word is a mystery answer.
+# the other 3 positions are UNCONSTRAINED -- the template says nothing about them, and no guess, grey or yellow is involved.
+# green letters: consonants only: b c d f g h j k l m n p q r s t v w x z (y is NOT among them -- it is a vowel here).
+# positions: 2-4. rows sorted by zipf DESCENDING, most common word first.
+# zipf is log10(occurrences per billion) from the committed guess_by_freq.txt; 0.00 means absent from wordfreq's list.
+# settings greens=2 pool=guesses require=answer letters=consonants positions=2-4 sort=zipf pool_size=12972 rows=14
+template,positions,letters,word,zipf
+.b.v.,2-4,bv,above,5.20
+.x.s.,2-4,xs,exist,4.73
+.s.g.,2-4,sg,usage,4.23
+.w.f.,2-4,wf,swift,4.15
+.v.d.,2-4,vd,evade,3.39
+.t.h.,2-4,th,itchy,3.34
+.v.k.,2-4,vk,evoke,3.27
+.p.x.,2-4,px,epoxy,3.10
+.j.c.,2-4,jc,eject,2.99
+.v.c.,2-4,vc,evict,2.97
+.d.g.,2-4,dg,adage,2.95
+.j.r.,2-4,jr,fjord,2.81
+.w.x.,2-4,wx,twixt,2.08
+.d.f.,2-4,df,edify,1.96

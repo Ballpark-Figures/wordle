@@ -1,0 +1,8 @@
+# 2 free-standing green letters that PIN a single word.
+# uniqueness judged over the 12972 legal guess words; rows kept: only those whose word is a mystery answer.
+# the other 3 positions are UNCONSTRAINED -- the template says nothing about them, and no guess, grey or yellow is involved.
+# green letters: vowels only: a e i o u y (y counts as a vowel).
+# positions: 2-4. rows sorted by zipf DESCENDING, most common word first.
+# zipf is log10(occurrences per billion) from the committed guess_by_freq.txt; 0.00 means absent from wordfreq's list.
+# settings greens=2 pool=guesses require=answer letters=vowels positions=2-4 sort=zipf pool_size=12972 rows=0
+template,positions,letters,word,zipf

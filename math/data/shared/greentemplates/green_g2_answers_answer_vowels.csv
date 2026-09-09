@@ -1,0 +1,51 @@
+# 2 free-standing green letters that PIN a single word.
+# uniqueness judged over the 2315 mystery answers; rows kept: only those whose word is a mystery answer.
+# the other 3 positions are UNCONSTRAINED -- the template says nothing about them, and no guess, grey or yellow is involved.
+# green letters: vowels only: a e i o u y (y counts as a vowel).
+# settings greens=2 pool=answers require=answer letters=vowels pool_size=2315 rows=45
+template,positions,letters,word
+ao...,1-2,ao,aorta
+ee...,1-2,ee,eerie
+ei...,1-2,ei,eight
+ey...,1-2,ey,eying
+io...,1-2,io,ionic
+oa...,1-2,oa,oaken
+ya...,1-2,ya,yacht
+yi...,1-2,yi,yield
+a.y..,1-3,ay,abyss
+i.y..,1-3,iy,idyll
+u.a..,1-3,ua,usage
+y.e..,1-3,ye,yield
+i..i.,1-4,ii,ionic
+o..o.,1-4,oo,onion
+u..o.,1-4,uo,union
+a...i,1-5,ai,alibi
+a...o,1-5,ao,audio
+e...i,1-5,ei,ennui
+.oe..,2-3,oe,poesy
+.uy..,2-3,uy,buyer
+.ye..,2-3,ye,hyena
+.a.y.,2-4,ay,satyr
+.i.y.,2-4,iy,vinyl
+.o.y.,2-4,oy,polyp
+.y.a.,2-4,ya,bylaw
+.y.u.,2-4,yu,syrup
+.a..u,2-5,au,bayou
+.y..a,2-5,ya,hyena
+.y..e,2-5,ye,cycle
+.y..o,2-5,yo,hydro
+..ao.,3-4,ao,chaos
+..au.,3-4,au,fraud
+..eu.,3-4,eu,queue
+..iu.,3-4,iu,opium
+..e.o,3-5,eo,credo
+..o.o,3-5,oo,photo
+..y.u,3-5,yu,bayou
+...ae,4-5,ae,algae
+...ao,4-5,ao,cacao
+...ea,4-5,ea,apnea
+...ii,4-5,ii,radii
+...oa,4-5,oa,cocoa
+...oe,4-5,oe,canoe
+...ou,4-5,ou,bayou
+...ui,4-5,ui,ennui

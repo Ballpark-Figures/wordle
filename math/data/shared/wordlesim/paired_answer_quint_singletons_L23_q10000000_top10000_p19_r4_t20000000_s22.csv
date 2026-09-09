@@ -1,0 +1,14 @@
+# paired comparison of 2 openings, 20000000 games, follow-up answer, pair-adaptive 0, seed 22, ranked on mean guesses
+# settings and finalists taken from paired_answer_quint_singletons_L23_q10000000_top10000_p19_r3_t10000000_s21.csv (root quint_singletons_L23_q10000000_top10000, pass 19)
+# leader clove rugby spank whift mozed, mean 6.00083 +/- 0.00004 (its own error)
+# 
+# opening                        mean    own se    vs leader paired se   sigma
+# clove rugby spank whift mozed    6.00083   0.00004            -         -       -
+# blaze comfy right spunk waved    6.00096   0.00004      0.00013   0.00005     2.7
+# 
+# pairing gain against the leader's nearest rival: unpaired error 0.00005, paired 0.00005 (1.1x tighter)
+# settings follow_up=answer pair_adaptive=0 win_within=6 trials=20000000 seed=22 words=2 rank=mean
+# lineage root=quint_singletons_L23_q10000000_top10000 pass=19 round=4 source=paired_answer_quint_singletons_L23_q10000000_top10000_p19_r3_t10000000_s21.csv
+word,trials,mean,stderr,diff_vs_leader,paired_stderr,sigma
+clove rugby spank whift mozed,20000000,6.000826,0.000037,0.000000,0.000000,0.000
+blaze comfy right spunk waved,20000000,6.000959,0.000039,0.000133,0.000049,2.709

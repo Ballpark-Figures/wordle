@@ -1,0 +1,59 @@
+# 2 free-standing green letters that PIN a single word.
+# uniqueness judged over the 12972 legal guess words; rows kept: only those whose word is a mystery answer.
+# the other 3 positions are UNCONSTRAINED -- the template says nothing about them, and no guess, grey or yellow is involved.
+# green letters: consonants only: b c d f g h j k l m n p q r s t v w x z (y is NOT among them -- it is a vowel here).
+# settings greens=2 pool=guesses require=answer letters=consonants pool_size=12972 rows=53
+template,positions,letters,word
+j.z..,1-3,jz,jazzy
+p.q..,1-3,pq,pique
+t..x.,1-4,tx,twixt
+d...p,1-5,dp,droop
+p...b,1-5,pb,plumb
+q...m,1-5,qm,qualm
+v...g,1-5,vg,vying
+w...w,1-5,ww,widow
+.bh..,2-3,bh,abhor
+.mc..,2-3,mc,emcee
+.pn..,2-3,pn,apnea
+.tc..,2-3,tc,itchy
+.wf..,2-3,wf,awful
+.xc..,2-3,xc,excel
+.b.v.,2-4,bv,above
+.d.f.,2-4,df,edify
+.d.g.,2-4,dg,adage
+.j.c.,2-4,jc,eject
+.j.r.,2-4,jr,fjord
+.p.x.,2-4,px,epoxy
+.s.g.,2-4,sg,usage
+.t.h.,2-4,th,itchy
+.v.c.,2-4,vc,evict
+.v.d.,2-4,vd,evade
+.v.k.,2-4,vk,evoke
+.w.f.,2-4,wf,swift
+.w.x.,2-4,wx,twixt
+.x.s.,2-4,xs,exist
+.f..n,2-5,fn,often
+.f..x,2-5,fx,affix
+.g..g,2-5,gg,aging
+.g..w,2-5,gw,aglow
+.j..t,2-5,jt,eject
+.p..c,2-5,pc,optic
+.q..l,2-5,ql,equal
+.q..p,2-5,qp,equip
+.s..g,2-5,sg,using
+..dk.,3-4,dk,vodka
+..gb.,3-4,gb,rugby
+..gs.,3-4,gs,angst
+..td.,3-4,td,outdo
+..tg.,3-4,tg,outgo
+..c.w,3-5,cw,macaw
+..f.h,3-5,fh,fifth
+..f.n,3-5,fn,elfin
+..j.r,3-5,jr,major
+..p.h,3-5,ph,depth
+..x.c,3-5,xc,toxic
+..x.h,3-5,xh,sixth
+..z.p,3-5,zp,unzip
+...bt,4-5,bt,doubt
+...rh,4-5,rh,myrrh
+...xt,4-5,xt,twixt

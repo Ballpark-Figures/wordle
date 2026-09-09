@@ -1,0 +1,34 @@
+# 3 free-standing green letters that PIN a single word.
+# uniqueness judged over the 12972 legal guess words; rows kept: only those whose word is a mystery answer.
+# the other 2 positions are UNCONSTRAINED -- the template says nothing about them, and no guess, grey or yellow is involved.
+# green letters: vowels only: a e i o u y (y counts as a vowel).
+# settings greens=3 pool=guesses require=answer letters=vowels pool_size=12972 rows=28
+template,positions,letters,word
+eyi..,1-2-3,eyi,eying
+yie..,1-2-3,yie,yield
+ao..a,1-2-5,aoa,aorta
+au..o,1-2-5,auo,audio
+au..y,1-2-5,auy,aunty
+ea..y,1-2-5,eay,early
+ee..e,1-2-5,eee,eerie
+e.ua.,1-3-4,eua,equal
+o.oi.,1-3-4,ooi,ovoid
+u.io.,1-3-4,uio,union
+u.ua.,1-3-4,uua,usual
+e.i.y,1-3-5,eiy,edify
+i.i.y,1-3-5,iiy,icily
+a..ue,1-4-5,aue,argue
+e..ui,1-4-5,eui,ennui
+i..oo,1-4-5,ioo,igloo
+.ueu.,2-3-4,ueu,queue
+.uie.,2-3-4,uie,quiet
+.ay.u,2-3-5,ayu,bayou
+.ua.i,2-3-5,uai,quasi
+.ui.y,2-3-5,uiy,juicy
+.uo.a,2-3-5,uoa,quota
+.uo.e,2-3-5,uoe,quote
+.ye.a,2-3-5,yea,hyena
+.a.ao,2-4-5,aao,cacao
+.a.oy,2-4-5,aoy,savoy
+.o.oa,2-4-5,ooa,cocoa
+..eue,3-4-5,eue,queue

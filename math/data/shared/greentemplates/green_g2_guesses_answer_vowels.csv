@@ -1,0 +1,7 @@
+# 2 free-standing green letters that PIN a single word.
+# uniqueness judged over the 12972 legal guess words; rows kept: only those whose word is a mystery answer.
+# the other 3 positions are UNCONSTRAINED -- the template says nothing about them, and no guess, grey or yellow is involved.
+# green letters: vowels only: a e i o u y (y counts as a vowel).
+# settings greens=2 pool=guesses require=answer letters=vowels pool_size=12972 rows=1
+template,positions,letters,word
+ao...,1-2,ao,aorta
