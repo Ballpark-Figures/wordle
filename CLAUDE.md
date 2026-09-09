@@ -961,6 +961,103 @@ subject to a guarantee. Do not put the two in one table.
   identical to removed ones. The second checks the weight product from strings, a
   monotone log, and an exact CSV replay. Run both after any change to either file.
 
+## `wturns` — WEIGHTED answers: what an OPTIMAL guesser spends against the weights
+The exact companion to the adversarial hill-climb above. `math/freq_search.py` tunes
+the weights against the GREEDY guesser (`topk.py` at k=1); this asks what an OPTIMAL
+guesser spends against those same weights. **A FIFTH compile-time mode of
+`optturns.c` (`-DWEIGHTED`)**, beside `hardturns`/`mmturns`/`ultraturns` — the same
+search under a different COST, not a program of its own. `sh build.sh` builds it.
+- **The objective, stated exactly:** minimise `sum over answers of w_a * (guesses
+  spent on a)`, **SUBJECT TO resolving every answer within `--depth`**. Reported
+  `expected` is that total over the summed weight. **`--depth` is REQUIRED and it
+  BINDS** — a weighted optimum may deliberately spend a deeper line on a LIGHT answer
+  to shorten a HEAVY one, so a depth-6 pass and a depth-7 pass are DIFFERENT
+  QUANTITIES with different CSVs, and `INFEASIBLE` is an expected result. Report a
+  total as an optimum **subject to a `<depth>`-guess guarantee**, never as minimum
+  expected guesses.
+- **THREE OBJECTIVES, THREE TABLES — never put them in one.** `optturns` minimises a
+  COUNT over a different answer set; `topk.py` reports expected guesses OUTRIGHT with
+  no cap; this is a capped WEIGHTED total. A `wturns` number and the greedy's 3.9782
+  are comparable ONLY once the cap is shown non-binding (solve at 6, then 7, then 8
+  and show the value stops moving) — **feasibility is not optimality**, and the fact
+  that the greedy finishes every word within 6 proves only the former.
+- **WHAT THE ANSWER MEANS.** The weights were tuned AGAINST THE GREEDY, so this
+  measures how much the greedy leaves on the table. **It is NOT the value of the
+  adversarial game** — that is a max-min needing the optimal guesser inside the
+  hill-climb loop, and nothing computes it.
+- **IT IS STILL AN INTEGER OBJECTIVE.** Weights must be DYADIC (`k / 2^m`) and are
+  scaled by their common denominator on load, so every total is exact and no
+  comparison is a float comparison. A non-dyadic weight is **REFUSED, not rounded** —
+  rounding would silently change the objective. `freq_search`'s moves are x2, /2 and
+  +/- powers of two down to 0.125, so its output is always dyadic (measured: max
+  denominator 4096, scale 4096, total 13679255 for the k=1 run).
+- **THE ANSWER LIST MUST BE SORTED BY WEIGHT DESCENDING, and the loader REFUSES one
+  that is not.** This is load-bearing, not cosmetic: the lower bound assigns the
+  shallowest levels to the heaviest answers, and it gets every bucket already in that
+  order for free ONLY because the answer INDEX order is weight-descending and every
+  partition in the solver is stable.
+- **`LBTAB` DOES NOT TRANSFER, and its replacement is the one real piece of new
+  math.** The uniform table is indexed by a COUNT; weighted, the bound depends on
+  WHICH weights. `build_lvl` unrolls the same capacity schedule per RANK —
+  `LVL[d][r]` is the level the r-th HEAVIEST answer gets — so a bucket's bound
+  accumulates DURING the counting pass and the hot loop stays O(n). Sound by a
+  rearrangement argument (among capacity-feasible depth assignments the cheapest puts
+  the largest weights at the smallest depths). **The startup check asserts the uniform
+  identity** `sum over r < n of LVL[d][r] == LBTAB[d][n]` at every depth, so a
+  mis-built schedule fails at startup rather than by quietly cutting a real optimum.
+- **The weight VECTOR is in the TT salt, unconditionally.** A state's value is a
+  function of its candidate SET given fixed weights, so the set is still a sufficient
+  key WITHIN a run — but two runs with different weights agree on every key while
+  meaning different objectives. Same hazard MASTERMIND's salt exists for.
+- **`--phantom-final`, `--pair-list` and `--triple-list` are REFUSED in weighted
+  mode** — their cost accounting is still unweighted, so a wrong number under a
+  right-looking name is the alternative.
+- **THE OPENER ORDER IS THE WEIGHTED SPLIT SCORE.** `--order ssq` in this binary means
+  ascending `sum over LOSING bins of (bin size x bin weight)` — the expected number of
+  candidate WORDS still alive, which is **`topk.py`'s own ranking rule**, so the sweep
+  is ordered by the same measure the guesser it is compared against uses. The WIN bin
+  is EXCLUDED (unweighted `ssq` includes it), so an opener that could BE the answer is
+  not penalised. Every opener is still examined and the result is still exact; the
+  order only decides WHEN.
+  - **IT ORDERS, IT DOES NOT PROVE.** Only the ascending LOWER-BOUND order
+    (`--order lb`) lets the first opener bounding above the incumbent prove the whole
+    TAIL is worse. Under `ssq` a stopped run holds **"the best of those examined so
+    far"** — probably the optimum, never proved to be. Say it that way.
+- **Run it with `bash solver/run-wturns-sweep.sh --weights <stem> --depth D`** (from
+  `math/`), attached, tee'd log. `--opener W` (repeatable) prices ONE opener exactly
+  instead of sweeping — much cheaper, exact for that opener, an upper bound on the
+  optimum, and **the way to price the full sweep before launching it**.
+  - **`--weights` takes a STEM, not a file:** `<stem>.txt` (the answer list) and
+    `<stem>.weights`, both written together by **`python3 tools/freqweights.py --from
+    <freqsearch csv> --stem <stem>`** so their ORDER cannot drift apart. The pattern
+    matrix for those answer columns is built on first run and cached under
+    `data/local/wturns/` (regenerable bulk, so it follows the shared/local split).
+  - Zero-weight words are DROPPED by `freqweights.py`, matching `topk.py`: a
+    zero-weight answer would cost nothing yet still branch the search. The k=1 run's
+    4282 candidates become **4229** answers that way.
+  - Data: `data/shared/wturns/optimal_<stem>_d<D>.csv` (sweep) or
+    `openers_<stem>_d<D>.csv` (named openers); log + matrix + tt under
+    `data/local/wturns/`. No `--tt-save` (see the note below).
+  - **NO TREES FROM THE SWEEP** — `--optimal-only` never calls `write_tree`, so the
+    winner's tree needs a follow-up `--opener <winner>` run at the SAME depth and
+    weights. The wrapper's header carries the command.
+- **`python3 tools/checkweighted.py` is the GATE**, and its strongest check is free:
+  **with every weight 1 the objective IS the guess count, so `wturns` must reproduce
+  `optturns`** — measured, same totals AND same node counts (salet 16672, reast 29780),
+  i.e. the same search tree and not merely the same answer; `--full` adds salet on the
+  real lists at 7920. That cannot catch an error symmetric in the weights, so it also
+  diffs the search against a brute-force weighted recursion (no bound, no ordering, no
+  closed forms) on a 24x16 mini `--data` directory across four weight vectors and
+  depths 2-5, replays the emitted tree from the STRINGS and checks its weighted sum
+  against the reported total, and pins all six refusals. **Coverage is ASSERTED**: it
+  FAILS unless the weighted optimum actually DIFFERED from the unweighted one, unless
+  an `INFEASIBLE` actually occurred, and unless the `n == 2` and `d == 2` closed forms
+  actually fired — a weighted check that never exercised the weights proves nothing.
+  Run it alongside `solver/validate.sh` and `tools/checkpatterns.py`.
+- **COST IS UNMEASURED for the full sweep.** Reference point: the uniform 2315-answer
+  depth-6 problem runs a median 58s per opener, p99 7.8h, max 86h. This is 4229
+  answers with a weaker bound. **Price one opener before launching the sweep.**
+
 ## Multiwordle (k boards at once) — a SIMULATION, not a solver
 k hidden answers, one per board, every guess played on every unsolved board at once.
 **Nothing here searches or optimises** — it MEASURES one named heuristic by Monte

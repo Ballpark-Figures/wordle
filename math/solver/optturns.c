@@ -205,6 +205,37 @@ typedef uint32_t pat_t;
 #else
 #define ULT 0
 #endif
+
+/* WEIGHTED: the answers carry a WEIGHT and the objective is the weighted total
+ * sum over answers of  w_a * (guesses spent on a)
+ * instead of the plain count.  build.sh emits `wturns` from this file with
+ * -DWEIGHTED; every `if (WGT)` and `#if WGT` folds away in the other binaries,
+ * so `optturns` keeps the code it has always had.
+ *
+ * WHY IT EXISTS.  The adversarial search (`math/freq_search.py`) tunes a weight
+ * per candidate word to maximise what a GREEDY guesser spends.  Asking what an
+ * OPTIMAL guesser spends against those same weights is this objective, and it
+ * is the same shape as the ordinary sweep -- minimise a total over the answers,
+ * subject to resolving every answer within --depth -- so it is a mode of this
+ * file rather than a solver of its own.
+ *
+ * IT IS STILL AN INTEGER OBJECTIVE, and that is deliberate.  The weights are
+ * required to be dyadic (k / 2^m) and are scaled by their common denominator on
+ * load, so every total is an exact integer and every comparison is exact -- the
+ * property the whole solver rests on.  A float weight would be REFUSED, not
+ * rounded: rounding would silently change the objective.
+ *
+ * THE ANSWER LIST MUST BE SORTED BY WEIGHT DESCENDING and the loader refuses one
+ * that is not.  The lower bound (build_lvl / wlb below) assigns the shallowest
+ * levels to the heaviest answers, and it gets every bucket already in that order
+ * for free ONLY because the answer INDEX order is weight-descending and every
+ * partition here is stable.  `tools/freqweights.py` writes both files that way.
+ */
+#ifdef WEIGHTED
+#define WGT 1
+#else
+#define WGT 0
+#endif
 #if ULT && defined(HARDMODE)
 #error "ULTRA and HARDMODE are incompatible: ultra mode restricts guesses to \
 words consistent with EVERY clue, a strict superset of hard mode's rule.  Build \
@@ -274,6 +305,49 @@ static int      ANS2G[MAXA];
 static char   (*GWORD)[WBUF];
 static char   (*AWORD)[WBUF];
 static int      LBTAB[MAXD][MAXA + 1];
+
+#if WGT
+/* --weights: WEIGHT[a] is answer a's weight, already multiplied by WSCALE so it
+ * is an exact integer.  WTOTAL is their sum, and is the denominator of every
+ * reported average -- the weighted analogue of NA.
+ *
+ * WSALT hashes the weight VECTOR into the TT key.  A state's value here is a
+ * function of its candidate SET (the set determines which weights), so the set
+ * is still a sufficient key WITHIN one run -- but two runs with different
+ * weights agree on every key while meaning different objectives, exactly the
+ * hazard MASTERMIND's unconditional salt exists for.  So it is salted
+ * unconditionally too, and a foreign tt.bin fails verification instead of
+ * answering. */
+static long long WEIGHT[MAXA];
+static long long WTOTAL = 0;
+static long long WSCALE = 1;
+static uint64_t  WSALT  = 0;
+
+/* LVL[d][r] = the search level (1-based) the counting bound assigns to the
+ * r-th HEAVIEST answer of a state with d guesses left; 0 means r is past the
+ * capacity of d levels, i.e. the state is infeasible at that depth.
+ *
+ * It is build_lb's schedule, unrolled per rank instead of summed per count:
+ * level 1 holds 1 answer (the guess itself), level k holds BRANCH^(k-1).  With
+ * every weight 1 it reproduces LBTAB exactly -- sum over r < n of LVL[d][r] ==
+ * LBTAB[d][n] -- which is what lets uniform weights reproduce optturns and is
+ * checked by tools/checkweighted.py.
+ *
+ * Per-RANK is what keeps the hot loop O(n): a bucket's bound can be accumulated
+ * as the bucket is counted (the r-th arrival into a bucket is its r-th heaviest,
+ * because the state is weight-ordered), instead of needing the finished bucket. */
+static int LVL[MAXD][MAXA + 1];
+#endif
+
+/* AW(a): answer a's weight -- a compile-time 1 outside weighted mode, so every
+ * cost expression below folds back to the count it has always been. */
+#if WGT
+#define AW(a)   WEIGHT[a]
+#define AVGDEN  ((double)WTOTAL)
+#else
+#define AW(a)   1
+#define AVGDEN  ((double)NA)
+#endif
 
 /* --------------------------------------------------------------- hard mode
  *
@@ -744,6 +818,157 @@ static void build_lb(void) {
     }
 }
 
+#if WGT
+/* The counting bound as a per-RANK level schedule -- see LVL's comment above.
+ * Same capacity argument as build_lb: with at most BRANCH non-winning bins per
+ * guess, level 1 resolves 1 answer, level k at most BRANCH^(k-1). */
+static void build_lvl(void) {
+    for (int d = 0; d < MAXD; d++) {
+        for (int r = 0; r <= NA; r++) LVL[d][r] = 0;
+        long long cap = 1;
+        int r = 0;
+        for (int k = 1; k <= d && r < NA; k++) {
+            for (long long t = 0; t < cap && r < NA; t++) LVL[d][r++] = k;
+            if (cap < MAXA) cap *= BRANCH;
+        }
+    }
+}
+
+/* Weighted lower bound for a state, given its members in weight-DESCENDING
+ * order (which every state here is -- see the WEIGHTED block at the top).
+ *
+ * SOUND: any strategy assigns each answer a depth, and the capacity argument
+ * bounds how many answers can sit at each depth.  Among all capacity-feasible
+ * assignments the cheapest puts the largest weights at the smallest depths --
+ * a rearrangement argument -- which is exactly LVL.  So this is <= the true
+ * value of the state, for every strategy, and never cuts a real optimum. */
+static inline int wlb(const uint16_t *S, int n, int d) {
+    if (n <= 0) return 0;
+    if (d >= MAXD) d = MAXD - 1;
+    if (d < 1 || LVL[d][n - 1] == 0) return INF;
+    long long t = 0;
+    for (int i = 0; i < n; i++) t += WEIGHT[S[i]] * LVL[d][i];
+    return (int)t;
+}
+
+static inline long long wsum_of(const uint16_t *S, int n) {
+    long long t = 0;
+    for (int i = 0; i < n; i++) t += WEIGHT[S[i]];
+    return t;
+}
+#endif
+
+/* The bound for a whole state.  Outside weighted mode this is the LBTAB lookup
+ * it has always been; the arguments it does not use fold away. */
+#if WGT
+#define STATE_LB(S, n, d)  wlb((S), (n), (d))
+#define STATE_W(S, n)      wsum_of((S), (n))
+#define ALL_W              WTOTAL
+#else
+#define STATE_LB(S, n, d)  LBTAB[(d)][(n)]
+#define STATE_W(S, n)      (n)
+#define ALL_W              NA
+#endif
+
+#if WGT
+/* Read `--weights FILE`: one `<word> <weight>` per line, `#` comments ignored.
+ *
+ * WEIGHTS ARE EXACT RATIONALS, NOT FLOATS.  A weight is `A` or `A/B` with B a
+ * power of two; every weight is then multiplied by the largest B seen, so the
+ * whole objective is an exact integer and no comparison anywhere is a float
+ * comparison.  Anything else is REFUSED rather than rounded -- rounding would
+ * silently change the objective, which is the one thing this file must never
+ * do quietly.
+ *
+ * Three properties are CHECKED, not assumed, because each one silently produces
+ * a wrong answer rather than an error:
+ *   - the words must match the answer list POSITION FOR POSITION (the same
+ *     byte-for-byte rule --patterns and --answer-list already carry);
+ *   - every weight must be strictly positive (a zero-weight answer would cost
+ *     nothing yet still branch the search -- topk.py drops such words, so they
+ *     must not be in the list at all);
+ *   - the weights must be NON-INCREASING, which is what makes the lower bound's
+ *     "shallowest levels to the heaviest answers" hold for every bucket. */
+static int load_weights(const char *path) {
+    FILE *f = fopen(path, "r");
+    if (!f) { fprintf(stderr, "cannot open %s\n", path); return 1; }
+    long long num[MAXA], den[MAXA], maxden = 1;
+    char word[256];
+    int n = 0;
+    char line[512];
+    while (fgets(line, sizeof line, f)) {
+        char *s = line;
+        while (*s == ' ' || *s == '\t') s++;
+        if (*s == '#' || *s == '\n' || *s == '\0') continue;
+        long long a = 0, b = 1;
+        if (sscanf(s, "%255s %lld/%lld", word, &a, &b) < 2) {
+            fprintf(stderr, "weights: cannot parse line: %s", line);
+            fclose(f); return 1;
+        }
+        if (n >= MAXA) { fprintf(stderr, "weights: more than MAXA (%d) lines\n", MAXA); fclose(f); return 1; }
+        if (b <= 0 || (b & (b - 1)) != 0) {
+            fprintf(stderr, "weights: %s has denominator %lld, not a power of two -- "
+                    "the solver is exact in integers and will not round it\n", word, b);
+            fclose(f); return 1;
+        }
+        if (a <= 0) {
+            fprintf(stderr, "weights: %s has weight %lld/%lld; every weight must be > 0 "
+                    "(drop zero-weight words from the answer list instead)\n", word, a, b);
+            fclose(f); return 1;
+        }
+        if ((int)strlen(word) != WORDLEN || strcmp(word, AWORD[n]) != 0) {
+            fprintf(stderr, "weights: line %d is %s but answer %d is %s -- the weights "
+                    "file must match the answer list position for position\n",
+                    n + 1, word, n, AWORD[n]);
+            fclose(f); return 1;
+        }
+        num[n] = a; den[n] = b;
+        if (b > maxden) maxden = b;
+        n++;
+    }
+    fclose(f);
+    if (n != NA) {
+        fprintf(stderr, "weights: %d lines but %d answers\n", n, NA);
+        return 1;
+    }
+    WSCALE = maxden;
+    WTOTAL = 0;
+    for (int a = 0; a < NA; a++) {
+        WEIGHT[a] = num[a] * (WSCALE / den[a]);
+        WTOTAL += WEIGHT[a];
+        if (a > 0 && WEIGHT[a] > WEIGHT[a - 1]) {
+            fprintf(stderr, "weights: %s (%lld) is heavier than %s (%lld) before it -- "
+                    "the answer list must be sorted by weight DESCENDING, or the lower "
+                    "bound is wrong.  tools/freqweights.py writes it that way.\n",
+                    AWORD[a], WEIGHT[a], AWORD[a - 1], WEIGHT[a - 1]);
+            return 1;
+        }
+    }
+    /* Every total the solver forms is at most WTOTAL * MAXD, and INF is the
+     * sentinel for "no solution", so the two must not meet.  Refuse rather than
+     * silently wrap -- a wrapped total would look like a very good opener. */
+    if (WTOTAL > (long long)(INF - 1) / MAXD) {
+        fprintf(stderr, "weights: total %lld x MAXD %d reaches the INF sentinel; "
+                "use a coarser scale\n", WTOTAL, MAXD);
+        return 1;
+    }
+    /* The --topk / --order ssq score packs into (score << 20 | guess index). */
+    if ((long long)NA * WTOTAL > (1LL << 42)) {
+        fprintf(stderr, "weights: NA x total (%lld) would overflow the packed "
+                "split-quality key\n", (long long)NA * WTOTAL);
+        return 1;
+    }
+    WSALT = 0x9E3779B97F4A7C15ULL;
+    for (int a = 0; a < NA; a++)
+        WSALT = (WSALT ^ (uint64_t)WEIGHT[a]) * 0x100000001B3ULL;
+    fprintf(stderr, "weights: %d answers, scale %lld, total %lld (%.6f), "
+            "max %lld, salt %016llx\n",
+            NA, WSCALE, WTOTAL, (double)WTOTAL / (double)WSCALE, WEIGHT[0],
+            (unsigned long long)WSALT);
+    return 0;
+}
+#endif
+
 /* ------------------------------------------------- transposition table */
 
 /* 32 bytes; two per 64-byte bucket, so a probe touches exactly one cache line */
@@ -840,6 +1065,13 @@ static inline void hash_state(const uint16_t *S, int n, int d, uint64_t ch,
     uint64_t a = (uint64_t)d * 0x9E3779B97F4A7C15ULL;
     uint64_t b = (uint64_t)d * 0xC2B2AE3D27D4EB4FULL;
     for (int i = 0; i < n; i++) { a ^= ZOB0[S[i]]; b ^= ZOB1[S[i]]; }
+#if WGT
+    /* The weight vector is part of the objective, so it is part of the key --
+     * see WSALT.  Unconditional in this binary, so a table made under one set of
+     * weights fails verification under another instead of answering. */
+    a ^= WSALT;
+    b ^= WSALT * 0xC2B2AE3D27D4EB4FULL;
+#endif
     *h0 = a ^ ch ^ GSALT;
     *h1 = b ^ (ch * 0xD6E8FEB86659FD93ULL) ^ (GSALT * 0x9E3779B97F4A7C15ULL);
 }
@@ -894,6 +1126,12 @@ typedef struct {
     uint16_t leg[MAXD][MAXG];      /* hard mode: guesses this state may play */
     int32_t  mark[MAXD][MAXG];     /* --topk: stamped membership, no clearing */
     int32_t  tag[MAXD];            /* current stamp value per depth */
+#if WGT
+    /* per-pattern weighted accumulators, filled during the SAME counting pass
+     * that fills cnt[] -- invariant: all zero between uses, like cnt[] */
+    long long wlbp[MAXD][NPAT];    /* bucket's weighted lower bound */
+    long long wsp[MAXD][NPAT];     /* bucket's summed weight */
+#endif
     long long nodes, probe, hit, fill;
 } Ctx;
 
@@ -944,15 +1182,17 @@ static int eval_guess(const uint16_t *S, int n, int d, int g, int best,
     int lbrest = 0;
     for (int k = 0; k < nb; k++) {
         if (bp[k] == ALL_GREEN) continue;
-        int v = LBTAB[d - 1][bcnt[k]];
+        int v = STATE_LB(buf + bstart[k], bcnt[k], d - 1);
         if (v >= INF) return INF;
         lbrest += v;
     }
 
-    int total = n;
+    /* every candidate still alive pays for this guess: the COUNT outside
+     * weighted mode, their summed WEIGHT inside it */
+    int total = (int)STATE_W(S, n);
     for (int k = 0; k < nb; k++) {
         if (bp[k] == ALL_GREEN) continue;
-        int own = LBTAB[d - 1][bcnt[k]];
+        int own = STATE_LB(buf + bstart[k], bcnt[k], d - 1);
         lbrest -= own;
         if (total + lbrest + own >= best) return INF;
         Cons kid;
@@ -966,11 +1206,15 @@ static int eval_guess(const uint16_t *S, int n, int d, int g, int best,
 }
 
 static int solve(const uint16_t *S, int n, int d, const Cons *C, Ctx *ctx) {
-    if (n == 1) return 1;
+    if (n == 1) return (int)AW(S[0]);
     if (d <= 1) return INF;
     if (n == 2) {
-        /* Guess either candidate: 1 if it is the answer, 2 if it is the other. */
-        if (!PHANTOM || ANS2G[S[0]] >= 0 || ANS2G[S[1]] >= 0) return 3;
+        /* Guess either candidate: 1 if it is the answer, 2 if it is the other.
+         * Weighted, that is w_first + 2 * w_second, so the HEAVIER one is played
+         * first -- and S[0] is the heavier, the state being weight-ordered.
+         * With every weight 1 this is the 3 it has always been. */
+        if (!PHANTOM || ANS2G[S[0]] >= 0 || ANS2G[S[1]] >= 0)
+            return (int)(AW(S[0]) + 2 * AW(S[1]));
         /* Under --phantom-final NEITHER may be played, so the pair has to be
          * SPLIT by some third guess and each half then costs its own phantom
          * naming move: 2 (the splitter, charged to both) + 1 + 1 = 4.  No guess
@@ -997,7 +1241,7 @@ static int solve(const uint16_t *S, int n, int d, const Cons *C, Ctx *ctx) {
      * state with no splitting guess at all is INF at every depth. */
     if (d > n) d = n;
 
-    int lb0 = LBTAB[d][n];
+    int lb0 = STATE_LB(S, n, d);
     if (lb0 >= INF) return INF;
 
     uint64_t h0, h1;
@@ -1012,6 +1256,8 @@ static int solve(const uint16_t *S, int n, int d, const Cons *C, Ctx *ctx) {
 
     long long nodes0 = ctx->nodes++;
     int best = INF, bestg = -1;
+    /* what every alive candidate pays for one guess here: n, or their weight */
+    long long WS = STATE_W(S, n);
 
     /* d == 2 closed form: the only finisher is a guess whose non-green buckets
      * are all singletons, costing 2n - (1 if g is itself in S). */
@@ -1035,8 +1281,19 @@ static int solve(const uint16_t *S, int n, int d, const Cons *C, Ctx *ctx) {
                 int green = cnt[ALL_GREEN] > 0;
                 for (int k = 0; k < nb; k++) cnt[bp[k]] = 0;
                 if (dup) continue;
-                if (green) { best = 2 * n - 1; bestg = g; goto d2done; }
-                if (2 * n < best) { best = 2 * n; bestg = g; }
+                /* Cost is 2 * WS minus the winner's own second guess, which it
+                 * does not pay -- so the best finisher is the HEAVIEST candidate
+                 * that splits the rest into singletons.  Pass 0 walks the
+                 * candidates in weight-descending order, so its first success IS
+                 * that one; and any non-candidate scores a strictly worse 2 * WS,
+                 * so a pass-0 hit ends the scan.  With every weight 1 this is the
+                 * 2n-1 / 2n it has always been. */
+                if (green) {
+                    if (!WGT) { best = (int)(2 * WS) - 1; bestg = g; goto d2done; }
+                    if (pass == 0) { best = (int)(2 * WS - AW(S[t])); bestg = g; goto d2done; }
+                    continue;              /* weighted: pass 0 already scored it */
+                }
+                if (2 * WS < best) { best = (int)(2 * WS); bestg = g; }
             }
         }
     d2done:
@@ -1055,6 +1312,35 @@ static int solve(const uint16_t *S, int n, int d, const Cons *C, Ctx *ctx) {
         int g = USE_CONS ? (int)leg[t] : t;
         const pat_t *row = PAT + (size_t)g * NA;
         int bp[MAXA], nb = 0;                    /* bucket ordinal, nb <= n */
+#if WGT
+        /* The r-th answer to arrive in a bucket is that bucket's r-th HEAVIEST,
+         * the state being weight-ordered -- so the bucket's weighted bound and
+         * summed weight both accumulate DURING the counting pass and the loop
+         * stays O(n), exactly as the unweighted one is. */
+        long long *wlbp = ctx->wlbp[d], *wsp = ctx->wsp[d];
+        for (int i = 0; i < n; i++) {
+            int p = row[S[i]], r = cnt[p]++;
+            if (r == 0) bp[nb++] = p;
+            wlbp[p] += WEIGHT[S[i]] * LVL[d - 1][r];
+            wsp[p]  += WEIGHT[S[i]];
+        }
+        int lv = (int)WS, dead = 0, ing = 0;
+        int64_t ss = 0;
+        for (int k = 0; k < nb; k++) {
+            int p = bp[k], c = cnt[p];
+            if (p == ALL_GREEN) { ing = 1; continue; }
+            /* Split quality, weighted: the expected number of candidate WORDS
+             * still alive, sum over losing bins of (bin size x bin weight).
+             * The WIN is excluded -- topk.py's rule, so that a guess which could
+             * BE the answer beats an equally-splitting outside word.  (The
+             * unweighted score below includes it, as it always has.) */
+            if (TOPK > 0) ss += (int64_t)c * wsp[p];
+            if (c == n) { dead = 1; break; }             /* guess reveals nothing */
+            if (LVL[d - 1][c - 1] == 0) { dead = 1; break; }
+            lv += (int)wlbp[p];
+        }
+        for (int k = 0; k < nb; k++) { cnt[bp[k]] = 0; wlbp[bp[k]] = 0; wsp[bp[k]] = 0; }
+#else
         for (int i = 0; i < n; i++) {
             int p = row[S[i]];
             if (cnt[p]++ == 0) bp[nb++] = p;
@@ -1071,6 +1357,7 @@ static int solve(const uint16_t *S, int n, int d, const Cons *C, Ctx *ctx) {
             lv += v;
         }
         for (int k = 0; k < nb; k++) cnt[bp[k]] = 0;
+#endif
         lbg[g] = dead ? INF : lv;
         if (!dead) {
             if (TOPK > 0) ssq[nss++] = (ss << 20) | (int64_t)g;
@@ -1257,7 +1544,7 @@ static int solve_opener(int g, int depth, Ctx *ctx) {
     memcpy(fill, start, (size_t)NPAT * sizeof(int));
     for (int a = 0; a < NA; a++) root[fill[row[a]]++] = (uint16_t)a;
 
-    int total = NA;
+    int total = (int)ALL_W;
     for (int p = 0; p < NPAT; p++) {
         if (p == ALL_GREEN || cnt[p] == 0) continue;
         Cons kid;                                /* the opener itself is unconstrained */
@@ -1329,6 +1616,25 @@ static int solve_escalating(int g, int dmin, int dmax, Ctx *ctx, int *used) {
 static int root_lb(int g, int depth) {
     int *cnt = pat_scratch(1);
     const pat_t *row = PAT + (size_t)g * NA;
+#if WGT
+    /* Answer indices ARE weight-descending, so the r-th answer landing in a
+     * bucket is that bucket's r-th heaviest and the bound accumulates in the
+     * same single pass the counts do. */
+    long long *wl = calloc((size_t)NPAT + 1, sizeof(long long));
+    if (!wl) { fprintf(stderr, "root_lb: out of memory\n"); exit(1); }
+    for (int a = 0; a < NA; a++) {
+        int p = row[a], r = cnt[p]++;
+        wl[p] += WEIGHT[a] * LVL[depth - 1][r];
+    }
+    long long lb = ALL_W;
+    for (int p = 0; p < NPAT; p++) {
+        if (p == ALL_GREEN || cnt[p] == 0) continue;
+        if (LVL[depth - 1][cnt[p] - 1] == 0) { free(cnt); free(wl); return INF; }
+        lb += wl[p];
+    }
+    free(cnt); free(wl);
+    return (int)lb;
+#else
     for (int a = 0; a < NA; a++) cnt[row[a]]++;
     int lb = NA;
     for (int p = 0; p < NPAT; p++) {
@@ -1339,6 +1645,7 @@ static int root_lb(int g, int depth) {
     }
     free(cnt);
     return lb;
+#endif
 }
 
 /* Exact total if it is <= `bound`, CUTOFF if provably above it, INF if the
@@ -1379,16 +1686,16 @@ static int solve_opener_bounded(int g, int depth, Ctx *ctx, int bound) {
 
     int lbrest = 0;
     for (int i = 0; i < np; i++) {
-        int v = LBTAB[depth - 1][cnt[ps[i]]];
+        int v = STATE_LB(root + start[ps[i]], cnt[ps[i]], depth - 1);
         if (v >= INF) return INF;
         lbrest += v;
     }
 
-    int total = NA;
+    int total = (int)ALL_W;
     if (total + lbrest > bound) return CUTOFF;
     for (int i = 0; i < np; i++) {
         int p = ps[i];
-        lbrest -= LBTAB[depth - 1][cnt[p]];
+        lbrest -= STATE_LB(root + start[p], cnt[p], depth - 1);
         Cons kid;
         if (USE_CONS) cons_apply(&kid, &CONS_NONE, g, p);
         int v = solve(root + start[p], cnt[p], depth - 1, USE_CONS ? &kid : &CONS_NONE, ctx);
@@ -1789,9 +2096,24 @@ static int64_t *sweep_order(int bisect) {
     for (int g = 0; g < NG; g++) {
         const pat_t *row = PAT + (size_t)g * NA;
         int *cnt = pat_scratch(1);
-        for (int a = 0; a < NA; a++) cnt[row[a]]++;
         int64_t ss = 0;
+#if WGT
+        /* Weighted split quality: sum over LOSING bins of bin size x bin weight
+         * -- the expected number of candidate WORDS still alive, which is
+         * topk.py's ranking rule and therefore the one the guesser this is
+         * measured against uses.  The WIN is excluded so an opener that could BE
+         * the answer is not penalised for it.  (Unweighted, below, is the sum of
+         * squared bin sizes including the win, unchanged.) */
+        long long *ws = calloc((size_t)NPAT + 1, sizeof(long long));
+        if (!ws) { fprintf(stderr, "sweep_order: out of memory\n"); exit(1); }
+        for (int a = 0; a < NA; a++) { cnt[row[a]]++; ws[row[a]] += WEIGHT[a]; }
+        for (int p = 0; p < NPAT; p++)
+            if (p != ALL_GREEN) ss += (int64_t)cnt[p] * ws[p];
+        free(ws);
+#else
+        for (int a = 0; a < NA; a++) cnt[row[a]]++;
         for (int p = 0; p < NPAT; p++) ss += (int64_t)cnt[p] * cnt[p];
+#endif
         free(cnt);
         ord[g] = (ss << 20) | (int64_t)g;
     }
@@ -1829,6 +2151,7 @@ int main(int argc, char **argv) {
     const char *answerlist = NULL, *patpath = NULL;
     int optonly = 0, uselength = 0;
     const char *pairlist = NULL, *triplelist = NULL;
+    const char *weightsfile = NULL;
     int depth = 6, ttbits = 28, threads = 0, sweep = 0, depthmax = -1;
     int depth_set = 0;
 
@@ -1849,6 +2172,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--guess-list") && i + 1 < argc) guesslist = argv[++i];
         else if (!strcmp(argv[i], "--answer-list") && i + 1 < argc) answerlist = argv[++i];
         else if (!strcmp(argv[i], "--patterns") && i + 1 < argc) patpath = argv[++i];
+        else if (!strcmp(argv[i], "--weights") && i + 1 < argc) weightsfile = argv[++i];
         else if (!strcmp(argv[i], "--pair-list") && i + 1 < argc) pairlist = argv[++i];
         else if (!strcmp(argv[i], "--triple-list") && i + 1 < argc) triplelist = argv[++i];
         else if (!strcmp(argv[i], "--pair-adaptive") && i + 1 < argc) PAIR_ADAPT = atoi(argv[++i]);
@@ -1905,6 +2229,46 @@ int main(int argc, char **argv) {
     }
 #else
     (void)depth_set;
+#endif
+
+#if WGT
+    /* --weights IS the objective here, so there is no default and no fallback:
+     * a weighted binary run without weights would silently be the unweighted
+     * solver wearing a different name. */
+    if (!weightsfile) {
+        fprintf(stderr, "wturns: --weights FILE is required -- the weights ARE the "
+                "objective, so there is nothing sensible to default to.  Use "
+                "solver/run-wturns-sweep.sh.\n");
+        return 1;
+    }
+    /* THE CAP IS PART OF THE OBJECTIVE.  A weighted optimum may deliberately
+     * spend a deeper line on a light answer to shorten a heavy one, so a
+     * depth-6 pass and a depth-7 pass are different quantities, not a fast and
+     * a slow route to one answer, and INFEASIBLE is an expected result.
+     * Inheriting optturns' default 6 would make that choice silently. */
+    if (!depth_set) {
+        fprintf(stderr, "wturns: --depth is required -- the cap is part of the "
+                "weighted objective, so each depth is a different quantity\n");
+        return 1;
+    }
+    /* Both would need their own weighted accounting (they still charge NA per
+     * guess); refusing beats reporting a wrong number under a right-looking
+     * name. */
+    if (PHANTOM) {
+        fprintf(stderr, "wturns: --phantom-final is not supported in weighted mode\n");
+        return 1;
+    }
+    if (pairlist || triplelist) {
+        fprintf(stderr, "wturns: --pair-list / --triple-list are not supported in "
+                "weighted mode (their cost accounting is still unweighted)\n");
+        return 1;
+    }
+#else
+    if (weightsfile) {
+        fprintf(stderr, "--weights needs the WEIGHTED build (wturns); this binary "
+                "minimises the plain guess count\n");
+        return 1;
+    }
 #endif
 
     /* Ultra mode, like hard mode and Mastermind, has genuine INFEASIBLE openers
@@ -2046,6 +2410,10 @@ int main(int argc, char **argv) {
      * while meaning entirely different games.  Salting it UNCONDITIONALLY is
      * what makes an optturns tt.bin fail verification in mmturns instead of
      * answering. */
+#if WGT
+    if (load_weights(weightsfile)) return 1;
+#endif
+
     if (guesslist || answerlist || TOPK > 0 || MM) {
         GSALT = 0xCBF29CE484222325ULL
               ^ ((uint64_t)NG * 0xD6E8FEB86659FD93ULL)
@@ -2099,8 +2467,43 @@ int main(int argc, char **argv) {
     fprintf(stderr, "branching: %d non-winning bins (max over %d guesses; %d attainable of %d)\n",
             BRANCH, NG, MM ? NPAT : NPAT - WORDLEN, NPAT);
     build_lb();
+#if WGT
+    build_lvl();
+    /* The uniform identity that ties the weighted bound to the one optturns has
+     * always used: with every weight 1, summing LVL over the first n ranks IS
+     * LBTAB[d][n].  Checked here at every depth so a mis-built schedule fails at
+     * startup rather than by quietly cutting a real optimum. */
+    for (int d = 1; d < MAXD; d++) {
+        long long t = 0;
+        for (int n = 1; n <= NA; n++) {
+            if (LVL[d][n - 1] == 0) {
+                if (LBTAB[d][n] < INF) {
+                    fprintf(stderr, "build_lvl: depth %d rank %d disagrees with LBTAB\n", d, n);
+                    return 1;
+                }
+                break;
+            }
+            t += LVL[d][n - 1];
+            if (LBTAB[d][n] != (int)t) {
+                fprintf(stderr, "build_lvl: depth %d n %d gives %lld, LBTAB says %d\n",
+                        d, n, t, LBTAB[d][n]);
+                return 1;
+            }
+        }
+    }
+    {
+        uint16_t *all = malloc(sizeof(uint16_t) * (size_t)NA);
+        if (!all) { fprintf(stderr, "out of memory\n"); return 1; }
+        for (int a = 0; a < NA; a++) all[a] = (uint16_t)a;
+        int rl = wlb(all, NA, depth);
+        free(all);
+        fprintf(stderr, "root LB(d=%d, n=%d) = %d  (%.5f avg, weighted)\n",
+                depth, NA, rl, (double)rl / AVGDEN);
+    }
+#else
     fprintf(stderr, "root LB(d=%d, n=%d) = %d  (%.5f avg)\n",
-            depth, NA, LBTAB[depth][NA], (double)LBTAB[depth][NA] / NA);
+            depth, NA, LBTAB[depth][NA], (double)LBTAB[depth][NA] / AVGDEN);
+#endif
     tt_init(ttbits, ttload);
     if (treedir) mkdir(treedir, 0755);
 
@@ -2123,7 +2526,7 @@ int main(int argc, char **argv) {
                 printf("%s  INFEASIBLE within %d guesses  (%.1fs)\n", openers[k], depthmax, dt);
             else
                 printf("%s  total=%d  expected=%.5f  d=%d  (%.1fs, %lld nodes, TT %.3f%% hit)\n",
-                       openers[k], total, (double)total / NA, used, dt, ctx->nodes,
+                       openers[k], total, (double)total / AVGDEN, used, dt, ctx->nodes,
                        100.0 * ctx->hit / (ctx->probe ? ctx->probe : 1));
             fflush(stdout);
         }
@@ -2252,11 +2655,11 @@ int main(int argc, char **argv) {
                             nbest++;
                             printf("[%7.0fs] %s %s %s  total=%5d  avg=%.5f  %s  %7.1fs\n",
                                    now_s() - t0, GWORD[cA[i]], GWORD[cB[i]], GWORD[cC[i]],
-                                   total, (double)total / NA, better ? "NEW BEST" : "TIED    ", dt);
+                                   total, (double)total / AVGDEN, better ? "NEW BEST" : "TIED    ", dt);
                             if (out) {
                                 fprintf(out, "%s,%s,%s,%d,%.5f,%.1f\n", GWORD[cA[i]],
                                         GWORD[cB[i]], GWORD[cC[i]], total,
-                                        (double)total / NA, dt);
+                                        (double)total / AVGDEN, dt);
                                 fflush(out);
                             }
                         }
@@ -2268,7 +2671,7 @@ int main(int argc, char **argv) {
                         printf("[%7.0fs] %6d/%d done (%d searched, %d cut, %d infeas)  "
                                "best=%d (avg %.5f)  eta %5.1fh\n",
                                el, seen, ncand, searched, cut, infeas, incumbent,
-                               incumbent < INF ? (double)incumbent / NA : 0.0,
+                               incumbent < INF ? (double)incumbent / AVGDEN : 0.0,
                                (el / (seen > 0 ? seen : 1)) * (ncand - seen) / 3600.0);
                     }
                     fflush(stdout);
@@ -2284,7 +2687,7 @@ int main(int argc, char **argv) {
             printf("NO TRIPLE in the list solves every answer within %d guesses.\n", depth);
         } else {
             printf("total=%d  expected=%.5f  over %d answers\n",
-                   incumbent, (double)incumbent / NA, NA);
+                   incumbent, (double)incumbent / AVGDEN, NA);
             printf("%d ordering%s attain it:", nbest, nbest == 1 ? "" : "s");
             for (int i = 0; i < nbest; i++)
                 printf(" %s+%s+%s", GWORD[bA[i]], GWORD[bB[i]], GWORD[bC[i]]);
@@ -2424,20 +2827,20 @@ int main(int argc, char **argv) {
                             nbest = 0; bestA[nbest] = cA[i]; bestB[nbest] = cB[i]; nbest++;
                             printf("[%7.0fs] %s %s  total=%5d  avg=%.5f  NEW BEST  %7.1fs\n",
                                    now_s() - t0, GWORD[cA[i]], GWORD[cB[i]], total,
-                                   (double)total / NA, dt);
+                                   (double)total / AVGDEN, dt);
                             if (out) {
                                 fprintf(out, "%s,%s,%d,%.5f,%.1f\n", GWORD[cA[i]],
-                                        GWORD[cB[i]], total, (double)total / NA, dt);
+                                        GWORD[cB[i]], total, (double)total / AVGDEN, dt);
                                 fflush(out);
                             }
                         } else if (total == incumbent) {
                             bestA[nbest] = cA[i]; bestB[nbest] = cB[i]; nbest++;
                             printf("[%7.0fs] %s %s  total=%5d  avg=%.5f  TIED      %7.1fs\n",
                                    now_s() - t0, GWORD[cA[i]], GWORD[cB[i]], total,
-                                   (double)total / NA, dt);
+                                   (double)total / AVGDEN, dt);
                             if (out) {
                                 fprintf(out, "%s,%s,%d,%.5f,%.1f\n", GWORD[cA[i]],
-                                        GWORD[cB[i]], total, (double)total / NA, dt);
+                                        GWORD[cB[i]], total, (double)total / AVGDEN, dt);
                                 fflush(out);
                             }
                         }
@@ -2449,7 +2852,7 @@ int main(int argc, char **argv) {
                         printf("[%7.0fs] %5d/%d done (%d searched, %d cut, %d infeas)  "
                                "best=%d (avg %.5f)  %.1f/min  eta %5.1fh\n",
                                el, seen, ncand, searched, cut, infeas, incumbent,
-                               incumbent < INF ? (double)incumbent / NA : 0.0,
+                               incumbent < INF ? (double)incumbent / AVGDEN : 0.0,
                                60.0 * seen / (el > 0 ? el : 1),
                                (el / (seen > 0 ? seen : 1)) * (ncand - seen) / 3600.0);
                     }
@@ -2466,7 +2869,7 @@ int main(int argc, char **argv) {
             printf("NO PAIR in the list solves every answer within %d guesses.\n", depth);
         } else {
             printf("total=%d  expected=%.5f  over %d answers\n",
-                   incumbent, (double)incumbent / NA, NA);
+                   incumbent, (double)incumbent / AVGDEN, NA);
             printf("%d pair%s attain it:", nbest, nbest == 1 ? "" : "s");
             for (int i = 0; i < nbest; i++) printf(" %s+%s", GWORD[bestA[i]], GWORD[bestB[i]]);
             printf("\n");
@@ -2585,7 +2988,7 @@ int main(int argc, char **argv) {
         else
             printf("optimal-only: %d openers by ascending root LB (min %d = %.5f avg)\n",
                    nord, nord ? (int)(ord[0] >> 20) : 0,
-                   nord ? (double)(int)(ord[0] >> 20) / NA : 0.0);
+                   nord ? (double)(int)(ord[0] >> 20) / AVGDEN : 0.0);
         fflush(stdout);
 
         /* ---- DEPTH IS MEASURED FROM THE FIRST OPENER, NOT ASSUMED -----------
@@ -2658,11 +3061,11 @@ int main(int argc, char **argv) {
                         if (lb[g] < INF) ord[nord++] = ((int64_t)lb[g] << 20) | (int64_t)g;
                     qsort(ord, nord, sizeof(int64_t), cmp_i64);
                     printf("re-ranked at depth %d: %d openers, min LB %d (%.5f avg)\n",
-                           depth, nord, (int)(ord[0] >> 20), (double)(int)(ord[0] >> 20) / NA);
+                           depth, nord, (int)(ord[0] >> 20), (double)(int)(ord[0] >> 20) / AVGDEN);
                 }
             } else {
                 printf("%s  solved at depth %d  total=%d  avg=%.5f  (%.1fs)\n",
-                       GWORD[g0], used, t0v, (double)t0v / NA, dt0);
+                       GWORD[g0], used, t0v, (double)t0v / AVGDEN, dt0);
             }
             /* The screen ran at the CEILING; now that the working depth is known,
              * tighten every bound to it. */
@@ -2679,11 +3082,11 @@ int main(int argc, char **argv) {
                 searched++;
                 if (out) {
                     fprintf(out, "%s,%d,%.5f,%d,%.1f\n",
-                            GWORD[g0], t0v, (double)t0v / NA, depth, dt0);
+                            GWORD[g0], t0v, (double)t0v / AVGDEN, depth, dt0);
                     fflush(out);
                 }
                 printf("[%7.0fs] %s  total=%5d  avg=%.5f  FIRST (depth %d)  %7.1fs\n",
-                       now_s() - t0, GWORD[g0], t0v, (double)t0v / NA, depth, dt0);
+                       now_s() - t0, GWORD[g0], t0v, (double)t0v / AVGDEN, depth, dt0);
             } else {
                 /* no incumbent to seed -- the walk starts unbounded, exactly as it
                  * would have if this opener had come up later in the order */
@@ -2801,7 +3204,7 @@ int main(int argc, char **argv) {
                         searched++;
                         if (out) {
                             fprintf(out, "%s,%d,%.5f,%d,%.1f\n",
-                                    GWORD[g], total, (double)total / NA, dused, dt);
+                                    GWORD[g], total, (double)total / AVGDEN, dused, dt);
                             fflush(out);
                         }
                         /* Solved at a shallower cap than the bound in force, so
@@ -2814,7 +3217,7 @@ int main(int argc, char **argv) {
                          * worse, so depth is tested before total. */
                         if (dused < depth) {
                             printf("[%7.0fs] %s  total=%5d  avg=%.5f  NEW BEST (depth %d, was %d)  %7.1fs\n",
-                                   el, GWORD[g], total, (double)total / NA, dused, depth, dt);
+                                   el, GWORD[g], total, (double)total / AVGDEN, dused, depth, dt);
                             depth = dused;            /* the bound IS the leader's depth */
                             incumbent = total;
                             nbest = 0; best[nbest++] = g;
@@ -2827,11 +3230,11 @@ int main(int argc, char **argv) {
                             incumbent = total;
                             nbest = 0; best[nbest++] = g;
                             printf("[%7.0fs] %s  total=%5d  avg=%.5f  NEW BEST  d=%d  lb=%d  %7.1fs  tt %.2f%%/%.2f%%\n",
-                                   el, GWORD[g], total, (double)total / NA, dused, mylb, dt, hit, occ);
+                                   el, GWORD[g], total, (double)total / AVGDEN, dused, mylb, dt, hit, occ);
                         } else if (total == incumbent) {
                             best[nbest++] = g;
                             printf("[%7.0fs] %s  total=%5d  avg=%.5f  TIED      d=%d  lb=%d  %7.1fs  tt %.2f%%/%.2f%%\n",
-                                   el, GWORD[g], total, (double)total / NA, dused, mylb, dt, hit, occ);
+                                   el, GWORD[g], total, (double)total / AVGDEN, dused, mylb, dt, hit, occ);
                         } else if (PRINT_OPENERS) {
                             /* Worse than the incumbent.  It still SOLVED and it
                              * still wrote a CSV row, so by default it printed
@@ -2839,7 +3242,7 @@ int main(int argc, char **argv) {
                              * the file held.  Same columns as the NEW BEST line,
                              * so the two read down one column. */
                             printf("[%7.0fs] %s  total=%5d  avg=%.5f            d=%d  lb=%d  %7.1fs  tt %.2f%%/%.2f%%\n",
-                                   el, GWORD[g], total, (double)total / NA, dused, mylb, dt, hit, occ);
+                                   el, GWORD[g], total, (double)total / AVGDEN, dused, mylb, dt, hit, occ);
                         }
                     }
                     /* Heartbeat on WHICHEVER comes first, count or time.  A count
@@ -2851,7 +3254,7 @@ int main(int argc, char **argv) {
                         int gone = seen + lbskip, left = nord - gone;
                         printf("[%7.0fs] %5d/%d done (%d searched, %d cut, %d lb-skip, %d infeas)  best=%d (avg %.5f)  %.1f/min  eta %5.1fh  tt %.2f%%/%.2f%%\n",
                                el, gone, nord, searched, cut, lbskip, infeas, incumbent,
-                               incumbent < INF ? (double)incumbent / NA : 0.0,
+                               incumbent < INF ? (double)incumbent / AVGDEN : 0.0,
                                gone / (el / 60.0),
                                (left > 0 && gone > 0) ? el / (double)gone * left / 3600.0 : 0.0,
                                hit, occ);
@@ -2869,7 +3272,7 @@ int main(int argc, char **argv) {
             printf("%d rejected by lower bound, %d proved infeasible by search.\n", nolb, infeas);
         } else {
             printf("depth=%d (worst case), total=%d  expected=%.5f  over %d answers\n",
-                   depth, incumbent, (double)incumbent / NA, NA);
+                   depth, incumbent, (double)incumbent / AVGDEN, NA);
             printf("%d opener%s attain it:", nbest, nbest == 1 ? "" : "s");
             for (int i = 0; i < nbest; i++) printf(" %s", GWORD[best[i]]);
             printf("\n");
@@ -2927,7 +3330,7 @@ int main(int argc, char **argv) {
 
                 if (total >= INF) fprintf(out, "%s,,,,%.1f\n", GWORD[g], dt);
                 else              fprintf(out, "%s,%d,%.5f,%d,%.1f\n", GWORD[g], total,
-                                          (double)total / NA, used, dt);
+                                          (double)total / AVGDEN, used, dt);
                 fflush(out);
                 completed++;
                 double el = now_s() - t0;
@@ -2950,7 +3353,7 @@ int main(int argc, char **argv) {
                            el / completed * left / 3600.0, hit, occ);
                 else
                     printf("[%7.0fs] %5d/%d  %s  total=%5d  exp=%.5f  d=%d%s%s %7.1fs  eta %5.1fh  tt %.2f%%/%.2f%%\n",
-                           el, ndone + completed, NG, GWORD[g], total, (double)total / NA,
+                           el, ndone + completed, NG, GWORD[g], total, (double)total / AVGDEN,
                            used, used > depth ? " *" : "  ",
                            tree_ok ? "" : " TREE-FAIL", dt,
                            el / completed * left / 3600.0, hit, occ);

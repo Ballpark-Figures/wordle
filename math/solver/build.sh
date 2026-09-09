@@ -2,8 +2,9 @@
 # Build the solvers from the single optturns.c.  Run from math/solver/.
 #
 #   sh build.sh           -- optturns (normal Wordle), hardturns (hard mode),
-#                            mmturns (Mastermind peg feedback) and ultraturns
+#                            mmturns (Mastermind peg feedback), ultraturns
 #                            (ultra hard mode: guesses must stay consistent)
+#                            and wturns (weighted answers)
 #   sh build.sh 7         -- optturns7, the 7-letter solver
 #   sh build.sh 4 6 7 8   -- several lengths at once
 #
@@ -53,6 +54,12 @@ if [ $# -eq 0 ]; then
   # (-DULTRA), carrying the accumulated consistency constraint as extra TT state
   # exactly as hard mode carries its own.
   gcc $BASE $OMP -DULTRA -o ultraturns optturns.c
+  # wturns is the WEIGHTED objective: the answers carry a weight and the total
+  # is sum of w_a x (guesses spent on a) rather than a plain count.  A fifth
+  # compile-time mode of this one source (-DWEIGHTED), because it is the same
+  # search under a different cost -- and with every weight 1 it reproduces
+  # optturns exactly, which is the differential test checkweighted.py runs.
+  gcc $BASE $OMP -DWEIGHTED -o wturns optturns.c
   # pairsplit is the PAIR-OPENER screen: no search, no TT, just the joint-split
   # score for every unordered pair of guesses. Separate program because it shares
   # nothing with the solver but the .npy loader.
