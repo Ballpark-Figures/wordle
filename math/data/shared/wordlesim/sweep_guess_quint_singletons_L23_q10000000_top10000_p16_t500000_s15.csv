@@ -1,0 +1,17 @@
+# wordle opener sweep: 500000 trials per word, follow-up guess, seed 15
+# lineage root=quint_singletons_L23_q10000000_top10000 pass=16 source=sweep_guess_quint_singletons_L23_q10000000_top10000_p15_t300000_s14.csv
+# settings follow_up=guess pair_adaptive=0 win_within=6 trials=500000 seed=15 words=7 rank=mean
+# 5-word openings, played BLIND in order; the follow-up plays the rest (math/wordlesim.py)
+# every opening faces the SAME 500000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_guess_quint_singletons_L23_q10000000_top10000_p16_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+bagel murky ponds whift cezve,500000,6.034824,0.000329,0.232799,1,6.0,8,0.962936,0.000267,481468,7.063
+bawdy kugel morph snift cezve,500000,6.035484,0.000336,0.237472,1,6.0,8,0.962116,0.000270,481058,7.080
+bowel farms pudgy think cezve,500000,6.034952,0.000338,0.238861,1,6.0,8,0.961652,0.000272,480826,7.082
+bagel fonds murky whipt cezve,500000,6.036804,0.000328,0.231831,1,6.0,8,0.961602,0.000272,480801,7.144
+bight curvy flask pownd mezes,500000,6.035880,0.000319,0.225913,2,6.0,8,0.962390,0.000269,481195,7.141
+curvy flaks might pownd bezel,500000,6.036476,0.000334,0.236427,1,6.0,8,0.961108,0.000273,480554,7.090
+carve dumky fight powns bezel,500000,6.036048,0.000339,0.239951,1,6.0,8,0.961450,0.000272,480725,7.123

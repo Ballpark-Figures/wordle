@@ -1,0 +1,31 @@
+# wordle opener sweep: 50000 trials per word, follow-up guess, seed 11
+# lineage root=triple_singletons_top10000_bestorder_guess pass=12 source=sweep_guess_triple_singletons_top10000_bestorder_guess_p11_t30000_s10_adapt2.csv
+# 3-word openings, played in order but ABANDONED once the follow-up is down to 2
+# or fewer words (--pair-adaptive, the rule in data/shared/PAIRS.md); ORDER MATTERS, so
+# a b and b a are different rows
+# every opening faces the SAME 50000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_guess_triple_singletons_top10000_bestorder_guess_p12_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+chant dorse blimp,50000,4.326520,0.003984,0.890955,1,4.0,11,0.985200,0.000540,49260,0.987
+caple short dingy,50000,4.339100,0.004207,0.940728,2,4.0,10,0.976760,0.000674,48838,0.991
+corse plant midgy,50000,4.334900,0.004139,0.925483,2,4.0,9,0.979380,0.000636,48969,0.984
+horst dance blimp,50000,4.333600,0.003934,0.879663,2,4.0,10,0.984620,0.000550,49231,0.975
+point carle dumbs,50000,4.330960,0.004063,0.908582,1,4.0,10,0.979020,0.000641,48951,0.968
+horst pance dimly,50000,4.337740,0.004123,0.921851,2,4.0,10,0.979280,0.000637,48964,0.966
+canst horde blimp,50000,4.339880,0.003927,0.878144,2,4.0,11,0.984520,0.000552,49226,0.962
+plant cries dumbo,50000,4.338840,0.004187,0.936165,1,4.0,11,0.978020,0.000656,48901,0.972
+horst caple dingy,50000,4.336280,0.004162,0.930706,2,4.0,10,0.977620,0.000662,48881,0.985
+clasp trone midgy,50000,4.344760,0.004088,0.914198,1,4.0,10,0.979820,0.000629,48991,0.990
+horst pance build,50000,4.341860,0.004183,0.935419,2,4.0,10,0.976960,0.000671,48848,0.976
+prone clast midgy,50000,4.347080,0.004107,0.918299,1,4.0,10,0.979620,0.000632,48981,0.975
+plant cores midgy,50000,4.340120,0.004084,0.913222,1,4.0,10,0.979520,0.000633,48976,0.975
+crane blist podgy,50000,4.343420,0.004128,0.923157,1,4.0,10,0.978560,0.000648,48928,0.983
+caple snort midgy,50000,4.343460,0.004086,0.913713,2,4.0,10,0.980440,0.000619,49022,0.975
+drant clies bumph,50000,4.337880,0.004066,0.909293,2,4.0,10,0.982220,0.000591,49111,0.975
+crone spalt midgy,50000,4.343200,0.004101,0.916925,1,4.0,10,0.980620,0.000617,49031,0.970
+clone spart midgy,50000,4.352240,0.004080,0.912219,1,4.0,10,0.980580,0.000617,49029,0.971
+plane crost midgy,50000,4.343020,0.004100,0.916719,1,4.0,10,0.979620,0.000632,48981,0.972
+clone tarps midgy,50000,4.348720,0.003990,0.892239,1,4.0,9,0.981560,0.000602,49078,0.975

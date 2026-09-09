@@ -1,0 +1,22 @@
+# paired comparison of 6 openings, 5000000 games, follow-up guess, pair-adaptive 2, seed 20
+# settings and finalists taken from paired_guess_pair_singletons_top10000_bestorder_guess_p17_r2_t3000000_s19_adapt2.csv (root pair_singletons_top10000_bestorder_guess, pass 17)
+# leader plant cries, mean 4.30504 +/- 0.00051 (its own error)
+# 
+# opening                        mean    own se    vs leader paired se   sigma
+# plant cries                 4.30504   0.00051            -         -       -
+# claes print                 4.30505   0.00051      0.00001   0.00005     0.2
+# caple trins                 4.30662   0.00050      0.00159   0.00041     3.9
+# clart peins                 4.30681   0.00050      0.00177   0.00032     5.5
+# clans tripe                 4.30765   0.00050      0.00261   0.00034     7.8
+# parse clint                 4.30767   0.00050      0.00263   0.00039     6.7
+# 
+# pairing gain against the leader's nearest rival: unpaired error 0.00072, paired 0.00005 (14.8x tighter)
+# settings follow_up=guess pair_adaptive=2 win_within=6 trials=5000000 seed=20 words=6
+# lineage root=pair_singletons_top10000_bestorder_guess pass=17 round=3 source=paired_guess_pair_singletons_top10000_bestorder_guess_p17_r2_t3000000_s19_adapt2.csv
+word,trials,mean,stderr,diff_vs_leader,paired_stderr,sigma
+plant cries,5000000,4.305037,0.000506,0.000000,0.000000,0.000
+claes print,5000000,4.305049,0.000505,0.000012,0.000048,0.240
+caple trins,5000000,4.306623,0.000496,0.001586,0.000406,3.909
+clart peins,5000000,4.306807,0.000504,0.001770,0.000320,5.535
+clans tripe,5000000,4.307646,0.000498,0.002608,0.000336,7.766
+parse clint,5000000,4.307667,0.000501,0.002630,0.000394,6.668

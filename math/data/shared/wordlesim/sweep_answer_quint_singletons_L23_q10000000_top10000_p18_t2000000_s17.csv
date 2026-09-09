@@ -1,0 +1,29 @@
+# wordle opener sweep: 2000000 trials per word, follow-up answer, seed 17
+# lineage root=quint_singletons_L23_q10000000_top10000 pass=18 source=sweep_answer_quint_singletons_L23_q10000000_top10000_p17_t1000000_s16.csv
+# settings follow_up=answer pair_adaptive=0 win_within=6 trials=2000000 seed=17 words=19 rank=mean
+# 5-word openings, played BLIND in order; the follow-up plays the rest (math/wordlesim.py)
+# every opening faces the SAME 2000000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_answer_quint_singletons_L23_q10000000_top10000_p18_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+blaze comfy right spunk waved,2000000,6.000875,0.000122,0.172957,1,6.0,7,0.993143,0.000058,1986285,13.832
+clove rugby spank whift mozed,2000000,6.000945,0.000117,0.165318,1,6.0,7,0.993954,0.000055,1987909,14.012
+downy giver pluck shaft zambo,2000000,6.001479,0.000122,0.172800,1,6.0,7,0.992684,0.000060,1985368,14.078
+blitz crown pudgy shmek favor,2000000,6.001215,0.000122,0.172026,1,6.0,7,0.993026,0.000059,1986051,14.022
+bagel downy furth skimp cezve,2000000,6.001334,0.000112,0.158345,1,6.0,7,0.994008,0.000055,1988015,14.111
+bawdy mover pluck shift zigan,2000000,6.001417,0.000123,0.173803,1,6.0,7,0.992672,0.000060,1985345,14.115
+curvy dowel fight spank zambo,2000000,6.001271,0.000123,0.174295,1,6.0,7,0.992752,0.000060,1985504,14.068
+downy giver pluck shaft jambe,2000000,6.001874,0.000123,0.173934,1,6.0,7,0.992290,0.000062,1984579,14.154
+downy giver pluck shaft jambo,2000000,6.001874,0.000123,0.173934,1,6.0,7,0.992290,0.000062,1984579,14.110
+downy giver pluck shaft jambs,2000000,6.001874,0.000123,0.173934,1,6.0,7,0.992290,0.000062,1984579,14.238
+downy giver pluck shaft jambu,2000000,6.001874,0.000123,0.173934,1,6.0,7,0.992290,0.000062,1984579,14.266
+bloke curvy fight spawn mozed,2000000,6.001316,0.000122,0.172781,1,6.0,7,0.992792,0.000060,1985584,14.235
+curvy dowel fight spank jambe,2000000,6.001438,0.000124,0.174773,1,6.0,7,0.992585,0.000061,1985170,14.184
+bagel crowd funky spitz vehme,2000000,6.001251,0.000118,0.167495,1,6.0,7,0.993554,0.000057,1987108,14.277
+block dumpy shift waver zigan,2000000,6.001750,0.000125,0.176370,1,6.0,7,0.992209,0.000062,1984419,14.106
+block dumpy given shaft wazir,2000000,6.001634,0.000125,0.176731,1,6.0,7,0.992275,0.000062,1984551,14.063
+black fudge nymph worst vizir,2000000,6.001191,0.000125,0.176809,1,6.0,7,0.992641,0.000060,1985282,14.058
+diver pluck shaft womby gazon,2000000,6.001701,0.000120,0.169006,1,6.0,7,0.993120,0.000058,1986241,13.970
+model rugby spank whift cezve,2000000,6.001817,0.000120,0.169349,1,6.0,7,0.993003,0.000059,1986006,14.063

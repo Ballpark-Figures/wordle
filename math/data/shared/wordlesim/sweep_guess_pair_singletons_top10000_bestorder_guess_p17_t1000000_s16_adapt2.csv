@@ -1,0 +1,33 @@
+# wordle opener sweep: 1000000 trials per word, follow-up guess, seed 16
+# lineage root=pair_singletons_top10000_bestorder_guess pass=17 source=sweep_guess_pair_singletons_top10000_bestorder_guess_p16_t500000_s15_adapt2.csv
+# 2-word openings, played in order but ABANDONED once the follow-up is down to 2
+# or fewer words (--pair-adaptive, the rule in data/shared/PAIRS.md); ORDER MATTERS, so
+# a b and b a are different rows
+# every opening faces the SAME 1000000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_guess_pair_singletons_top10000_bestorder_guess_p17_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+clans tripe,1000000,4.307537,0.001113,1.113421,2,4.0,12,0.959653,0.000197,959653,19.073
+claes print,1000000,4.306074,0.001130,1.129913,2,4.0,12,0.958267,0.000200,958267,19.263
+plant cries,1000000,4.305170,0.001132,1.132012,1,4.0,12,0.958144,0.000200,958144,19.201
+caple trins,1000000,4.306110,0.001107,1.107244,2,4.0,12,0.960400,0.000195,960400,19.012
+clart peins,1000000,4.306727,0.001127,1.127475,2,4.0,12,0.958811,0.000199,958811,18.869
+crane slipt,1000000,4.308205,0.001128,1.128376,1,4.0,12,0.958895,0.000199,958895,18.621
+crane spilt,1000000,4.308284,0.001129,1.129030,1,4.0,12,0.958825,0.000199,958825,18.887
+claps trine,1000000,4.309645,0.001113,1.112708,2,4.0,12,0.959748,0.000197,959748,18.886
+plans trice,1000000,4.308506,0.001119,1.118750,2,4.0,12,0.958847,0.000199,958847,18.826
+plast crine,1000000,4.310019,0.001128,1.128239,2,4.0,12,0.959082,0.000198,959082,18.874
+parse clint,1000000,4.308421,0.001121,1.120906,1,4.0,12,0.959494,0.000197,959494,18.814
+place trins,1000000,4.306693,0.001116,1.116321,1,4.0,12,0.959290,0.000198,959290,18.796
+clint pears,1000000,4.309077,0.001123,1.123073,2,4.0,12,0.958540,0.000199,958540,19.008
+cline traps,1000000,4.309100,0.001110,1.109583,2,4.0,12,0.959911,0.000196,959911,19.237
+prase clint,1000000,4.311047,0.001126,1.126327,2,4.0,12,0.958970,0.000198,958970,19.266
+plats crine,1000000,4.310030,0.001122,1.122498,2,4.0,12,0.959183,0.000198,959183,19.310
+plant crise,1000000,4.310208,0.001125,1.124969,1,4.0,12,0.959343,0.000197,959343,19.308
+clipe trans,1000000,4.310234,0.001110,1.109615,2,4.0,12,0.959770,0.000196,959770,19.349
+cripe slant,1000000,4.309413,0.001126,1.126168,2,4.0,12,0.958693,0.000199,958693,19.016
+spalt crine,1000000,4.313101,0.001126,1.125925,2,4.0,12,0.958643,0.000199,958643,19.120
+corse plant,1000000,4.310421,0.001119,1.118732,2,4.0,12,0.959495,0.000197,959495,18.981
+cline tarps,1000000,4.312763,0.001107,1.106932,2,4.0,12,0.959653,0.000197,959653,18.958

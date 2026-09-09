@@ -1,0 +1,12 @@
+# wordle single-board simulation (see math/wordlesim.py)
+# strategy=random-guess trials=1 seed=0 win_within=6
+# answers drawn uniformly from the 2315 mystery words; guesses from the 12972 legal words
+# NO guess cap: play continues past 6 until the word is found, so the mean is unconstrained
+# and the win rate is the fraction of those untruncated scores that came in at 6 or fewer
+game,guesses,won,answer,sequence
+0,4,1,surer,pious scurf surah surer
+# strategy random-guess, trials 1, seed 0
+# mean guesses 4.0000  +/- 0.0000 (standard error)
+# win rate (within 6) 100.0000%  +/- 0.0000%  (1 of 1 games)
+# sd 0.0000   min 4   median 4.0   max 4
+#    4 guesses       1  100.00%

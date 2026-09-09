@@ -1,0 +1,17 @@
+# wordle opener sweep: 200000 trials per word, follow-up answer, seed 13
+# lineage root=pair_singletons_top10000_bestorder_answer pass=14 source=sweep_answer_pair_singletons_top10000_bestorder_answer_p13_t100000_s12.csv
+# settings follow_up=answer pair_adaptive=0 win_within=6 trials=200000 seed=13 words=7 rank=mean
+# 2-word openings, played BLIND in order; the follow-up plays the rest (math/wordlesim.py)
+# every opening faces the SAME 200000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_answer_pair_singletons_top10000_bestorder_answer_p14_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+parse clint,200000,3.695120,0.001748,0.781870,1,4.0,9,0.994760,0.000161,198952,1.501
+crane spilt,200000,3.703035,0.001758,0.786136,1,4.0,10,0.994855,0.000160,198971,1.435
+crine spalt,200000,3.704360,0.001752,0.783531,3,4.0,10,0.994855,0.000160,198971,1.446
+crane slipt,200000,3.703600,0.001758,0.786111,1,4.0,10,0.994785,0.000161,198957,1.432
+slant cripe,200000,3.703790,0.001757,0.785699,1,4.0,10,0.994785,0.000161,198957,1.450
+price slant,200000,3.704095,0.001768,0.790891,1,4.0,10,0.994345,0.000168,198869,1.444
+spice larnt,200000,3.706350,0.001761,0.787593,1,4.0,9,0.994620,0.000164,198924,1.609

@@ -1,0 +1,9 @@
+# wordle opener sweep: 1000000 trials per word, follow-up answer, seed 4
+# strategy in math/wordlesim.py: the word is played on turn 0, the follow-up plays the rest
+# every word faces the SAME 1000000 answers, drawn from the 2315 mystery words (common random numbers)
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+slate,1000000,3.821830,0.000999,0.999288,1,4.0,11,0.988629,0.000106,988629,7.742
+least,1000000,3.832036,0.000995,0.995397,1,4.0,10,0.988648,0.000106,988648,7.811
+reast,1000000,3.835924,0.001014,1.014023,2,4.0,11,0.987630,0.000111,987630,7.843

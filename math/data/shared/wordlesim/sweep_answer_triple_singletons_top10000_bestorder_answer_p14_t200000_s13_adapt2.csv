@@ -1,0 +1,16 @@
+# wordle opener sweep: 200000 trials per word, follow-up answer, seed 13
+# lineage root=triple_singletons_top10000_bestorder_answer pass=14 source=sweep_answer_triple_singletons_top10000_bestorder_answer_p13_t100000_s12_adapt2.csv
+# 3-word openings, played in order but ABANDONED once the follow-up is down to 2
+# or fewer words (--pair-adaptive, the rule in data/shared/PAIRS.md); ORDER MATTERS, so
+# a b and b a are different rows
+# every opening faces the SAME 200000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_answer_triple_singletons_top10000_bestorder_answer_p14_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+parse clint dumbo,200000,3.782975,0.001730,0.773575,1,4.0,8,0.996815,0.000126,199363,1.565
+siren clapt dumbo,200000,3.793980,0.001702,0.760979,1,4.0,8,0.996640,0.000129,199328,1.516
+crane spilt dumbo,200000,3.795365,0.001738,0.777382,1,4.0,8,0.996695,0.000128,199339,1.505
+drice slant bumpy,200000,3.795875,0.001727,0.772166,2,4.0,8,0.996910,0.000124,199382,1.519
+parse clint dough,200000,3.791915,0.001763,0.788625,1,4.0,9,0.996810,0.000126,199362,1.521

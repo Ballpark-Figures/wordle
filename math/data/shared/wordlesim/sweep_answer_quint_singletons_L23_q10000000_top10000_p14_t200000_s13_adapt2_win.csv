@@ -1,0 +1,58 @@
+# wordle opener sweep: 200000 trials per word, follow-up answer, seed 13
+# lineage root=quint_singletons_L23_q10000000_top10000 pass=14 source=sweep_answer_quint_singletons_L23_q10000000_top10000_p13_t100000_s12_adapt2_win.csv
+# settings follow_up=answer pair_adaptive=2 win_within=6 trials=200000 seed=13 words=46 rank=win_rate
+# 5-word openings, played in order but ABANDONED once the follow-up is down to 2
+# or fewer words (--pair-adaptive, the rule in data/shared/PAIRS.md); ORDER MATTERS, so
+# a b and b a are different rows
+# every opening faces the SAME 200000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_answer_quint_singletons_L23_q10000000_top10000_p14_se5-win.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+bumph doven first zygal cawks,200000,4.241110,0.001716,0.767300,2,4.0,6,1.000000,0.000000,200000,1.949
+chowk faver gundy spilt jembe,200000,4.345120,0.001820,0.813797,2,4.0,6,1.000000,0.000000,200000,1.956
+clift punky sarge vozhd wembs,200000,4.127510,0.001743,0.779361,2,4.0,6,1.000000,0.000000,200000,1.854
+clipt funky sarge vozhd wembs,200000,4.129775,0.001743,0.779312,2,4.0,6,1.000000,0.000000,200000,1.858
+diver flunk ghast womby capiz,200000,4.193110,0.001817,0.812682,1,4.0,6,1.000000,0.000000,200000,1.893
+blawn dumky fiver ghost capiz,200000,4.373230,0.001844,0.824514,2,4.0,6,1.000000,0.000000,200000,1.945
+blown dumky fiver ghast capiz,200000,4.411850,0.001837,0.821470,1,4.0,6,1.000000,0.000000,200000,1.968
+chapt flisk rugby vowed jamon,200000,4.198955,0.001924,0.860306,2,4.0,6,1.000000,0.000000,200000,1.905
+chapt flisk rugby vowed zaman,200000,4.198955,0.001924,0.860306,2,4.0,6,1.000000,0.000000,200000,1.891
+coved flask rugby whipt jamon,200000,4.270670,0.001845,0.825149,2,4.0,6,1.000000,0.000000,200000,1.941
+coved flask rugby whipt zaman,200000,4.270670,0.001845,0.825149,2,4.0,6,1.000000,0.000000,200000,1.912
+coved flimp rugby shakt wanze,200000,4.310345,0.001849,0.826798,2,4.0,6,1.000000,0.000000,200000,1.930
+davit flock hyper swung zombi,200000,4.219055,0.001816,0.812283,2,4.0,6,1.000000,0.000000,200000,1.895
+chapt flisk moved rugby ajwan,200000,4.163965,0.001872,0.837236,2,4.0,6,1.000000,0.000000,200000,1.891
+chapt flisk moved rugby jawan,200000,4.163965,0.001872,0.837236,2,4.0,6,1.000000,0.000000,200000,1.888
+chapt flisk rugby vowed axman,200000,4.198955,0.001924,0.860306,2,4.0,6,1.000000,0.000000,200000,1.897
+chave flisk pownd rugby matza,200000,4.253775,0.001877,0.839605,2,4.0,6,1.000000,0.000000,200000,1.907
+chive flask pownd rugby matza,200000,4.252425,0.001882,0.841725,2,4.0,6,1.000000,0.000000,200000,1.868
+chowk diver fluyt spang zambo,200000,4.324805,0.001823,0.815181,2,4.0,6,1.000000,0.000000,200000,1.859
+chowk dungy faver slipt zimbi,200000,4.392100,0.001752,0.783435,2,4.0,6,1.000000,0.000000,200000,1.877
+clomp rugby sixth waved frank,200000,4.339270,0.001890,0.845109,2,4.0,6,1.000000,0.000000,200000,1.863
+clonk pudgy shaft wiver zambo,200000,4.252315,0.001777,0.794528,2,4.0,6,1.000000,0.000000,200000,1.838
+coved flask rugby whipt axman,200000,4.270670,0.001845,0.825149,2,4.0,6,1.000000,0.000000,200000,1.851
+davit flock hyper swung zimbi,200000,4.219055,0.001816,0.812283,2,4.0,6,1.000000,0.000000,200000,1.851
+bench dript mawky vlogs furze,200000,4.188415,0.001888,0.844363,1,4.0,6,1.000000,0.000000,200000,1.821
+blind mawky progs vetch furze,200000,4.291495,0.001811,0.809931,1,4.0,6,1.000000,0.000000,200000,1.852
+blond mawky prigs vetch furze,200000,4.290115,0.001815,0.811869,1,4.0,6,1.000000,0.000000,200000,1.854
+caved flong rumpy shtik bwazi,200000,4.224065,0.001872,0.837044,2,4.0,6,1.000000,0.000000,200000,1.838
+caver duply fight snowk bemix,200000,4.179895,0.001837,0.821624,2,4.0,6,1.000000,0.000000,200000,1.815
+caver duply fight snowk jembe,200000,4.179895,0.001837,0.821624,2,4.0,6,1.000000,0.000000,200000,1.935
+chaft rugby skimp voled wanze,200000,4.293735,0.001892,0.846114,2,4.0,6,1.000000,0.000000,200000,1.864
+champ flisk rugby voted ajwan,200000,4.337000,0.001868,0.835580,1,4.0,6,1.000000,0.000000,200000,1.882
+champ flisk rugby voted jawan,200000,4.337000,0.001868,0.835580,1,4.0,6,1.000000,0.000000,200000,1.885
+chimp flask rugby voted ajwan,200000,4.342675,0.001839,0.822491,2,4.0,6,1.000000,0.000000,200000,1.876
+chimp flask rugby voted jawan,200000,4.342675,0.001839,0.822491,2,4.0,6,1.000000,0.000000,200000,1.943
+chowk dungy faver slipt zimbs,200000,4.392100,0.001752,0.783435,2,4.0,6,1.000000,0.000000,200000,1.966
+chowk faver gundy spilt bemix,200000,4.345120,0.001820,0.813797,2,4.0,6,1.000000,0.000000,200000,2.010
+clamp doven furzy sight bawks,200000,4.261145,0.001930,0.863152,1,4.0,6,1.000000,0.000000,200000,1.928
+coved flimp rugby shakt ajwan,200000,4.310345,0.001849,0.826798,2,4.0,6,1.000000,0.000000,200000,1.943
+coved flimp rugby shakt jawan,200000,4.310345,0.001849,0.826798,2,4.0,6,1.000000,0.000000,200000,1.932
+coved flimp rugby shakt waxen,200000,4.310345,0.001849,0.826798,2,4.0,6,1.000000,0.000000,200000,1.965
+downy jambe pluck sight fever,200000,4.414890,0.001876,0.838928,1,5.0,6,1.000000,0.000000,200000,2.046
+duvet flank girsh womby capiz,200000,4.170415,0.001827,0.817207,1,4.0,6,1.000000,0.000000,200000,1.893
+flank gived hurst womby capiz,200000,4.183885,0.001841,0.823137,1,4.0,6,1.000000,0.000000,200000,1.919
+flobs mudir pawky thegn cezve,200000,4.323195,0.001882,0.841519,2,4.0,6,1.000000,0.000000,200000,1.928
+bight marvy pluck sownd froze,200000,4.339375,0.001856,0.829833,2,4.0,6,1.000000,0.000000,200000,1.935

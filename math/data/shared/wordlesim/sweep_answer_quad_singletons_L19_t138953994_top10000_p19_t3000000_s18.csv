@@ -1,0 +1,13 @@
+# wordle opener sweep: 3000000 trials per word, follow-up answer, seed 18
+# lineage root=quad_singletons_L19_t138953994_top10000 pass=19 source=sweep_answer_quad_singletons_L19_t138953994_top10000_p18_t2000000_s17.csv
+# settings follow_up=answer pair_adaptive=0 win_within=6 trials=3000000 seed=18 words=3 rank=mean
+# 4-word openings, played BLIND in order; the follow-up plays the rest (math/wordlesim.py)
+# every opening faces the SAME 3000000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_answer_quad_singletons_L19_t138953994_top10000_p19_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+champ flint rugby sowed,3000000,5.022095,0.000114,0.197754,1,5.0,7,0.999237,0.000016,2997712,18.588
+bawdy chump flint gorse,3000000,5.022539,0.000116,0.201586,1,5.0,7,0.998810,0.000020,2996429,19.398
+clung riped shaft womby,3000000,5.022966,0.000108,0.186926,1,5.0,7,0.999238,0.000016,2997715,20.275

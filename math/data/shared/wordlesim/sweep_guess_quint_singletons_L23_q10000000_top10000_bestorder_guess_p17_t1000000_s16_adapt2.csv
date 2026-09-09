@@ -1,0 +1,15 @@
+# wordle opener sweep: 1000000 trials per word, follow-up guess, seed 16
+# lineage root=quint_singletons_L23_q10000000_top10000_bestorder_guess pass=17 source=sweep_guess_quint_singletons_L23_q10000000_top10000_bestorder_guess_p16_t500000_s15_adapt2.csv
+# settings follow_up=guess pair_adaptive=2 win_within=6 trials=1000000 seed=16 words=3 rank=mean
+# 5-word openings, played in order but ABANDONED once the follow-up is down to 2
+# or fewer words (--pair-adaptive, the rule in data/shared/PAIRS.md); ORDER MATTERS, so
+# a b and b a are different rows
+# every opening faces the SAME 1000000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_guess_quint_singletons_L23_q10000000_top10000_bestorder_guess_p17_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+clift pared wonks vughy jembe,1000000,4.573247,0.000940,0.940293,2,5.0,8,0.983358,0.000128,983358,24.907
+farse compt blink vughy dewax,1000000,4.578184,0.000967,0.966949,2,5.0,9,0.972454,0.000164,972454,25.376
+ronde clift sumph gawky vibex,1000000,4.578468,0.000915,0.914562,2,5.0,8,0.978458,0.000145,978458,26.293

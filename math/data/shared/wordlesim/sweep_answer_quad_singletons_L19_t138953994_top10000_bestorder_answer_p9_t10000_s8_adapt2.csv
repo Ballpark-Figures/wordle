@@ -1,0 +1,54 @@
+# wordle opener sweep: 10000 trials per word, follow-up answer, seed 8
+# lineage root=quad_singletons_L19_t138953994_top10000_bestorder_answer pass=9 source=sweep_answer_quad_singletons_L19_t138953994_top10000_bestorder_answer_p8_t5000_s7_adapt2.csv
+# settings follow_up=answer pair_adaptive=2 win_within=6 trials=10000 seed=8 words=42
+# 4-word openings, played in order but ABANDONED once the follow-up is down to 2
+# or fewer words (--pair-adaptive, the rule in data/shared/PAIRS.md); ORDER MATTERS, so
+# a b and b a are different rows
+# every opening faces the SAME 10000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_answer_quad_singletons_L19_t138953994_top10000_bestorder_answer_p9_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+dorse clint bumph gawky,10000,3.867100,0.007891,0.789113,2,4.0,7,0.999000,0.000316,9990,0.096
+clint sabre whomp fudgy,10000,3.868000,0.007889,0.788948,2,4.0,7,0.998500,0.000387,9985,0.082
+borde canst flimp vughy,10000,3.876700,0.007559,0.755880,2,4.0,7,0.999700,0.000173,9997,0.089
+cable snirt whomp fudgy,10000,3.864300,0.007830,0.783037,1,4.0,7,0.998700,0.000360,9987,0.082
+birle canst whomp fudgy,10000,3.859200,0.007924,0.792362,2,4.0,7,0.999100,0.000300,9991,0.083
+durst pagle finch womby,10000,3.909000,0.007548,0.754835,2,4.0,7,0.999100,0.000300,9991,0.087
+clint saber whomp fudgy,10000,3.898400,0.007947,0.794695,2,4.0,7,0.998500,0.000387,9985,0.088
+farse compt blind vughy,10000,3.891400,0.007388,0.738824,2,4.0,7,0.999800,0.000141,9998,0.084
+drant chile bumpy gowfs,10000,3.900400,0.008122,0.812247,2,4.0,8,0.998600,0.000374,9986,0.084
+rance blist whomp fudgy,10000,3.882700,0.007939,0.793854,2,4.0,7,0.999300,0.000264,9993,0.084
+hance worst blimp fudgy,10000,3.911400,0.007780,0.777953,2,4.0,7,0.999300,0.000264,9993,0.084
+borde clint swamp vughy,10000,3.907800,0.007594,0.759445,2,4.0,6,1.000000,0.000000,10000,0.082
+morse clipt bundh gawky,10000,3.891400,0.007921,0.792129,2,4.0,7,0.998400,0.000400,9984,0.082
+horst caged blimp funky,10000,3.928900,0.007677,0.767661,2,4.0,7,0.998500,0.000387,9985,0.088
+robed clint swamp vughy,10000,3.908300,0.007534,0.753358,2,4.0,6,1.000000,0.000000,10000,0.084
+first pagle dunch womby,10000,3.901600,0.007622,0.762218,1,4.0,7,0.999100,0.000300,9991,0.082
+chart sowne blimp fudgy,10000,3.905400,0.007996,0.799572,1,4.0,7,0.998700,0.000360,9987,0.081
+horst cadge blimp funky,10000,3.940300,0.007779,0.777944,2,4.0,7,0.998800,0.000346,9988,0.085
+marse pitch blown fudgy,10000,3.880200,0.007966,0.796562,2,4.0,7,0.999200,0.000283,9992,0.089
+parse mitch blown fudgy,10000,3.877300,0.008026,0.802564,1,4.0,7,0.998900,0.000331,9989,0.081
+parse ditch flung womby,10000,3.892800,0.007941,0.794085,1,4.0,7,0.999400,0.000245,9994,0.081
+brame clipt sownd vughy,10000,3.907200,0.007571,0.757130,2,4.0,6,1.000000,0.000000,10000,0.082
+chant birle dumpy gowfs,10000,3.922200,0.008120,0.812043,1,4.0,7,0.998700,0.000360,9987,0.082
+howre canst blimp fudgy,10000,3.911800,0.007758,0.775810,2,4.0,7,0.998200,0.000424,9982,0.083
+first dance gulph womby,10000,3.903700,0.007803,0.780312,1,4.0,7,0.999000,0.000316,9990,0.082
+dirge clast bumph wonky,10000,3.915600,0.008198,0.819844,1,4.0,7,0.998700,0.000360,9987,0.082
+dirge plast chunk womby,10000,3.911200,0.008025,0.802483,1,4.0,7,0.999600,0.000200,9996,0.082
+caner blist whomp fudgy,10000,3.900300,0.008057,0.805745,2,4.0,7,0.998500,0.000387,9985,0.082
+dance thirl bumpy gowfs,10000,3.909500,0.008004,0.800359,1,4.0,7,0.999500,0.000224,9995,0.082
+parse glift dunch womby,10000,3.907700,0.007671,0.767098,1,4.0,7,0.999600,0.000200,9996,0.082
+chant worse blimp fudgy,10000,3.921100,0.007888,0.788757,1,4.0,7,0.998900,0.000331,9989,0.082
+rhine clapt wombs fudgy,10000,3.891500,0.008032,0.803239,2,4.0,7,0.999400,0.000245,9994,0.083
+borel chant wimps fudgy,10000,3.920500,0.007936,0.793626,2,4.0,7,0.998600,0.000374,9986,0.088
+ratch sowne blimp fudgy,10000,3.913100,0.007814,0.781415,2,4.0,7,0.999500,0.000224,9995,0.082
+chile brant dumpy gowfs,10000,3.917800,0.007972,0.797187,2,4.0,7,0.999100,0.000300,9991,0.084
+borne clift damps vughy,10000,3.923700,0.007539,0.753880,1,4.0,7,0.999600,0.000200,9996,0.082
+warst phone climb fudgy,10000,3.921700,0.007693,0.769304,2,4.0,7,0.999600,0.000200,9996,0.082
+parse dutch fling womby,10000,3.923200,0.007843,0.784323,1,4.0,7,0.999100,0.000300,9991,0.083
+robed clint sumph gawky,10000,3.931900,0.007638,0.763754,2,4.0,7,0.999300,0.000264,9993,0.083
+force blast dingy whump,10000,3.930300,0.007812,0.781219,1,4.0,7,0.998800,0.000346,9988,0.083
+frist pagle dunch womby,10000,3.912800,0.007634,0.763449,2,4.0,7,0.999500,0.000224,9995,0.082
+whore canst blimp fudgy,10000,3.919200,0.007843,0.784304,2,4.0,7,0.997900,0.000458,9979,0.082

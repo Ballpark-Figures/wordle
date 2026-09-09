@@ -1,0 +1,14 @@
+# paired comparison of 2 openings, 30000000 games, follow-up guess, pair-adaptive 2, seed 23, ranked on mean guesses
+# settings and finalists taken from paired_guess_pair_singletons_top10000_bestorder_guess_p17_r5_t20000000_s22_adapt2.csv (root pair_singletons_top10000_bestorder_guess, pass 17)
+# leader plant cries, mean 4.30498 +/- 0.00021 (its own error)
+# 
+# opening                        mean    own se    vs leader paired se   sigma
+# plant cries                 4.30498   0.00021            -         -       -
+# claes print                 4.30499   0.00021      0.00001   0.00002     0.5
+# 
+# pairing gain against the leader's nearest rival: unpaired error 0.00029, paired 0.00002 (14.8x tighter)
+# settings follow_up=guess pair_adaptive=2 win_within=6 trials=30000000 seed=23 words=2 rank=mean
+# lineage root=pair_singletons_top10000_bestorder_guess pass=17 round=6 source=paired_guess_pair_singletons_top10000_bestorder_guess_p17_r5_t20000000_s22_adapt2.csv
+word,trials,mean,stderr,diff_vs_leader,paired_stderr,sigma
+plant cries,30000000,4.304982,0.000207,0.000000,0.000000,0.000
+claes print,30000000,4.304993,0.000206,0.000010,0.000020,0.530

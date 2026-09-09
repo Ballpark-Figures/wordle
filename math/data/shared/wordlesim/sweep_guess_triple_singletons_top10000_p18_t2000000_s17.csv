@@ -1,0 +1,12 @@
+# wordle opener sweep: 2000000 trials per word, follow-up guess, seed 17
+# lineage root=triple_singletons_top10000 pass=18 source=sweep_guess_triple_singletons_top10000_p17_t1000000_s16.csv
+# 3-word openings, played BLIND in order; the follow-up plays the rest (math/wordlesim.py)
+# every opening faces the SAME 2000000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_guess_triple_singletons_top10000_p18_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+carle point dumbs,2000000,4.485474,0.000521,0.736880,2,4.0,11,0.980304,0.000098,1960608,25.563
+canst horde blimp,2000000,4.484350,0.000500,0.706527,2,4.0,11,0.984685,0.000087,1969371,25.734
+dance horst blimp,2000000,4.485333,0.000501,0.709209,1,4.0,11,0.984693,0.000087,1969387,25.848

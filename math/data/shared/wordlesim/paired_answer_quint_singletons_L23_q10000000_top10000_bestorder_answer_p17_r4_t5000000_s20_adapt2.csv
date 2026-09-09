@@ -1,0 +1,14 @@
+# paired comparison of 2 openings, 5000000 games, follow-up answer, pair-adaptive 2, seed 20, ranked on mean guesses
+# settings and finalists taken from paired_answer_quint_singletons_L23_q10000000_top10000_bestorder_answer_p17_r3_t3000000_s19_adapt2.csv (root quint_singletons_L23_q10000000_top10000_bestorder_answer, pass 17)
+# leader sprit maned flock vughy bwazi, mean 3.95005 +/- 0.00037 (its own error)
+# 
+# opening                        mean    own se    vs leader paired se   sigma
+# sprit maned flock vughy bwazi    3.95005   0.00037            -         -       -
+# spilt farce gunky vozhd wembs    3.95130   0.00039      0.00125   0.00041     3.1
+# 
+# pairing gain against the leader's nearest rival: unpaired error 0.00054, paired 0.00041 (1.3x tighter)
+# settings follow_up=answer pair_adaptive=2 win_within=6 trials=5000000 seed=20 words=2 rank=mean
+# lineage root=quint_singletons_L23_q10000000_top10000_bestorder_answer pass=17 round=4 source=paired_answer_quint_singletons_L23_q10000000_top10000_bestorder_answer_p17_r3_t3000000_s19_adapt2.csv
+word,trials,mean,stderr,diff_vs_leader,paired_stderr,sigma
+sprit maned flock vughy bwazi,5000000,3.950053,0.000371,0.000000,0.000000,0.000
+spilt farce gunky vozhd wembs,5000000,3.951302,0.000388,0.001249,0.000409,3.051

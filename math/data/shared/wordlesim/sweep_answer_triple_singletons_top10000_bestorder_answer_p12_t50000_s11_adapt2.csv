@@ -1,0 +1,31 @@
+# wordle opener sweep: 50000 trials per word, follow-up answer, seed 11
+# lineage root=triple_singletons_top10000_bestorder_answer pass=12 source=sweep_answer_triple_singletons_top10000_bestorder_answer_p11_t30000_s10_adapt2.csv
+# 3-word openings, played in order but ABANDONED once the follow-up is down to 2
+# or fewer words (--pair-adaptive, the rule in data/shared/PAIRS.md); ORDER MATTERS, so
+# a b and b a are different rows
+# every opening faces the SAME 50000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_answer_triple_singletons_top10000_bestorder_answer_p12_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+parse clint dumbo,50000,3.781500,0.003469,0.775738,1,4.0,8,0.996840,0.000251,49842,0.411
+siren clapt dumbo,50000,3.793860,0.003417,0.764080,1,4.0,8,0.996780,0.000253,49839,0.399
+parse clint dough,50000,3.792160,0.003545,0.792625,1,4.0,8,0.996680,0.000257,49834,0.398
+drice slant bumpy,50000,3.792880,0.003444,0.770060,2,4.0,8,0.997200,0.000236,49860,0.394
+caple snirt dumbo,50000,3.801620,0.003476,0.777173,2,4.0,8,0.996720,0.000256,49836,0.398
+crane spilt dumbo,50000,3.794300,0.003496,0.781639,1,4.0,8,0.996460,0.000266,49823,0.396
+drant slice bumpy,50000,3.794740,0.003431,0.767164,2,4.0,8,0.997080,0.000241,49854,0.394
+price slant dumbo,50000,3.794100,0.003470,0.775885,1,4.0,8,0.996740,0.000255,49837,0.394
+ripen clast dumbo,50000,3.799580,0.003391,0.758303,1,4.0,8,0.997340,0.000230,49867,0.387
+crine plast dumbo,50000,3.797440,0.003430,0.767008,2,4.0,8,0.996500,0.000264,49825,0.395
+prase clint dumbo,50000,3.792580,0.003473,0.776614,2,4.0,8,0.996400,0.000268,49820,0.394
+corse daint plumb,50000,3.801940,0.003405,0.761370,2,4.0,8,0.996840,0.000251,49842,0.400
+spilt rance dough,50000,3.799700,0.003506,0.783959,1,4.0,8,0.997260,0.000234,49863,0.389
+plant crise dumbo,50000,3.797400,0.003483,0.778746,1,4.0,8,0.996040,0.000281,49802,0.396
+spice larnt dumbo,50000,3.800840,0.003481,0.778272,1,4.0,8,0.996900,0.000249,49845,0.394
+parse clint gumbo,50000,3.799380,0.003584,0.801489,1,4.0,8,0.996260,0.000273,49813,0.401
+parse clint womby,50000,3.797760,0.003593,0.803338,1,4.0,9,0.996560,0.000262,49828,0.388
+parse clint demob,50000,3.798220,0.003555,0.794832,1,4.0,8,0.996800,0.000253,49840,0.391
+caple snirt dough,50000,3.805100,0.003529,0.789079,2,4.0,9,0.996780,0.000253,49839,0.394
+corse plant midgy,50000,3.797160,0.003384,0.756721,2,4.0,8,0.997060,0.000242,49853,0.389

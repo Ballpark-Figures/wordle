@@ -1,0 +1,19 @@
+# wordle opener sweep: 500000 trials per word, follow-up guess, seed 15
+# lineage root=quint_singletons_L23_q10000000_top10000_bestorder_guess pass=16 source=sweep_guess_quint_singletons_L23_q10000000_top10000_bestorder_guess_p15_t300000_s14_adapt2.csv
+# settings follow_up=guess pair_adaptive=2 win_within=6 trials=500000 seed=15 words=7 rank=mean
+# 5-word openings, played in order but ABANDONED once the follow-up is down to 2
+# or fewer words (--pair-adaptive, the rule in data/shared/PAIRS.md); ORDER MATTERS, so
+# a b and b a are different rows
+# every opening faces the SAME 500000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_guess_quint_singletons_L23_q10000000_top10000_bestorder_guess_p16_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+clift pared wonks vughy jembe,500000,4.574778,0.001333,0.942303,2,5.0,8,0.983142,0.000182,491571,12.423
+farse compt blink vughy dewax,500000,4.580060,0.001369,0.967899,2,5.0,9,0.972122,0.000233,486061,12.886
+clift paned works vughy jembe,500000,4.582080,0.001321,0.934058,2,5.0,8,0.983144,0.000182,491572,13.285
+ronde clift sumph gawky vibex,500000,4.581298,0.001296,0.916376,2,5.0,8,0.978406,0.000206,489203,13.370
+clift wared ponks vughy jembe,500000,4.581700,0.001324,0.935946,2,5.0,8,0.983292,0.000181,491646,13.270
+flint carks pombe vughy jewed,500000,4.583898,0.001335,0.944184,1,5.0,8,0.978312,0.000206,489156,13.210
+clift waned porks vughy jembe,500000,4.584914,0.001319,0.932778,2,5.0,8,0.983336,0.000181,491668,13.146

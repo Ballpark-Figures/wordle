@@ -1,0 +1,17 @@
+# wordle opener sweep: 100000 trials per word, follow-up guess, seed 12
+# lineage root=triple_singletons_top10000 pass=13 source=sweep_guess_triple_singletons_top10000_p12_t50000_s11.csv
+# 3-word openings, played BLIND in order; the follow-up plays the rest (math/wordlesim.py)
+# every opening faces the SAME 100000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_guess_triple_singletons_top10000_p13_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+carle point dumbs,100000,4.487300,0.002327,0.735938,2,4.0,10,0.980830,0.000434,98083,1.306
+canst horde blimp,100000,4.482220,0.002224,0.703412,2,4.0,10,0.985080,0.000383,98508,1.304
+dance horst blimp,100000,4.482150,0.002241,0.708637,1,4.0,11,0.984780,0.000387,98478,1.308
+chant dorse blimp,100000,4.487650,0.002260,0.714726,1,4.0,10,0.984750,0.000388,98475,1.306
+biont carle dumps,100000,4.493740,0.002341,0.740410,4,4.0,10,0.980190,0.000441,98019,1.302
+crane doilt bumps,100000,4.495190,0.002379,0.752252,1,4.0,11,0.978890,0.000455,97889,1.303
+carle pinot dumbs,100000,4.496810,0.002344,0.741226,4,4.0,11,0.979740,0.000446,97974,1.325
+cores plant midgy,100000,4.499780,0.002331,0.737011,2,4.0,10,0.980540,0.000437,98054,1.313

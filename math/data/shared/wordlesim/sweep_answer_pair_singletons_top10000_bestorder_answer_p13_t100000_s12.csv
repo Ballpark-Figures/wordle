@@ -1,0 +1,24 @@
+# wordle opener sweep: 100000 trials per word, follow-up answer, seed 12
+# lineage root=pair_singletons_top10000_bestorder_answer pass=13 source=sweep_answer_pair_singletons_top10000_bestorder_answer_p12_t50000_s11.csv
+# settings follow_up=answer pair_adaptive=0 win_within=6 trials=100000 seed=12 words=14 rank=mean
+# 2-word openings, played BLIND in order; the follow-up plays the rest (math/wordlesim.py)
+# every opening faces the SAME 100000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_answer_pair_singletons_top10000_bestorder_answer_p13_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+parse clint,100000,3.693280,0.002460,0.777977,1,4.0,10,0.994980,0.000223,99498,0.730
+crane slipt,100000,3.699590,0.002480,0.784098,1,4.0,9,0.995100,0.000221,99510,0.719
+crane spilt,100000,3.697600,0.002470,0.780948,1,4.0,9,0.995430,0.000213,99543,0.730
+slant cripe,100000,3.699750,0.002478,0.783751,1,4.0,9,0.995100,0.000221,99510,0.721
+price slant,100000,3.700780,0.002486,0.786202,1,4.0,9,0.994910,0.000225,99491,0.726
+crine spalt,100000,3.699050,0.002461,0.778091,3,4.0,9,0.995430,0.000213,99543,0.724
+spice larnt,100000,3.703240,0.002482,0.784755,1,4.0,9,0.994850,0.000226,99485,0.721
+caple snirt,100000,3.710070,0.002487,0.786306,3,4.0,9,0.994730,0.000229,99473,0.727
+plant crise,100000,3.708270,0.002504,0.791852,1,4.0,9,0.994340,0.000237,99434,0.725
+clint prase,100000,3.709190,0.002498,0.789864,3,4.0,9,0.994340,0.000237,99434,0.726
+crine plast,100000,3.709190,0.002498,0.789864,3,4.0,9,0.994340,0.000237,99434,0.707
+cried slant,100000,3.711930,0.002498,0.790008,1,4.0,10,0.994010,0.000244,99401,0.724
+spilt rance,100000,3.709160,0.002462,0.778472,1,4.0,9,0.995220,0.000218,99522,0.756
+rance slipt,100000,3.710510,0.002468,0.780520,3,4.0,9,0.994610,0.000232,99461,0.791

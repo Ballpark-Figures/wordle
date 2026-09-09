@@ -1,0 +1,30 @@
+# paired comparison of 10 openings, 300000 games, follow-up guess, pair-adaptive 2, seed 15, ranked on WIN RATE
+# settings and finalists taken from sweep_guess_quad_singletons_L19_t138953994_top10000_p15_t300000_s14_adapt2_win.csv (root quad_singletons_L19_t138953994_top10000, pass 15)
+# leader chaft globy mirvs pwned, win rate 0.99270 +/- 0.00016 (its own error)
+# 
+# opening                    win rate    own se    vs leader paired se   sigma
+# chaft globy mirvs pwned     0.99270   0.00016            -         -       -
+# chawk dingy flobs mpret     0.99252   0.00016      0.00018   0.00017     1.1
+# chowk dingy flabs mpret     0.99252   0.00016      0.00018   0.00017     1.1
+# burks camel fight pownd     0.99224   0.00016      0.00046   0.00019     2.4
+# chivy dwang flobs mpret     0.99223   0.00016      0.00047   0.00009     5.0
+# curbs flank mowed pight     0.99200   0.00016      0.00070   0.00019     3.6
+# bingy flack mpret showd     0.99196   0.00016      0.00074   0.00017     4.4
+# bumfs carle kight pownd     0.99191   0.00016      0.00079   0.00020     4.0
+# bight curfs mowed plank     0.99190   0.00016      0.00080   0.00019     4.1
+# chavs gibel rownd tumpy     0.99188   0.00016      0.00082   0.00020     4.1
+# 
+# pairing gain against the leader's nearest rival: unpaired error 0.00022, paired 0.00017 (1.3x tighter)
+# settings follow_up=guess pair_adaptive=2 win_within=6 trials=300000 seed=15 words=10 rank=win_rate
+# lineage root=quad_singletons_L19_t138953994_top10000 pass=15 round=1 source=sweep_guess_quad_singletons_L19_t138953994_top10000_p15_t300000_s14_adapt2_win.csv
+word,trials,win_rate,win_rate_stderr,diff_vs_leader,paired_stderr,sigma
+chaft globy mirvs pwned,300000,0.992700,0.000155,0.000000,0.000000,0.000
+chawk dingy flobs mpret,300000,0.992520,0.000157,0.000180,0.000167,1.080
+chowk dingy flabs mpret,300000,0.992520,0.000157,0.000180,0.000167,1.080
+burks camel fight pownd,300000,0.992237,0.000160,0.000463,0.000193,2.406
+chivy dwang flobs mpret,300000,0.992233,0.000160,0.000467,0.000094,4.987
+curbs flank mowed pight,300000,0.992003,0.000163,0.000697,0.000192,3.629
+bingy flack mpret showd,300000,0.991963,0.000163,0.000737,0.000168,4.377
+bumfs carle kight pownd,300000,0.991910,0.000164,0.000790,0.000195,4.042
+bight curfs mowed plank,300000,0.991903,0.000164,0.000797,0.000193,4.131
+chavs gibel rownd tumpy,300000,0.991883,0.000164,0.000817,0.000198,4.131

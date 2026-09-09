@@ -1,0 +1,24 @@
+# wordle opener sweep: 2000000 trials per word, follow-up guess, seed 17
+# lineage root=pair_singletons_top10000_bestorder_guess pass=18 source=sweep_guess_pair_singletons_top10000_bestorder_guess_p17_t1000000_s16.csv
+# settings follow_up=guess pair_adaptive=0 win_within=6 trials=2000000 seed=17 words=14 rank=mean
+# 2-word openings, played BLIND in order; the follow-up plays the rest (math/wordlesim.py)
+# every opening faces the SAME 2000000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_guess_pair_singletons_top10000_bestorder_guess_p18_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+plant cries,2000000,4.309925,0.000796,1.125076,1,4.0,12,0.958128,0.000142,1916256,34.369
+print claes,2000000,4.309892,0.000796,1.125144,1,4.0,12,0.958128,0.000142,1916256,32.446
+tripe clans,2000000,4.313428,0.000782,1.105580,1,4.0,12,0.959728,0.000139,1919457,33.895
+trice plans,2000000,4.314388,0.000785,1.109570,1,4.0,12,0.959001,0.000140,1918002,36.379
+place trins,2000000,4.314367,0.000785,1.109616,1,4.0,12,0.959001,0.000140,1918002,36.778
+claps trine,2000000,4.314305,0.000780,1.103743,3,4.0,12,0.959728,0.000139,1919457,34.578
+cline traps,2000000,4.314305,0.000780,1.103743,3,4.0,12,0.959728,0.000139,1919457,34.904
+clipe trans,2000000,4.314305,0.000780,1.103743,3,4.0,12,0.959728,0.000139,1919457,35.337
+clart peins,2000000,4.313885,0.000790,1.116771,3,4.0,13,0.958865,0.000140,1917729,36.029
+clint pears,2000000,4.313885,0.000790,1.116771,3,4.0,13,0.958865,0.000140,1917729,35.251
+parse clint,2000000,4.312054,0.000787,1.113689,1,4.0,12,0.959734,0.000139,1919468,35.376
+slant cripe,2000000,4.316472,0.000793,1.120963,1,4.0,12,0.958399,0.000141,1916799,36.321
+crane slipt,2000000,4.316457,0.000793,1.120994,1,4.0,12,0.958399,0.000141,1916799,35.575
+caple trins,2000000,4.314102,0.000777,1.099205,3,4.0,12,0.960326,0.000138,1920652,34.987

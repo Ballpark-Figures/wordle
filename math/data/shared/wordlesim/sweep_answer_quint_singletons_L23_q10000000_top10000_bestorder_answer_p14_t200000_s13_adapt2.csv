@@ -1,0 +1,14 @@
+# wordle opener sweep: 200000 trials per word, follow-up answer, seed 13
+# lineage root=quint_singletons_L23_q10000000_top10000_bestorder_answer pass=14 source=sweep_answer_quint_singletons_L23_q10000000_top10000_bestorder_answer_p13_t100000_s12_adapt2.csv
+# settings follow_up=answer pair_adaptive=2 win_within=6 trials=200000 seed=13 words=2 rank=mean
+# 5-word openings, played in order but ABANDONED once the follow-up is down to 2
+# or fewer words (--pair-adaptive, the rule in data/shared/PAIRS.md); ORDER MATTERS, so
+# a b and b a are different rows
+# every opening faces the SAME 200000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_answer_quint_singletons_L23_q10000000_top10000_bestorder_answer_p14_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+sprit maned flock vughy bwazi,200000,3.951545,0.001853,0.828523,2,4.0,8,0.997840,0.000104,199568,2.088
+spilt farce gunky vozhd wembs,200000,3.954030,0.001942,0.868355,1,4.0,7,0.999565,0.000047,199913,1.987

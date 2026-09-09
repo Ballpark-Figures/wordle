@@ -1,0 +1,16 @@
+# paired comparison of 3 openings, 10000000 games, follow-up guess, pair-adaptive 0, seed 21, ranked on mean guesses
+# settings and finalists taken from paired_guess_quad_singletons_L19_t138953994_top10000_p20_r1_t5000000_s20.csv (root quad_singletons_L19_t138953994_top10000, pass 20)
+# leader burns comfy padle wight, mean 5.11427 +/- 0.00011 (its own error)
+# 
+# opening                        mean    own se    vs leader paired se   sigma
+# burns comfy padle wight     5.11427   0.00011            -         -       -
+# bumfs corny padle wight     5.11427   0.00011      0.00000   0.00003     0.1
+# bowne curfs madly pight     5.11436   0.00011      0.00009   0.00004     2.4
+# 
+# pairing gain against the leader's nearest rival: unpaired error 0.00016, paired 0.00003 (5.8x tighter)
+# settings follow_up=guess pair_adaptive=0 win_within=6 trials=10000000 seed=21 words=3 rank=mean
+# lineage root=quad_singletons_L19_t138953994_top10000 pass=20 round=2 source=paired_guess_quad_singletons_L19_t138953994_top10000_p20_r1_t5000000_s20.csv
+word,trials,mean,stderr,diff_vs_leader,paired_stderr,sigma
+burns comfy padle wight,10000000,5.114269,0.000114,0.000000,0.000000,0.000
+bumfs corny padle wight,10000000,5.114273,0.000114,0.000004,0.000028,0.130
+bowne curfs madly pight,10000000,5.114356,0.000112,0.000087,0.000036,2.413

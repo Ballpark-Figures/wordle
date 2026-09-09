@@ -1,0 +1,24 @@
+# wordle opener sweep: 300000 trials per word, follow-up guess, seed 14
+# lineage root=quint_singletons_L23_q10000000_top10000 pass=15 source=sweep_guess_quint_singletons_L23_q10000000_top10000_p14_t200000_s13.csv
+# settings follow_up=guess pair_adaptive=0 win_within=6 trials=300000 seed=14 words=14 rank=mean
+# 5-word openings, played BLIND in order; the follow-up plays the rest (math/wordlesim.py)
+# every opening faces the SAME 300000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_guess_quint_singletons_L23_q10000000_top10000_p15_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+bagel murky ponds whift cezve,300000,6.033907,0.000436,0.238615,1,6.0,8,0.963410,0.000343,289023,4.254
+bawdy kugel morph snift cezve,300000,6.034690,0.000426,0.233510,1,6.0,8,0.962963,0.000345,288889,4.262
+bowel farms pudgy think cezve,300000,6.034830,0.000437,0.239466,1,6.0,8,0.961737,0.000350,288521,4.301
+curvy flaks might pownd bezel,300000,6.035787,0.000436,0.238885,1,6.0,8,0.961483,0.000351,288445,4.312
+bight curvy flask pownd mezes,300000,6.035513,0.000414,0.226522,2,6.0,8,0.962577,0.000347,288773,4.280
+bagel dorms funky whipt cezve,300000,6.037127,0.000437,0.239350,1,6.0,8,0.960687,0.000355,288206,4.298
+carve dumky fight powns bezel,300000,6.035940,0.000433,0.237182,1,6.0,8,0.961623,0.000351,288487,4.312
+bagel fonds murky whipt cezve,300000,6.035410,0.000429,0.235052,1,6.0,8,0.962330,0.000348,288699,4.302
+bagel dumpy fowth kirns cezve,300000,6.036860,0.000443,0.242793,1,6.0,8,0.960930,0.000354,288279,4.276
+carve monks pudgy whift bezel,300000,6.036380,0.000433,0.237410,1,6.0,8,0.961033,0.000353,288310,4.327
+bagel dorms punky whift cezve,300000,6.036583,0.000415,0.227329,1,6.0,8,0.962367,0.000347,288710,4.296
+bagel dormy punks whift cezve,300000,6.036583,0.000415,0.227329,1,6.0,8,0.962367,0.000347,288710,4.297
+bagel dumky firth powns cezve,300000,6.036100,0.000414,0.226827,1,6.0,8,0.962960,0.000345,288888,4.316
+bagel dumky fowth pirns cezve,300000,6.036100,0.000414,0.226827,1,6.0,8,0.962960,0.000345,288888,4.270

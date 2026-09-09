@@ -1,0 +1,14 @@
+# paired comparison of 2 openings, 3000000 games, follow-up guess, pair-adaptive 2, seed 19, ranked on WIN RATE
+# settings and finalists taken from paired_guess_quint_singletons_L23_q10000000_top10000_p16_r3_t2000000_s18_adapt2_win.csv (root quint_singletons_L23_q10000000_top10000, pass 16)
+# leader dumky forth gibel pawns cezve, win rate 0.98670 +/- 0.00007 (its own error)
+# 
+# opening                        mean    own se    vs leader paired se   sigma
+# dumky forth gibel pawns cezve    0.98670   0.00007            -         -       -
+# bagel murky pownd shift cezve    0.98627   0.00007      0.00042   0.00007     6.3
+# 
+# pairing gain against the leader's nearest rival: unpaired error 0.00009, paired 0.00007 (1.4x tighter)
+# settings follow_up=guess pair_adaptive=2 win_within=6 trials=3000000 seed=19 words=2 rank=win_rate
+# lineage root=quint_singletons_L23_q10000000_top10000 pass=16 round=4 source=paired_guess_quint_singletons_L23_q10000000_top10000_p16_r3_t2000000_s18_adapt2_win.csv
+word,trials,mean,stderr,diff_vs_leader,paired_stderr,sigma
+dumky forth gibel pawns cezve,3000000,0.986697,0.000066,0.000000,0.000000,0.000
+bagel murky pownd shift cezve,3000000,0.986272,0.000067,0.000424,0.000067,6.341

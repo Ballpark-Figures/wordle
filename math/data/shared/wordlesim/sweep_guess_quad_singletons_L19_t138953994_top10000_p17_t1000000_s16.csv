@@ -1,0 +1,21 @@
+# wordle opener sweep: 1000000 trials per word, follow-up guess, seed 16
+# lineage root=quad_singletons_L19_t138953994_top10000 pass=17 source=sweep_guess_quad_singletons_L19_t138953994_top10000_p16_t500000_s15.csv
+# settings follow_up=guess pair_adaptive=0 win_within=6 trials=1000000 seed=16 words=11 rank=mean
+# 4-word openings, played BLIND in order; the follow-up plays the rest (math/wordlesim.py)
+# every opening faces the SAME 1000000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_guess_quad_singletons_L19_t138953994_top10000_p17_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+bowne curfs madly pight,1000000,5.113603,0.000354,0.354437,3,5.0,8,0.990704,0.000096,990704,14.193
+burns comfy padle wight,1000000,5.113878,0.000360,0.359716,2,5.0,8,0.990542,0.000097,990542,14.220
+bumfs corny padle wight,1000000,5.113923,0.000360,0.359515,2,5.0,8,0.990542,0.000097,990542,14.057
+bugle corms pandy whift,1000000,5.114619,0.000364,0.364167,1,5.0,8,0.990518,0.000097,990518,14.932
+cable dormy pungs whift,1000000,5.116308,0.000365,0.365191,1,5.0,8,0.990926,0.000095,990926,14.702
+curly dangs pombe whift,1000000,5.116222,0.000364,0.363825,1,5.0,8,0.991181,0.000093,991181,14.345
+burnt comfy padle whigs,1000000,5.116235,0.000373,0.372702,1,5.0,8,0.990473,0.000097,990473,14.075
+bundt comfy parle whigs,1000000,5.115826,0.000360,0.360403,2,5.0,8,0.990772,0.000096,990772,14.153
+cable morns pudgy whift,1000000,5.115851,0.000369,0.368624,1,5.0,8,0.990886,0.000095,990886,13.960
+bundt chime gowfs parly,1000000,5.116533,0.000361,0.360865,2,5.0,8,0.990585,0.000097,990585,13.853
+bumfs carle downy pight,1000000,5.115854,0.000358,0.357927,3,5.0,8,0.990333,0.000098,990333,12.996

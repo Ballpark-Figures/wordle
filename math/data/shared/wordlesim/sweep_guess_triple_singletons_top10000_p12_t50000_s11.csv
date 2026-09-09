@@ -1,0 +1,25 @@
+# wordle opener sweep: 50000 trials per word, follow-up guess, seed 11
+# lineage root=triple_singletons_top10000 pass=12 source=sweep_guess_triple_singletons_top10000_p11_t30000_s10.csv
+# 3-word openings, played BLIND in order; the follow-up plays the rest (math/wordlesim.py)
+# every opening faces the SAME 50000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_guess_triple_singletons_top10000_p12_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+carle point dumbs,50000,4.483000,0.003296,0.736995,2,4.0,10,0.981320,0.000605,49066,0.661
+canst horde blimp,50000,4.483020,0.003164,0.707419,2,4.0,11,0.984720,0.000549,49236,0.648
+dance horst blimp,50000,4.484980,0.003178,0.710623,1,4.0,10,0.984340,0.000555,49217,0.652
+chant dorse blimp,50000,4.488740,0.003233,0.722941,1,4.0,10,0.983520,0.000569,49176,0.644
+biont carle dumps,50000,4.495520,0.003319,0.742045,4,4.0,10,0.979160,0.000639,48958,0.648
+crane doilt bumps,50000,4.497160,0.003375,0.754668,1,4.0,10,0.979400,0.000635,48970,0.643
+carle pinot dumbs,50000,4.497960,0.003312,0.740626,4,4.0,10,0.979920,0.000627,48996,0.657
+cores plant midgy,50000,4.498900,0.003318,0.741923,2,4.0,10,0.980140,0.000624,49007,0.651
+clint sabre podgy,50000,4.501880,0.003323,0.743107,4,4.0,10,0.978900,0.000643,48945,0.654
+coble riant dumps,50000,4.507920,0.003327,0.743901,4,4.0,11,0.979680,0.000631,48984,0.647
+clone tarps midgy,50000,4.500980,0.003245,0.725596,1,4.0,9,0.981980,0.000595,49099,0.649
+cabre doilt pungs,50000,4.506360,0.003417,0.764075,4,4.0,10,0.976300,0.000680,48815,0.650
+boart cline dumps,50000,4.504040,0.003373,0.754291,4,4.0,10,0.978160,0.000654,48908,0.648
+canst drole gimpy,50000,4.505680,0.003290,0.735594,4,4.0,10,0.980340,0.000621,49017,0.650
+corse plant midgy,50000,4.501960,0.003323,0.743026,2,4.0,9,0.979760,0.000630,48988,0.648
+cadre point glums,50000,4.504340,0.003377,0.755164,2,4.0,10,0.978140,0.000654,48907,0.648

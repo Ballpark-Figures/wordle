@@ -1,0 +1,60 @@
+# wordle opener sweep: 100000 trials per word, follow-up guess, seed 12
+# lineage root=quint_singletons_L23_q10000000_top10000 pass=13 source=sweep_guess_quint_singletons_L23_q10000000_top10000_p12_t50000_s11_adapt2_win.csv
+# settings follow_up=guess pair_adaptive=2 win_within=6 trials=100000 seed=12 words=48 rank=win_rate
+# 5-word openings, played in order but ABANDONED once the follow-up is down to 2
+# or fewer words (--pair-adaptive, the rule in data/shared/PAIRS.md); ORDER MATTERS, so
+# a b and b a are different rows
+# every opening faces the SAME 100000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_guess_quint_singletons_L23_q10000000_top10000_p13_se5-win.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+borel dumky pangs whift cezve,100000,4.691760,0.002630,0.831538,2,5.0,8,0.986420,0.000366,98642,2.723
+bungy model parks whift cezve,100000,4.684960,0.002688,0.849892,2,5.0,8,0.985900,0.000373,98590,2.709
+barky model pungs whift cezve,100000,4.680870,0.002674,0.845478,2,5.0,8,0.985960,0.000372,98596,2.771
+balmy fight rowed spunk cezve,100000,4.748370,0.002648,0.837472,1,5.0,8,0.986190,0.000369,98619,2.642
+bagel murky pownd shift cezve,100000,4.776940,0.002610,0.825222,1,5.0,8,0.987070,0.000357,98707,2.652
+bagel dorms punky whift cezve,100000,4.651300,0.002776,0.877984,1,5.0,8,0.985870,0.000373,98587,2.588
+bagel dormy punks whift cezve,100000,4.646360,0.002787,0.881423,1,5.0,8,0.986220,0.000369,98622,2.581
+bawns dumky forel pight cezve,100000,4.770320,0.002512,0.794288,2,5.0,8,0.986010,0.000371,98601,2.724
+dumky forth gibel pawns cezve,100000,4.793980,0.002534,0.801463,2,5.0,8,0.987180,0.000356,98718,2.713
+borel dumky fawns pight cezve,100000,4.740890,0.002629,0.831227,2,5.0,8,0.986300,0.000368,98630,2.630
+barmy kugel pownd shift cezve,100000,4.781200,0.002607,0.824435,2,5.0,8,0.985860,0.000373,98586,2.632
+bagel dumky porns whift cezve,100000,4.687000,0.002659,0.840832,1,5.0,8,0.985860,0.000373,98586,2.596
+bawdy kugel morph snift cezve,100000,4.828080,0.002517,0.796046,1,5.0,8,0.985970,0.000372,98597,2.662
+bungs model parky whift cezve,100000,4.681340,0.002692,0.851365,2,5.0,8,0.986400,0.000366,98640,2.603
+borel dumky fight pawns cezve,100000,4.774000,0.002611,0.825755,2,5.0,8,0.986470,0.000365,98647,2.647
+bagel dumky fowth pirns cezve,100000,4.826910,0.002580,0.815890,1,5.0,8,0.986020,0.000371,98602,2.676
+banks morel pudgy whift cezve,100000,4.667580,0.002730,0.863438,2,5.0,8,0.986130,0.000370,98613,2.596
+bagel murky ponds whift cezve,100000,4.688270,0.002669,0.844003,1,5.0,8,0.985720,0.000375,98572,2.619
+barmy dowel fight spunk cezve,100000,4.720800,0.002732,0.863930,2,5.0,8,0.985660,0.000376,98566,2.616
+bagel dorky snift whump cezve,100000,4.620610,0.002756,0.871608,1,5.0,8,0.986130,0.000370,98613,2.559
+bumfs garth kidel powny cezve,100000,4.706750,0.002688,0.849977,2,5.0,8,0.985470,0.000378,98547,2.621
+burgh model pawky snift cezve,100000,4.783410,0.002667,0.843532,2,5.0,8,0.986150,0.000370,98615,2.663
+bowel farms pudgy think cezve,100000,4.738660,0.002666,0.843012,1,5.0,8,0.984530,0.000390,98453,2.619
+bight dumky forel pawns cezve,100000,4.813190,0.002467,0.780281,2,5.0,8,0.986220,0.000369,98622,2.646
+borel dampy gunks whift cezve,100000,4.665820,0.002740,0.866436,2,5.0,8,0.985100,0.000383,98510,2.584
+dongs parky umbel whift cezve,100000,4.711960,0.002656,0.839810,2,5.0,8,0.984450,0.000391,98445,2.622
+bagel firth kumys pownd cezve,100000,4.687840,0.002856,0.903141,1,5.0,8,0.984530,0.000390,98453,2.601
+bagel dumky firth powns cezve,100000,4.761760,0.002641,0.835122,1,5.0,8,0.985640,0.000376,98564,2.659
+dumpy fowth gibel karns cezve,100000,4.854110,0.002471,0.781327,1,5.0,8,0.986400,0.000366,98640,2.703
+dight forky pawns umbel cezve,100000,4.782810,0.002576,0.814742,2,5.0,8,0.984790,0.000387,98479,2.657
+darky fight powns umbel cezve,100000,4.775130,0.002607,0.824433,2,5.0,8,0.984950,0.000385,98495,2.658
+bagel dumpy norks whift cezve,100000,4.704810,0.002713,0.857963,1,5.0,8,0.985120,0.000383,98512,2.623
+dorky pangs umbel whift cezve,100000,4.710370,0.002656,0.839793,2,5.0,8,0.984900,0.000386,98490,2.621
+bumfs dowel parky thing cezve,100000,4.793820,0.002560,0.809479,2,5.0,8,0.984070,0.000396,98407,2.666
+danks porgy umbel whift cezve,100000,4.714880,0.002645,0.836513,2,5.0,8,0.985250,0.000381,98525,2.627
+barny fowth gumps kidel cezve,100000,4.760280,0.002719,0.859768,2,5.0,8,0.985650,0.000376,98565,2.642
+dawen flobs murky pight cezve,100000,4.741500,0.002666,0.843104,2,5.0,8,0.985010,0.000384,98501,2.617
+bagel dumpy fowth kirns cezve,100000,4.809960,0.002662,0.841648,1,5.0,8,0.984770,0.000387,98477,2.664
+darks pongy umbel whift cezve,100000,4.712930,0.002646,0.836796,2,5.0,8,0.984890,0.000386,98489,2.621
+darky pongs umbel whift cezve,100000,4.711960,0.002653,0.839071,2,5.0,8,0.984890,0.000386,98489,2.612
+dawks fight porny umbel cezve,100000,4.791040,0.002529,0.799876,2,5.0,8,0.984950,0.000385,98495,2.646
+dawns fight porky umbel cezve,100000,4.759430,0.002683,0.848495,2,5.0,8,0.984860,0.000386,98486,2.645
+dorks fawny pight umbel cezve,100000,4.758550,0.002673,0.845304,2,5.0,8,0.985360,0.000380,98536,2.648
+dorky fight pawns umbel cezve,100000,4.782680,0.002577,0.814763,2,5.0,8,0.985290,0.000381,98529,2.653
+barps gunky model whift cezve,100000,4.708900,0.002601,0.822367,2,5.0,8,0.984480,0.000391,98448,2.612
+banks fudgy morel whipt cezve,100000,4.744060,0.002530,0.800076,2,5.0,8,0.985500,0.000378,98550,2.627
+fared pight slunk womby cezve,100000,4.654290,0.002785,0.880626,2,5.0,8,0.984460,0.000391,98446,2.631
+downs fight parky umbel cezve,100000,4.768780,0.002654,0.839371,2,5.0,8,0.984670,0.000389,98467,2.774

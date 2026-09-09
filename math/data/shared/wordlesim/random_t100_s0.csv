@@ -1,0 +1,116 @@
+# wordle single-board simulation (see math/wordlesim.py)
+# strategy=random trials=100 seed=0 win_within=6
+# answers drawn uniformly from the 2315 mystery words; guesses from the 12972 legal words
+# NO guess cap: play continues past 6 until the word is found, so the mean is unconstrained
+# and the win rate is the fraction of those untruncated scores that came in at 6 or fewer
+game,guesses,won,answer,sequence
+0,4,1,surer,privy outer ruder surer
+1,5,1,fella,aphid brake cagey equal fella
+2,5,1,spoon,pygmy troop spool spook spoon
+3,2,1,semen,preen semen
+4,4,1,never,unset honey vixen never
+5,4,1,abide,grime utile shine abide
+6,5,1,skull,sense strap shook silky skull
+7,3,1,tabby,alien patsy tabby
+8,4,1,exult,lease flier extol exult
+9,3,1,alpha,abuse adopt alpha
+10,4,1,ready,media delay beady ready
+11,4,1,skirt,gorge krill smirk skirt
+12,7,0,spice,wimpy poise spire spite spike spine spice
+13,4,1,rigor,rupee ratty robin rigor
+14,4,1,buyer,opine refer usher buyer
+15,3,1,gloat,ferry lingo gloat
+16,4,1,scene,thyme anode venue scene
+17,4,1,furry,rebus lurid curvy furry
+18,5,1,scent,parse shell seedy stein scent
+19,4,1,great,flesh trend erect great
+20,4,1,debug,savoy nicer budge debug
+21,3,1,bigot,gloss tonga bigot
+22,3,1,sneer,fifty cocoa sneer
+23,4,1,tense,bench denim tenet tense
+24,4,1,flung,odder chaff fuzzy flung
+25,4,1,title,sorry naive cutie title
+26,4,1,atone,nylon intro tonga atone
+27,6,1,crank,venom brain grand frank prank crank
+28,4,1,extol,tough retro often extol
+29,5,1,crass,silly usurp arson crash crass
+30,4,1,prism,booth mammy smell prism
+31,3,1,skirt,tying moist skirt
+32,3,1,lapse,vista false lapse
+33,4,1,lousy,aside shown torus lousy
+34,4,1,pleat,fried yeast eclat pleat
+35,5,1,agile,jumpy swoon lever cleat agile
+36,4,1,hefty,meter debut testy hefty
+37,5,1,hater,emcee shrew hyper hover hater
+38,4,1,tweet,unfit beset egret tweet
+39,4,1,burst,seize usual rusty burst
+40,4,1,ratty,weigh storm altar ratty
+41,3,1,brief,table beefy brief
+42,4,1,wince,steak wedge whine wince
+43,4,1,cause,manic yacht cargo cause
+44,4,1,gorge,stalk dicey ombre gorge
+45,3,1,delve,timer seedy delve
+46,4,1,twang,wharf awake swamp twang
+47,2,1,moist,quilt moist
+48,4,1,cause,undue purse abuse cause
+49,2,1,spout,setup spout
+50,3,1,clump,pixel lumpy clump
+51,5,1,tying,scene fauna blind joint tying
+52,4,1,cavil,maker tatty valid cavil
+53,5,1,dwell,baron mucus wedge dwelt dwell
+54,3,1,basic,quail cabin basic
+55,5,1,debar,house ripen wreck berry debar
+56,3,1,niece,sixty field niece
+57,3,1,dirty,crock three dirty
+58,4,1,death,brunt ethic theta death
+59,5,1,speck,ovine sweat sleep sperm speck
+60,5,1,spite,bacon rifle seize spike spite
+61,4,1,itchy,harsh ought tithe itchy
+62,3,1,stash,polyp sixth stash
+63,4,1,vouch,privy level vaunt vouch
+64,5,1,mushy,delay picky booby nutty mushy
+65,6,1,carol,staff daddy banal lapel cavil carol
+66,3,1,apron,parka strap apron
+67,4,1,snort,haute troll storm snort
+68,3,1,adobe,board abode adobe
+69,3,1,bough,below bongo bough
+70,4,1,quash,meaty clasp swash quash
+71,4,1,pried,value shrew creep pried
+72,5,1,ankle,tacit evade abuse angle ankle
+73,4,1,golly,hovel lofty godly golly
+74,2,1,liken,lingo liken
+75,4,1,whole,roach thong shook whole
+76,5,1,femur,witty cress mover lemur femur
+77,4,1,there,choke theme these there
+78,3,1,forum,offal spoof forum
+79,5,1,fifth,balmy ethic night width fifth
+80,5,1,spook,edify shoal spout spoon spook
+81,4,1,noose,twirl sumac pesky noose
+82,3,1,sword,yacht fjord sword
+83,4,1,night,cameo bunny sniff night
+84,4,1,arrow,savvy pleat among arrow
+85,3,1,gripe,tipsy prize gripe
+86,4,1,omega,nicer shale kebab omega
+87,5,1,coven,smith funny novel woven coven
+88,4,1,feast,blade peach yeast feast
+89,3,1,angry,obese gully angry
+90,5,1,motel,sling papal wheel model motel
+91,4,1,paler,waxen facet paper paler
+92,3,1,gaudy,rebel pushy gaudy
+93,4,1,quoth,onion towel shout quoth
+94,4,1,think,waive brisk chick think
+95,3,1,lucky,lousy lumpy lucky
+96,3,1,shelf,fiery cleft shelf
+97,3,1,repay,grape taper repay
+98,5,1,baggy,salvo patty carry bawdy baggy
+99,4,1,filly,grind wispy kitty filly
+# strategy random, trials 100, seed 0
+# mean guesses 3.9400  +/- 0.0886 (standard error)
+# win rate (within 6) 99.0000%  +/- 0.9950%  (99 of 100 games)
+# sd 0.8856   min 2   median 4.0   max 7
+#    2 guesses       4    4.00%
+#    3 guesses      25   25.00%
+#    4 guesses      48   48.00%
+#    5 guesses      20   20.00%
+#    6 guesses       2    2.00%
+#    7 guesses       1    1.00%   (loss)

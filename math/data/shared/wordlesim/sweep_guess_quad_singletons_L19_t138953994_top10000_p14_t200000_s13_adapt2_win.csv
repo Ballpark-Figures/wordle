@@ -1,0 +1,48 @@
+# wordle opener sweep: 200000 trials per word, follow-up guess, seed 13
+# lineage root=quad_singletons_L19_t138953994_top10000 pass=14 source=sweep_guess_quad_singletons_L19_t138953994_top10000_p13_t100000_s12_adapt2_win.csv
+# settings follow_up=guess pair_adaptive=2 win_within=6 trials=200000 seed=13 words=36 rank=win_rate
+# 4-word openings, played in order but ABANDONED once the follow-up is down to 2
+# or fewer words (--pair-adaptive, the rule in data/shared/PAIRS.md); ORDER MATTERS, so
+# a b and b a are different rows
+# every opening faces the SAME 200000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_guess_quad_singletons_L19_t138953994_top10000_p14_se5-win.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+chawk dingy flobs mpret,200000,4.772600,0.001669,0.746192,2,5.0,9,0.992135,0.000198,198427,4.364
+chaft globy mirvs pwned,200000,4.696045,0.001801,0.805493,2,5.0,8,0.992295,0.000196,198459,4.398
+bingy flack mpret showd,200000,4.709660,0.001734,0.775671,2,5.0,9,0.992140,0.000197,198428,4.413
+chowk dingy flabs mpret,200000,4.777805,0.001657,0.741018,2,5.0,9,0.992130,0.000198,198426,4.436
+burks camel fight pownd,200000,4.603330,0.001839,0.822488,2,5.0,9,0.992100,0.000198,198420,4.359
+chivy dwang flobs mpret,200000,4.787910,0.001695,0.757833,2,5.0,9,0.992185,0.000197,198437,4.433
+curbs flank mowed pight,200000,4.663410,0.001825,0.816082,2,5.0,9,0.991605,0.000204,198321,4.383
+burgh clift ponks wamed,200000,4.680415,0.001843,0.824096,2,5.0,9,0.990750,0.000214,198150,4.394
+cured fight plank wombs,200000,4.649995,0.001864,0.833598,2,5.0,9,0.990925,0.000212,198185,4.410
+chavs gibel rownd tumpy,200000,4.635425,0.001782,0.796846,2,5.0,8,0.991775,0.000202,198355,4.380
+bandy flock might sprew,200000,4.767655,0.001744,0.780131,2,5.0,8,0.991210,0.000209,198242,4.459
+clank fight pured wombs,200000,4.656765,0.001856,0.829818,1,5.0,9,0.991150,0.000209,198230,4.411
+block mangy spred whift,200000,4.666750,0.001765,0.789321,1,5.0,8,0.991270,0.000208,198254,4.383
+blank curfs mowed pight,200000,4.650875,0.001852,0.828112,1,5.0,9,0.991275,0.000208,198255,4.390
+bangs chowk fluid mpret,200000,4.773065,0.001672,0.747869,2,5.0,9,0.991300,0.000208,198260,4.423
+chowk dumbs glift paren,200000,4.836125,0.001580,0.706663,2,5.0,8,0.991285,0.000208,198257,4.434
+bandh flick germy swopt,200000,4.738100,0.001775,0.793701,2,5.0,8,0.990835,0.000213,198167,4.451
+carle dumbs pongy whift,200000,4.544570,0.001844,0.824716,2,5.0,8,0.990910,0.000212,198182,4.275
+combs flank pured wight,200000,4.650545,0.001797,0.803467,2,5.0,9,0.991135,0.000210,198227,4.411
+blunk cawed fight romps,200000,4.747060,0.001795,0.802729,2,5.0,8,0.990470,0.000217,198094,4.430
+bight curfs mowed plank,200000,4.695590,0.001780,0.796032,2,5.0,9,0.991450,0.000206,198290,4.388
+bumfs carle kight pownd,200000,4.594025,0.001839,0.822443,2,5.0,9,0.991435,0.000206,198287,4.321
+clift handy purge wombs,200000,4.590455,0.001821,0.814544,2,5.0,8,0.991000,0.000211,198200,4.400
+bundt chimp farle gowks,200000,4.638645,0.001766,0.789905,2,5.0,8,0.990710,0.000215,198142,4.350
+bumfs cored plank wight,200000,4.636605,0.001813,0.810773,2,5.0,9,0.991120,0.000210,198224,4.414
+clint humfs podge warby,200000,4.607005,0.001845,0.825253,2,5.0,8,0.990810,0.000213,198162,4.325
+champ flisk rugby toned,200000,4.767780,0.001758,0.786414,1,5.0,9,0.991120,0.000210,198224,4.404
+clift gundy howbe ramps,200000,4.721685,0.001769,0.791138,2,5.0,8,0.991140,0.000210,198228,4.349
+dunch glift pombe warks,200000,4.699490,0.001818,0.812900,2,5.0,8,0.990490,0.000217,198098,4.317
+comby dungs parle whift,200000,4.599595,0.001691,0.756137,2,5.0,8,0.990815,0.000213,198163,4.329
+block fawny might spred,200000,4.812350,0.001724,0.771188,1,5.0,8,0.991110,0.000210,198222,4.417
+bumfs clank pored wight,200000,4.641835,0.001804,0.806651,2,5.0,9,0.991095,0.000210,198219,4.309
+bundt chimp fogle warks,200000,4.716290,0.001739,0.777928,2,5.0,9,0.991140,0.000210,198228,4.371
+bluid chowk fangs mpret,200000,4.770830,0.001708,0.763835,2,5.0,9,0.991110,0.000210,198222,4.455
+cured flank pight wombs,200000,4.642590,0.001878,0.840025,2,5.0,9,0.991205,0.000209,198241,4.397
+chowk dumbs flint parge,200000,4.805205,0.001635,0.731193,2,5.0,9,0.991225,0.000209,198245,4.443

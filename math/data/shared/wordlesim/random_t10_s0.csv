@@ -1,0 +1,24 @@
+# wordle single-board simulation (see math/wordlesim.py)
+# strategy=random trials=10 seed=0 win_within=6
+# answers drawn uniformly from the 2315 mystery words; guesses from the 12972 legal words
+# NO guess cap: play continues past 6 until the word is found, so the mean is unconstrained
+# and the win rate is the fraction of those untruncated scores that came in at 6 or fewer
+game,guesses,won,answer,sequence
+0,4,1,surer,privy outer ruder surer
+1,5,1,fella,aphid brake cagey equal fella
+2,5,1,spoon,pygmy troop spool spook spoon
+3,2,1,semen,preen semen
+4,4,1,never,unset honey vixen never
+5,4,1,abide,grime utile shine abide
+6,5,1,skull,sense strap shook silky skull
+7,3,1,tabby,alien patsy tabby
+8,4,1,exult,lease flier extol exult
+9,3,1,alpha,abuse adopt alpha
+# strategy random, trials 10, seed 0
+# mean guesses 3.9000  +/- 0.3145 (standard error)
+# win rate (within 6) 100.0000%  +/- 0.0000%  (10 of 10 games)
+# sd 0.9944   min 2   median 4.0   max 5
+#    2 guesses       1   10.00%
+#    3 guesses       2   20.00%
+#    4 guesses       4   40.00%
+#    5 guesses       3   30.00%

@@ -1,0 +1,24 @@
+# paired comparison of 7 openings, 10000000 games, follow-up answer, pair-adaptive 0, seed 21, ranked on mean guesses
+# settings and finalists taken from paired_answer_quint_singletons_L23_q10000000_top10000_p19_r2_t5000000_s20.csv (root quint_singletons_L23_q10000000_top10000, pass 19)
+# leader blaze comfy right spunk waved, mean 6.00079 +/- 0.00006 (its own error)
+# 
+# opening                        mean    own se    vs leader paired se   sigma
+# blaze comfy right spunk waved    6.00079   0.00006            -         -       -
+# clove rugby spank whift mozed    6.00089   0.00005      0.00010   0.00007     1.4
+# downy giver pluck shaft zambo    6.00123   0.00006      0.00043   0.00007     6.0
+# black fudge nymph worst vizir    6.00132   0.00006      0.00053   0.00007     7.1
+# curvy dowel fight spank jambe    6.00133   0.00006      0.00054   0.00007     7.3
+# blitz crown pudgy shmek favor    6.00134   0.00005      0.00054   0.00007     7.3
+# curvy dowel fight spank zambo    6.00135   0.00006      0.00055   0.00007     7.6
+# 
+# pairing gain against the leader's nearest rival: unpaired error 0.00008, paired 0.00007 (1.1x tighter)
+# settings follow_up=answer pair_adaptive=0 win_within=6 trials=10000000 seed=21 words=7 rank=mean
+# lineage root=quint_singletons_L23_q10000000_top10000 pass=19 round=3 source=paired_answer_quint_singletons_L23_q10000000_top10000_p19_r2_t5000000_s20.csv
+word,trials,mean,stderr,diff_vs_leader,paired_stderr,sigma
+blaze comfy right spunk waved,10000000,6.000794,0.000055,0.000000,0.000000,0.000
+clove rugby spank whift mozed,10000000,6.000892,0.000052,0.000098,0.000069,1.413
+downy giver pluck shaft zambo,10000000,6.001226,0.000056,0.000432,0.000072,5.999
+black fudge nymph worst vizir,10000000,6.001321,0.000055,0.000527,0.000075,7.062
+curvy dowel fight spank jambe,10000000,6.001332,0.000055,0.000537,0.000073,7.323
+blitz crown pudgy shmek favor,10000000,6.001335,0.000054,0.000541,0.000074,7.307
+curvy dowel fight spank zambo,10000000,6.001347,0.000055,0.000553,0.000073,7.596

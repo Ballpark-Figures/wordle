@@ -1,0 +1,12 @@
+# wordle opener sweep: 300000 trials per word, follow-up answer, seed 14
+# lineage root=triple_singletons_top10000 pass=15 source=sweep_answer_triple_singletons_top10000_p14_t200000_s13.csv
+# 3-word openings, played BLIND in order; the follow-up plays the rest (math/wordlesim.py)
+# every opening faces the SAME 300000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_answer_triple_singletons_top10000_p15_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+dance horst blimp,300000,4.163973,0.000769,0.421402,1,4.0,8,0.998320,0.000075,299496,1.767
+chant dorse blimp,300000,4.164233,0.000770,0.421697,1,4.0,8,0.998187,0.000078,299456,1.757
+canst horde blimp,300000,4.165953,0.000764,0.418434,2,4.0,8,0.998317,0.000075,299495,1.758

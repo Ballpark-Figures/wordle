@@ -1,0 +1,13 @@
+# wordle opener sweep: 300000 trials per word, follow-up answer, seed 14
+# lineage root=pair_singletons_top10000_bestorder_answer pass=15 source=sweep_answer_pair_singletons_top10000_bestorder_answer_p14_t200000_s13_adapt2.csv
+# 2-word openings, played in order but ABANDONED once the follow-up is down to 2
+# or fewer words (--pair-adaptive, the rule in data/shared/PAIRS.md); ORDER MATTERS, so
+# a b and b a are different rows
+# every opening faces the SAME 300000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_answer_pair_singletons_top10000_bestorder_answer_p15_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+parse clint,300000,3.666893,0.001486,0.814061,1,4.0,10,0.994843,0.000131,298453,2.231
+crane spilt,300000,3.675680,0.001485,0.813277,1,4.0,9,0.995057,0.000128,298517,2.176

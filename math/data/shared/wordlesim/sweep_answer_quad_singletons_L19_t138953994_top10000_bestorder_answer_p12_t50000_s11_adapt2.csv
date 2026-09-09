@@ -1,0 +1,17 @@
+# wordle opener sweep: 50000 trials per word, follow-up answer, seed 11
+# lineage root=quad_singletons_L19_t138953994_top10000_bestorder_answer pass=12 source=sweep_answer_quad_singletons_L19_t138953994_top10000_bestorder_answer_p11_t30000_s10_adapt2.csv
+# settings follow_up=answer pair_adaptive=2 win_within=6 trials=50000 seed=11 words=5
+# 4-word openings, played in order but ABANDONED once the follow-up is down to 2
+# or fewer words (--pair-adaptive, the rule in data/shared/PAIRS.md); ORDER MATTERS, so
+# a b and b a are different rows
+# every opening faces the SAME 50000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_answer_quad_singletons_L19_t138953994_top10000_bestorder_answer_p12_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+birle canst whomp fudgy,50000,3.864240,0.003566,0.797334,2,4.0,7,0.998700,0.000161,49935,0.424
+cable snirt whomp fudgy,50000,3.873940,0.003546,0.792806,1,4.0,7,0.998620,0.000166,49931,0.418
+clint sabre whomp fudgy,50000,3.874540,0.003544,0.792548,2,4.0,7,0.998620,0.000166,49931,0.435
+borde canst flimp vughy,50000,3.871220,0.003431,0.767155,2,4.0,7,0.999720,0.000075,49986,0.421
+dorse clint bumph gawky,50000,3.879380,0.003501,0.782817,2,4.0,7,0.998740,0.000159,49937,0.418

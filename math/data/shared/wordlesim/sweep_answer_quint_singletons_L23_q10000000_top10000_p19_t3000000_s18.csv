@@ -1,0 +1,21 @@
+# wordle opener sweep: 3000000 trials per word, follow-up answer, seed 18
+# lineage root=quint_singletons_L23_q10000000_top10000 pass=19 source=sweep_answer_quint_singletons_L23_q10000000_top10000_p18_t2000000_s17.csv
+# settings follow_up=answer pair_adaptive=0 win_within=6 trials=3000000 seed=18 words=11 rank=mean
+# 5-word openings, played BLIND in order; the follow-up plays the rest (math/wordlesim.py)
+# every opening faces the SAME 3000000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_answer_quint_singletons_L23_q10000000_top10000_p19_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+blaze comfy right spunk waved,3000000,6.000875,0.000101,0.175066,1,6.0,7,0.993016,0.000048,2979048,20.903
+clove rugby spank whift mozed,3000000,6.001052,0.000095,0.165053,1,6.0,7,0.993875,0.000045,2981625,20.940
+black fudge nymph worst vizir,3000000,6.001352,0.000101,0.174279,1,6.0,7,0.992628,0.000049,2977885,21.107
+blitz crown pudgy shmek favor,3000000,6.001318,0.000098,0.169715,1,6.0,7,0.993097,0.000048,2979291,20.807
+bagel crowd funky spitz vehme,3000000,6.001139,0.000098,0.169818,1,6.0,7,0.993505,0.000046,2980514,20.767
+curvy dowel fight spank zambo,3000000,6.001212,0.000102,0.176386,1,6.0,7,0.992665,0.000049,2977995,20.694
+bloke curvy fight spawn mozed,3000000,6.001124,0.000102,0.176751,1,6.0,7,0.992704,0.000049,2978112,20.773
+bagel downy furth skimp cezve,3000000,6.001103,0.000093,0.161288,1,6.0,7,0.994013,0.000045,2982039,20.767
+bawdy mover pluck shift zigan,3000000,6.001158,0.000101,0.175318,1,6.0,7,0.992748,0.000049,2978245,20.857
+curvy dowel fight spank jambe,3000000,6.001203,0.000102,0.176359,1,6.0,7,0.992674,0.000049,2978023,20.832
+downy giver pluck shaft zambo,3000000,6.001324,0.000101,0.174653,1,6.0,7,0.992667,0.000049,2978001,20.791

@@ -1,0 +1,14 @@
+# wordle opener sweep: 5000000 trials per word, follow-up guess, seed 19
+# lineage root=pair_singletons_top10000_bestorder_guess pass=20 source=sweep_guess_pair_singletons_top10000_bestorder_guess_p19_t3000000_s18.csv
+# settings follow_up=guess pair_adaptive=0 win_within=6 trials=5000000 seed=19 words=4 rank=mean
+# 2-word openings, played BLIND in order; the follow-up plays the rest (math/wordlesim.py)
+# every opening faces the SAME 5000000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_guess_pair_singletons_top10000_bestorder_guess_p20_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+print claes,5000000,4.310074,0.000503,1.123846,1,4.0,12,0.958233,0.000089,4791163,79.389
+plant cries,5000000,4.310090,0.000503,1.123813,1,4.0,12,0.958233,0.000089,4791163,80.041
+parse clint,5000000,4.312436,0.000498,1.113025,1,4.0,12,0.959645,0.000088,4798224,86.276
+tripe clans,5000000,4.313988,0.000494,1.105221,1,4.0,12,0.959809,0.000088,4799044,85.665

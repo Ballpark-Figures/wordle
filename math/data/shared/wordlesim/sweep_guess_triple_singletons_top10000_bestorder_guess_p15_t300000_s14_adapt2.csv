@@ -1,0 +1,17 @@
+# wordle opener sweep: 300000 trials per word, follow-up guess, seed 14
+# lineage root=triple_singletons_top10000_bestorder_guess pass=15 source=sweep_guess_triple_singletons_top10000_bestorder_guess_p14_t200000_s13_adapt2.csv
+# 3-word openings, played in order but ABANDONED once the follow-up is down to 2
+# or fewer words (--pair-adaptive, the rule in data/shared/PAIRS.md); ORDER MATTERS, so
+# a b and b a are different rows
+# every opening faces the SAME 300000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_guess_triple_singletons_top10000_bestorder_guess_p15_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+chant dorse blimp,300000,4.325530,0.001634,0.895222,1,4.0,10,0.984613,0.000225,295384,5.780
+horst dance blimp,300000,4.328917,0.001608,0.880575,2,4.0,11,0.984520,0.000225,295356,5.807
+corse plant midgy,300000,4.329067,0.001672,0.915801,2,4.0,10,0.980277,0.000254,294083,5.824
+canst horde blimp,300000,4.332167,0.001595,0.873850,2,4.0,11,0.984933,0.000222,295480,5.771
+point carle dumbs,300000,4.330590,0.001644,0.900605,1,4.0,10,0.980363,0.000253,294109,5.792
+drant clies bumph,300000,4.335360,0.001651,0.904033,2,4.0,11,0.982123,0.000242,294637,5.830

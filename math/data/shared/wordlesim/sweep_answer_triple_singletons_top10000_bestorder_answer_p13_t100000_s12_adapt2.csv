@@ -1,0 +1,24 @@
+# wordle opener sweep: 100000 trials per word, follow-up answer, seed 12
+# lineage root=triple_singletons_top10000_bestorder_answer pass=13 source=sweep_answer_triple_singletons_top10000_bestorder_answer_p12_t50000_s11_adapt2.csv
+# 3-word openings, played in order but ABANDONED once the follow-up is down to 2
+# or fewer words (--pair-adaptive, the rule in data/shared/PAIRS.md); ORDER MATTERS, so
+# a b and b a are different rows
+# every opening faces the SAME 100000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_answer_triple_singletons_top10000_bestorder_answer_p13_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+parse clint dumbo,100000,3.784520,0.002435,0.770126,1,4.0,8,0.996990,0.000173,99699,0.776
+parse clint dough,100000,3.794900,0.002492,0.787921,1,4.0,9,0.996450,0.000188,99645,0.770
+prase clint dumbo,100000,3.798820,0.002437,0.770566,2,4.0,8,0.996610,0.000184,99661,0.766
+drice slant bumpy,100000,3.794550,0.002447,0.773658,2,4.0,8,0.997080,0.000171,99708,0.764
+siren clapt dumbo,100000,3.790090,0.002409,0.761796,1,4.0,8,0.996950,0.000174,99695,0.763
+price slant dumbo,100000,3.796990,0.002443,0.772401,1,4.0,8,0.996940,0.000175,99694,0.759
+crane spilt dumbo,100000,3.794270,0.002459,0.777542,1,4.0,8,0.996680,0.000182,99668,0.761
+drant slice bumpy,100000,3.797550,0.002425,0.766870,2,4.0,8,0.996910,0.000176,99691,0.787
+corse plant midgy,100000,3.800590,0.002392,0.756473,2,4.0,8,0.996660,0.000182,99666,0.781
+plant crise dumbo,100000,3.799990,0.002446,0.773532,1,4.0,8,0.996730,0.000181,99673,0.764
+crine plast dumbo,100000,3.803140,0.002432,0.769150,2,4.0,8,0.996520,0.000186,99652,0.763
+parse clint womby,100000,3.801490,0.002507,0.792862,1,4.0,9,0.996850,0.000177,99685,0.771
+parse clint demob,100000,3.802460,0.002494,0.788761,1,4.0,8,0.997010,0.000173,99701,0.772

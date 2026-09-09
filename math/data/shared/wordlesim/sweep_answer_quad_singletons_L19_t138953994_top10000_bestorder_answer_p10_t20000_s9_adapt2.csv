@@ -1,0 +1,25 @@
+# wordle opener sweep: 20000 trials per word, follow-up answer, seed 9
+# lineage root=quad_singletons_L19_t138953994_top10000_bestorder_answer pass=10 source=sweep_answer_quad_singletons_L19_t138953994_top10000_bestorder_answer_p9_t10000_s8_adapt2.csv
+# settings follow_up=answer pair_adaptive=2 win_within=6 trials=20000 seed=9 words=13
+# 4-word openings, played in order but ABANDONED once the follow-up is down to 2
+# or fewer words (--pair-adaptive, the rule in data/shared/PAIRS.md); ORDER MATTERS, so
+# a b and b a are different rows
+# every opening faces the SAME 20000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_answer_quad_singletons_L19_t138953994_top10000_bestorder_answer_p10_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+birle canst whomp fudgy,20000,3.859650,0.005664,0.801052,2,4.0,7,0.998650,0.000260,19973,0.175
+cable snirt whomp fudgy,20000,3.870500,0.005631,0.796405,1,4.0,7,0.998450,0.000278,19969,0.164
+dorse clint bumph gawky,20000,3.878150,0.005553,0.785324,2,4.0,7,0.998700,0.000255,19974,0.167
+clint sabre whomp fudgy,20000,3.876700,0.005612,0.793680,2,4.0,7,0.998250,0.000296,19965,0.167
+borde canst flimp vughy,20000,3.868300,0.005338,0.754906,2,4.0,7,0.999750,0.000112,19995,0.171
+parse mitch blown fudgy,20000,3.892550,0.005720,0.808911,1,4.0,7,0.998500,0.000274,19970,0.171
+marse pitch blown fudgy,20000,3.899800,0.005598,0.791702,2,4.0,7,0.999050,0.000218,19981,0.178
+rance blist whomp fudgy,20000,3.897000,0.005625,0.795502,2,4.0,7,0.999000,0.000223,19980,0.171
+farse compt blind vughy,20000,3.890800,0.005149,0.728150,2,4.0,7,0.999800,0.000100,19996,0.175
+morse clipt bundh gawky,20000,3.913400,0.005654,0.799645,2,4.0,7,0.998200,0.000300,19964,0.170
+rhine clapt wombs fudgy,20000,3.914850,0.005700,0.806122,2,4.0,8,0.998550,0.000269,19971,0.164
+parse ditch flung womby,20000,3.892650,0.005606,0.792753,1,4.0,7,0.999300,0.000187,19986,0.165
+clint saber whomp fudgy,20000,3.900800,0.005650,0.798994,2,4.0,7,0.998850,0.000240,19977,0.167

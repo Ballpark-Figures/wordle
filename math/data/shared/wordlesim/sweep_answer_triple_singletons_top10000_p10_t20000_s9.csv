@@ -1,0 +1,20 @@
+# wordle opener sweep: 20000 trials per word, follow-up answer, seed 9
+# lineage root=triple_singletons_top10000 pass=10 source=sweep_answer_triple_singletons_top10000_p9_t10000_s8.csv
+# 3-word openings, played BLIND in order; the follow-up plays the rest (math/wordlesim.py)
+# every opening faces the SAME 20000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_answer_triple_singletons_top10000_p10_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+dance horst blimp,20000,4.166300,0.002965,0.419348,1,4.0,7,0.998450,0.000278,19969,0.128
+chant dorse blimp,20000,4.164950,0.002951,0.417313,1,4.0,8,0.998400,0.000283,19968,0.118
+canst horde blimp,20000,4.166050,0.002939,0.415675,2,4.0,7,0.998550,0.000269,19971,0.117
+canst horde flimp,20000,4.178200,0.003026,0.427965,2,4.0,7,0.998600,0.000264,19972,0.118
+dance horst flimp,20000,4.172400,0.002992,0.423069,1,4.0,8,0.998700,0.000255,19974,0.118
+ratch sonde blimp,20000,4.179100,0.003024,0.427706,3,4.0,7,0.998600,0.000264,19972,0.118
+clast rhine podgy,20000,4.196550,0.003260,0.461008,4,4.0,7,0.997500,0.000353,19950,0.122
+crime slant podgy,20000,4.186450,0.003220,0.455408,1,4.0,8,0.997050,0.000383,19941,0.130
+corse daint glyph,20000,4.185900,0.003206,0.453378,3,4.0,8,0.996750,0.000402,19935,0.120
+birse clapt mound,20000,4.181800,0.003141,0.444251,3,4.0,8,0.997200,0.000374,19944,0.122
+crone spalt midgy,20000,4.183200,0.003176,0.449163,1,4.0,8,0.997000,0.000387,19940,0.120

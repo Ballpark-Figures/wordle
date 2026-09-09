@@ -1,0 +1,14 @@
+# paired comparison of 2 openings, 30000000 games, follow-up guess, pair-adaptive 0, seed 23
+# settings and finalists taken from paired_guess_triple_singletons_top10000_p22_t20000000_s22.csv (root triple_singletons_top10000, pass 22)
+# leader carle point dumbs, mean 4.48444 +/- 0.00013 (its own error)
+# 
+# opening                        mean    own se    vs leader paired se   sigma
+# carle point dumbs           4.48444   0.00013            -         -       -
+# canst horde blimp           4.48456   0.00013      0.00012   0.00013     0.9
+# 
+# pairing gain against the leader's nearest rival: unpaired error 0.00019, paired 0.00013 (1.5x tighter)
+# settings follow_up=guess pair_adaptive=0 win_within=6 trials=30000000 seed=23 words=2
+# lineage root=triple_singletons_top10000 pass=22 round=2 source=paired_guess_triple_singletons_top10000_p22_t20000000_s22.csv
+word,trials,mean,stderr,diff_vs_leader,paired_stderr,sigma
+carle point dumbs,30000000,4.484443,0.000134,0.000000,0.000000,0.000
+canst horde blimp,30000000,4.484563,0.000129,0.000120,0.000127,0.944

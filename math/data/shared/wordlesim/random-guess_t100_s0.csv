@@ -1,0 +1,118 @@
+# wordle single-board simulation (see math/wordlesim.py)
+# strategy=random-guess trials=100 seed=0 win_within=6
+# answers drawn uniformly from the 2315 mystery words; guesses from the 12972 legal words
+# NO guess cap: play continues past 6 until the word is found, so the mean is unconstrained
+# and the win rate is the fraction of those untruncated scores that came in at 6 or fewer
+game,guesses,won,answer,sequence
+0,4,1,surer,pious scurf surah surer
+1,4,1,aphid,bench amahs ahold aphid
+2,3,1,spoon,pongy snoop spoon
+3,4,1,lumpy,oxeye yrivd pully lumpy
+4,5,1,preen,molal purty priss preed preen
+5,4,1,sprig,purpy apres sprit sprig
+6,4,1,swift,muddy anils stirk swift
+7,3,1,style,corbe axile style
+8,6,1,alien,mocks avyze aheap airer adieu alien
+9,5,1,guide,amirs beigy eking glide guide
+10,5,1,ready,meets pelon debug redia ready
+11,6,1,gorge,kudos zoril porta worry corno gorge
+12,6,1,vigil,pooks thewy malar linin civil vigil
+13,5,1,teeth,carby pique skegs tweet teeth
+14,5,1,media,hapax black arvee menta media
+15,4,1,scene,torus bassi sycee scene
+16,3,1,might,grill pingo might
+17,4,1,dread,gaits molar pyran dread
+18,5,1,flyer,share lered ogler ulcer flyer
+19,4,1,debug,roily penna begum debug
+20,5,1,bigot,hasks terce jonty pitot bigot
+21,4,1,diner,smeke tuner biner diner
+22,5,1,realm,gilly padle beals realo realm
+23,6,1,ionic,treat skols ohing covin yonic ionic
+24,5,1,nylon,hushy zymic fyked xylol nylon
+25,4,1,plunk,nomas uprun punce plunk
+26,4,1,tough,puzel unica fouds tough
+27,5,1,vague,attap gears madge bagie vague
+28,5,1,posse,shill wakfs guest jesse posse
+29,5,1,lapse,wedge chose musse abase lapse
+30,5,1,vault,payee halma wawls fault vault
+31,5,1,agile,krays quena mamee alive agile
+32,6,1,hefty,merry eensy peppy belay hedgy hefty
+33,4,1,emcee,sambo murid thyme emcee
+34,5,1,tweet,veles creep dweeb tween tweet
+35,7,0,seize,womby trine saice spile skive seise seize
+36,6,1,brief,tegus armer yrneh preed oriel brief
+37,6,1,gamma,chiks lover yummy mamma namma gamma
+38,4,1,gorge,stank demur grice gorge
+39,5,1,flask,doseh traps swain abask flask
+40,5,1,twang,woods fewer macaw thawy twang
+41,6,1,image,chiks vivat mauri admin imago image
+42,5,1,setup,crate teems geist seton setup
+43,5,1,tying,rotis glift agita thigh tying
+44,5,1,silky,chimp lifts sisal silly silky
+45,5,1,dwell,basij loued redly dwelt dwell
+46,7,0,basic,poohs safer bassi basij basin basil basic
+47,4,1,cameo,mzees rumen comet cameo
+48,3,1,eclat,drubs elect eclat
+49,4,1,throw,diffs clove bothy throw
+50,4,1,broth,skatt fifth rowth broth
+51,4,1,ovine,tasse knife quine ovine
+52,5,1,bacon,mutis galax dawen capon bacon
+53,3,1,lipid,sprag putti lipid
+54,4,1,sappy,wheal paans sampi sappy
+55,5,1,bezel,mowas diver kelep betel bezel
+56,5,1,suite,vulgo cubic suids suint suite
+57,5,1,apnea,tyers waded abcee annex apnea
+58,5,1,stall,slunk sibyl steel stool stall
+59,4,1,brand,adunc daine gland brand
+60,7,0,below,elves maerl ledgy cello teloi felon below
+61,6,1,pried,vraic tried dried fried wried pried
+62,3,1,gusty,baits sexto gusty
+63,7,0,hovel,joint fogou lobes moled yokel vowel hovel
+64,4,1,slung,addio gunks swung slung
+65,6,1,madam,teens limax omrah macaw mapau madam
+66,3,1,print,glume pivot print
+67,4,1,shall,fugal allel myall shall
+68,5,1,theft,ewers plead chevy thegn theft
+69,5,1,melon,whams mobie mezzo metol melon
+70,5,1,shock,pesto somas synod scour shock
+71,8,0,night,celom bhats right dight tight pight fight night
+72,3,1,gripe,trail priss gripe
+73,4,1,nicer,ripes liner niter nicer
+74,2,1,smith,meith smith
+75,7,0,shove,mazed grebe copse stoke swole shone shove
+76,3,1,obese,khats birsy obese
+77,5,1,motel,siker pacey wowed mohel motel
+78,5,1,paler,wimpy pates parev pacer paler
+79,4,1,rebel,noils calyx leper rebel
+80,4,1,tuber,otary truth turps tuber
+81,5,1,beard,lucks joint heame ready beard
+82,5,1,fiery,cosec penal gigue viewy fiery
+83,9,0,baggy,rille shaws catty daddy gappy faggy naggy jaggy baggy
+84,5,1,deity,latus theme repot benty deity
+85,4,1,slain,using vinas sarin slain
+86,8,0,parry,beige coral fards karzy tarty marvy harry parry
+87,8,0,woody,loopy booby doozy goody moody hoody foody woody
+88,7,0,braid,rises aggri kafir train craic drail braid
+89,7,0,snort,dobes glost scout spoot shott skort snort
+90,7,0,shaft,sowls sunup shive shaky shard shama shaft
+91,6,1,clued,eigne wowed added tsked pured clued
+92,5,1,stink,sperm skats stonk stunk stink
+93,5,1,quest,lilos sythe verst egest quest
+94,9,0,mouse,suave chuse louse rouse douse touse youse bouse mouse
+95,4,1,smirk,bubbe manta chimo smirk
+96,4,1,after,tight wonts aptly after
+97,5,1,salty,flood silen sylva splay salty
+98,6,1,fjord,oxbow smoky leone chord fiord fjord
+99,6,1,gauge,redid homes epact gauze gauje gauge
+# strategy random-guess, trials 100, seed 0
+# mean guesses 4.9800  +/- 0.1333 (standard error)
+# win rate (within 6) 87.0000%  +/- 3.3630%  (87 of 100 games)
+# sd 1.3332   min 2   median 5.0   max 9
+#    2 guesses       1    1.00%
+#    3 guesses       9    9.00%
+#    4 guesses      27   27.00%
+#    5 guesses      37   37.00%
+#    6 guesses      13   13.00%
+#    7 guesses       8    8.00%   (loss)
+#    8 guesses       3    3.00%   (loss)
+#    9 guesses       2    2.00%   (loss)

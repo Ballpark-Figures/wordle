@@ -1,0 +1,36 @@
+# wordle opener sweep: 500000 trials per word, follow-up guess, seed 15
+# lineage root=quad_singletons_L19_t138953994_top10000 pass=16 source=sweep_guess_quad_singletons_L19_t138953994_top10000_p15_t300000_s14.csv
+# settings follow_up=guess pair_adaptive=0 win_within=6 trials=500000 seed=15 words=26 rank=mean
+# 4-word openings, played BLIND in order; the follow-up plays the rest (math/wordlesim.py)
+# every opening faces the SAME 500000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_guess_quad_singletons_L19_t138953994_top10000_p16_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+bumfs corny padle wight,500000,5.115584,0.000512,0.361830,2,5.0,8,0.990282,0.000139,495141,7.153
+bowne curfs madly pight,500000,5.114984,0.000505,0.356930,3,5.0,8,0.990480,0.000137,495240,7.080
+burns comfy padle wight,500000,5.115518,0.000512,0.362124,2,5.0,8,0.990282,0.000139,495141,7.091
+burnt comfy padle whigs,500000,5.116862,0.000529,0.374184,1,5.0,8,0.990412,0.000138,495206,6.621
+bugle corms pandy whift,500000,5.116322,0.000521,0.368374,1,5.0,8,0.990178,0.000139,495089,6.713
+bundt comfy parle whigs,500000,5.116896,0.000512,0.361878,2,5.0,8,0.990542,0.000137,495271,6.505
+bumfs carle downy pight,500000,5.117508,0.000510,0.360344,3,5.0,8,0.990132,0.000140,495066,6.472
+cable dormy pungs whift,500000,5.116780,0.000519,0.366719,1,5.0,8,0.990870,0.000135,495435,6.500
+curds fable might powny,500000,5.117930,0.000519,0.366779,2,5.0,8,0.990200,0.000139,495100,6.582
+curdy fable might powns,500000,5.117930,0.000519,0.366779,2,5.0,8,0.990200,0.000139,495100,6.604
+curly dawns fight pombe,500000,5.117838,0.000526,0.372119,1,5.0,8,0.990324,0.000138,495162,6.761
+badly gorms punce whift,500000,5.118176,0.000519,0.367035,1,5.0,8,0.990372,0.000138,495186,6.868
+curly dangs pombe whift,500000,5.116860,0.000517,0.365869,1,5.0,8,0.991060,0.000133,495530,6.950
+cable morns pudgy whift,500000,5.117420,0.000526,0.371608,1,5.0,8,0.990556,0.000137,495278,7.029
+bundt chime gowfs parly,500000,5.117486,0.000513,0.362518,2,5.0,8,0.990408,0.000138,495204,6.997
+bunds comfy parle wight,500000,5.117548,0.000514,0.363432,2,5.0,8,0.990610,0.000136,495305,7.290
+curbs manly podge whift,500000,5.118092,0.000511,0.361567,2,5.0,8,0.991188,0.000132,495594,7.295
+corbe madly pungs whift,500000,5.118002,0.000512,0.361969,2,5.0,8,0.991188,0.000132,495594,7.561
+burnt comfy pagle whids,500000,5.117698,0.000532,0.376507,1,5.0,8,0.989764,0.000142,494882,7.461
+bayle curfs might pownd,500000,5.118146,0.000510,0.360732,3,5.0,8,0.990218,0.000139,495109,7.447
+barms godly punce whift,500000,5.118560,0.000514,0.363131,2,5.0,8,0.990372,0.000138,495186,7.468
+bumfs carle dight powny,500000,5.118400,0.000506,0.357566,5,5.0,8,0.990132,0.000140,495066,7.478
+bumfs carny dowle pight,500000,5.118400,0.000506,0.357566,5,5.0,8,0.990132,0.000140,495066,7.350
+curdy fight moble pawns,500000,5.118758,0.000515,0.364229,2,5.0,8,0.990200,0.000139,495100,7.397
+curly dight fawns pombe,500000,5.118646,0.000523,0.369683,1,5.0,8,0.990324,0.000138,495162,7.382
+bungy corms padle whift,500000,5.117830,0.000502,0.355188,5,5.0,8,0.990770,0.000135,495385,7.137

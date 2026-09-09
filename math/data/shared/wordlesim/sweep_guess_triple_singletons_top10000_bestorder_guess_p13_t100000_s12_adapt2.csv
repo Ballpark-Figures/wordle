@@ -1,0 +1,28 @@
+# wordle opener sweep: 100000 trials per word, follow-up guess, seed 12
+# lineage root=triple_singletons_top10000_bestorder_guess pass=13 source=sweep_guess_triple_singletons_top10000_bestorder_guess_p12_t50000_s11_adapt2.csv
+# 3-word openings, played in order but ABANDONED once the follow-up is down to 2
+# or fewer words (--pair-adaptive, the rule in data/shared/PAIRS.md); ORDER MATTERS, so
+# a b and b a are different rows
+# every opening faces the SAME 100000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_guess_triple_singletons_top10000_bestorder_guess_p13_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+chant dorse blimp,100000,4.324710,0.002822,0.892402,1,4.0,10,0.985010,0.000384,98501,1.918
+point carle dumbs,100000,4.328050,0.002833,0.895791,1,4.0,10,0.980810,0.000434,98081,1.932
+horst dance blimp,100000,4.326960,0.002773,0.877055,2,4.0,11,0.985440,0.000379,98544,1.921
+corse plant midgy,100000,4.331020,0.002883,0.911753,2,4.0,10,0.980270,0.000440,98027,1.931
+horst caple dingy,100000,4.337120,0.002948,0.932190,2,4.0,10,0.978150,0.000462,97815,1.938
+horst pance dimly,100000,4.337620,0.002915,0.921868,2,4.0,10,0.978830,0.000455,97883,1.935
+drant clies bumph,100000,4.336610,0.002851,0.901550,2,4.0,10,0.982610,0.000413,98261,1.950
+plant cries dumbo,100000,4.343080,0.002953,0.933716,1,4.0,11,0.978840,0.000455,97884,1.960
+caple short dingy,100000,4.337230,0.002969,0.938837,2,4.0,10,0.977020,0.000474,97702,1.949
+canst horde blimp,100000,4.333040,0.002766,0.874810,2,4.0,11,0.984660,0.000389,98466,1.937
+plant cores midgy,100000,4.339210,0.002880,0.910678,1,4.0,10,0.980020,0.000443,98002,1.951
+horst pance build,100000,4.344600,0.002960,0.935959,2,4.0,11,0.976420,0.000480,97642,1.958
+plane crost midgy,100000,4.345060,0.002910,0.920121,1,4.0,10,0.980180,0.000441,98018,1.954
+crone spalt midgy,100000,4.346070,0.002889,0.913572,1,4.0,10,0.980470,0.000438,98047,1.954
+crane blist podgy,100000,4.354400,0.002944,0.931069,1,4.0,10,0.977260,0.000471,97726,1.953
+caple snort midgy,100000,4.346600,0.002889,0.913694,2,4.0,10,0.980590,0.000436,98059,1.946
+clasp trone midgy,100000,4.343960,0.002870,0.907557,1,4.0,10,0.981540,0.000426,98154,1.945

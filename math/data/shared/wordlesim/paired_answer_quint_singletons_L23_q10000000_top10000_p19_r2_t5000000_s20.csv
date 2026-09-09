@@ -1,0 +1,30 @@
+# paired comparison of 10 openings, 5000000 games, follow-up answer, pair-adaptive 0, seed 20, ranked on mean guesses
+# settings and finalists taken from paired_answer_quint_singletons_L23_q10000000_top10000_p19_r1_t3000000_s19.csv (root quint_singletons_L23_q10000000_top10000, pass 19)
+# leader clove rugby spank whift mozed, mean 6.00088 +/- 0.00007 (its own error)
+# 
+# opening                        mean    own se    vs leader paired se   sigma
+# clove rugby spank whift mozed    6.00088   0.00007            -         -       -
+# blaze comfy right spunk waved    6.00113   0.00008      0.00025   0.00010     2.6
+# blitz crown pudgy shmek favor    6.00126   0.00008      0.00038   0.00010     3.7
+# black fudge nymph worst vizir    6.00127   0.00008      0.00038   0.00010     3.7
+# curvy dowel fight spank jambe    6.00129   0.00008      0.00040   0.00010     4.1
+# curvy dowel fight spank zambo    6.00133   0.00008      0.00044   0.00010     4.6
+# downy giver pluck shaft zambo    6.00133   0.00008      0.00045   0.00010     4.4
+# bawdy mover pluck shift zigan    6.00140   0.00008      0.00051   0.00010     5.1
+# bloke curvy fight spawn mozed    6.00143   0.00008      0.00055   0.00010     5.4
+# bagel crowd funky spitz vehme    6.00151   0.00007      0.00063   0.00010     6.3
+# 
+# pairing gain against the leader's nearest rival: unpaired error 0.00011, paired 0.00010 (1.1x tighter)
+# settings follow_up=answer pair_adaptive=0 win_within=6 trials=5000000 seed=20 words=10 rank=mean
+# lineage root=quint_singletons_L23_q10000000_top10000 pass=19 round=2 source=paired_answer_quint_singletons_L23_q10000000_top10000_p19_r1_t3000000_s19.csv
+word,trials,mean,stderr,diff_vs_leader,paired_stderr,sigma
+clove rugby spank whift mozed,5000000,6.000881,0.000074,0.000000,0.000000,0.000
+blaze comfy right spunk waved,5000000,6.001135,0.000077,0.000254,0.000098,2.600
+blitz crown pudgy shmek favor,5000000,6.001264,0.000076,0.000383,0.000102,3.740
+black fudge nymph worst vizir,5000000,6.001266,0.000079,0.000385,0.000105,3.678
+curvy dowel fight spank jambe,5000000,6.001286,0.000078,0.000405,0.000098,4.142
+curvy dowel fight spank zambo,5000000,6.001326,0.000078,0.000445,0.000097,4.597
+downy giver pluck shaft zambo,5000000,6.001328,0.000079,0.000447,0.000102,4.385
+bawdy mover pluck shift zigan,5000000,6.001396,0.000078,0.000514,0.000100,5.131
+bloke curvy fight spawn mozed,5000000,6.001431,0.000078,0.000550,0.000102,5.384
+bagel crowd funky spitz vehme,5000000,6.001514,0.000074,0.000633,0.000101,6.258

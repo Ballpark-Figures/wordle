@@ -1,0 +1,12 @@
+# wordle opener sweep: 2000000 trials per word, follow-up guess, seed 17
+# lineage root=quint_singletons_L23_q10000000_top10000 pass=18 source=sweep_guess_quint_singletons_L23_q10000000_top10000_p17_t1000000_s16.csv
+# settings follow_up=guess pair_adaptive=0 win_within=6 trials=2000000 seed=17 words=2 rank=mean
+# 5-word openings, played BLIND in order; the follow-up plays the rest (math/wordlesim.py)
+# every opening faces the SAME 2000000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_guess_quint_singletons_L23_q10000000_top10000_p18_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+bagel murky ponds whift cezve,2000000,6.033965,0.000169,0.238587,1,6.0,8,0.963221,0.000133,1926443,27.543
+bowel farms pudgy think cezve,2000000,6.034822,0.000168,0.237301,1,6.0,8,0.961819,0.000136,1923638,28.251

@@ -1,0 +1,14 @@
+# paired comparison of 2 openings, 10000000 games, follow-up answer, pair-adaptive 0, seed 21
+# settings and finalists taken from sweep_answer_triple_singletons_top10000_p21_t10000000_s20.csv (root triple_singletons_top10000, pass 21)
+# leader dance horst blimp, mean 4.16444 +/- 0.00013 (its own error)
+# 
+# opening                        mean    own se    vs leader paired se   sigma
+# dance horst blimp           4.16444   0.00013            -         -       -
+# chant dorse blimp           4.16525   0.00013      0.00080   0.00008    10.4
+# 
+# pairing gain against the leader's nearest rival: unpaired error 0.00019, paired 0.00008 (2.4x tighter)
+# settings follow_up=answer pair_adaptive=0 win_within=6 trials=10000000 seed=21 words=2
+# lineage root=triple_singletons_top10000 pass=21 round=1 source=sweep_answer_triple_singletons_top10000_p21_t10000000_s20.csv
+word,trials,mean,stderr,diff_vs_leader,paired_stderr,sigma
+dance horst blimp,10000000,4.164442,0.000133,0.000000,0.000000,0.000
+chant dorse blimp,10000000,4.165247,0.000134,0.000805,0.000077,10.396

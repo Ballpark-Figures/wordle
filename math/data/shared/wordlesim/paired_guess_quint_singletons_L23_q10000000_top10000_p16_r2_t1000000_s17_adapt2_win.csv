@@ -1,0 +1,30 @@
+# paired comparison of 10 openings, 1000000 games, follow-up guess, pair-adaptive 2, seed 17, ranked on WIN RATE
+# settings and finalists taken from paired_guess_quint_singletons_L23_q10000000_top10000_p16_r1_t500000_s16_adapt2_win.csv (root quint_singletons_L23_q10000000_top10000, pass 16)
+# leader dumky forth gibel pawns cezve, win rate 0.98707 +/- 0.00011 (its own error)
+# 
+# opening                        mean    own se    vs leader paired se   sigma
+# dumky forth gibel pawns cezve    0.98707   0.00011            -         -       -
+# bagel murky pownd shift cezve    0.98656   0.00012      0.00050   0.00012     4.4
+# bagel dorms punky whift cezve    0.98641   0.00012      0.00066   0.00011     6.2
+# bagel dormy punks whift cezve    0.98641   0.00012      0.00066   0.00011     6.2
+# balmy fight rowed spunk cezve    0.98637   0.00012      0.00069   0.00012     5.6
+# borel dumky pangs whift cezve    0.98637   0.00012      0.00070   0.00011     6.4
+# banks morel pudgy whift cezve    0.98613   0.00012      0.00094   0.00011     8.2
+# bungy model parks whift cezve    0.98613   0.00012      0.00094   0.00011     8.2
+# bungs model parky whift cezve    0.98613   0.00012      0.00094   0.00011     8.2
+# barky model pungs whift cezve    0.98613   0.00012      0.00094   0.00011     8.2
+# 
+# pairing gain against the leader's nearest rival: unpaired error 0.00016, paired 0.00012 (1.4x tighter)
+# settings follow_up=guess pair_adaptive=2 win_within=6 trials=1000000 seed=17 words=10 rank=win_rate
+# lineage root=quint_singletons_L23_q10000000_top10000 pass=16 round=2 source=paired_guess_quint_singletons_L23_q10000000_top10000_p16_r1_t500000_s16_adapt2_win.csv
+word,trials,mean,stderr,diff_vs_leader,paired_stderr,sigma
+dumky forth gibel pawns cezve,1000000,0.987066,0.000113,0.000000,0.000000,0.000
+bagel murky pownd shift cezve,1000000,0.986562,0.000115,0.000504,0.000115,4.365
+bagel dorms punky whift cezve,1000000,0.986407,0.000116,0.000659,0.000107,6.159
+bagel dormy punks whift cezve,1000000,0.986407,0.000116,0.000659,0.000107,6.159
+balmy fight rowed spunk cezve,1000000,0.986371,0.000116,0.000695,0.000123,5.642
+borel dumky pangs whift cezve,1000000,0.986365,0.000116,0.000701,0.000109,6.424
+banks morel pudgy whift cezve,1000000,0.986130,0.000117,0.000936,0.000115,8.152
+bungy model parks whift cezve,1000000,0.986130,0.000117,0.000936,0.000115,8.152
+bungs model parky whift cezve,1000000,0.986130,0.000117,0.000936,0.000115,8.152
+barky model pungs whift cezve,1000000,0.986130,0.000117,0.000936,0.000115,8.152

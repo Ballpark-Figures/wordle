@@ -1,0 +1,15 @@
+# wordle opener sweep: 5000000 trials per word, follow-up guess, seed 19
+# lineage root=quad_singletons_L19_t138953994_top10000_bestorder_guess pass=20 source=sweep_guess_quad_singletons_L19_t138953994_top10000_bestorder_guess_p19_t3000000_s18_adapt2.csv
+# settings follow_up=guess pair_adaptive=2 win_within=6 trials=5000000 seed=19 words=3 rank=mean
+# 4-word openings, played in order but ABANDONED once the follow-up is down to 2
+# or fewer words (--pair-adaptive, the rule in data/shared/PAIRS.md); ORDER MATTERS, so
+# a b and b a are different rows
+# every opening faces the SAME 5000000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_guess_quad_singletons_L19_t138953994_top10000_bestorder_guess_p20_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+draft chiel pungs womby,5000000,4.466836,0.000390,0.871092,1,4.0,8,0.990090,0.000044,4950448,111.642
+farse compt blind vughy,5000000,4.466159,0.000390,0.871888,2,4.0,9,0.987987,0.000049,4939933,121.512
+force blast dingy whump,5000000,4.467573,0.000398,0.889692,1,4.0,9,0.988839,0.000047,4944197,125.502

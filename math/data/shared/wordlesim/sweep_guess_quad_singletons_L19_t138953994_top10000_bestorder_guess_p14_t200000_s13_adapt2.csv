@@ -1,0 +1,29 @@
+# wordle opener sweep: 200000 trials per word, follow-up guess, seed 13
+# lineage root=quad_singletons_L19_t138953994_top10000_bestorder_guess pass=14 source=sweep_guess_quad_singletons_L19_t138953994_top10000_bestorder_guess_p13_t100000_s12_adapt2.csv
+# settings follow_up=guess pair_adaptive=2 win_within=6 trials=200000 seed=13 words=17
+# 4-word openings, played in order but ABANDONED once the follow-up is down to 2
+# or fewer words (--pair-adaptive, the rule in data/shared/PAIRS.md); ORDER MATTERS, so
+# a b and b a are different rows
+# every opening faces the SAME 200000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_guess_quad_singletons_L19_t138953994_top10000_bestorder_guess_p14_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+draft chiel pungs womby,200000,4.470525,0.001951,0.872574,1,4.0,8,0.989785,0.000225,197957,4.183
+farse compt blind vughy,200000,4.463275,0.001950,0.872024,2,4.0,9,0.987680,0.000247,197536,4.189
+force blast dingy whump,200000,4.466365,0.001994,0.891870,1,4.0,9,0.988365,0.000240,197673,4.186
+chant borel wimps fudgy,200000,4.477195,0.001958,0.875628,1,5.0,8,0.988855,0.000235,197771,4.212
+borde canst flimp vughy,200000,4.472655,0.001978,0.884724,2,4.0,9,0.987595,0.000247,197519,4.223
+clint dorse bumph gawky,200000,4.471890,0.001962,0.877567,2,4.0,8,0.989200,0.000231,197840,4.195
+chirt pagle funds womby,200000,4.476545,0.001915,0.856524,2,4.0,8,0.989320,0.000230,197864,4.179
+clift borne damps vughy,200000,4.473835,0.001916,0.856872,2,4.0,9,0.988240,0.000241,197648,4.209
+chant fried plugs womby,200000,4.479040,0.001987,0.888462,1,4.0,8,0.988515,0.000238,197703,4.201
+clint sabre whomp fudgy,200000,4.477535,0.002000,0.894444,2,5.0,8,0.988490,0.000239,197698,4.185
+clift darns pombe vughy,200000,4.476795,0.001897,0.848390,2,4.0,9,0.988995,0.000233,197799,4.206
+cable morns whipt fudgy,200000,4.480270,0.001891,0.845727,1,4.0,8,0.990090,0.000221,198018,4.236
+snirt cable whomp fudgy,200000,4.474100,0.001998,0.893467,2,5.0,8,0.989030,0.000233,197806,4.234
+flint barde comps vughy,200000,4.473490,0.001938,0.866690,1,4.0,9,0.987725,0.000246,197545,4.223
+chaft plier dungs womby,200000,4.483115,0.001970,0.881220,2,5.0,8,0.989200,0.000231,197840,4.238
+moble carns whipt fudgy,200000,4.481275,0.001883,0.842041,2,4.0,8,0.990505,0.000217,198101,4.220
+worst hance blimp fudgy,200000,4.481200,0.001975,0.883120,1,5.0,8,0.989445,0.000229,197889,4.204

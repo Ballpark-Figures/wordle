@@ -1,0 +1,18 @@
+# wordle opener sweep: 1000000 trials per word, follow-up answer, seed 16
+# lineage root=quad_singletons_L19_t138953994_top10000 pass=17 source=sweep_answer_quad_singletons_L19_t138953994_top10000_p16_t500000_s15.csv
+# settings follow_up=answer pair_adaptive=0 win_within=6 trials=1000000 seed=16 words=8 rank=mean
+# 4-word openings, played BLIND in order; the follow-up plays the rest (math/wordlesim.py)
+# every opening faces the SAME 1000000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_answer_quad_singletons_L19_t138953994_top10000_p17_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+champ flint rugby sowed,1000000,5.021869,0.000197,0.196725,1,5.0,7,0.999233,0.000028,999233,7.253
+bawdy chump flint gorse,1000000,5.022103,0.000200,0.200206,1,5.0,7,0.998852,0.000034,998852,7.178
+chump downy first gable,1000000,5.022476,0.000203,0.203447,1,5.0,7,0.998802,0.000035,998802,6.912
+bugle champ downy first,1000000,5.022837,0.000204,0.204317,1,5.0,7,0.998852,0.000034,998852,6.994
+clung riped shaft womby,1000000,5.022370,0.000188,0.187717,1,5.0,7,0.999230,0.000028,999230,6.939
+champ dowel rugby snift,1000000,5.023077,0.000201,0.200944,1,5.0,7,0.999205,0.000028,999205,6.987
+chant flimp rugby sowed,1000000,5.023083,0.000187,0.187169,1,5.0,7,0.999233,0.000028,999233,6.988
+champ dowse flint rugby,1000000,5.023283,0.000190,0.190113,1,5.0,7,0.999089,0.000030,999089,6.946

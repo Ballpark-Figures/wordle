@@ -1,0 +1,37 @@
+# wordle opener sweep: 50000 trials per word, follow-up answer, seed 11
+# lineage root=pair_singletons_top10000_bestorder_answer pass=12 source=sweep_answer_pair_singletons_top10000_bestorder_answer_p11_t30000_s10_adapt2.csv
+# 2-word openings, played in order but ABANDONED once the follow-up is down to 2
+# or fewer words (--pair-adaptive, the rule in data/shared/PAIRS.md); ORDER MATTERS, so
+# a b and b a are different rows
+# every opening faces the SAME 50000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_answer_pair_singletons_top10000_bestorder_answer_p12_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+crane spilt,50000,3.678220,0.003654,0.817026,1,4.0,9,0.994720,0.000324,49736,0.394
+crane slipt,50000,3.684260,0.003653,0.816934,1,4.0,9,0.994560,0.000329,49728,0.388
+caple snirt,50000,3.683620,0.003638,0.813521,2,4.0,9,0.995080,0.000313,49754,0.392
+parse clint,50000,3.667960,0.003664,0.819392,1,4.0,9,0.994240,0.000338,49712,0.384
+price slant,50000,3.679360,0.003664,0.819343,1,4.0,9,0.994200,0.000340,49710,0.386
+drice slant,50000,3.684480,0.003709,0.829398,2,4.0,9,0.992840,0.000377,49642,0.382
+serin clapt,50000,3.694440,0.003650,0.816141,2,4.0,10,0.994460,0.000332,49723,0.383
+crine spalt,50000,3.681280,0.003613,0.807856,2,4.0,9,0.994980,0.000316,49749,0.381
+plant crise,50000,3.680080,0.003638,0.813526,1,4.0,9,0.995100,0.000312,49755,0.388
+drant slice,50000,3.688320,0.003707,0.828969,2,4.0,9,0.993160,0.000369,49658,0.380
+prase clint,50000,3.679540,0.003639,0.813744,2,4.0,9,0.995200,0.000309,49760,0.378
+crine plast,50000,3.688580,0.003626,0.810833,2,4.0,9,0.994680,0.000325,49734,0.381
+slant cripe,50000,3.681960,0.003629,0.811507,1,4.0,9,0.994160,0.000341,49708,0.380
+cline spart,50000,3.686100,0.003659,0.818230,2,4.0,10,0.994760,0.000323,49738,0.379
+slipt rance,50000,3.690960,0.003639,0.813724,2,4.0,9,0.994620,0.000327,49731,0.387
+spice larnt,50000,3.681240,0.003634,0.812555,1,4.0,9,0.994820,0.000321,49741,0.384
+lance sprit,50000,3.696420,0.003658,0.817993,1,4.0,9,0.994500,0.000331,49725,0.384
+siren clapt,50000,3.692420,0.003637,0.813356,1,4.0,9,0.995180,0.000310,49759,0.384
+clart snipe,50000,3.694220,0.003643,0.814697,2,4.0,9,0.994940,0.000317,49747,0.383
+spare clint,50000,3.686620,0.003657,0.817769,1,4.0,9,0.994600,0.000328,49730,0.381
+spilt rance,50000,3.688200,0.003628,0.811341,1,4.0,8,0.995140,0.000311,49757,0.380
+clart spine,50000,3.690260,0.003672,0.821130,2,4.0,10,0.994000,0.000345,49700,0.389
+scale print,50000,3.695480,0.003674,0.821536,1,4.0,10,0.994480,0.000331,49724,0.384
+slant cried,50000,3.691920,0.003676,0.822083,1,4.0,10,0.993560,0.000358,49678,0.386
+cline sprat,50000,3.691680,0.003669,0.820337,2,4.0,10,0.994120,0.000342,49706,0.381
+corse plant,50000,3.694500,0.003639,0.813623,2,4.0,9,0.994620,0.000327,49731,0.383

@@ -1,0 +1,36 @@
+# wordle opener sweep: 200000 trials per word, follow-up guess, seed 13
+# lineage root=quint_singletons_L23_q10000000_top10000 pass=14 source=sweep_guess_quint_singletons_L23_q10000000_top10000_p13_t100000_s12.csv
+# settings follow_up=guess pair_adaptive=0 win_within=6 trials=200000 seed=13 words=26 rank=mean
+# 5-word openings, played BLIND in order; the follow-up plays the rest (math/wordlesim.py)
+# every opening faces the SAME 200000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_guess_quint_singletons_L23_q10000000_top10000_p14_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+bawdy kugel morph snift cezve,200000,6.035775,0.000532,0.238087,1,6.0,8,0.961965,0.000428,192393,2.869
+bowel farms pudgy think cezve,200000,6.035840,0.000522,0.233336,1,6.0,8,0.961360,0.000431,192272,2.844
+bagel dumpy fowth kirns cezve,200000,6.037165,0.000555,0.248121,1,6.0,8,0.960315,0.000437,192063,2.839
+bagel murky ponds whift cezve,200000,6.034705,0.000528,0.236328,1,6.0,8,0.962880,0.000423,192576,2.842
+bight curvy flask pownd mezes,200000,6.036530,0.000500,0.223754,2,6.0,8,0.962190,0.000426,192438,2.852
+bagel fonds murky whipt cezve,200000,6.036800,0.000525,0.234960,1,6.0,8,0.961415,0.000431,192283,2.852
+curvy flaks might pownd bezel,200000,6.036515,0.000529,0.236520,1,6.0,8,0.961270,0.000431,192254,2.845
+bagel dorms funky whipt cezve,200000,6.036570,0.000527,0.235845,1,6.0,8,0.961375,0.000431,192275,2.851
+carve dumky fight powns bezel,200000,6.036650,0.000531,0.237544,1,6.0,8,0.960940,0.000433,192188,2.837
+carve monks pudgy whift bezel,200000,6.037195,0.000529,0.236457,1,6.0,8,0.960425,0.000436,192085,2.850
+bagel dumky firth powns cezve,200000,6.037255,0.000507,0.226533,1,6.0,8,0.962270,0.000426,192454,2.828
+bagel dumky fowth pirns cezve,200000,6.037255,0.000507,0.226533,1,6.0,8,0.962270,0.000426,192454,2.853
+bagel dumpy frows think cezve,200000,6.037735,0.000566,0.252945,1,6.0,8,0.957965,0.000449,191593,2.864
+chive front mawks pudgy bezel,200000,6.038055,0.000503,0.224938,2,6.0,8,0.960460,0.000436,192092,2.841
+bagel murky pownd shift cezve,200000,6.037815,0.000555,0.248385,1,6.0,8,0.959175,0.000442,191835,2.829
+bagel dorms punky whift cezve,200000,6.037220,0.000503,0.225022,1,6.0,8,0.961980,0.000428,192396,2.847
+bagel dormy punks whift cezve,200000,6.037220,0.000503,0.225022,1,6.0,8,0.961980,0.000428,192396,2.869
+carve dumpy gonks whift bezel,200000,6.038185,0.000560,0.250514,1,6.0,8,0.958610,0.000445,191722,2.845
+carve dumky pongs whift bezel,200000,6.038595,0.000513,0.229446,1,6.0,8,0.960165,0.000437,192033,2.853
+blown murky paged shift cezve,200000,6.038195,0.000565,0.252698,1,6.0,8,0.958400,0.000446,191680,2.859
+bawdy forel gumps think cezve,200000,6.038220,0.000529,0.236410,1,6.0,8,0.959720,0.000440,191944,2.850
+curvy madge ponks whift bezel,200000,6.038485,0.000508,0.227254,1,6.0,8,0.960425,0.000436,192085,2.839
+curvy plank tombs weigh fazed,200000,6.038210,0.000565,0.252686,1,6.0,9,0.958295,0.000447,191659,2.788
+burgh model pawky snift cezve,200000,6.038145,0.000493,0.220409,2,6.0,8,0.961500,0.000430,192300,2.776
+curvy flask might pwned booze,200000,6.038545,0.000570,0.254911,1,6.0,9,0.957470,0.000451,191494,2.791
+dumky forth gibel pawns cezve,200000,6.039430,0.000496,0.221733,2,6.0,8,0.960475,0.000436,192095,2.791

@@ -1,0 +1,40 @@
+# wordle opener sweep: 50000 trials per word, follow-up guess, seed 11
+# lineage root=quint_singletons_L23_q10000000_top10000_bestorder_guess pass=12 source=sweep_guess_quint_singletons_L23_q10000000_top10000_bestorder_guess_p11_t30000_s10_adapt2.csv
+# settings follow_up=guess pair_adaptive=2 win_within=6 trials=50000 seed=11 words=28 rank=mean
+# 5-word openings, played in order but ABANDONED once the follow-up is down to 2
+# or fewer words (--pair-adaptive, the rule in data/shared/PAIRS.md); ORDER MATTERS, so
+# a b and b a are different rows
+# every opening faces the SAME 50000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_guess_quint_singletons_L23_q10000000_top10000_bestorder_guess_p12_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+farse compt blink vughy dewax,50000,4.584260,0.004354,0.973591,2,5.0,9,0.971060,0.000750,48553,1.219
+clift pared wonks vughy jembe,50000,4.567760,0.004238,0.947706,2,5.0,8,0.982620,0.000584,49131,1.180
+ronde clift sumph gawky vibex,50000,4.583500,0.004094,0.915535,2,5.0,8,0.978320,0.000651,48916,1.244
+clift wared ponks vughy jembe,50000,4.577060,0.004186,0.936077,2,5.0,8,0.983680,0.000567,49184,1.266
+clift paned works vughy jembe,50000,4.579260,0.004181,0.934909,2,5.0,8,0.983280,0.000573,49164,1.257
+clift ragde sumph wonky vibex,50000,4.588320,0.004098,0.916328,2,5.0,8,0.978780,0.000645,48939,1.267
+clift waned porks vughy jembe,50000,4.581880,0.004174,0.933356,2,5.0,8,0.982660,0.000584,49133,1.249
+shift ronde clump gawky vibex,50000,4.585680,0.004191,0.937100,1,5.0,8,0.977440,0.000664,48872,1.267
+flint carks pombe vughy jewed,50000,4.586840,0.004253,0.951019,1,5.0,8,0.977460,0.000664,48873,1.266
+snift gable dorky whump cezve,50000,4.589780,0.004112,0.919476,2,5.0,8,0.979180,0.000639,48959,1.252
+clift sarge bumph wonky vexed,50000,4.598800,0.004272,0.955352,2,5.0,8,0.976720,0.000674,48836,1.260
+sprit maned flock vughy bwazi,50000,4.594560,0.004342,0.970916,2,5.0,9,0.970440,0.000757,48522,1.258
+flint carks pombe vughy dewax,50000,4.586300,0.004305,0.962585,1,5.0,9,0.974880,0.000700,48744,1.248
+clank first pombe vughy jawed,50000,4.595060,0.004281,0.957174,1,5.0,8,0.973500,0.000718,48675,1.228
+glint sabed forky whump cezve,50000,4.602120,0.004188,0.936434,1,5.0,8,0.979340,0.000636,48967,1.231
+snift bogle darky whump cezve,50000,4.596060,0.004049,0.905466,2,5.0,8,0.980360,0.000621,49018,1.208
+glift sonde barky whump cezve,50000,4.597320,0.004084,0.913316,2,5.0,8,0.977660,0.000661,48883,1.232
+spilt forge bundh mawky cezve,50000,4.603360,0.004099,0.916501,1,5.0,8,0.980140,0.000624,49007,1.213
+snift ragde plumy chowk vibex,50000,4.593940,0.004193,0.937632,2,5.0,8,0.975620,0.000690,48781,1.211
+hared glift punks womby cezve,50000,4.598260,0.004071,0.910385,2,5.0,8,0.982440,0.000587,49122,1.214
+parse clift gunky vozhd wembs,50000,4.596260,0.004509,1.008323,1,5.0,8,0.979320,0.000636,48966,1.223
+sprit famed clonk vughy bwazi,50000,4.600620,0.004239,0.947889,2,5.0,9,0.970880,0.000752,48544,1.234
+clipt farse gunky vozhd wembs,50000,4.600160,0.004542,1.015632,2,5.0,8,0.977460,0.000664,48873,1.220
+shift ragde clump wonky vibex,50000,4.603280,0.004131,0.923813,1,5.0,8,0.977020,0.000670,48851,1.226
+glift pared hunks womby cezve,50000,4.599680,0.004076,0.911526,2,5.0,8,0.982820,0.000581,49141,1.239
+clift dawen porks vughy jembe,50000,4.600380,0.004154,0.928752,2,5.0,8,0.981960,0.000595,49098,1.219
+flint parks combe vughy jewed,50000,4.600320,0.004176,0.933742,1,5.0,8,0.978160,0.000654,48908,1.202
+bagel porns whift dumky cezve,50000,4.599400,0.004021,0.899142,1,5.0,8,0.985340,0.000537,49267,1.239

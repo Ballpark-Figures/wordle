@@ -1,0 +1,23 @@
+# wordle opener sweep: 100000 trials per word, follow-up answer, seed 12
+# lineage root=pair_singletons_top10000_bestorder_answer pass=13 source=sweep_answer_pair_singletons_top10000_bestorder_answer_p12_t50000_s11_adapt2.csv
+# 2-word openings, played in order but ABANDONED once the follow-up is down to 2
+# or fewer words (--pair-adaptive, the rule in data/shared/PAIRS.md); ORDER MATTERS, so
+# a b and b a are different rows
+# every opening faces the SAME 100000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_answer_pair_singletons_top10000_bestorder_answer_p13_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+parse clint,100000,3.672850,0.002572,0.813308,1,4.0,10,0.994480,0.000234,99448,0.759
+crane spilt,100000,3.676040,0.002570,0.812611,1,4.0,9,0.995250,0.000217,99525,0.785
+price slant,100000,3.684060,0.002590,0.819090,1,4.0,9,0.994560,0.000233,99456,0.755
+prase clint,100000,3.685060,0.002581,0.816235,2,4.0,9,0.994870,0.000226,99487,0.752
+plant crise,100000,3.686600,0.002580,0.815725,1,4.0,10,0.994780,0.000228,99478,0.759
+spice larnt,100000,3.683990,0.002586,0.817774,1,4.0,9,0.994460,0.000235,99446,0.754
+crine spalt,100000,3.682280,0.002550,0.806226,2,4.0,9,0.995020,0.000223,99502,0.766
+slant cripe,100000,3.681710,0.002582,0.816387,1,4.0,9,0.994490,0.000234,99449,0.755
+caple snirt,100000,3.686030,0.002579,0.815659,2,4.0,9,0.994820,0.000227,99482,0.760
+crane slipt,100000,3.682450,0.002583,0.816835,1,4.0,9,0.995040,0.000222,99504,0.769
+drice slant,100000,3.685330,0.002628,0.831132,2,4.0,9,0.993310,0.000258,99331,0.771
+cline spart,100000,3.686690,0.002583,0.816819,2,4.0,9,0.994770,0.000228,99477,0.763

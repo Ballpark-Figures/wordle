@@ -1,0 +1,24 @@
+# paired comparison of 7 openings, 1000000 games, follow-up guess, pair-adaptive 2, seed 17, ranked on WIN RATE
+# settings and finalists taken from paired_guess_quad_singletons_L19_t138953994_top10000_p15_r2_t500000_s16_adapt2_win.csv (root quad_singletons_L19_t138953994_top10000, pass 15)
+# leader chawk dingy flobs mpret, win rate 0.99240 +/- 0.00009 (its own error)
+# 
+# opening                    win rate    own se    vs leader paired se   sigma
+# chawk dingy flobs mpret     0.99240   0.00009            -         -       -
+# chowk dingy flabs mpret     0.99240   0.00009      0.00000   0.00000     inf
+# chaft globy mirvs pwned     0.99236   0.00009      0.00004   0.00009     0.5
+# burks camel fight pownd     0.99213   0.00009      0.00027   0.00010     2.8
+# chivy dwang flobs mpret     0.99204   0.00009      0.00036   0.00009     4.0
+# curbs flank mowed pight     0.99192   0.00009      0.00049   0.00009     5.3
+# chavs gibel rownd tumpy     0.99170   0.00009      0.00071   0.00012     5.9
+# 
+# pairing gain against the leader's nearest rival: unpaired error 0.00012, paired 0.00000 (infx tighter)
+# settings follow_up=guess pair_adaptive=2 win_within=6 trials=1000000 seed=17 words=7 rank=win_rate
+# lineage root=quad_singletons_L19_t138953994_top10000 pass=15 round=3 source=paired_guess_quad_singletons_L19_t138953994_top10000_p15_r2_t500000_s16_adapt2_win.csv
+word,trials,win_rate,win_rate_stderr,diff_vs_leader,paired_stderr,sigma
+chawk dingy flobs mpret,1000000,0.992403,0.000087,0.000000,0.000000,0.000
+chowk dingy flabs mpret,1000000,0.992403,0.000087,0.000000,0.000000,0.000
+chaft globy mirvs pwned,1000000,0.992359,0.000087,0.000044,0.000092,0.479
+burks camel fight pownd,1000000,0.992130,0.000088,0.000273,0.000096,2.845
+chivy dwang flobs mpret,1000000,0.992041,0.000089,0.000362,0.000090,4.021
+curbs flank mowed pight,1000000,0.991916,0.000090,0.000487,0.000092,5.315
+chavs gibel rownd tumpy,1000000,0.991696,0.000091,0.000707,0.000121,5.853

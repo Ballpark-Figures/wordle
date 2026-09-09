@@ -1,0 +1,26 @@
+# wordle opener sweep: 30000 trials per word, follow-up answer, seed 10
+# lineage root=quint_singletons_L23_q10000000_top10000_bestorder_answer pass=11 source=sweep_answer_quint_singletons_L23_q10000000_top10000_bestorder_answer_p10_t20000_s9_adapt2.csv
+# settings follow_up=answer pair_adaptive=2 win_within=6 trials=30000 seed=10 words=14 rank=mean
+# 5-word openings, played in order but ABANDONED once the follow-up is down to 2
+# or fewer words (--pair-adaptive, the rule in data/shared/PAIRS.md); ORDER MATTERS, so
+# a b and b a are different rows
+# every opening faces the SAME 30000 answers, drawn from the 2315 mystery words (common random numbers)
+# the candidate openings came from data/shared/wordlesim/shortlist_answer_quint_singletons_L23_q10000000_top10000_bestorder_answer_p11_se5.txt -- a screen of an existing ranking, so this is
+# the best of those examined, never the best opening
+# NO guess cap: win_rate is the fraction of untruncated scores at 6 guesses or fewer
+# the head is a SHORTLIST, not a winner -- see the winner's-curse note in tools/wordle_sweep.py
+word,trials,mean,stderr,sd,min,median,max,win_rate,win_rate_stderr,wins,seconds
+parse clift gunky vozhd wembs,30000,3.955600,0.005025,0.870357,1,4.0,7,0.999767,0.000088,29993,0.320
+spilt farce gunky vozhd wembs,30000,3.948400,0.005000,0.866081,1,4.0,7,0.999633,0.000111,29989,0.316
+slipt farce gunky vozhd wembs,30000,3.959333,0.005019,0.869389,2,4.0,7,0.999800,0.000082,29994,0.322
+sarge clipt funky vozhd wembs,30000,3.949433,0.005015,0.868697,2,4.0,6,1.000000,0.000000,30000,0.313
+sprit maned flock vughy bwazi,30000,3.950800,0.004799,0.831266,2,4.0,8,0.997333,0.000298,29920,0.304
+surge clipt fawny vozhd kembo,30000,3.960400,0.004833,0.837171,1,4.0,7,0.999533,0.000125,29986,0.300
+surge clipt fawny vozhd kembs,30000,3.960400,0.004833,0.837171,1,4.0,7,0.999533,0.000125,29986,0.297
+farse clipt gunky vozhd wembs,30000,3.968967,0.004972,0.861178,2,4.0,7,0.999633,0.000111,29989,0.296
+purse flint gawcy vozhd kembo,30000,3.968667,0.004776,0.827148,1,4.0,7,0.999233,0.000160,29977,0.309
+purse flint gawcy vozhd kembs,30000,3.968667,0.004776,0.827148,1,4.0,7,0.999233,0.000160,29977,0.289
+farse compt blink vughy dewax,30000,3.960067,0.004657,0.806656,2,4.0,7,0.998067,0.000254,29942,0.297
+pared clift snowk vughy jembe,30000,3.963967,0.004772,0.826614,2,4.0,8,0.998233,0.000242,29947,0.298
+ronde clift sumph gawky vibex,30000,3.958667,0.004566,0.790809,2,4.0,7,0.998667,0.000211,29960,0.291
+caret flisk pownd vughy jembe,30000,3.973300,0.004719,0.817278,2,4.0,7,0.998900,0.000191,29967,0.294

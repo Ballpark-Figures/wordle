@@ -1,0 +1,30 @@
+# paired comparison of 10 openings, 2000000 games, follow-up guess, pair-adaptive 2, seed 18
+# settings and finalists taken from paired_guess_pair_singletons_top10000_bestorder_guess_p17_t1000000_s17_adapt2.csv (root pair_singletons_top10000_bestorder_guess, pass 17)
+# leader plant cries, mean 4.30589 +/- 0.00080 (its own error)
+# 
+# opening                        mean    own se    vs leader paired se   sigma
+# plant cries                 4.30589   0.00080            -         -       -
+# claes print                 4.30589   0.00080      0.00000   0.00008     0.1
+# clart peins                 4.30729   0.00080      0.00140   0.00051     2.8
+# caple trins                 4.30729   0.00078      0.00141   0.00064     2.2
+# clans tripe                 4.30815   0.00079      0.00227   0.00053     4.3
+# plans trice                 4.30819   0.00079      0.00230   0.00055     4.2
+# parse clint                 4.30886   0.00079      0.00298   0.00062     4.8
+# place trins                 4.30900   0.00079      0.00312   0.00055     5.7
+# crane slipt                 4.30924   0.00080      0.00335   0.00050     6.7
+# crane spilt                 4.31044   0.00080      0.00455   0.00056     8.1
+# 
+# pairing gain against the leader's nearest rival: unpaired error 0.00113, paired 0.00008 (14.8x tighter)
+# settings follow_up=guess pair_adaptive=2 win_within=6 trials=2000000 seed=18 words=10
+# lineage root=pair_singletons_top10000_bestorder_guess pass=17 round=1 source=paired_guess_pair_singletons_top10000_bestorder_guess_p17_t1000000_s17_adapt2.csv
+word,trials,mean,stderr,diff_vs_leader,paired_stderr,sigma
+plant cries,2000000,4.305886,0.000800,0.000000,0.000000,0.000
+claes print,2000000,4.305890,0.000799,0.000004,0.000076,0.052
+clart peins,2000000,4.307290,0.000797,0.001404,0.000505,2.779
+caple trins,2000000,4.307294,0.000783,0.001408,0.000642,2.194
+clans tripe,2000000,4.308152,0.000787,0.002266,0.000531,4.263
+plans trice,2000000,4.308190,0.000790,0.002303,0.000548,4.206
+parse clint,2000000,4.308865,0.000792,0.002979,0.000624,4.773
+place trins,2000000,4.309001,0.000790,0.003116,0.000550,5.660
+crane slipt,2000000,4.309238,0.000798,0.003351,0.000502,6.674
+crane spilt,2000000,4.310435,0.000799,0.004549,0.000558,8.146
