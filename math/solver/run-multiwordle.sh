@@ -80,6 +80,11 @@ MATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 K=""
 T=""
 SEED=0
+# The rule played AFTER the opening.  The wrapper carries a default a human reads
+# and forwards it EXPLICITLY; the tool refuses without one.  greedy is the
+# original and keeps the filename it always had, so committed results still
+# reproduce -- see math/multiwordle.py for what the three rules are.
+STRATEGY=greedy
 # How many words the opening uses, resolved against the singletons rankings.
 # No word is defaulted here: -n 1 reads the head of guess_singletons.csv.
 NOPEN=1
@@ -91,6 +96,7 @@ PROGRESS=""
 while [ $# -gt 0 ]; do
     case "$1" in
         -k|--boards)  K="$2";        shift 2 ;;
+        --strategy)   STRATEGY="$2"; shift 2 ;;
         -t|--trials)  T="$2";        shift 2 ;;
         --seed)       SEED="$2";     shift 2 ;;
         -n|--num-openers) NOPEN="$2"; shift 2 ;;
@@ -110,6 +116,11 @@ case "$T" in
 esac
 case "$SEED" in
     ''|*[!0-9]*) echo "--seed must be a non-negative number" >&2; exit 1 ;;
+esac
+case "$STRATEGY" in
+    greedy|srank|minavg) ;;
+    *) echo "unknown --strategy '$STRATEGY' (greedy, srank or minavg)" >&2
+       exit 1 ;;
 esac
 case "$NOPEN" in
     ''|*[!0-9]*|0) echo "-n must be a positive number (how many opening words)" >&2; exit 1 ;;
@@ -170,8 +181,11 @@ fi
 
 OUTDIR=data/shared/multiwordle
 LOC=data/local/multiwordle
-# words joined by '-', so a single-word run keeps the filename it always had
+# words joined by '-', so a single-word run keeps the filename it always had.
+# The strategy joins the stem only when it is NOT greedy, for the same reason:
+# every committed file was written under greedy and must keep resolving to itself.
 STEM="k${K}_$(echo "$OPENING" | tr ' ' '-')_t${T}_s${SEED}"
+[ "$STRATEGY" = greedy ] || STEM="${STEM}_${STRATEGY}"
 OUT="$OUTDIR/$STEM.csv"
 mkdir -p "$OUTDIR" "$LOC"
 
@@ -182,7 +196,7 @@ guard_output multiwordle_sim.py "$OUT" || exit 1
 
 # One --opener per word: FLAGS is word-split unquoted below, so a single
 # --openers "a b" would arrive as two arguments and be rejected.
-FLAGS="-k $K -t $T --seed $SEED --out $OUT"
+FLAGS="-k $K -t $T --seed $SEED --strategy $STRATEGY --out $OUT"
 if [ -n "$SOURCE" ]; then
     FLAGS="$FLAGS --openers-from $SOURCE"
 else

@@ -6,9 +6,24 @@ Run it through the wrapper, which sets --out and tees a log:
     bash solver/run-multiwordle.sh -k 4 -t 10000 -n 2        # open with the top PAIR
     bash solver/run-multiwordle.sh -k 4 -t 10000 -n 3 --seed 7
     bash solver/run-multiwordle.sh -k 4 -t 10000 --openers "clint soare"
+    bash solver/run-multiwordle.sh -k 4 -t 10000 --strategy minavg --opener trace
 
 The wrapper's -n names the SIZE of the opening (default 1) and resolves it against
 the singletons ranking for that size, so no opening word is hardcoded anywhere.
+
+--strategy NAMES THE RULE played after the opening -- greedy, srank or minavg,
+all three stated exactly in math/multiwordle.py.  This is the tool for ONE
+opening measured in depth (it writes every game's answers and full guess
+sequence); tools/multiwordle_race.py is the tool for finding WHICH opening.
+`greedy` is the original and keeps the filename it always had, so every committed
+result still reproduces; the other two put their name in the stem.
+
+HOW EACH ONE IS PLAYED, because they do not all take the same path.  `greedy` and
+`srank` run the reference implementation against this file's single RNG stream,
+which is what keeps greedy's committed files bit-identical.  `minavg` runs the
+numba kernel instead: it is far too slow otherwise, and it is DETERMINISTIC -- it
+draws no randomness at all -- so there is no stream to keep consistent and the
+kernel and the reference are the same function (the gate diffs them).
 
 WHAT THIS MEASURES, precisely: the EXPECTED TOTAL GUESSES to solve all k boards,
 over random draws of the k answers AND over the strategy's own coin flips.  The
@@ -48,7 +63,9 @@ import numpy as np
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
 from build_patterns import load_patterns  # noqa: E402
-from multiwordle import answer_to_guess, draw_answers, play_game  # noqa: E402
+from multiwordle import (GREEDY, MINAVG, SRANK, STRATEGIES, answer_to_guess,
+                         draw_answers, make_rule, play_game)  # noqa: E402
+import multiwordle_fast as mf  # noqa: E402
 from wordle import load_words  # noqa: E402
 
 COLUMNS = "game,guesses,answers,sequence"
@@ -78,6 +95,7 @@ def openers_from(path):
 
 def parse_args(argv):
     k = t = None
+    strategy = None
     seed = 0
     openers = []
     source = None
@@ -88,6 +106,8 @@ def parse_args(argv):
         a = argv[i]
         if a in ("-k", "--boards"):
             k = int(argv[i + 1]); i += 2
+        elif a == "--strategy":
+            strategy = argv[i + 1]; i += 2
         elif a in ("-t", "--trials"):
             t = int(argv[i + 1]); i += 2
         elif a == "--seed":
@@ -107,6 +127,15 @@ def parse_args(argv):
             progress = int(argv[i + 1]); i += 2
         else:
             raise SystemExit("unknown argument: %s" % a)
+    if strategy not in STRATEGIES:
+        # The rule is the experiment, not a setting of it: greedy, srank and
+        # minavg are three different strategies and a file that did not say which
+        # produced it would be ambiguous forever.  The WRAPPER carries a default a
+        # human can read and forwards it explicitly; this refuses.
+        raise SystemExit(
+            "--strategy is required and names the rule: one of %s.\n"
+            "Use the wrapper, which passes one: bash solver/run-multiwordle.sh"
+            % ", ".join(STRATEGIES))
     if k is None or k < 1:
         raise SystemExit("-k (number of boards) is required and must be >= 1")
     if t is None or t < 1:
@@ -126,7 +155,7 @@ def parse_args(argv):
         raise SystemExit(
             "--out is required (or --no-out to discard results deliberately).\n"
             "Use the wrapper, which sets it: bash solver/run-multiwordle.sh")
-    return k, t, seed, openers, source, out, progress
+    return k, t, strategy, seed, openers, source, out, progress
 
 
 def summarise(scores, k):
@@ -149,7 +178,7 @@ def summarise(scores, k):
 
 
 def main(argv):
-    k, t, seed, openers, source, out, progress = parse_args(argv)
+    k, t, strategy, seed, openers, source, out, progress = parse_args(argv)
 
     guesses = load_words("guess")
     answers = load_words("mystery")
@@ -164,29 +193,53 @@ def main(argv):
     openers_g = [guesses.index(w) for w in openers]
     rng = np.random.default_rng(seed)
 
+    # minavg searches every legal guess at every turn, so it runs the kernel; the
+    # other two run the reference against this file's single RNG stream.  See the
+    # module docstring for why that split is safe.
+    pool = np.arange(len(guesses), dtype=np.int64)
+    rule = None
+    turn2 = None
+    if strategy == SRANK:
+        rule = make_rule(SRANK, guesses=guesses)
+    elif strategy == MINAVG:
+        og = np.asarray(openers_g, dtype=np.int64)
+        if len(og) == 1:
+            turn2 = mf.turn2_table(pat, int(og[0]), pool)
+        scratch = (np.empty(mf.turn_bound(k, len(og)), dtype=np.int64),
+                   np.empty((k, len(pool))), np.empty(k), np.empty(k))
+
+    def one_game(answer_idx):
+        if strategy != MINAVG:
+            return play_game(pat, ans2g, answer_idx, openers_g, rng, rule)
+        played, vals, cur, best = scratch
+        n = mf.play_minavg(pat, np.asarray(answer_idx, dtype=np.int64), og,
+                           pool, turn2 if turn2 is not None else np.zeros((1, 1)),
+                           turn2 is not None, played, vals, cur, best)
+        return [int(g) for g in played[:n]]
+
     fh = None
     if out:
         os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
         fh = open(out, "w")
-        fh.write("# multiwordle, fixed opening then smallest-board greedy "
-                 "(see math/multiwordle.py)\n")
-        fh.write("# boards=%d trials=%d opening=%s seed=%d\n"
-                 % (k, t, " ".join(openers), seed))
+        fh.write("# multiwordle, blind opening then the %s rule "
+                 "(see math/multiwordle.py)\n" % strategy)
+        fh.write("# boards=%d trials=%d opening=%s seed=%d strategy=%s\n"
+                 % (k, t, " ".join(openers), seed, strategy))
         if source:
             fh.write("# opening taken from the first data row of %s\n" % source)
         fh.write("# answers drawn without replacement from the 2315 mystery words; "
                  "no guess cap\n")
         fh.write(COLUMNS + "\n")
 
-    print("multiwordle: k=%d  trials=%d  opening=%s  seed=%d"
-          % (k, t, " ".join(openers), seed))
+    print("multiwordle: %s  k=%d  trials=%d  opening=%s  seed=%d"
+          % (strategy, k, t, " ".join(openers), seed))
     if source:
         print("  opening from %s" % source)
     scores = []
     t0 = time.time()
     for game in range(t):
         answer_idx = draw_answers(len(answers), k, rng)
-        played = play_game(pat, ans2g, answer_idx, openers_g, rng)
+        played = one_game(answer_idx)
         scores.append(len(played))
         if fh:
             fh.write("%d,%d,%s,%s\n" % (
@@ -200,8 +253,8 @@ def main(argv):
 
     st = summarise(scores, k)
     lines = [
-        "trials %d, boards %d, opening %s, seed %d"
-        % (t, k, " ".join(openers), seed),
+        "strategy %s, trials %d, boards %d, opening %s, seed %d"
+        % (strategy, t, k, " ".join(openers), seed),
         "mean total guesses %.4f  +/- %.4f (standard error)"
         % (st["mean_guesses"], st["stderr"]),
         "sd %.4f   min %d   median %.1f   max %d"
