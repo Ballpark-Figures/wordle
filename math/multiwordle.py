@@ -344,7 +344,13 @@ class SingletonRank:
         vals = [self.value(board_composition(states[j])) for j in boards]
         best = max(vals)
         tied = [j for j, v in zip(boards, vals) if v == best]
-        j = tied[int(rng.integers(len(tied)))] if len(tied) > 1 else tied[0]
+        # ALWAYS draw, even with one tied board (where the draw can only return
+        # 0).  Consumption then depends on the turn number alone and not on the
+        # state, which is what keeps two coupled candidates in step: a rule that
+        # skipped the draw when there was no tie would consume a different number
+        # of randoms per game and the pairing would decay after the first turn
+        # where they disagreed about whether a tie existed.
+        j = tied[int(rng.integers(len(tied)))]
         idx = np.flatnonzero(alive[j])
         return int(ans2g[idx[int(rng.integers(len(idx)))]])
 
