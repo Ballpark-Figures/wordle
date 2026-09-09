@@ -749,6 +749,32 @@ static void walk_line(Ctx *c, int need, char *out, size_t outsz) {
              "%s%s", used ? " " : "", PWORD[mem[0]]);
 }
 
+/* ------------------------------------------------------------------ output
+ *
+ * EVERY ROW THE RUN WRITES GOES THROUGH ONE FUNCTION, so the incremental rows and
+ * the final one cannot drift apart in their columns -- and every row is FLUSHED,
+ * because a row that exists only in a buffer is a row a Ctrl-C throws away. */
+
+typedef struct {
+    FILE       *out;
+    const char *pool;
+    const char *mode;
+    Ctx       **ctxs;
+    int         nthreads;
+    double      t_start;
+    int         greedy;
+} Row;
+
+static void write_row(const Row *r, const char *status, int len, const char *line) {
+    if (!r->out) return;
+    long long nodes = 0;
+    for (int t = 0; t < r->nthreads; t++) nodes += r->ctxs[t]->nodes;
+    fprintf(r->out, "%s,%d,%s,%s,%d,%d,%lld,%d,%.3f,%s\n",
+            r->pool, NP, r->mode, status, len, r->greedy, nodes, r->nthreads,
+            wall_time() - r->t_start, line);
+    fflush(r->out);
+}
+
 /* -------------------------------------------------------------------- main */
 
 static void usage(void) {
@@ -894,13 +920,48 @@ int main(int argc, char **argv) {
     char gline[65536];
     double t_start = T_START;
     int length = 0, greedy = 0;
-    const char *kind = "exact";
+    /* Doubles as the CSV's `status`: `final` is the only value that claims nothing
+     * longer exists, and a run that dies never writes one. */
+    const char *kind = "final";
+
+    /* THE FILE IS OPENED, AND EVERY IMPROVEMENT IS FLUSHED TO IT AS IT LANDS.
+     *
+     * A row written only at the end is a row a Ctrl-C throws away, and this
+     * ladder can run for a long time before it finishes: the greedy line, and
+     * every longer chain the ladder then finds, are ACHIEVABLE results the moment
+     * they exist, so each is a row. `status` says which is which -- `greedy` and
+     * `improved` are lower bounds standing at the time they were written, `final`
+     * is the one the ladder PROVED maximal by failing at length + 1. A killed run
+     * therefore keeps its best chain and says honestly that it is a lower bound;
+     * only the absence of a `final` row distinguishes it from a complete one.
+     *
+     * This repo has already lost a day of multi-hour runs to output that was
+     * printed and not saved, and 3h24m of another to rows that existed only in a
+     * terminal. Nothing about a long run should have to survive on a log under
+     * data/local/, which is gitignored and does not travel. */
+    FILE *out = NULL;
+    if (outpath) {
+        int fresh = 1;
+        FILE *t = fopen(outpath, "r");
+        if (t) { fresh = fgetc(t) == EOF; fclose(t); }
+        out = fopen(outpath, "a");
+        if (!out) { fprintf(stderr, "cannot write %s\n", outpath); return 1; }
+        if (fresh) fprintf(out,
+            "pool,words,mode,status,length,greedy,nodes,threads,secs,line\n");
+    }
+    Row row = { out, poolpath ? poolpath : "mystery.txt",
+                greedy_only ? "greedy" : target ? "target"
+                            : exact ? "exact" : "ladder",
+                ctxs, nthreads, t_start, 0 };
 
     greedy = greedy_len(c, gline, sizeof gline);
     printf("greedy playout: %d  %s\n", greedy, gline);
     fflush(stdout);
     snprintf(line, sizeof line, "%s", gline);
     length = greedy;
+    row.greedy = greedy;
+    /* On disk before the search starts: it is achievable, so it is a result. */
+    write_row(&row, "greedy", greedy, gline);
 
     if (greedy_only) {
         kind = "lower";
@@ -942,6 +1003,9 @@ int main(int argc, char **argv) {
             verified = incumbent;
             printf("        NEW LONGEST: %d  %s\n", incumbent, line);
             fflush(stdout);
+            /* Flushed here, not at the end: this chain exists and is playable
+             * whatever happens to the rest of the run. */
+            write_row(&row, "improved", incumbent, line);
         }
         /* A --floor is a CLAIM the run has not tested: the ladder only ever asked
          * about floor + 1. Make it produce its line, which re-searches and dies
@@ -966,31 +1030,24 @@ int main(int argc, char **argv) {
         fprintf(stderr, "internal: recursion hit MAXD=%d -- raise it\n", MAXD);
         return 1;
     }
-    if (blown && !strcmp(kind, "exact")) kind = "lower";
+    if (blown && !strcmp(kind, "final")) kind = "lower";
     double secs = wall_time() - t_start;
 
     if (target)
         printf("\nTARGET %d: %s\n%s%s\n", target, kind,
                length ? "  " : "", length ? line : "  (no line)");
     else
-        printf("\nLONGEST CHAIN: %d words (%s)\n  %s\n", length, kind, line);
+        printf("\nLONGEST CHAIN: %d words (%s)\n  %s\n", length,
+               !strcmp(kind, "final") ? "exact maximum" : kind, line);
     if (blown)
         printf("  WARNING: --max-nodes was hit, so this is a LOWER bound, not the maximum.\n");
     printf("done in %.1fs (wall), %lld nodes\n", secs, nodes);
 
-    if (outpath) {
-        int fresh = 1;
-        FILE *t = fopen(outpath, "r");
-        if (t) { fresh = fgetc(t) == EOF; fclose(t); }
-        FILE *out = fopen(outpath, "a");
-        if (!out) { fprintf(stderr, "cannot write %s\n", outpath); return 1; }
-        if (fresh) fprintf(out, "pool,words,mode,kind,length,greedy,nodes,threads,secs,line\n");
-        fprintf(out, "%s,%d,%s,%s,%d,%d,%lld,%d,%.3f,%s\n",
-                poolpath ? poolpath : "mystery.txt", NP,
-                greedy_only ? "greedy" : target ? "target" : exact ? "exact" : "ladder",
-                kind, length, greedy, nodes, nthreads, secs, line);
-        fclose(out);
-    }
+    /* `final` is the claim the incremental rows cannot make: not just "this chain
+     * exists" but "nothing longer does". A run that dies before this writes none,
+     * which is exactly how a reader tells a killed run from a finished one. */
+    write_row(&row, kind, length, line);
+    if (out) fclose(out);
 
     for (int t = 0; t < nthreads; t++) ctx_free(ctxs[t]);
     free(ctxs);

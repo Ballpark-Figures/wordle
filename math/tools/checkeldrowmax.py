@@ -94,7 +94,7 @@ BINARY = os.path.join(MATH, "solver", "eldrowmax")
 FAILS = []
 WARNS = []
 
-RESULT = re.compile(r"^LONGEST CHAIN: (?P<val>\d+) words \((?P<kind>\w+)\)")
+RESULT = re.compile(r"^LONGEST CHAIN: (?P<val>\d+) words \((?P<kind>[^)]+)\)")
 GREEDY = re.compile(r"^greedy playout: (?P<val>\d+)\s+(?P<line>.*)$")
 
 
@@ -186,6 +186,66 @@ def sample_pool(answers, size, rng):
     return sorted(alive)
 
 
+def check_csv(pool, expect_val):
+    """The OUTPUT PATH, end to end: run with --out and read the file back.
+
+    Every other check here calls the binary with --no-out, so nothing would
+    exercise the header, the incremental rows or the final one -- and a sibling
+    solver in this repo shipped a broken format string for exactly that reason,
+    crashing every first run AFTER the file had been created. So: run it for real
+    into a temp file and parse what lands.
+
+    The rows are the run's own history. `greedy` is written before the search
+    starts, `improved` each time the ladder finds a longer chain, and `final` only
+    when the ladder has PROVED nothing longer exists -- which is what makes a
+    killed run distinguishable from a finished one. Complaints are returned.
+    """
+    bad = []
+    with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as fh:
+        fh.write("\n".join(pool) + "\n")
+        wordpath = fh.name
+    out = wordpath + ".csv"
+    try:
+        cmd = [BINARY, "--words", wordpath, "--out", out, "--data", "data",
+               "--tt-bits", "20", "--threads", "1"]
+        p = subprocess.run(cmd, cwd=MATH, capture_output=True, text=True)
+        if p.returncode != 0:
+            return [f"the --out run failed ({p.returncode}): {p.stderr.strip()}"]
+        if not os.path.exists(out):
+            return ["--out was given but no file was written"]
+        rows = [r for r in open(out).read().splitlines() if r.strip()]
+    finally:
+        os.unlink(wordpath)
+        if os.path.exists(out):
+            os.unlink(out)
+
+    header = rows[0].split(",")
+    want_cols = ["pool", "words", "mode", "status", "length", "greedy",
+                 "nodes", "threads", "secs", "line"]
+    if header != want_cols:
+        bad.append(f"header is {header}, want {want_cols}")
+        return bad
+    body = [r.split(",", len(want_cols) - 1) for r in rows[1:]]
+    if not body:
+        bad.append("the file has a header and no rows")
+        return bad
+    if body[0][3] != "greedy":
+        bad.append(f"the first row's status is {body[0][3]!r}, want 'greedy' -- the "
+                   "greedy line must be on disk before the search starts")
+    if body[-1][3] != "final":
+        bad.append(f"the last row's status is {body[-1][3]!r}, want 'final'")
+    elif int(body[-1][4]) != expect_val:
+        bad.append(f"the final row says {body[-1][4]}, the run reported {expect_val}")
+    lengths = [int(r[4]) for r in body if r[3] in ("greedy", "improved")]
+    if lengths != sorted(set(lengths)):
+        bad.append(f"the incremental lengths are not strictly increasing: {lengths}")
+    for r in body:
+        if int(r[4]) > expect_val:
+            bad.append(f"a {r[3]} row claims {r[4]}, longer than the maximum "
+                       f"{expect_val}")
+    return bad
+
+
 def check(tag, got, want, why):
     if got != want:
         FAILS.append(f"{tag}: {why} -- got {got}, want {want}")
@@ -258,7 +318,11 @@ def main():
         return cval, greedy
 
     for case in range(args.cases):
-        cval, greedy = diff_case(str(case), sample_pool(answers, args.size, rng))
+        pool = sample_pool(answers, args.size, rng)
+        cval, greedy = diff_case(str(case), pool)
+        if case == 0:
+            for complaint in check_csv(pool, cval):
+                FAILS.append(f"case 0 CSV: {complaint}")
         if greedy is not None and greedy < cval:
             saw_search += 1
         if cval >= 4:
