@@ -2056,6 +2056,77 @@ per starting letter. `math/solver/README.md` "Lingo" is the detail; the key fact
   the lists as exactly the filtered full lists and replays emitted trees
   length-generally. Run it alongside `solver/validate.sh` and `checkpatterns.py`.
 
+## `eldrowmax` — the LONGEST CONSISTENT CHAIN (every play a possible answer)
+The exact answer to "how long can a game be dragged out if every word you play must
+still be a POSSIBLE ANSWER — consistent with every clue so far?". Run it with
+**`bash solver/run-eldrowmax.sh [--greedy | --target N | --floor N | --exact]`**
+(from `math/`), attached, tee'd log; `--dry-run` resolves and stops.
+- **IT IS `math/eldrow.py`'s `longest_chain` OBJECTIVE, made exact and made to
+  scale.** That module states the rule and REMAINS THE REFERENCE; its exact search
+  is Python branch-and-bound (tiny lists only) and its full-list mode is a beam,
+  which finds chains and never proves one longest.
+- **eldrow COUNTS ONE LESS.** It counts guesses-until-a-singleton; `eldrowmax`
+  counts the WORDS IN THE SEQUENCE, the final naming move included. `c == python +
+  1` exactly, and the gate asserts that relation rather than comparing loosely.
+- **THREE DIFFERENT GAMES, and their totals never share a table.** `optturns`
+  minimises; `antistall` maximises under ANTIWORDLE's legality — greens in place,
+  yellows reused, greys as count caps — which is a strictly LOOSER rule admitting
+  words the answer could not be (11 of the 16 plays in its best known line are
+  guess-only junk like `bunjy`); `eldrowmax` maximises where every play is a live
+  candidate. Same words, three objectives.
+- **THE POOL IS PART OF THE OBJECTIVE**, `--words`, defaulting to the 2315 mystery
+  answers (the user's call, 2026-09-09: plays drawn from the possible answers, and
+  the answer likewise from the 2315). Every pool word must be in the pattern
+  matrix's lists. A different pool is a different quantity and gets its own CSV.
+- **THERE IS NO ANSWER TO FIX, and that is what makes it cheap** — unlike
+  `antistall`, which sweeps 2315 separate searches. Choosing which feedback branch
+  to follow IS choosing which answer survives, so the maximum over answers and the
+  maximum over branches are one maximum, taken in a single search from the full
+  list. The answer is just the last word of the chain.
+- **THE STATE IS THE CANDIDATE SET AND NOTHING ELSE**, and a move is `(word,
+  feedback)`. So two moves reaching the same bucket are the same subgame — which is
+  what pass 1 dedups on, a strictly coarser collapse than dedup by feedback.
+- **ONE BOUND, `value(S) <= |S|`** (every move drops at least the word played).
+  **ANTISTALL'S OTHER TWO BOUNDS DO NOT TRANSFER and are deliberately absent**: its
+  resource bound counts count-pins and square-bans, its letters bound counts
+  untouched letters plus non-green squares, and both are facts about how
+  antiwordle's CONSTRAINT tightens, not about how a candidate set shrinks. Carrying
+  either across would have silently cut correct lines.
+- **A SEPARATE BINARY, not a mode of `antistall.c`** (the `greens` precedent): it
+  shares the loader, the table and the arena and NONE of the search — with plays
+  restricted to the live set, `DELTA[g]` cannot express a move.
+- **The DEFAULT is the decision ladder** (greedy playout for an incumbent, then
+  `can_reach(bar + 1)` until it fails), because a subtree dies the moment it cannot
+  reach the target rather than when it has been measured. `--exact` computes the
+  same number by outright maximisation and is kept as the ladder's oracle; the gate
+  diffs them. **The memo key carries the budget**, so every entry stays exact.
+- **NO DEPTH CAP AND NO BEAM** — the game has none and a restricted search would
+  not be the maximum. `MAXD` is an array bound (a chain cannot outlast its pool).
+- **COST IS UNMEASURED as of 2026-09-09.** Price it with `--greedy` (seconds) and
+  then a `--target` at the greedy length plus one before committing to the ladder.
+- **`python3 tools/checkeldrowmax.py` is the GATE**: the value against
+  `eldrow.longest_chain` plus one; the emitted line REPLAYED FROM THE STRINGS with
+  `wordle.pattern` (every play consistent with every earlier clue, exactly ONE
+  survivor at the end — a line ending with two alive is self-refuting); the line's
+  length against the value; the ladder against `--exact`; `--no-prune` against
+  pruned; a deliberately tiny table (the fingerprint IS the memo key, and a
+  correlated-halves collision is exactly what got past a value-only diff in
+  `antistall`); and `--threads 1` against `--threads 4`.
+  - **ITS POOLS ARE REACHABLE GAME STATES, NOT RANDOM SUBSETS, and that is
+    load-bearing.** A random sample of the 2315 is dissimilar enough that the first
+    guess shatters it into singletons, so every case came back 3 with the recursion
+    barely entered. Pools are built the way the game builds one: play a word, keep a
+    bucket, repeat.
+  - **THE HARD CASE IS HUNTED FOR, NOT HOPED FOR.** Greedy is optimal on most
+    pools, and a pool where it is exercises none of the search; on random seeds the
+    tally came up empty as often as not. So the gate keeps drawing until greedy is
+    STRICTLY short of the answer, and failing to find one is itself a finding.
+- Data under `math/data/shared/eldrow/eldrowmax.<pool>.csv`, one row per run with
+  every knob as a column; log under `math/data/local/eldrow/`.
+- **The rest of the antiwordle family (`antistall`, `antiexpect`, `antiwordle.py`,
+  `eldrow.py`) has NO section here** — the source headers and the wrapper comments
+  are the documentation. Worth writing up when one of them is next touched.
+
 ## Gameplay layout
 - (Describe this video's on-screen layout and the assets in `animations/assets/`.)
 

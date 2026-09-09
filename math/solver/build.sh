@@ -85,7 +85,14 @@ if [ $# -eq 0 ]; then
   # answer, so its state carries BOTH the legal set and the still-possible answers.
   # A different objective from antistall's per-answer maximum, hence its own program.
   gcc $BASE $OMP -o antiexpect antiexpect.c
-  echo "built ./optturns, ./hardturns, ./mmturns, ./ultraturns, ./pairsplit, ./strturns, ./strguess, ./greens ./antistall and ./antiexpect  (5 letters)"
+  # eldrowmax is the LONGEST CONSISTENT CHAIN: every word played must itself still
+  # be a possible answer, which is a strictly tighter rule than antistall's
+  # antiwordle legality.  Its own file rather than a mode of antistall.c because
+  # the state is the CANDIDATE SET and a move is (word, feedback), so neither the
+  # per-guess delta table nor either of antistall's two bounds survives the change
+  # -- it shares the loader, the table and the arena and none of the search.
+  gcc $BASE $OMP -o eldrowmax eldrowmax.c
+  echo "built ./optturns, ./hardturns, ./mmturns, ./ultraturns, ./pairsplit, ./strturns, ./strguess, ./greens, ./antistall, ./antiexpect and ./eldrowmax  (5 letters)"
   exit 0
 fi
 
