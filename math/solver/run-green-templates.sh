@@ -7,6 +7,8 @@
 #     bash solver/run-green-templates.sh --greens 3
 #     bash solver/run-green-templates.sh --letters vowels
 #     bash solver/run-green-templates.sh --pool guesses --letters consonants
+#     bash solver/run-green-templates.sh --top 200      # longer printed table
+#     bash solver/run-green-templates.sh --top all      # print every row
 #     bash solver/run-green-templates.sh --positions 1-3
 #     bash solver/run-green-templates.sh --sort zipf
 #     bash solver/run-green-templates.sh --pool guesses --require any
@@ -53,6 +55,11 @@
 #   back.  IT MUST NAME EXACTLY --greens POSITIONS -- `--positions 1-3` with
 #   `--greens 2` agrees, with `--greens 3` it does not, and the tool REFUSES
 #   rather than reinterpret one flag in the light of the other.
+#
+#   --top IS PRESENTATION ONLY: how many rows to print, an integer or `all`.  It
+#   never touches the FILE, which always holds every row whatever --top says, and
+#   it is not in the stem for that reason.  It lengthens the two summary lists
+#   too.  The default is 50.
 #
 #   --sort IS NOT A RESTRICTION and is not part of the question: it reorders the
 #   very same rows.  `template` is position-then-letter (the deterministic
@@ -118,7 +125,9 @@ REQUIRE=answer
 LETTERS=all
 POSITIONS=all
 SORT=template
-TOP=20
+# PRESENTATION ONLY -- --top never changes the FILE, which always holds every
+# row, so it is deliberately NOT in the stem.  `all` prints the lot.
+TOP=50
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -147,6 +156,10 @@ case "$LETTERS" in
     all|vowels|consonants) ;;
     *) echo "--letters must be 'all' (the 26), 'vowels' (aeiouy -- y IS a vowel) or 'consonants' (the other 20 -- y is NOT one)" >&2
        exit 1 ;;
+esac
+case "$TOP" in
+    all) ;;
+    ''|*[!0-9]*) echo "--top must be a non-negative integer or 'all'" >&2; exit 1 ;;
 esac
 case "$SORT" in
     template|zipf) ;;

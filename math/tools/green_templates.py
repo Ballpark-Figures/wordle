@@ -62,6 +62,11 @@ the other four are:
              this REFUSES otherwise rather than quietly reinterpreting one flag
              in the light of the other.
 
+  --top      HOW MANY ROWS TO PRINT -- an integer, or `all`.  PRESENTATION
+             ONLY: it never touches the FILE, which always holds every row, and
+             it is not in the filename for that reason.  It also lengthens the
+             two summary lists.
+
   --sort     IS NOT A RESTRICTION AND IS NOT PART OF THE QUESTION -- it reorders
              the very same rows.  `template` is the position-then-letter order
              (the deterministic default); `zipf` is DESCENDING word frequency,
@@ -404,7 +409,13 @@ def main(argv):
                          "run that prints its answer and saves nothing is how a "
                          "result gets lost; use solver/run-green-templates.sh.")
     out = argv[argv.index("--out") + 1] if "--out" in argv else None
-    top = int(argv[argv.index("--top") + 1]) if "--top" in argv else 20
+    top_spec = argv[argv.index("--top") + 1] if "--top" in argv else "20"
+    if top_spec != "all":
+        try:
+            if int(top_spec) < 0:
+                raise ValueError
+        except ValueError:
+            raise SystemExit("--top must be a non-negative integer or `all`")
 
     answers = load_words("mystery")
     words = answers if pool_name == "answers" else load_words("guess")
@@ -526,6 +537,9 @@ def main(argv):
                            zipf[word]))
         print("wrote %s" % os.path.relpath(out, _MATH))
 
+    # PRESENTATION ONLY -- it never changes the FILE, which always holds every
+    # row. `all` prints the lot.
+    top = len(rows) if top_spec == "all" else int(top_spec)
     print("\n%8s %10s %8s %8s %6s"
           % ("template", "positions", "letters", "word", "zipf"))
     for positions, letters in rows[:top]:
@@ -534,7 +548,9 @@ def main(argv):
               % (show(positions, letters, word_len), fmt_positions(positions),
                  "".join(letters), word, zipf[word]))
     if len(rows) > top:
-        print("... %d more" % (len(rows) - top))
+        print("... %d more of %d (--top %d shown; --top all prints every row, "
+              "and the CSV always holds them all)"
+              % (len(rows) - top, len(rows), top))
 
     per_word = {}
     for k in rows:
@@ -549,12 +565,19 @@ def main(argv):
         print("zipf of the pinned words: %.2f down to %.2f, median %.2f; "
               "%d of %d at or above 2.50"
               % (zs[0], zs[-1], zs[len(zs) // 2], above, len(zs)))
-        print("most common: %s"
-              % ", ".join("%s %.2f" % (w, zipf[w])
-                          for w in sorted(pinned, key=lambda w: (-zipf[w], w))[:8]))
+        n_list = len(pinned) if top_spec == "all" else min(len(pinned),
+                                                            max(8, int(top_spec)))
+        print("most common (%d of %d): %s"
+              % (n_list, len(pinned),
+                 ", ".join("%s %.2f" % (w, zipf[w])
+                           for w in sorted(pinned,
+                                           key=lambda w: (-zipf[w], w))[:n_list])))
     best = sorted(per_word.items(), key=lambda kv: (-kv[1], kv[0]))
-    print("most-pinned: %s"
-          % ", ".join("%s x%d" % (w, c) for w, c in best[:8]))
+    n_best = len(best) if top_spec == "all" else min(len(best),
+                                                     max(8, int(top_spec)))
+    print("most-pinned (%d of %d): %s"
+          % (n_best, len(best),
+             ", ".join("%s x%d" % (w, c) for w, c in best[:n_best])))
     print("pinned by exactly one template: %d word(s)"
           % sum(1 for c in per_word.values() if c == 1))
     if letter_set == "all":
