@@ -1121,21 +1121,82 @@ that becomes true, and the survivors keep playing on a doubling schedule.
   is wide, then pairwise `sum(d)`/`sum(d^2)` computed FROM it once the field is under
   `--pair-at`, after which memory no longer depends on the game count. Verified equal
   both ways, with the switch confirmed to actually fire.
+- **GAMES ARE THE OUTER LOOP, so a halt always leaves the field LEVEL** (user's
+  call, 2026-09-09). It used to run openings-outer inside a block, which left some
+  openings on 100 games and the rest on 0 — resumable, but nothing you could rank
+  or cut, which is most of what halting is for. Verified to change nothing it
+  measures: games are seeded per game INDEX, so loop order cannot move a score, and
+  the standings and eliminations are byte-identical to the openings-outer version
+  for both rules and across the pairwise switch.
+  - **The chunk size is MEASURED, not chosen.** Interleaving costs one pass of
+    per-opening setup per game chunk (`minavg`'s 25 MB turn-2 table), so a
+    calibration — once per block, after a warmup call so it does not time the JIT —
+    sizes the chunk to hold setup under `--memo-overhead` (default 10%). `srank`
+    has no setup and chunks as finely as it likes; `minavg` at k=2 has to take a
+    whole block at a time and at k=16 takes about twenty chunks. **The cost of
+    interleaving is inversely related to how much you need it**, which is why one
+    fixed chunk size would have been wrong.
+  - Checkpoints are bounded to one per `--checkpoint` seconds (default 30) rather
+    than one per chunk, since the history grows with the game count; the state is
+    consistent at every chunk boundary, so a skipped write costs seconds of games
+    and never correctness.
 - **RESUMABLE MID-BLOCK.** It checkpoints atomically as it goes; Ctrl-C and re-run the
   same command. Verified byte-identical to an uninterrupted run both after a clean
   stop and after a SIGINT part-way through a block, and invariant to `--chunk`.
 - **The field is every legal guess, and ANSWER openings are tracked separately** —
   the best surviving one is named in every status line and the last one's elimination
   is called out, since the 2315 answers are a subset worth following in their own right.
-- **MEASURED first-block cost over all 12972 openings** (18 threads, 2026-09-09):
-  `srank` is seconds at every k; `minavg` is ~0.1 h at k=1 and k=2, 0.3 h at k=4,
-  0.6 h at k=8 and **1.9 h at k=16**. `minavg` searches 12972 words every turn; its
-  turn-2 search is memoised per opener (a 243x12972 table, 0.01 s to build) because
-  that is the one turn where every board's candidate set is still large.
+- **WHY `minavg` COSTS ~2000x WHAT `srank` DOES**: it SEARCHES and `srank` does not.
+  Every turn `minavg` evaluates all 12972 guesses against every unsolved board's live
+  candidates and takes a lexicographic argmin; `srank` computes k colour compositions
+  (~26 ops each) and draws twice. It is not overhead to tune away, it is what "near
+  optimal" costs — the same shape as `strturns`.
+- **THE SINGLETON FAST PATH IS EXACT and is most of `minavg`'s speed at large k.**
+  `a_j(g)` is 0 only when board j holds ONE candidate and g is that word, so the
+  moment any board is a singleton the smallest attainable first component is 0 and
+  the ONLY guesses attaining it are the singleton boards' own words — the search
+  collapses from 12972 to at most k, with no change to the answer. MEASURED share of
+  searched turns that qualify: 36% at k=2, 55% at k=4, 69% at k=8, **88% at k=16**,
+  i.e. most common exactly where the search is dearest. **Its tie-break is the trap
+  the gate caught**: two singleton boards genuinely TIE (playing either scores 0 on
+  its own board and 1 on the other), so the candidates must be sorted into POOL order
+  or they tie-break by board and silently disagree with the full scan.
+- **MEASURED first-block cost over all 12972 openings** (18 threads, 2026-09-09,
+  with the singleton path): `srank` is seconds at every k; `minavg` is ~0.05 h at
+  k=1, 0.07 h at k=2, 0.14 h at k=4, 0.23 h at k=8 and **0.49 h at k=16** (it was
+  1.9 h at k=16 before that path). Its turn-2 search is separately memoised per
+  opener (a 243x12972 table, 0.01 s to build), that being the one turn where every
+  board's candidate set is still large.
 - **`--dry-run` resolves everything and stops before any game**, leaving no partial
   CSV to be mistaken for a result that died. Use it for every wrapper change.
 - Data: standings + eliminations CSVs in `data/shared/multiwordle/race_*`,
   checkpoint and log under `data/local/multiwordle/`.
+
+### `run-multiwordle-exact.sh` — the one cell where sampling is unnecessary
+**`minavg` at k=1 only.** The answer is one word drawn uniformly from the 2315 and
+the rule is deterministic, so those 2315 games ARE the population: the mean is the
+TRUE expected guesses. No standard error, no cut, no winner's curse, and the best
+row is THE best opener among the 12972 rather than a screen.
+- **It REFUSES a randomised strategy and refuses k>1** rather than returning
+  something weaker under an exact-sounding name — `greedy`/`srank` have a
+  distribution over their own coin flips, and k>1 has a population of `C(2315, k)`.
+- **It stays opener-major on purpose, and that is NOT the race's bug.** A row is
+  meaningful only once all 2315 answers are played, so interleaving would leave no
+  complete rows until the very end — the opposite of what halting wants. What it
+  needed instead was a visit ORDER.
+- **The visit order is DERIVED AND NAMED: ascending expected answers remaining
+  after the opener**, the quantity `minavg` minimises at the root (one 30M-lookup
+  pass, 0.53 s; it ranks `roate` 60.4 best and `immix` 967.4 worst, both known
+  results for that quantity). Alphabetical order left a halt holding an arbitrary
+  slice — `trace` scores 3.4436 and sits near the end of the guess list. `--order
+  file` restores the old behaviour, and the CSV stamps which it used: an explicit
+  disagreement on resume is refused, a file predating the stamp is continued with a
+  note, since its rows are exact either way.
+- **It is also the gate's only check reaching OUTSIDE the multiwordle code**: at k=1
+  `minavg` is a one-ply heuristic over ordinary Wordle, so whenever its worst game
+  is within 6 its strategy lies inside the set `optturns` minimised over and its
+  total must be at least the committed optimum. Measured: salet 7979 vs 7920, trace
+  7972 vs 7926, laten 8119 vs 8038. The within-6 precondition is checked per opener.
 - **`python3 tools/checkmultiwordle.py` is the GATE**: it replays the same seeds
   through an independent implementation that keeps candidates as LISTS OF WORDS and
   recomputes every feedback from the strings with `wordle.pattern` — no matrix, no
