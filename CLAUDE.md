@@ -1653,9 +1653,21 @@ tee'd log; `WORDLE_SOLVER` picks the sweep, `--top N` names the file.
   inverted** (added 2026-09-09, mirroring Wordle in One): the mean number of
   words still consistent, same answer weighting, so a node of `n` candidates
   contributes `n*n` and `n*m` and the cell is `sum(n^2)/sum(n)`. **NOT
-  `100/pct_rand_*`.** Sort on `avg_answers` to rank the states by how much the
-  strategy has narrowed things down — the tool prints the whole table a second
-  time in that order, and the per-level summary carries both means.
+  `100/pct_rand_*`.** The per-level summary carries both means.
+- **THE `avg_answers` RANKING IS PRINTED TWICE, AND THE TWO ARE DIFFERENT
+  QUESTIONS** (user's call, 2026-09-09). **WITHIN each level** is the default
+  reading: how narrowed a board is depends heavily on how many rows have been
+  played, so pooling ranks the game's CLOCK as much as the tiles, and two
+  compositions are comparable when the same number of guesses produced them.
+  **POOLED ACROSS the levels** asks what a composition is worth with the turn
+  forgotten rather than held fixed.
+  - **The pooled view's denominator is NOT ANSWERS.** An answer sits in a node at
+    every level it survives, so pooling counts it once per surviving turn — those
+    cells are candidate-weighted BOARD STATES, and **a pooled cell is not a share
+    of the 2315**. Within a level each answer appears at most once, which is
+    exactly what makes that view the answer-weighted one.
+  - **The CSV stays per (level, composition)** — the raw cells both views are
+    built from, so either is rebuildable from it.
 - **A WON GAME IS NOT A CASE.** A tree line records no pattern for its final guess
   (it would be all green), so a game ending at turn k has no level-k state and
   leaves every deeper level. Level counts therefore FALL with depth.

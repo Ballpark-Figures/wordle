@@ -47,6 +47,21 @@ are different aggregations of one distribution, so a cell can rank differently
 under the two. The node-weighted reading (every board once, cases/nodes) stays
 recoverable, since `pct_rand_answers` is exactly nodes/cases.
 
+THE RANKED VIEWS COME IN TWO, AND THEY ARE DIFFERENT QUESTIONS. Sorting the
+cells by `avg_answers` is printed once WITHIN each level -- the default reading,
+since how narrowed a board is depends heavily on how many rows have been played,
+so pooling the levels ranks the game's clock as much as the tiles -- and once
+POOLED ACROSS the levels, which asks what a composition is worth with the turn
+forgotten rather than held fixed.
+
+  THE POOLED VIEW'S DENOMINATOR IS NOT ANSWERS. An answer sits in a node at
+  EVERY level it survives, so pooling counts it once per surviving turn: those
+  cells are candidate-weighted BOARD STATES, and a pooled cell is NOT a share of
+  the 2315. Within a level each answer appears at most once, which is exactly
+  what makes the per-level view the answer-weighted one. The CSV stays per
+  (level, composition) -- the raw cells both views are built from, so either can
+  be rebuilt from it.
+
 A WON GAME IS NOT A CASE. A tree line records no pattern for its final guess (it
 would be all green), so a game that ends at turn k simply has no level-k state
 and drops out of every deeper level -- the same reason `wordle_in_one.py` carries
@@ -375,21 +390,57 @@ def main():
                          avg(sum_ans[d, g, y], cases[d, g, y]),
                          avg(sum_gss[d, g, y], cases[d, g, y])))
 
-    # the same cells again, ordered by how many answer words are still alive --
-    # the sort the table above cannot show, being laid out by level then tiles
-    print("\nby avg_answers (fewest words left first):")
-    print("%5s %6s %7s %6s %12s %10s %11s %10s %11s"
-          % ("level", "green", "yellow", "gray", "cases", "pct_one", "rand_ans",
-             "avg_ans", "avg_guess"))
-    cells = [(d, g, y) for d in levels for g in range(L + 1)
-             for y in range(L + 1 - g) if cases[d, g, y]]
-    for d, g, y in sorted(cells, key=lambda c: avg(sum_ans[c], cases[c])):
-        print("%5d %6d %7d %6d %12d %9.4f%% %10.4f%% %10.2f %11.2f"
-              % (d, g, y, L - g - y, cases[d, g, y],
-                 pct(singles[d, g, y], cases[d, g, y]),
-                 pct(nodes[d, g, y], cases[d, g, y]),
-                 avg(sum_ans[d, g, y], cases[d, g, y]),
-                 avg(sum_gss[d, g, y], cases[d, g, y])))
+    # The same cells again, ordered by how many answer words are still alive --
+    # the sort the tables above cannot show, being laid out by tile counts. TWO
+    # RANKINGS, because they answer two questions: one WITHIN each level, holding
+    # the turn fixed, and one POOLED ACROSS the levels, forgetting it. Which is
+    # right depends on whether you know how many rows have been played.
+    def rank_table(indent, nd, cs, sg, sa, sgs):
+        """One ranked block over (greens, yellows), fewest words left first."""
+        print("%s%6s %7s %6s %12s %10s %11s %10s %11s"
+              % (indent, "green", "yellow", "gray", "cases", "pct_one",
+                 "rand_ans", "avg_ans", "avg_guess"))
+        cells = [(g, y) for g in range(L + 1) for y in range(L + 1 - g)
+                 if cs[g, y]]
+        for g, y in sorted(cells, key=lambda c: avg(sa[c], cs[c])):
+            print("%s%6d %7d %6d %12d %9.4f%% %10.4f%% %10.2f %11.2f"
+                  % (indent, g, y, L - g - y, cs[g, y],
+                     pct(sg[g, y], cs[g, y]), pct(nd[g, y], cs[g, y]),
+                     avg(sa[g, y], cs[g, y]), avg(sgs[g, y], cs[g, y])))
+
+    print("\nby avg_answers WITHIN each level (fewest words left first).")
+    print("Read this one by default: how narrowed a board is depends heavily on "
+          "how many rows have been played, so two compositions are comparable "
+          "when the same number of guesses produced them.")
+    for d in levels:
+        c = int(cases[d].sum())
+        print("\n  level %d -- %d cases, %.2f answers alive on average"
+              % (d, c, avg(int(sum_ans[d].sum()), c)))
+        rank_table("  ", nodes[d], cases[d], singles[d], sum_ans[d], sum_gss[d])
+
+    # POOLED ACROSS THE LEVELS: every board of one composition, whatever turn it
+    # arose on -- "the board shows this many greens and yellows; how many words
+    # is that worth?", with the turn forgotten rather than held fixed.
+    #
+    # ITS DENOMINATOR IS A DIFFERENT THING, and it is NOT answers. An answer sits
+    # in a node at EVERY level it survives, so pooling counts it once per
+    # surviving turn: these cells are candidate-weighted BOARD STATES. Within a
+    # level an answer appears at most once, which is exactly what makes that view
+    # the answer-weighted one. Never read a pooled cell as a share of the 2315.
+    p_nodes = nodes[:MAXLVL].sum(axis=0)
+    p_cases = cases[:MAXLVL].sum(axis=0)
+    p_singles = singles[:MAXLVL].sum(axis=0)
+    p_sum_ans = sum_ans[:MAXLVL].sum(axis=0)
+    p_sum_gss = sum_gss[:MAXLVL].sum(axis=0)
+    c = int(p_cases.sum())
+    print("\nby avg_answers ACROSS all levels, pooled by tile composition "
+          "(fewest words left first).")
+    print("Cases here are BOARD STATES weighted by candidates -- an answer "
+          "counts once per level it survives -- so a pooled cell is NOT a share "
+          "of the 2315, and a composition mixes the turns it can arise on.")
+    print("  all levels -- %d cases, %.2f answers alive on average"
+          % (c, avg(int(p_sum_ans.sum()), c)))
+    rank_table("  ", p_nodes, p_cases, p_singles, p_sum_ans, p_sum_gss)
 
     print("\nby level:")
     for d in levels:

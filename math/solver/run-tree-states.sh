@@ -32,8 +32,16 @@
 #   INVERTED: the mean NUMBER of words still consistent, under the same answer
 #   weighting, so a node of n candidates enters the mean n times.  They are NOT
 #   100/pct_rand_*: the mean of n and the mean of 1/n are different aggregations
-#   of one distribution.  Sort on avg_answers to rank the states by how much the
-#   strategy has narrowed things down.
+#   of one distribution.
+#
+#   THE avg_answers RANKING IS PRINTED TWICE.  WITHIN each level is the default
+#   reading -- how narrowed a board is depends heavily on how many rows have
+#   been played, so pooling ranks the game's clock as much as the tiles.  POOLED
+#   ACROSS the levels asks what a composition is worth with the turn forgotten;
+#   its denominator is NOT answers (an answer counts once per level it survives,
+#   so those cells are candidate-weighted BOARD STATES and a pooled cell is not
+#   a share of the 2315).  The CSV stays per (level, composition), the raw cells
+#   both views are built from.
 #
 #   A WON GAME IS NOT A CASE: a line records no pattern for its final guess, so
 #   a game that ends at turn k has no level-k state and leaves every deeper
