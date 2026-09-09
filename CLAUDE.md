@@ -2252,6 +2252,49 @@ still be a POSSIBLE ANSWER — consistent with every clue so far?". Run it with
   `eldrow.py`) has NO section here** — the source headers and the wrapper comments
   are the documentation. Worth writing up when one of them is next touched.
 
+## `--tt-save` IS BACKWARDS EVERYWHERE — no wrapper writes a table any more
+**Fixed 2026-09-09 in all five wrappers that did it** (`run-length-sweep.sh`,
+`run-ultra-sweep.sh`, `run-mm-sweep.sh`, `run-strturns-sweep.sh`,
+`run-strsts-sweep.sh`), generalising the fix `run-greens.sh` already carried.
+- **THE FLAG CANNOT DO WHAT IT LOOKS LIKE IT DOES.** `tt_save` sits at the END of a
+  code path, so it fires ONLY on normal completion — exactly when the table is
+  worthless, because a finished run's CSV marks its work done and a re-run resumes,
+  finds nothing to do and exits WITHOUT READING IT. The case that would pay, an
+  interrupted run, saves nothing: **there is no signal handler in `optturns.c` or
+  `strturns.c`**, so Ctrl-C never reaches the line.
+- **MEASURED, and it is why the machine stopped working:** 302 snapshots at 8 GB
+  each = **728 GB, 79% of the disk**, filling it to 1.1 GB free so that no process
+  could write at all. One was an 8 GB table beside a **4 KB** result from a run that
+  took **2 SECONDS**. It multiplies because each settings combination gets its own
+  directory and table, so a sweep over ~20 values of K leaves ~160 GB for ONE word
+  length (`optlen10` 160 GB, `optlen11` 152 GB, `optlen9` 108 GB, `ultraturns` 92).
+- **The long sweeps never had this** — `run-sweep.sh`, `run-ans-sweep.sh` and
+  `run-hard-sweep.sh` do not pass `--tt-save`. They snapshot the LIVE table with
+  `tools/ttdump.py`, which is the mechanism that actually survives a kill. **That is
+  the route to use if a warm table is ever genuinely wanted.**
+- **`--tt-load` stays in all of them.** It costs nothing and a deliberately-made
+  table is still worth warming from; with nothing writing one, `WARM` is just empty.
+- `math/data/local/pairs/tt.bin` and `tt_ans.bin` were KEPT — `run-ans-sweep.sh` is
+  the one place a snapshot is load-bearing.
+
+## OPEN: the fixes above should not have needed doing five times
+**The user's call, 2026-09-09 — RAISED, NOT YET SCHEDULED. Do not start it without
+asking.** The `--tt-save` bug had already been diagnosed and fixed once, in
+`run-greens.sh`, complete with a written explanation of why the flag is backwards —
+and it still cost 728 GB, because the fix lived in one wrapper and the other five
+were never revisited. The wrappers are largely copies of each other (same `WARM`
+block, same `guard_output`, same tee'd-log preamble, same bash-3.2 array guards), so
+a correction to one is invisible to the rest.
+- The same shape has bitten repeatedly and is worth listing when the refactor is
+  scoped: the `date -Is` GNU-ism (fixed in `run-greens.sh`, still broken in
+  `run-sweep.sh`, `run-hard-sweep.sh`, `run-ans-sweep.sh`), the missing `--out`
+  (`run-wordle-in-one.sh` is still red in `checkconventions.sh`), and this one.
+- `solver/checkconventions.sh` is the existing mechanism for exactly this and it
+  works — it is what catches a missing wrapper or a missing `--out`. **A cheaper
+  first step than a refactor is probably a new CHECK there** ("no wrapper passes
+  `--tt-save`", "every wrapper uses the portable `date`"), since a check applies
+  everywhere by construction and needs no shared code.
+
 ## Gameplay layout
 - (Describe this video's on-screen layout and the assets in `animations/assets/`.)
 

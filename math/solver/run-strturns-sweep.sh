@@ -97,6 +97,30 @@ FLAGS="--topk $TOPK"
 [ "$ALLOW" -eq 1 ] && FLAGS="$FLAGS --allow-unsolved"
 [ -n "$DEPTHMAX" ] && FLAGS="$FLAGS --depth-max $DEPTHMAX"
 
+# NOTHING SAVES A TABLE ANY MORE, and the reason is worth writing down.
+#
+# tt_save runs at the END of a code path, so it fired ONLY on normal completion --
+# which is exactly when the table is worthless: a finished run's CSV marks its work
+# done, so re-running the same settings resumes, finds nothing to do, and exits
+# without ever reading it.  The case where a warm table WOULD pay -- an interrupted
+# run -- saved nothing, because there is no signal handler and Ctrl-C never reaches
+# that line.  So the flag was backwards.
+#
+# MEASURED 2026-09-09: 302 of these snapshots had accumulated at 8 GB each, 728 GB
+# in total, which was 79% of the machine's disk and had filled it to the point that
+# nothing could write.  One of them was an 8 GB table beside a 4 KB result from a
+# run that took 2 SECONDS.  The cost multiplies because each (settings) combination
+# gets its own directory and its own table, so a sweep over ~20 values of K leaves
+# ~160 GB for one word length.
+#
+# The genuinely long sweeps -- run-sweep.sh, run-ans-sweep.sh, run-hard-sweep.sh --
+# never passed --tt-save at all: they snapshot the LIVE table with tools/ttdump.py,
+# which is the mechanism that actually survives a kill.  Use that if a warm table is
+# ever wanted here.
+#
+# --tt-load stays: it costs nothing, and a table created deliberately (by hand or by
+# the tt* tools) is still worth warming from.  With nothing writing one
+# automatically, WARM is simply empty.
 WARM=""
 [ -f "$LOC/tt.bin" ] && WARM="--tt-load $LOC/tt.bin"
 
@@ -108,5 +132,5 @@ echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] resuming wordle W-to-S sweep (depth $DEPT
     --depth "$DEPTH" $FLAGS \
     --out "$OUT" \
     --tt-bits "$TTBITS" --threads "$THREADS" \
-    $WARM --tt-save "$LOC/tt.bin" \
+    $WARM \
     2>&1 | tee -a "$LOC/sweep.log"
