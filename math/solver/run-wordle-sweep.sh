@@ -360,6 +360,17 @@ if [ -n "$SHORTFROM" ]; then
         exit 1
     fi
     # Prefer the source's own lineage header; fall back to unpicking its stem.
+    # THE STRATEGY IS A PROPERTY OF THE CASCADE, NOT OF ONE COMMAND, and that
+    # applies to --pair-adaptive exactly as it does to --rank.  It did not, and
+    # the consequence was silent: pass 1 of the win-rate cascades ran adaptive
+    # and every later pass ran BLIND on the shortlist the adaptive pass had
+    # chosen, because the flag was simply absent from the later commands.  The
+    # filenames stayed honest (no _adapt2), but the cascade was two strategies.
+    SRCADAPT=$(sed -n 's/^# settings .*pair_adaptive=\([0-9]*\).*/\1/p' "$SHORTFROM" | head -1)
+    if [ -n "$SRCADAPT" ] && [ "$ADAPT" = 0 ] && [ "$SRCADAPT" != 0 ]; then
+        ADAPT="$SRCADAPT"
+        echo "pair-adaptive: inherited $ADAPT from the source"
+    fi
     SRCRANK=$(sed -n 's/^# settings .*rank=\([a-z_]*\).*/\1/p' "$SHORTFROM" | head -1)
     if [ -n "$SRCRANK" ] && [ "$RANK" = mean ]; then
         # the cascade's ranking is a property of the CASCADE, not of one command

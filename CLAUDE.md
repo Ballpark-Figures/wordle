@@ -1221,6 +1221,14 @@ CSV row per word, flushed).
   from its source, so it stays one all the way down. **It lands in the stem as
   `_win`**, because a win-rate cascade and a mean cascade off the same root at the
   same pass are two different experiments that would otherwise collide.
+- **A LATER PASS INHERITS `--pair-adaptive` AND `--rank` FROM ITS SOURCE — the
+  STRATEGY is a property of the CASCADE, not of one command.** This is a scar:
+  `--rank` was inherited and `--pair-adaptive` was not, so the win-rate quad and
+  quint cascades ran ADAPTIVE at pass 1 and BLIND at every pass after it, on a
+  shortlist the adaptive pass had chosen. Nothing was mislabeled — the stems
+  correctly lacked `_adapt2` — but the cascade was two different strategies
+  spliced together, and the agent had told the user both flags were inherited.
+  **Check a cascade's `# settings` line across its passes before trusting it.**
 - **THE ORDERING CHOOSER IS OFF UNDER `--rank win_rate` (user's call,
   2026-09-08).** `order_openings.py` minimises EXPECTED GUESSES, which is the
   wrong criterion for a win-rate cascade, so applying it there would quietly build
