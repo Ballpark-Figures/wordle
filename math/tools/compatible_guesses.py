@@ -37,6 +37,21 @@ TWO READINGS OF "COMPATIBLE", AND BOTH ARE REPORTED.
   from the SQUARE 12972x12972 pattern matrix, which is gitignored under
   data/local/ and so missing on a fresh clone (`build_patterns.py --full`).
 
+--skip-allgrey EXCLUDES THE ALL-GREY BOARDS FROM THE NUMERATOR (the user's call,
+2026-09-09), and it changes the quantity, so it lands in the output filename. A
+guess played while the board shows no green and no yellow tile -- the opener came
+back all grey, and every guess since did too -- stops counting as a compatible
+choice. THE DENOMINATOR IS UNTOUCHED: every one of the N * 2315 paths still
+counts, including the ones that lost every examined guess this way, so the number
+stays directly comparable with the unrestricted one and is weakly smaller.
+
+  A green or yellow, once seen, stays on the board, so "only greys so far" is
+  exactly "every earlier pattern in this line was all-grey" -- one test on the
+  recorded patterns, no state to accumulate.
+
+  The run reports the excluded decisions either way, so the unrestricted number
+  is recoverable from a restricted run and vice versa.
+
 THE TOP N ARE N DIFFERENT STRATEGIES POOLED, best first by `total` in the sweep's
 own CSV, ties on the word -- the same selection `tree_states.py` uses. Each
 contributes its own 2315 answers, so every opener carries EQUAL weight however
@@ -127,6 +142,11 @@ def main():
     ap.add_argument("--out", help="output CSV (the wrapper sets this)")
     ap.add_argument("--no-out", action="store_true",
                     help="print only, write nothing -- say so deliberately")
+    ap.add_argument("--skip-allgrey", action="store_true",
+                    help="do not count a guess played on an ALL-GREY board "
+                         "(no green or yellow tile yet). Changes the quantity, "
+                         "so it lands in the output filename; the DENOMINATOR "
+                         "is untouched -- every path still counts.")
     ap.add_argument("--check-lines", type=int, default=25,
                     help="lines per opener whose decisions are recomputed from "
                          "the strings (default 25; 0 disables, not advised)")
@@ -172,7 +192,9 @@ def main():
     pos_ans = np.zeros(MAXMID + 1, dtype=np.int64)
     pos_leg = np.zeros(MAXMID + 1, dtype=np.int64)
     by_len_paths = np.zeros(MAXMID + 3, dtype=np.int64)  # by line length
+    by_len_ex = np.zeros(MAXMID + 3, dtype=np.int64)
     by_len_ans = np.zeros(MAXMID + 3, dtype=np.int64)
+    grey_mid = grey_ans = grey_leg = 0     # the all-grey decisions themselves
     rows_out = []
 
     disagreed = 0
@@ -212,12 +234,22 @@ def main():
                                      "consistent with its own row %d"
                                      % (word, ans, j + 1))
 
-            c_ans = c_leg = 0
+            c_ans = c_leg = c_mid = 0
             for k in range(1, n - 1):
                 legal = all(PATF[gi[j], gi[k]] == codes[j] for j in range(k))
                 is_ans = legal and gs[k] in answer_set
                 if legal != is_ans:
                     disagreed += 1
+                # A green or yellow, once seen, stays on the board, so "only
+                # greys so far" is exactly "every earlier pattern was all-grey".
+                hinted = any(codes[j] for j in range(k))
+                if not hinted:
+                    grey_mid += 1
+                    grey_leg += legal
+                    grey_ans += is_ans
+                    if args.skip_allgrey:
+                        continue
+                c_mid += 1
                 pos_mid[min(k + 1, MAXMID)] += 1
                 if legal:
                     c_leg += 1
@@ -225,11 +257,12 @@ def main():
                 if is_ans:
                     c_ans += 1
                     pos_ans[min(k + 1, MAXMID)] += 1
-            o_mid += max(0, n - 2)
+            o_mid += c_mid
             o_ans += c_ans
             o_leg += c_leg
             dist_ans[min(c_ans, MAXMID)] += 1
             dist_leg[min(c_leg, MAXMID)] += 1
+            by_len_ex[min(n, MAXMID + 2)] += c_mid
             by_len_ans[min(n, MAXMID + 2)] += c_ans
 
             # gate: the same `answer` decision, straight from the tree's
@@ -281,6 +314,9 @@ def main():
         raise SystemExit("COVERAGE FAILED: every examined guess was a candidate")
     if disagreed == 0:
         raise SystemExit("COVERAGE FAILED: the two readings never disagreed")
+    if grey_mid == 0:
+        raise SystemExit("COVERAGE FAILED: no guess was ever played on an "
+                         "all-grey board, so --skip-allgrey cannot be exercised")
 
     avg_ans = hit_ans / paths
     avg_leg = hit_leg / paths
@@ -289,6 +325,17 @@ def main():
     print("top %d %s trees, %d paths (%d openers x %d answers)"
           % (args.top, SOLVER, paths, len(ranked), len(answers)))
     print("guesses examined (opener and final guess excluded): %d" % midd)
+    if args.skip_allgrey:
+        print("  ALL-GREY BOARDS EXCLUDED from the numerator: %d further "
+              "guesses were" % grey_mid)
+        print("  played with no green or yellow on the board and do not count "
+              "(%d of them" % grey_ans)
+        print("  were live candidates, %d consistent). The denominator is "
+              "untouched." % grey_leg)
+    else:
+        print("  of these, %d were played on an ALL-GREY board (%d live "
+              "candidates, %d" % (grey_mid, grey_ans, grey_leg))
+        print("  consistent) -- --skip-allgrey drops them from the numerator.")
     print()
     print("AVERAGE COMPATIBLE GUESSES PER PATH")
     print("  answer pool (a live candidate -- could have won):  %.6f" % avg_ans)
@@ -319,9 +366,8 @@ def main():
     print("  guesses |    paths |  examined | candidates | per path")
     for n in range(MAXMID + 3):
         if by_len_paths[n]:
-            ex = by_len_paths[n] * max(0, n - 2)
             print("  %7d | %8d | %9d | %10d | %.4f"
-                  % (n, by_len_paths[n], ex, by_len_ans[n],
+                  % (n, by_len_paths[n], by_len_ex[n], by_len_ans[n],
                      by_len_ans[n] / by_len_paths[n]))
     print()
     print("done in %.1fs" % (time.time() - t0))
@@ -330,6 +376,10 @@ def main():
         with open(args.out, "w") as f:
             f.write("# compatible guesses in the top %d %s trees, opener and "
                     "final guess excluded\n" % (args.top, SOLVER))
+            f.write("# skip_allgrey=%s -- a guess played with no green or "
+                    "yellow on the board %s\n"
+                    % (args.skip_allgrey,
+                       "does NOT count" if args.skip_allgrey else "counts"))
             f.write("# compatible_answers: the guess was a live CANDIDATE (a "
                     "mystery word consistent with every clue)\n")
             f.write("# compatible_legal: the guess was consistent with every "
@@ -345,6 +395,9 @@ def main():
             f.write("# compatible_legal %d\n" % hit_leg)
             f.write("# avg_answers %.6f\n" % avg_ans)
             f.write("# avg_legal %.6f\n" % avg_leg)
+            f.write("# allgrey_decisions %d\n" % grey_mid)
+            f.write("# allgrey_compatible_answers %d\n" % grey_ans)
+            f.write("# allgrey_compatible_legal %d\n" % grey_leg)
         print("wrote %s" % args.out)
 
 

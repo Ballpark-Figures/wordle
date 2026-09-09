@@ -3,6 +3,7 @@
 # attached, with live output in this terminal.
 #
 #     bash solver/run-compatible-guesses.sh --top 1000     # from math/, or anywhere
+#     bash solver/run-compatible-guesses.sh --top 1000 --skip-allgrey
 #     bash solver/run-compatible-guesses.sh --top 1
 #     WORDLE_SOLVER=hardturns bash solver/run-compatible-guesses.sh --top 100
 #
@@ -25,6 +26,14 @@
 #     legal -- the guess was consistent with every clue so far without being a
 #       mystery word.  Every answer hit is a legal hit; the extra ones are
 #       guess-only words like `courd` that could never have won.
+#
+#   --skip-allgrey EXCLUDES THE ALL-GREY BOARDS FROM THE NUMERATOR (the user's
+#   call, 2026-09-09): a guess played while the board shows no green and no
+#   yellow tile -- the opener came back all grey, and every guess since did too
+#   -- stops counting as a compatible choice.  THE DENOMINATOR IS UNTOUCHED:
+#   every one of the N * 2315 paths still counts, so the number stays directly
+#   comparable with the unrestricted one and is weakly smaller.  It is a
+#   DIFFERENT QUANTITY, so it gets its own file.
 #
 #   THE TOP N ARE N DIFFERENT STRATEGIES POOLED, best first by `total` in the
 #   sweep's own CSV, ties on the word -- the same selection tree_states.py uses.
@@ -51,11 +60,13 @@ SOLVER="${WORDLE_SOLVER:-optturns}"
 
 TOP=""
 PROGRESS=25
+SKIPGREY=""
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        --top)      TOP="$2";      shift 2 ;;
-        --progress) PROGRESS="$2"; shift 2 ;;
+        --top)          TOP="$2";      shift 2 ;;
+        --progress)     PROGRESS="$2"; shift 2 ;;
+        --skip-allgrey) SKIPGREY=1;    shift ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
     esac
 done
@@ -85,7 +96,10 @@ PY=../.venv/bin/python
 
 OUTDIR=data/shared/compatguess
 LOC=data/local/compatguess
+# The restriction changes the quantity, so it is part of the name -- two
+# different numbers must never share a file.
 STEM="compatible_${SOLVER}_top${TOP}"
+[ -n "$SKIPGREY" ] && STEM="${STEM}_skipgrey"
 OUT="$OUTDIR/$STEM.csv"
 mkdir -p "$OUTDIR" "$LOC"
 
@@ -99,4 +113,4 @@ echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] compatible guesses $STEM" \
     | tee -a "$LOC/$STEM.log"
 
 "$PY" -u tools/compatible_guesses.py --top "$TOP" --progress "$PROGRESS" \
-    --out "$OUT" 2>&1 | tee -a "$LOC/$STEM.log"
+    ${SKIPGREY:+--skip-allgrey} --out "$OUT" 2>&1 | tee -a "$LOC/$STEM.log"
