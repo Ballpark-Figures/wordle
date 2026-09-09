@@ -1777,6 +1777,56 @@ tee'd log — never a bare `tools/wordle_in_one.py`, which REFUSES without the f
   pct_rand_guesses,avg_answers,avg_guesses`). The all-guesses
   games file is gzipped (264778 rows). Log under `data/local/singletons/`.
 
+## `run-maxbucket.sh` — openers ranked by their LARGEST bucket (the minimax criterion)
+A guess PARTITIONS the answers (same part iff same feedback); this ranks openers
+by the size of the BIGGEST part — the worst case, how many answers survive the
+unluckiest reply — ascending. `bash solver/run-maxbucket.sh` (from `math/`),
+attached, tee'd log. Exact and deterministic: a pure function of the committed
+word lists and the pattern matrix, no sampling, no seed, no cap, so a re-run
+reproduces its file byte for byte.
+- **IT IS A DIFFERENT QUANTITY FROM EVERY OTHER RANKING HERE — never table it
+  beside one.** Not the EXPECTED answers remaining (a weighted mean over the same
+  partition; the mean of `n` and the max of `n` are different aggregations and
+  rank differently — the same distinction `wordle_in_one.py`'s `avg_answers` vs
+  `pct_rand_*` carries). Not the singleton count of `run-singles.sh`, which looks
+  only at the parts of size ONE while this looks only at the largest. And
+  emphatically not an `optturns`-family total, which is a number of GUESSES
+  subject to a 6-guess guarantee.
+- **THE ANSWER SET IS PART OF THE QUESTION and is NOT defaulted in the tool** (the
+  greens scar): `--answer-set mystery` counts buckets over the 2315 curated
+  answers, `--answer-set all` makes every one of the 12972 legal words an answer
+  (which needs the square matrix, `build_patterns.py --full`). Two different
+  quantities, two files. The WRAPPER carries the default a human reads (`mystery`)
+  and forwards it explicitly; `tools/maxbucket.py` refuses without it.
+- **`--rank` IS A SEPARATE AXIS and changes no count** — `all` lists every legal
+  guess, `answers` lists only the 2315, exactly as `singletons.py --answers` does.
+  A word scores what it always scored; ranks move only because the field is
+  smaller. Do not confuse it with `--answer-set`, which changes the numbers.
+- **THE ALL-GREEN BUCKET CANNOT BE THE LARGEST**, so there is no `_nowin` column of
+  the kind `singletons.py` needs: it holds the answers equal to the guess, hence
+  size 1 for the 2315 guesses that are answers and 0 for the rest, against maxima
+  in the hundreds.
+- **TIES ARE REAL** (the quantity is an integer over a large field) and the
+  ranking is on `max_bucket` ALONE — the alphabetical tie-break exists only to
+  make the file deterministic and carries no meaning. `max_pattern` (the
+  lowest-coded pattern attaining the maximum), `max_ties` and `buckets` are
+  DESCRIPTIVE columns, not secondary keys.
+- **IT REUSES `absurdle.bucket_counts`, and that is the source of the gate.**
+  Absurdle's host answers with the pattern of the LARGEST bucket, so `max_bucket`
+  IS the number of candidates an opener leaves against that host — the identity
+  that makes `data/shared/absurdle/one_shortest_solution.txt` an independent
+  oracle for the MINIMUM of this ranking. (Nothing here inherits Absurdle's
+  unverified-rules caveat: the partition is plain Wordle feedback either way.)
+- **`python3 tools/maxbucket.py` HAS THE GATE BUILT IN and it always runs**:
+  sampled guesses are re-bucketed FROM THE STRINGS with `wordle.pattern`, sharing
+  no machinery with the matrix path (pinning the matrix, its column order and the
+  argmax bookkeeping), and in the default answer set the minimum is cross-checked
+  against that committed Absurdle witness — read from the file, never typed in. It
+  exits nonzero rather than reporting.
+- Data under `math/data/shared/maxbucket/maxbucket_<answer-set>_<rank>.csv`
+  (`word,max_bucket,max_pattern,max_ties,buckets,rank`); log under
+  `math/data/local/maxbucket/`.
+
 ## Tree states (`run-tree-states.sh`) — the same two questions, at every level
 The in-game companion to Wordle in One: it walks the emitted OPTIMAL TREES and
 asks, at each LEVEL k (the state after k guesses and their feedback) and each

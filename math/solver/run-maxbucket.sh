@@ -1,0 +1,120 @@
+#!/bin/bash
+# Rank openers by the SIZE OF THE LARGEST BUCKET their feedback produces,
+# attached, with live output in this terminal.
+#
+#     bash solver/run-maxbucket.sh                      # from math/, or anywhere
+#     bash solver/run-maxbucket.sh --answer-set all
+#     bash solver/run-maxbucket.sh --rank answers
+#     bash solver/run-maxbucket.sh --top 50             # longer printed head
+#
+# WHAT THIS COMPUTES, precisely:
+#
+#   A guess PARTITIONS the answers -- two answers share a part iff they give it
+#   the same feedback.  This reports, per guess, the size of the BIGGEST part:
+#   the worst case, how many answers are still alive after the unluckiest reply.
+#   Ranked ascending, smallest worst case first.
+#
+#   IT IS THE MINIMAX CRITERION AND IS NOT COMPARABLE WITH ANYTHING ELSE HERE.
+#   Not the EXPECTED answers remaining (a weighted mean over the parts -- a
+#   different aggregation of the same partition, and it ranks differently), not
+#   the singleton count of run-singles.sh (which looks at the parts of size ONE),
+#   and emphatically not an optturns-family total, which is a number of GUESSES
+#   subject to a 6-guess guarantee.  A worst-case bucket size says nothing about
+#   how the rest of the game goes.  Never put these in one table.
+#
+#   THE ANSWER SET IS PART OF THE QUESTION.  --answer-set mystery counts buckets
+#   over the 2315 curated answers; --answer-set all makes every one of the 12972
+#   legal words an answer.  Different questions, different files.  --rank is a
+#   SEPARATE axis: it restricts which words are listed as ROWS and changes no
+#   count -- a word scores what it always scored, and ranks move only because the
+#   field is smaller.
+#
+#   Nothing searches or samples: a pure function of the committed word lists and
+#   the pattern matrix, so it is exact, has no standard error, and a re-run
+#   reproduces its file byte for byte.
+#
+#   THE GATE IS BUILT IN and always runs: sampled guesses are re-bucketed FROM
+#   THE STRINGS by wordle.pattern (sharing no machinery with the matrix path),
+#   and in the default answer set the minimum is cross-checked against the
+#   committed data/shared/absurdle/one_shortest_solution.txt, whose opener is a
+#   minimiser of this same quantity.  It exits nonzero rather than reporting.
+#
+# USE THIS RATHER THAN CALLING tools/maxbucket.py DIRECTLY.  The tool refuses to
+# run without --out and refuses to pick either axis for you; this forwards both
+# EXPLICITLY, so the one decision has one owner, and it tees a log naming the run.
+#
+# Outputs data/shared/maxbucket/maxbucket_<answer-set>_<rank>.csv, columns
+# word,max_bucket,max_pattern,max_ties,buckets,rank.  max_pattern is the
+# lowest-coded pattern attaining the maximum and max_ties how many attain it;
+# both are DESCRIPTIVE -- the ranking is on max_bucket alone, ties broken
+# alphabetically to make the file deterministic.  Log under data/local/maxbucket/.
+
+set -u
+
+MATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Defaults a HUMAN reads, forwarded explicitly -- never ones the program falls
+# back on: tools/maxbucket.py refuses to run if either is missing.
+ANSWER_SET=mystery
+RANK=all
+TOP=25
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --answer-set) ANSWER_SET="$2"; shift 2 ;;
+        --rank)       RANK="$2";       shift 2 ;;
+        --top)        TOP="$2";        shift 2 ;;
+        *) echo "unknown arg: $1" >&2; exit 1 ;;
+    esac
+done
+
+case "$ANSWER_SET" in
+    mystery|all) ;;
+    *) echo "--answer-set must be 'mystery' (the 2315) or 'all' (the 12972)" >&2
+       exit 1 ;;
+esac
+case "$RANK" in
+    all|answers) ;;
+    *) echo "--rank must be 'all' (every legal guess) or 'answers' (the 2315)" >&2
+       exit 1 ;;
+esac
+
+cd "$MATH" || exit 1
+
+PY=../.venv/bin/python
+[ -x "$PY" ] || { echo "no venv python at $PY" >&2; exit 1; }
+
+# --answer-set all reads the SQUARE guess x guess matrix -- a separate artifact
+# from the 12972x2315 one, gitignored under data/local/, so it is missing on a
+# fresh clone.
+if [ "$ANSWER_SET" = all ] && [ ! -f data/local/patterns/patterns_full.npy ]; then
+    echo "--answer-set all needs the square guess x guess matrix." >&2
+    echo "  Build it with '$PY build_patterns.py --full' (~18s, 168 MB)." >&2
+    exit 1
+fi
+if [ ! -f data/local/patterns/patterns.npy ]; then
+    echo "the pattern matrix is missing (it is gitignored under data/local/)." >&2
+    echo "  Build it with '$PY build_patterns.py' (~2s, 30 MB)." >&2
+    exit 1
+fi
+
+OUT=data/shared/maxbucket/maxbucket_${ANSWER_SET}_${RANK}.csv
+
+MARKER="maxbucket.py --answer-set $ANSWER_SET --rank $RANK"
+RUNNING=$(pgrep -f -- "$MARKER" 2>/dev/null | tr '\n' ' ')
+if [ -n "$RUNNING" ]; then
+    echo "REFUSING: the same run is already going (pid $RUNNING)." >&2
+    echo "  Two copies would write $OUT at once." >&2
+    exit 1
+fi
+
+LOC=data/local/maxbucket
+mkdir -p "$LOC" data/shared/maxbucket
+
+# BSD date has no -Is; this form works on both macOS and Linux.
+echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] maxbucket: answer-set=$ANSWER_SET rank=$RANK" \
+    | tee -a "$LOC/maxbucket_${ANSWER_SET}_${RANK}.log"
+
+"$PY" -u tools/maxbucket.py --answer-set "$ANSWER_SET" --rank "$RANK" \
+    --top "$TOP" --out "$OUT" 2>&1 \
+    | tee -a "$LOC/maxbucket_${ANSWER_SET}_${RANK}.log"
