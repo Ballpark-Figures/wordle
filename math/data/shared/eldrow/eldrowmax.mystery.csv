@@ -1,0 +1,24 @@
+pool,words,mode,status,length,greedy,nodes,threads,secs,line
+mystery.txt,2315,ladder,greedy,9,9,0,18,0.013,fuzzy vivid bongo mamma askew exact leach peach reach
+mystery.txt,2315,ladder,improved,10,9,11918,18,7.576,fuzzy vivid bongo mamma askew cease shape stale stare state
+mystery.txt,2315,ladder,improved,11,9,49529,18,14.784,fuzzy vivid bongo mamma cheap asset tease stake stale stare state
+mystery.txt,2315,ladder,improved,12,9,98252,18,21.995,fuzzy vivid bongo amass rarer paper taker cater eater hater later water
+mystery.txt,2315,ladder,improved,13,9,138447,18,29.236,fuzzy vivid mamma tenth gorge boxer joker wooer cower lower power rower sower
+mystery.txt,2315,ladder,improved,14,9,300457,18,37.365,fuzzy vivid arena gorge boxer homer joker wooer cower lower power rower sower tower
+mystery.txt,2315,ladder,improved,15,9,1393216,18,46.153,fuzzy mamma eerie odder boxer goner joker hover wooer cower lower power rower sower tower
+mystery.txt,2315,ladder,greedy,9,9,0,18,0.015,fuzzy vivid bongo mamma askew exact leach peach reach
+mystery.txt,2315,ladder,reached,10,9,16372,18,3.633,
+mystery.txt,2315,ladder,improved,10,9,16372,18,3.633,broom cacao posit novel lowly dolly folly golly holly jolly
+mystery.txt,2315,ladder,reached,11,9,58960,18,7.240,
+mystery.txt,2315,ladder,improved,11,9,58960,18,7.240,broom posse toxin koala coyly lowly dolly folly golly holly jolly
+mystery.txt,2315,ladder,reached,12,9,107803,18,10.851,
+mystery.txt,2315,ladder,improved,12,9,107803,18,10.851,frail cocoa kebab jazzy mammy daddy nanny savvy gassy hasty pasty tasty
+mystery.txt,2315,ladder,reached,13,9,195942,18,14.501,
+mystery.txt,2315,ladder,improved,13,9,195942,18,14.501,drain blurb gorge foyer joker hover wooer cower mower power rower sower tower
+mystery.txt,2315,ladder,reached,14,9,813973,18,19.051,
+mystery.txt,2315,ladder,improved,14,9,813973,18,19.051,bribe query defer gazer joker hover wooer cower lower mower power rower sower tower
+mystery.txt,2315,ladder,reached,15,9,1473523,18,24.229,
+mystery.txt,2315,ladder,improved,15,9,1473523,18,24.229,dread eerie upper foyer joker boxer goner hover wooer cower lower mower rower sower tower
+mystery.txt,2315,ladder,reached,16,9,7241713,18,53.297,
+mystery.txt,2315,ladder,improved,16,9,7241713,18,53.297,graze inner queer odder foyer boxer joker hover wooer cower lower mower power rower sower tower
+mystery.txt,2315,ladder,final,16,9,93498522,18,141.156,graze inner queer odder foyer boxer joker hover wooer cower lower mower power rower sower tower
