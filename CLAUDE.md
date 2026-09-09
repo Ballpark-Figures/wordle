@@ -1590,6 +1590,18 @@ tee'd log — never a bare `tools/wordle_in_one.py`, which REFUSES without the f
   report.** Identity worth knowing: `1/n` summed over a bucket's `n` pairs is
   exactly 1, so `pct_rand_answers` is also the count of DISTINCT non-empty
   (guess, pattern) rows of that composition over its pairs.
+- **`avg_answers` / `avg_guesses` ARE THOSE SAME TWO POOLS COUNTED RATHER THAN
+  INVERTED** (added 2026-09-09): the mean NUMBER of words the row leaves alive,
+  over the same pairs, so a bucket of `n` answers enters the mean `n` times and
+  the cell is `sum(n^2)/sum(n)`. **They are NOT `100/pct_rand_*`** — the mean of
+  `n` and the mean of `1/n` are different aggregations of one distribution (the
+  first is dominated by the wide buckets, the second by the narrow ones), so a
+  composition can rank differently under the two. **The weighting is
+  ANSWER-weighted** (user's call), matching every other column; the
+  node-weighted reading (every distinct row once, `pairs/rows`) stays
+  recoverable, since `pct_rand_answers` IS `rows/pairs`. Sort on `avg_answers`
+  to rank compositions by how much the row narrowed things down; the tool also
+  prints the table a second time in that order.
 - **THE LEGAL-WORD COLUMN NEEDS THE SQUARE 12972x12972 MATRIX** (`python3
   build_patterns.py --full`, ~18s/168 MB), gitignored under `data/local/` and so
   MISSING ON A FRESH CLONE — the wrapper and the tool both refuse with that
@@ -1609,7 +1621,7 @@ tee'd log — never a bare `tools/wordle_in_one.py`, which REFUSES without the f
 - Data under `math/data/shared/singletons/`: `wordle_in_one_games[_allguesses]
   .csv[.gz]` (one row per game) and `wordle_in_one_breakdown[_allguesses].csv`
   (`greens,yellows,grays,games,games_nowin,pairs,pct,pct_nowin,pct_rand_answers,
-  pct_rand_guesses`). The all-guesses
+  pct_rand_guesses,avg_answers,avg_guesses`). The all-guesses
   games file is gzipped (264778 rows). Log under `data/local/singletons/`.
 
 ## Tree states (`run-tree-states.sh`) — the same two questions, at every level
@@ -1637,6 +1649,13 @@ tee'd log; `WORDLE_SOLVER` picks the sweep, `--top N` names the file.
   sitting in an already-narrowed node. `nodes` is reported beside `cases`, so the
   node-weighted reading stays recoverable (and `pct_rand_answers` IS `nodes/cases`,
   the same 1/n identity as in Wordle in One).
+- **`avg_answers` / `avg_guesses` are the same two pools COUNTED rather than
+  inverted** (added 2026-09-09, mirroring Wordle in One): the mean number of
+  words still consistent, same answer weighting, so a node of `n` candidates
+  contributes `n*n` and `n*m` and the cell is `sum(n^2)/sum(n)`. **NOT
+  `100/pct_rand_*`.** Sort on `avg_answers` to rank the states by how much the
+  strategy has narrowed things down — the tool prints the whole table a second
+  time in that order, and the per-level summary carries both means.
 - **A WON GAME IS NOT A CASE.** A tree line records no pattern for its final guess
   (it would be all green), so a game ending at turn k has no level-k state and
   leaves every deeper level. Level counts therefore FALL with depth.
@@ -1663,7 +1682,8 @@ tee'd log; `WORDLE_SOLVER` picks the sweep, `--top N` names the file.
   tool both refuse with that command on a fresh clone.
 - Data: `math/data/shared/treestates/states_<solver>_top<N>.csv`
   (`level,greens,yellows,grays,nodes,cases,singles,pct_single,pct_rand_answers,
-  pct_rand_guesses`); log under `math/data/local/treestates/`.
+  pct_rand_guesses,avg_answers,avg_guesses`); log under
+  `math/data/local/treestates/`.
 
 ## Nerdle (8-symbol equations) — the GUESS enumeration, pass one
 A different game living beside the wordle variants. `math/nerdle.py` states the rules

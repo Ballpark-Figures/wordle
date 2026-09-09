@@ -38,6 +38,15 @@ pct_rand_answers is `nodes / cases` and pct_rand_guesses is weakly smaller (the
 legal-word pool is a superset containing every consistent answer). A pick from
 the whole list ignoring the board is a flat 1/2315 or 1/12972 and is not this.
 
+`avg_answers` AND `avg_guesses` ARE THOSE SAME TWO POOLS COUNTED RATHER THAN
+INVERTED -- how many words the board still leaves alive on average. The same
+answer weighting applies (the user's call, 2026-09-09), so a node of n
+candidates contributes n * n and n * m and `avg_answers` is sum(n^2)/sum(n) over
+the cell's nodes. They are NOT 100/pct_rand_*: the mean of n and the mean of 1/n
+are different aggregations of one distribution, so a cell can rank differently
+under the two. The node-weighted reading (every board once, cases/nodes) stays
+recoverable, since `pct_rand_answers` is exactly nodes/cases.
+
 A WON GAME IS NOT A CASE. A tree line records no pattern for its final guess (it
 would be all green), so a game that ends at turn k simply has no level-k state
 and drops out of every deeper level -- the same reason `wordle_in_one.py` carries
@@ -223,6 +232,10 @@ def main():
     cases = np.zeros((MAXLVL, L + 1, L + 1), dtype=np.int64)
     singles = np.zeros((MAXLVL, L + 1, L + 1), dtype=np.int64)
     rand_gss = np.zeros((MAXLVL, L + 1, L + 1), dtype=np.float64)
+    # numerators of the answer-weighted mean number of words still alive: a node
+    # of n candidates and m legal words contributes n * n and n * m
+    sum_ans = np.zeros((MAXLVL, L + 1, L + 1), dtype=np.int64)
+    sum_gss = np.zeros((MAXLVL, L + 1, L + 1), dtype=np.int64)
 
     rng = random.Random(0)
     checked_lines = checked_nodes = 0
@@ -266,6 +279,8 @@ def main():
                 if n == 1:
                     singles[d, g, y] += 1
                 rand_gss[d, g, y] += n / m
+                sum_ans[d, g, y] += n * n
+                sum_gss[d, g, y] += n * m
                 sizes[(rows[0][1][:d], rows[0][2][:d])] = (n, m)
             kids = defaultdict(list)
             for row in rows:
@@ -335,10 +350,13 @@ def main():
     def pct(num, den):
         return 100.0 * num / den if den else 0.0
 
+    def avg(num, den):
+        return num / den if den else 0.0
+
     levels = [d for d in range(MAXLVL) if cases[d].sum()]
-    hdr = ("%5s %6s %7s %6s %10s %12s %10s %11s %11s"
+    hdr = ("%5s %6s %7s %6s %10s %12s %10s %11s %11s %10s %11s"
            % ("level", "green", "yellow", "gray", "nodes", "cases", "pct_one",
-              "rand_ans", "rand_guess"))
+              "rand_ans", "rand_guess", "avg_ans", "avg_guess"))
     print("\nopeners: %d (best by total in the %s sweep, %s .. %s)"
           % (len(ranked), SOLVER, ranked[0], ranked[-1]))
     print("cases are ANSWERS: a node holding n candidates counts n times\n")
@@ -348,18 +366,40 @@ def main():
             for y in range(L + 1 - g):
                 if not cases[d, g, y]:
                     continue
-                print("%5d %6d %7d %6d %10d %12d %9.4f%% %10.4f%% %10.4f%%"
+                print("%5d %6d %7d %6d %10d %12d %9.4f%% %10.4f%% %10.4f%% "
+                      "%10.2f %11.2f"
                       % (d, g, y, L - g - y, nodes[d, g, y], cases[d, g, y],
                          pct(singles[d, g, y], cases[d, g, y]),
                          pct(nodes[d, g, y], cases[d, g, y]),
-                         pct(rand_gss[d, g, y], cases[d, g, y])))
+                         pct(rand_gss[d, g, y], cases[d, g, y]),
+                         avg(sum_ans[d, g, y], cases[d, g, y]),
+                         avg(sum_gss[d, g, y], cases[d, g, y])))
+
+    # the same cells again, ordered by how many answer words are still alive --
+    # the sort the table above cannot show, being laid out by level then tiles
+    print("\nby avg_answers (fewest words left first):")
+    print("%5s %6s %7s %6s %12s %10s %11s %10s %11s"
+          % ("level", "green", "yellow", "gray", "cases", "pct_one", "rand_ans",
+             "avg_ans", "avg_guess"))
+    cells = [(d, g, y) for d in levels for g in range(L + 1)
+             for y in range(L + 1 - g) if cases[d, g, y]]
+    for d, g, y in sorted(cells, key=lambda c: avg(sum_ans[c], cases[c])):
+        print("%5d %6d %7d %6d %12d %9.4f%% %10.4f%% %10.2f %11.2f"
+              % (d, g, y, L - g - y, cases[d, g, y],
+                 pct(singles[d, g, y], cases[d, g, y]),
+                 pct(nodes[d, g, y], cases[d, g, y]),
+                 avg(sum_ans[d, g, y], cases[d, g, y]),
+                 avg(sum_gss[d, g, y], cases[d, g, y])))
+
     print("\nby level:")
     for d in levels:
         c, nd = int(cases[d].sum()), int(nodes[d].sum())
         print("  level %d: %8d cases in %7d nodes, narrowed to one %7.4f%%, "
-              "random pick right %7.4f%% (answers) / %7.4f%% (legal guesses)"
+              "random pick right %7.4f%% (answers) / %7.4f%% (legal guesses), "
+              "%8.2f answers / %8.2f legal words alive"
               % (d, c, nd, pct(int(singles[d].sum()), c), pct(nd, c),
-                 pct(float(rand_gss[d].sum()), c)))
+                 pct(float(rand_gss[d].sum()), c),
+                 avg(int(sum_ans[d].sum()), c), avg(int(sum_gss[d].sum()), c)))
 
     if args.no_out:
         return
@@ -376,19 +416,25 @@ def main():
                 "pct_rand_answers/pct_rand_guesses=chance a random pick from the "
                 "words still consistent is right, drawing from the answers and "
                 "from the sweep's legal guesses\n")
+        f.write("# avg_answers/avg_guesses=mean over those same cases of the "
+                "NUMBER of words still consistent, from the answers and from the "
+                "sweep's legal guesses -- the same two pools counted rather than "
+                "inverted, so these are NOT 100/pct_rand_*\n")
         f.write("level,greens,yellows,grays,nodes,cases,singles,pct_single,"
-                "pct_rand_answers,pct_rand_guesses\n")
+                "pct_rand_answers,pct_rand_guesses,avg_answers,avg_guesses\n")
         for d in levels:
             for g in range(L + 1):
                 for y in range(L + 1 - g):
                     if not cases[d, g, y]:
                         continue
-                    f.write("%d,%d,%d,%d,%d,%d,%d,%.5f,%.5f,%.5f\n"
+                    f.write("%d,%d,%d,%d,%d,%d,%d,%.5f,%.5f,%.5f,%.5f,%.5f\n"
                             % (d, g, y, L - g - y, nodes[d, g, y], cases[d, g, y],
                                singles[d, g, y],
                                pct(singles[d, g, y], cases[d, g, y]),
                                pct(nodes[d, g, y], cases[d, g, y]),
-                               pct(rand_gss[d, g, y], cases[d, g, y])))
+                               pct(rand_gss[d, g, y], cases[d, g, y]),
+                               avg(sum_ans[d, g, y], cases[d, g, y]),
+                               avg(sum_gss[d, g, y], cases[d, g, y])))
     print("\nwrote %s" % os.path.relpath(args.out, _MATH))
 
 

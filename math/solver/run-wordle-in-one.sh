@@ -37,6 +37,14 @@
 #   is always the worse of the two, being a superset.  A pick from the WHOLE
 #   list ignoring the row would be a flat 1/2315 or 1/12972 and is NOT this.
 #
+#   avg_answers AND avg_guesses ARE THOSE SAME TWO POOLS COUNTED RATHER THAN
+#   INVERTED: the mean NUMBER of words the row leaves alive, over the same pairs
+#   and with the same answer weighting, so a bucket of n answers enters the mean
+#   n times.  They are NOT 100/pct_rand_*: the mean of n and the mean of 1/n are
+#   different aggregations of one distribution, so a composition can rank
+#   differently under the two.  Sort on avg_answers to rank compositions by how
+#   much the row narrowed things down.
+#
 #   The all-green row is a singleton that tells you nothing you did not already
 #   know by typing the word.  Its denominator is exactly the 2315 self-pairs, so
 #   its 100% is arithmetic, not a measurement -- read pct_nowin there.
@@ -54,7 +62,7 @@
 #   --guesses all     : wordle_in_one_games_allguesses.csv.gz,
 #                       wordle_in_one_breakdown_allguesses.csv
 # Breakdown columns: greens,yellows,grays,games,games_nowin,pairs,pct,pct_nowin,
-# pct_rand_answers,pct_rand_guesses.
+# pct_rand_answers,pct_rand_guesses,avg_answers,avg_guesses.
 # Log under data/local/singletons/.
 
 set -u

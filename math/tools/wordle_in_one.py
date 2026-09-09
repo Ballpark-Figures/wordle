@@ -45,6 +45,20 @@ a flat 1/2315 or 1/12972 and is not what these columns report.
   exactly 1, so `pct_rand_answers` is also the count of DISTINCT non-empty
   (guess, pattern) rows of that composition over its pair count.
 
+`avg_answers` and `avg_guesses` ARE THE SAME TWO POOLS COUNTED RATHER THAN
+INVERTED: the mean of n, and of m, over the SAME pairs -- how many words the row
+leaves alive on average. They are NOT 100/pct_rand_*: the mean of n and the mean
+of 1/n are different aggregations of the same distribution (the first is
+dominated by the wide buckets, the second by the narrow ones), so a composition
+can rank differently under the two and both are reported.
+
+  THE WEIGHTING IS ANSWER-WEIGHTED, matching every other column here (the user's
+  call, 2026-09-09): a bucket holding n answers contributes n pairs, so it enters
+  the mean n times and `avg_answers` is sum(n^2)/sum(n) over the composition's
+  buckets. The other reading -- every DISTINCT (guess, pattern) row counted once,
+  giving pairs/rows -- is a different number, and it stays recoverable, since
+  `pct_rand_answers` is exactly rows/pairs.
+
 THE ANSWER-POOL COLUMN NEEDS ONLY patterns.npy; THE GUESS-POOL COLUMN NEEDS THE
 SQUARE 12972x12972 MATRIX (`python3 build_patterns.py --full`, ~18s/168 MB),
 which is gitignored under data/local/ and so is MISSING ON A FRESH CLONE. The
@@ -69,7 +83,8 @@ Outputs, under data/shared/singletons/:
                                  pattern,greens,yellows,grays (pattern G/Y/B)
   wordle_in_one_breakdown[_allguesses].csv    per (greens,yellows) composition:
                                  games, games_nowin, pairs, pct, pct_nowin,
-                                 pct_rand_answers, pct_rand_guesses
+                                 pct_rand_answers, pct_rand_guesses,
+                                 avg_answers, avg_guesses
 The all-guesses games file is gzipped (264778 rows).
 A pure function of the committed word lists, so it regenerates anywhere.
 """
@@ -161,6 +176,10 @@ code_pairs = np.zeros(NPAT, dtype=np.int64)   # (guess, answer) pairs per patter
 # the answer pool and once for the legal-guess pool.
 rand_ans_code = np.zeros(NPAT, dtype=np.float64)
 rand_gss_code = np.zeros(NPAT, dtype=np.float64)
+# Sum of (words the row leaves alive) over those same pairs -- the numerator of
+# the answer-weighted mean, so a bucket of n answers contributes n * n and n * m.
+sum_ans_code = np.zeros(NPAT, dtype=np.int64)
+sum_gss_code = np.zeros(NPAT, dtype=np.int64)
 per_guess = {}          # guess word -> singleton count (for the gate)
 games = []              # (guess, answer, pattern_code)
 
@@ -185,6 +204,8 @@ for gi in guess_idx:
     # pool, and n/m for the legal-word pool (m >= n by the gate above)
     rand_ans_code[nz] += 1.0
     rand_gss_code[nz] += counts[nz] / counts_full[nz]
+    sum_ans_code[nz] += counts[nz] * counts[nz]
+    sum_gss_code[nz] += counts[nz] * counts_full[nz]
     is_single = counts[row] == 1                         # boolean over answers
     ai = np.nonzero(is_single)[0]
     per_guess[guesses[gi]] = len(ai)
@@ -205,6 +226,15 @@ rand_ans = np.zeros((L + 1, L + 1), dtype=np.float64)
 rand_gss = np.zeros((L + 1, L + 1), dtype=np.float64)
 np.add.at(rand_ans, (comp[:, 0], comp[:, 1]), rand_ans_code)
 np.add.at(rand_gss, (comp[:, 0], comp[:, 1]), rand_gss_code)
+
+sum_ans = np.zeros((L + 1, L + 1), dtype=np.int64)
+sum_gss = np.zeros((L + 1, L + 1), dtype=np.int64)
+np.add.at(sum_ans, (comp[:, 0], comp[:, 1]), sum_ans_code)
+np.add.at(sum_gss, (comp[:, 0], comp[:, 1]), sum_gss_code)
+# every pair leaves at least the answer itself alive, and the legal-word pool is
+# a superset of the answer pool bucket by bucket (the gate above pins that)
+assert (sum_ans >= pairs).all(), "a cell averaged under one answer alive"
+assert (sum_gss >= sum_ans).all(), "the legal-word pool was smaller than the answers"
 # a forced answer is a pick of 1 from 1, and the legal-word pool contains every
 # consistent answer, so these orderings hold cell by cell
 assert (rand_ans >= tally - 1e-9).all(), "random-pick rate below the singleton rate"
@@ -216,10 +246,16 @@ total_nowin = int(tally_nowin.sum())
 total_pairs = int(pairs.sum())
 total_rand_ans = float(rand_ans.sum())
 total_rand_gss = float(rand_gss.sum())
+total_sum_ans = int(sum_ans.sum())
+total_sum_gss = int(sum_gss.sum())
 
 
 def pct(num, den):
     return 100.0 * num / den if den else 0.0
+
+
+def avg(num, den):
+    return num / den if den else 0.0
 
 
 # --- GATE: per-guess totals must match the committed guess_singletons CSV
@@ -272,18 +308,24 @@ with open(BREAK_OUT, "w") as f:
             "1/(words the row leaves consistent), drawing from the 2315 answers "
             "and from the 12972 legal guesses respectively -- how often a random "
             "pick from what is still alive would be right\n")
+    f.write("# avg_answers/avg_guesses=mean over those same pairs of the NUMBER "
+            "of words the row leaves consistent, from the 2315 answers and from "
+            "the 12972 legal guesses -- the same two pools counted rather than "
+            "inverted, so these are NOT 100/pct_rand_*\n")
     f.write("greens,yellows,grays,games,games_nowin,pairs,pct,pct_nowin,"
-            "pct_rand_answers,pct_rand_guesses\n")
+            "pct_rand_answers,pct_rand_guesses,avg_answers,avg_guesses\n")
     for g in range(L + 1):
         for y in range(L + 1 - g):
             if not (tally[g, y] or pairs[g, y]):
                 continue
-            f.write("%d,%d,%d,%d,%d,%d,%.5f,%.5f,%.5f,%.5f\n"
+            f.write("%d,%d,%d,%d,%d,%d,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f\n"
                     % (g, y, L - g - y, tally[g, y], tally_nowin[g, y],
                        pairs[g, y], pct(tally[g, y], pairs[g, y]),
                        pct(tally_nowin[g, y], pairs[g, y]),
                        pct(rand_ans[g, y], pairs[g, y]),
-                       pct(rand_gss[g, y], pairs[g, y])))
+                       pct(rand_gss[g, y], pairs[g, y]),
+                       avg(sum_ans[g, y], pairs[g, y]),
+                       avg(sum_gss[g, y], pairs[g, y])))
 
 print("wrote %s (%d games)" % (os.path.relpath(GAMES_OUT, _MATH), total))
 print("wrote %s" % os.path.relpath(BREAK_OUT, _MATH))
@@ -295,53 +337,82 @@ print("%d games total (%.4f%% of all pairs); %d excluding the all-green "
       % (total, pct(total, total_pairs), total_nowin,
          pct(total_nowin, total_pairs)))
 print("a random pick from what the row leaves alive is right %.4f%% of the time "
-      "(answer pool) / %.4f%% (legal-guess pool)\n"
+      "(answer pool) / %.4f%% (legal-guess pool)"
       % (pct(total_rand_ans, total_pairs), pct(total_rand_gss, total_pairs)))
+print("a row leaves %.2f answer words alive on average / %.2f legal guess words\n"
+      % (avg(total_sum_ans, total_pairs), avg(total_sum_gss, total_pairs)))
 
 # printed breakdown
-print("singleton RATE by (greens, yellows, grays), and the rate a RANDOM pick "
-      "from what the row leaves alive is right:")
-print("%6s %7s %6s %10s %12s %12s %9s %10s %11s %11s"
+print("singleton RATE by (greens, yellows, grays), the rate a RANDOM pick from "
+      "what the row leaves alive is right, and how many words that is:")
+print("%6s %7s %6s %10s %12s %12s %9s %10s %11s %11s %10s %11s"
       % ("green", "yellow", "gray", "games", "games_nowin", "pairs", "pct",
-         "pct_nowin", "rand_ans", "rand_guess"))
+         "pct_nowin", "rand_ans", "rand_guess", "avg_ans", "avg_guess"))
 for g in range(L + 1):
     for y in range(L + 1 - g):
         if not (tally[g, y] or pairs[g, y]):
             continue
-        print("%6d %7d %6d %10d %12d %12d %8.4f%% %9.4f%% %10.4f%% %10.4f%%"
+        print("%6d %7d %6d %10d %12d %12d %8.4f%% %9.4f%% %10.4f%% %10.4f%% "
+              "%10.2f %11.2f"
               % (g, y, L - g - y, tally[g, y], tally_nowin[g, y], pairs[g, y],
                  pct(tally[g, y], pairs[g, y]),
                  pct(tally_nowin[g, y], pairs[g, y]),
                  pct(rand_ans[g, y], pairs[g, y]),
-                 pct(rand_gss[g, y], pairs[g, y])))
+                 pct(rand_gss[g, y], pairs[g, y]),
+                 avg(sum_ans[g, y], pairs[g, y]),
+                 avg(sum_gss[g, y], pairs[g, y])))
 
-def marginal(label, k, won, pr, ra, rg):
+# the same cells again, ordered by how many answer words the row leaves alive --
+# the sort the table above cannot show, since it is laid out by composition
+print("\nby avg_answers (fewest words left first):")
+print("%6s %7s %6s %12s %9s %11s %10s %11s"
+      % ("green", "yellow", "gray", "pairs", "pct", "rand_ans", "avg_ans",
+         "avg_guess"))
+cells = [(g, y) for g in range(L + 1) for y in range(L + 1 - g)
+         if tally[g, y] or pairs[g, y]]
+for g, y in sorted(cells, key=lambda c: avg(sum_ans[c], pairs[c])):
+    print("%6d %7d %6d %12d %8.4f%% %10.4f%% %10.2f %11.2f"
+          % (g, y, L - g - y, pairs[g, y], pct(tally[g, y], pairs[g, y]),
+             pct(rand_ans[g, y], pairs[g, y]),
+             avg(sum_ans[g, y], pairs[g, y]), avg(sum_gss[g, y], pairs[g, y])))
+
+
+def marginal(label, k, won, pr, ra, rg, sa, sg):
     print("  %d %s: %8d games / %10d pairs = %7.4f%%   rand %7.4f%% / %7.4f%%"
-          % (k, label, won, pr, pct(won, pr), pct(ra, pr), pct(rg, pr)))
+          "   avg %8.2f / %8.2f"
+          % (k, label, won, pr, pct(won, pr), pct(ra, pr), pct(rg, pr),
+             avg(sa, pr), avg(sg, pr)))
 
 
-print("\nmarginal by greens (rand = answer pool / legal-guess pool):")
+print("\nmarginal by greens (rand and avg = answer pool / legal-guess pool):")
 for g in range(L + 1):
     if int(pairs[g].sum()):
         marginal("green", g, int(tally[g].sum()), int(pairs[g].sum()),
-                 float(rand_ans[g].sum()), float(rand_gss[g].sum()))
+                 float(rand_ans[g].sum()), float(rand_gss[g].sum()),
+                 int(sum_ans[g].sum()), int(sum_gss[g].sum()))
 print("marginal by yellows:")
 for y in range(L + 1):
     if int(pairs[:, y].sum()):
         marginal("yellow", y, int(tally[:, y].sum()), int(pairs[:, y].sum()),
-                 float(rand_ans[:, y].sum()), float(rand_gss[:, y].sum()))
+                 float(rand_ans[:, y].sum()), float(rand_gss[:, y].sum()),
+                 int(sum_ans[:, y].sum()), int(sum_gss[:, y].sum()))
 print("marginal by grays:")
 gray_games = np.zeros(L + 1, dtype=np.int64)
 gray_pairs = np.zeros(L + 1, dtype=np.int64)
 gray_ra = np.zeros(L + 1, dtype=np.float64)
 gray_rg = np.zeros(L + 1, dtype=np.float64)
+gray_sa = np.zeros(L + 1, dtype=np.int64)
+gray_sg = np.zeros(L + 1, dtype=np.int64)
 for g in range(L + 1):
     for y in range(L + 1 - g):
         gray_games[L - g - y] += tally[g, y]
         gray_pairs[L - g - y] += pairs[g, y]
         gray_ra[L - g - y] += rand_ans[g, y]
         gray_rg[L - g - y] += rand_gss[g, y]
+        gray_sa[L - g - y] += sum_ans[g, y]
+        gray_sg[L - g - y] += sum_gss[g, y]
 for k in range(L + 1):
     if gray_pairs[k]:
         marginal("gray", k, int(gray_games[k]), int(gray_pairs[k]),
-                 float(gray_ra[k]), float(gray_rg[k]))
+                 float(gray_ra[k]), float(gray_rg[k]),
+                 int(gray_sa[k]), int(gray_sg[k]))

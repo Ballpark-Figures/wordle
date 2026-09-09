@@ -28,6 +28,13 @@
 #   a node already narrowed to one.  The node count is reported beside it, so
 #   the other reading stays recoverable.
 #
+#   avg_answers AND avg_guesses ARE THE RANDOM-PICK POOLS COUNTED RATHER THAN
+#   INVERTED: the mean NUMBER of words still consistent, under the same answer
+#   weighting, so a node of n candidates enters the mean n times.  They are NOT
+#   100/pct_rand_*: the mean of n and the mean of 1/n are different aggregations
+#   of one distribution.  Sort on avg_answers to rank the states by how much the
+#   strategy has narrowed things down.
+#
 #   A WON GAME IS NOT A CASE: a line records no pattern for its final guess, so
 #   a game that ends at turn k has no level-k state and leaves every deeper
 #   level -- the same accounting as wordle_in_one's games_nowin column.
