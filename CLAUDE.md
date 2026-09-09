@@ -1504,9 +1504,14 @@ differences instead.
   later tool cannot be broken by rewording a paragraph. Older files fall back to
   the first line plus, for `adapt` alone, the prose — parsing prose is the
   fallback, never the plan, which is why the settings line exists.
-- **THE OUTPUT IS SWEEP-SHAPED**: `word,trials,mean,stderr` first, then
-  `diff_vs_leader,paired_stderr,sigma`, so `sweep_shortlist.py` and every other
-  reader of a sweep CSV reads it too. The name is derived by the tool itself
+- **THE OUTPUT IS SWEEP-SHAPED**: `word,trials,<value>,<value>_stderr` first,
+  then `diff_vs_leader,paired_stderr,sigma`, so `sweep_shortlist.py` and every
+  other reader of a sweep CSV reads it too. **The value column is named after the
+  RANKING** (`mean`/`stderr` or `win_rate`/`win_rate_stderr`) — it used to be
+  `mean` whatever was ranked, so a win-rate paired file carried a win rate in a
+  column called `mean` and every reader asking for `win_rate` failed on it. Files
+  written before the fix are still readable: `read_sweep` falls back to `mean`
+  when the header's `# settings rank=` says that is what it holds. The name is derived by the tool itself
   (`--print-stem`), so the wrapper does not re-implement it in shell.
 - **ROUNDS CHAIN, AND THE CUT IS ON THE PAIRED SIGMA.** A paired CSV is itself a
   valid `--from`: **`--sigma N` (default 5) keeps every opening within N PAIRED

@@ -51,6 +51,7 @@ trials and the same games, so nothing about it favours a word.
 """
 
 import os
+import re
 import sys
 
 
@@ -90,14 +91,24 @@ def read_sweep(path, value="mean"):
     the plain `stderr` every sweep here has always written.
     """
     err = "stderr" if value == "mean" else value + "_stderr"
-    header, rows, trials = None, [], {}
+    header, rows, trials, head = None, [], {}, []
     with open(path) as f:
         for line in f:
-            if line.startswith("#") or not line.strip():
+            if line.startswith("#"):
+                head.append(line.rstrip("\n"))
+                continue
+            if not line.strip():
                 continue
             cols = [c.strip() for c in line.rstrip("\n").split(",")]
             if header is None:
                 header = cols
+                # COMPATIBILITY: paired files written before the value column was
+                # named after the ranking carry a win rate in a column called
+                # `mean`.  Their `# settings rank=` line says what it really is,
+                # so trust that rather than failing on the name.
+                if value not in header and "mean" in header and \
+                        re.search(r"# settings .*rank=%s" % value, "\n".join(head)):
+                    value, err = "mean", "stderr"
                 for name in ("word", value, err):
                     if name not in header:
                         raise SystemExit("%s has no %r column (it has: %s)"

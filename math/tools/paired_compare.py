@@ -375,7 +375,8 @@ def main(argv):
                     mean[lead], se[lead]))
     lines.append("")
     lines.append("%-24s %10s %9s %12s %9s %7s" %
-                 ("opening", "mean", "own se", "vs leader", "paired se", "sigma"))
+                 ("opening", "win rate" if rank == "win_rate" else "mean",
+                  "own se", "vs leader", "paired se", "sigma"))
     for k in order:
         if k == lead:
             lines.append("%-24s %10.5f %9.5f %12s %9s %7s"
@@ -418,7 +419,15 @@ def main(argv):
         # tools/sweep_shortlist.py and every reader of a sweep CSV can read this
         # file too.  The paired columns follow; they are the point, but they do
         # not get in the way of the format everything else already speaks.
-        f.write("word,trials,mean,stderr,diff_vs_leader,paired_stderr,sigma\n")
+        # NAME THE VALUE COLUMN FOR WHAT IT IS.  It used to be `mean` whatever was
+        # being ranked, so a win-rate paired file carried a win rate in a column
+        # called `mean` and every reader asking for `win_rate` failed on it.  The
+        # header's `rank=` said so, but a column name that lies is worse than one
+        # that is merely terse.
+        vcol = "mean" if rank == "mean" else rank
+        ecol = "stderr" if rank == "mean" else rank + "_stderr"
+        f.write("word,trials,%s,%s,diff_vs_leader,paired_stderr,sigma\n"
+                % (vcol, ecol))
         for k in order:
             f.write("%s,%d,%.6f,%.6f,%.6f,%.6f,%.3f\n"
                     % (openings[k], t, mean[k], se[k],
