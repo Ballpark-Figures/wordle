@@ -270,6 +270,7 @@ def main(argv):
     check_minavg(guesses, mystery, pat, ans2g)
     check_kernels(guesses, mystery, pat, ans2g)
     check_race(guesses, mystery)
+    check_exact_vs_optimum(guesses, mystery, pat)
 
     print()
     if FAILS:
@@ -711,6 +712,57 @@ def check_race(guesses, mystery):
     for tag in ("whole", "split", "switch"):
         wipe(tag)
     os.remove(field)
+
+
+def check_exact_vs_optimum(guesses, mystery, pat):
+    """minavg at k=1 must never beat the exact optimum -- an outside cross-check.
+
+    At k=1 `minavg` is a one-ply heuristic over ordinary Wordle, and this file can
+    evaluate it EXACTLY (2315 answers, deterministic rule, no sampling).  So its
+    total is directly comparable with `data/shared/optturns/opener_totals.csv`,
+    which is the minimum total guesses subject to resolving every answer within 6
+    and is itself validated against Bertsimas and Paskov.
+
+    The comparison is only legitimate when minavg actually resolves every answer
+    within 6, since otherwise its strategy is outside the set optturns minimised
+    over -- so that is checked per opener rather than assumed, and an opener whose
+    worst game is longer is skipped with a note.  Nothing else in this gate reaches
+    outside the multiwordle code at all, which is what makes it worth having.
+    """
+    opt = {}
+    path = os.path.join("data", "shared", "optturns", "opener_totals.csv")
+    if not os.path.exists(path):
+        check("optturns totals are available for the k=1 cross-check", True,
+              "SKIPPED: no %s" % path)
+        return
+    with open(path) as f:
+        for line in f:
+            if line.startswith("#") or line.startswith("word,"):
+                continue
+            c = line.split(",")
+            if len(c) > 1 and c[1].strip():
+                opt[c[0].strip()] = int(c[1])
+
+    pool = np.arange(len(guesses), dtype=np.int64)
+    every = np.arange(len(mystery), dtype=np.int64).reshape(len(mystery), 1)
+    scores = np.empty(len(mystery), dtype=np.int64)
+    rows = []
+    for w in ("salet", "trace", "laten"):
+        if w not in opt:
+            continue
+        og = np.array([guesses.index(w)], dtype=np.int64)
+        t2 = mf.turn2_table(pat, int(og[0]), pool)
+        mf.run_minavg_games(pat, every, og, pool, t2, True, scores)
+        rows.append((w, int(scores.sum()), int(scores.max()), opt[w]))
+    ok = all(tot >= o for _, tot, mx, o in rows if mx <= 6)
+    used = [r for r in rows if r[2] <= 6]
+    check("minavg's exact k=1 total never beats the optturns optimum",
+          ok and used,
+          "; ".join("%s %d vs optimum %d" % (w, t, o) for w, t, mx, o in used))
+    check("every minavg k=1 game finished, and within the 6 optturns assumes",
+          all(1 <= mx <= 6 for _, _, mx, _ in rows),
+          "worst game per opener: "
+          + ", ".join("%s %d" % (w, mx) for w, _, mx, _ in rows))
 
 
 if __name__ == "__main__":
