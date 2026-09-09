@@ -94,8 +94,12 @@ BINARY = os.path.join(MATH, "solver", "eldrowmax")
 FAILS = []
 WARNS = []
 
+# Anchored on the leading phrase and the number, tolerant of the prose between
+# them: both of these have been reworded once already, and a gate that dies on a
+# clarified sentence is a gate that discourages clarifying it. The line is always
+# the row beneath.
 RESULT = re.compile(r"^LONGEST CHAIN: (?P<val>\d+) words \((?P<kind>[^)]+)\)")
-GREEDY = re.compile(r"^greedy playout: (?P<val>\d+)\s+(?P<line>.*)$")
+GREEDY = re.compile(r"^greedy playout\b.*?(?P<val>\d+)\s*$")
 
 
 def run_c(pool, extra=()):
@@ -239,6 +243,22 @@ def check_csv(pool, expect_val):
     lengths = [int(r[4]) for r in body if r[3] in ("greedy", "improved")]
     if lengths != sorted(set(lengths)):
         bad.append(f"the incremental lengths are not strictly increasing: {lengths}")
+
+    # A `reached` row is the LENGTH, recorded the moment the decision proves it and
+    # before the witness is rebuilt -- which is the window a Ctrl-C used to lose.
+    # It carries no line by construction, and an `improved` row at the same length
+    # must follow it.
+    for i, r in enumerate(body):
+        if r[3] != "reached":
+            continue
+        if r[-1].strip():
+            bad.append(f"a 'reached' row carries a line ({r[-1]!r}); it is written "
+                       "before the line exists and must be empty")
+        later = [x for x in body[i + 1:]
+                 if x[3] == "improved" and int(x[4]) == int(r[4])]
+        if not later:
+            bad.append(f"'reached' at {r[4]} is never followed by an 'improved' row "
+                       "at the same length, so no witness was ever recorded")
     for r in body:
         if int(r[4]) > expect_val:
             bad.append(f"a {r[3]} row claims {r[4]}, longer than the maximum "

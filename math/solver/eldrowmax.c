@@ -290,6 +290,15 @@ typedef struct {
  * thread has to agree on when the clock started. */
 static double T_START;
 
+/* WHAT THE SEARCH IS CURRENTLY DOING, in words, for the heartbeat to name.
+ *
+ * Silence is bad; so is a heartbeat that does not say which QUESTION it belongs
+ * to. A bar that has been decided and a witness that is being rebuilt look
+ * identical from a node count alone, and that ambiguity is exactly what made a
+ * long witness rebuild read as a hang. Written only by the main thread, and only
+ * outside a parallel region; workers read it. */
+static char PHASE[128] = "starting";
+
 /* One dedup table per THREAD, not per depth: pass 1 at a level finishes entirely
  * before pass 2 starts recursing, and pass 2 never consults it again, so a deeper
  * level is free to reuse the same memory.
@@ -472,12 +481,12 @@ static int descend(Ctx *c, int depth, int gp, uint64_t *h0, uint64_t *h1) {
     return hi - lo;
 }
 
-static void heartbeat(Ctx *c, const char *what) {
+static void heartbeat(Ctx *c) {
     double now = wall_time();
     if (now < c->next_beat) return;
     c->next_beat = now + REPORT;
-    fprintf(stderr, "        ... %s: %lld nodes, %.0fs\n",
-            what, c->nodes, now - T_START);
+    fprintf(stderr, "        ... %s: %lld nodes, %.0fs elapsed\n",
+            PHASE, c->nodes, now - T_START);
 }
 
 /* The exact value: the longest chain from this set, the naming move included. */
@@ -487,7 +496,7 @@ static int value(Ctx *c, int depth, int n, uint64_t h0, uint64_t h1) {
     if (n <= 1) return 1;                     /* only the answer is left to name */
     if (depth + 1 >= MAXD) { c->overflow = 1; return 1; }
     if (MAXNODES && c->nodes >= MAXNODES) { c->budget_blown = 1; return -1; }
-    if ((c->nodes & 0xFFFF) == 0) heartbeat(c, "exact");
+    if ((c->nodes & 0xFFFF) == 0) heartbeat(c);
 
     c->nodes++;
     Cand *cand = c->cpool + c->ctop;
@@ -530,7 +539,7 @@ static int can_reach(Ctx *c, int depth, int n, uint64_t h0, uint64_t h1, int nee
     if (n < need) return 0;                   /* the size bound */
     if (depth + 1 >= MAXD) { c->overflow = 1; return 0; }
     if (MAXNODES && c->nodes >= MAXNODES) { c->budget_blown = 1; return 0; }
-    if ((c->nodes & 0xFFFF) == 0) heartbeat(c, "deciding");
+    if ((c->nodes & 0xFFFF) == 0) heartbeat(c);
 
     uint64_t k0 = h0 ^ (uint64_t)need * 0x9E3779B97F4A7C15ULL;
     uint64_t k1 = h1 ^ (uint64_t)need * 0xC2B2AE3D27D4EB4FULL;
@@ -644,10 +653,19 @@ static int greedy_len(Ctx *c, char *out, size_t outsz) {
 /* ------------------------------------------------------- the root dispatcher
  *
  * The root's children are independent decision problems sharing only the
- * (self-verifying) table, so they parallelise directly.  Only the ROOT is split:
- * below it the recursion is sequential, which keeps the search order -- and so the
- * reported line -- identical whatever the thread count.  --threads 1 and --threads
- * N must agree on the answer; the gate checks that they do. */
+ * (self-verifying) table, so they parallelise directly.  Only the ROOT is split;
+ * below it the recursion is sequential.
+ *
+ * THE LENGTH IS DETERMINISTIC, THE WITNESS LINE IS NOT, and that is a real
+ * consequence of parallelism worth stating rather than discovering.  The loop
+ * STOPS as soon as any thread succeeds, so which successful root moves get tested
+ * at all depends on timing, and the witness handed back is the lowest-indexed of
+ * those that happened to be tested.  At --threads 1 that is the first success in
+ * canonical order and is reproducible; above it, a re-run can report a DIFFERENT
+ * chain of the SAME length.  Nothing is lost by that -- an optimum is rarely
+ * unique and the length is the result -- but a line is "a longest chain", never
+ * "the longest chain".  The gate requires the lengths to agree across thread
+ * counts and only warns when the lines differ. */
 static int root_can_reach(Ctx **ctxs, int nthreads, int need, int *witness) {
     Ctx *c0 = ctxs[0];
     memcpy(c0->arena[0], ROOT, sizeof ROOT);
@@ -661,7 +679,17 @@ static int root_can_reach(Ctx **ctxs, int nthreads, int need, int *witness) {
     int ncand = expand(c0, 0, cand, CANDPOOL);
     qsort(cand, ncand, sizeof(Cand), cand_cmp);
 
-    int found = 0, found_gp = -1;
+    /* How many root moves can even be tried: the list is sorted by child size and
+     * a child smaller than need - 1 cannot carry the rest of the chain, so the
+     * tail is dead. Printing this makes the bar's SIZE visible up front rather
+     * than leaving a node count to be interpreted. */
+    int ntest = 0;
+    while (ntest < ncand && cand[ntest].bound >= need - 1) ntest++;
+    fprintf(stderr, "        bar %d: %d root moves to try (of %d children of the "
+                    "full %d-word set)\n", need, ntest, ncand, ROOTN);
+
+    int found = 0, found_gp = -1, ndone = 0;
+    double root_beat = wall_time() + REPORT;
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic, 1) if (nthreads > 1)
 #endif
@@ -684,13 +712,22 @@ static int root_can_reach(Ctx **ctxs, int nthreads, int need, int *witness) {
         int lo = c->start[p], hi = c->start[p + 1];
         uint64_t ch0, ch1;
         int nC = ctx_set_root(c, c->sort + lo, hi - lo, &ch0, &ch1);
-        if (can_reach(c, 0, nC, ch0, ch1, need - 1)) {
+        int ok = can_reach(c, 0, nC, ch0, ch1, need - 1);
 #ifdef _OPENMP
-#pragma omp critical (eldrowmax_found)
+#pragma omp critical (eldrowmax_progress)
 #endif
-            {
-                if (!found || cand[i].gp < found_gp) found_gp = cand[i].gp;
-                found = 1;
+        {
+            ndone++;
+            if (ok && (!found || cand[i].gp < found_gp)) found_gp = cand[i].gp;
+            if (ok) found = 1;
+            /* Progress WITHIN a bar. A bar can run for hours and returns only a
+             * yes or a no at the end of it, so without this the only signal is a
+             * node count that says nothing about how far along it is. */
+            double now = wall_time();
+            if (!ok && now >= root_beat) {
+                root_beat = now + REPORT;
+                fprintf(stderr, "        ... bar %d: %d/%d root moves ruled out, "
+                                "%.0fs elapsed\n", need, ndone, ntest, now - T_START);
             }
         }
     }
@@ -699,34 +736,88 @@ static int root_can_reach(Ctx **ctxs, int nthreads, int need, int *witness) {
     return found;
 }
 
-/* Rebuild a witness line of exactly `need` words by RE-SEARCHING at each step
- * rather than trusting a stored move: the table evicts, but a repeat search of an
- * already-searched position is nearly free, and a wrong line would be worse than a
- * slow one. */
-static void walk_line(Ctx *c, int need, char *out, size_t outsz) {
+/* Is `gp`'s played word actually a live candidate here? A move recovered from the
+ * table or from the root search is a HINT, and a hint has to be checked before it
+ * is played: on a fingerprint collision it would belong to a different state, and
+ * playing a word that is not a candidate is exactly the illegal move this whole
+ * objective is about not making. `mem` is ascending, so this is a binary search. */
+static int move_is_live(const uint16_t *mem, int n, int gp) {
+    int g = gp / NPAT, lo = 0, hi = n - 1;
+    while (lo <= hi) {
+        int mid = (lo + hi) / 2;
+        if (mem[mid] == g) return 1;
+        if (mem[mid] < g) lo = mid + 1; else hi = mid - 1;
+    }
+    return 0;
+}
+
+/* Rebuild a witness line of exactly `need` words.
+ *
+ * THE MOVE IS TAKEN FROM THE SEARCH THAT ALREADY FOUND IT, not re-derived. An
+ * earlier version scanned each level's moves from scratch, and that was a real
+ * defect rather than a slow path: the root search runs its children across every
+ * thread and STOPS the moment any one of them succeeds, so the moves earlier in
+ * the canonical order were never tested at all -- and a scan in canonical order
+ * then paid full price for exactly those. Measured on the 2315-word pool, a bar
+ * that took 29s to decide had not finished rebuilding its witness six minutes
+ * later, which read as a hang.
+ *
+ * So: the root's move comes from the search's own witness, and every deeper move
+ * from the table, where can_reach stored it on the way past. BOTH ARE VERIFIED
+ * rather than trusted -- the word must be live here, and the child must actually
+ * reach the remaining budget -- and the full scan is still there underneath for
+ * when an entry has been evicted. A hint can therefore only ever make this
+ * FASTER; it cannot make the line wrong. */
+static void walk_line(Ctx *c, int need, int hint, char *out, size_t outsz) {
     uint16_t mem[MAXP];
     int n = ROOTN;
     for (int i = 0; i < NP; i++) mem[i] = (uint16_t)i;
     size_t used = 0;
     out[0] = 0;
     int left = need;
+    int step = 0;
     while (left > 1) {
         uint64_t h0, h1;
         n = ctx_set_root(c, mem, n, &h0, &h1);
-        Cand *cand = c->cpool + c->ctop;
-        int ncand = expand(c, 0, cand, CANDPOOL - c->ctop);
-        /* The reserve is not optional: can_reach below allocates its own frames
-         * from the same arena, and without it they would overwrite this list. */
-        c->ctop += ncand;
-        qsort(cand, ncand, sizeof(Cand), cand_cmp);
+        snprintf(PHASE, sizeof PHASE, "rebuilding the %d-word line, step %d/%d",
+                 need, ++step, need);
         int picked = -1;
-        for (int i = 0; i < ncand && picked < 0; i++) {
-            if (cand[i].bound < left - 1) break;
-            uint64_t ch0, ch1;
-            int nC = descend(c, 0, cand[i].gp, &ch0, &ch1);
-            if (can_reach(c, 1, nC, ch0, ch1, left - 1)) picked = cand[i].gp;
+
+        /* 1. The move the search already found: the root's from the caller, a
+         *    deeper one from the table under this state's own budgeted key. */
+        int hinted = -1;
+        if (step == 1 && hint >= 0) {
+            hinted = hint;
+        } else {
+            uint64_t k0 = h0 ^ (uint64_t)left * 0x9E3779B97F4A7C15ULL;
+            uint64_t k1 = h1 ^ (uint64_t)left * 0xC2B2AE3D27D4EB4FULL;
+            int val, bg;
+            if (tt_get(k0, k1, &val, &bg) && val == 1 && bg >= 0) hinted = bg;
         }
-        c->ctop -= ncand;
+        if (hinted >= 0 && move_is_live(mem, n, hinted)) {
+            uint64_t ch0, ch1;
+            int nC = descend(c, 0, hinted, &ch0, &ch1);
+            if (nC > 0 && can_reach(c, 1, nC, ch0, ch1, left - 1)) picked = hinted;
+        }
+
+        /* 2. The scan, for a hint that was evicted or did not verify. */
+        Cand *cand = c->cpool + c->ctop;
+        int ncand = 0;
+        if (picked < 0) {
+            ncand = expand(c, 0, cand, CANDPOOL - c->ctop);
+            /* The reserve is not optional: can_reach below allocates its own
+             * frames from the same arena, and without it they would overwrite
+             * this list. */
+            c->ctop += ncand;
+            qsort(cand, ncand, sizeof(Cand), cand_cmp);
+            for (int i = 0; i < ncand && picked < 0; i++) {
+                if (cand[i].bound < left - 1) break;
+                uint64_t ch0, ch1;
+                int nC = descend(c, 0, cand[i].gp, &ch0, &ch1);
+                if (can_reach(c, 1, nC, ch0, ch1, left - 1)) picked = cand[i].gp;
+            }
+            c->ctop -= ncand;
+        }
         if (picked < 0) {
             fprintf(stderr, "internal: no move reaches %d from a state that does\n", left);
             exit(1);
@@ -954,8 +1045,10 @@ int main(int argc, char **argv) {
                             : exact ? "exact" : "ladder",
                 ctxs, nthreads, t_start, 0 };
 
+    snprintf(PHASE, sizeof PHASE, "greedy playout");
     greedy = greedy_len(c, gline, sizeof gline);
-    printf("greedy playout: %d  %s\n", greedy, gline);
+    printf("greedy playout (a LOWER bound, the ladder's starting incumbent): %d\n"
+           "  %s\n", greedy, gline);
     fflush(stdout);
     snprintf(line, sizeof line, "%s", gline);
     length = greedy;
@@ -968,18 +1061,36 @@ int main(int argc, char **argv) {
     } else if (target) {
         /* A single decision, for pricing a run before committing to the ladder. */
         int witness = -1;
+        /* Set BEFORE the search: a stale label is worse than none, and this one
+         * left a heartbeat saying "greedy playout" 16s into deciding a bar. */
+        snprintf(PHASE, sizeof PHASE, "deciding whether %d is reachable", target);
         int ok = root_can_reach(ctxs, nthreads, target, &witness);
         printf("target %d: %s\n", target, ok ? "REACHED" : "not reachable");
-        if (ok) { walk_line(c, target, line, sizeof line); length = target; printf("  %s\n", line); }
-        else    { length = 0; }
+        if (ok) {
+            write_row(&row, "reached", target, "");
+            walk_line(c, target, witness, line, sizeof line);
+            length = target;
+            printf("  %s\n", line);
+        } else {
+            length = 0;
+        }
         kind = ok ? "reached" : "unreachable";
     } else if (exact) {
+        snprintf(PHASE, sizeof PHASE, "maximising outright over the %d-word set",
+                 ROOTN);
         memcpy(c->arena[0], ROOT, sizeof ROOT);
         memcpy(c->widx[0], ROOTW, (size_t)ROOTNW * sizeof(uint16_t));
         c->nwid[0] = ROOTNW;
         int v = value(c, 0, ROOTN, ROOTH0, ROOTH1);
         if (v < 0) { printf("ABANDONED at --max-nodes\n"); kind = "lower"; }
-        else { length = v; walk_line(c, v, line, sizeof line); }
+        else {
+            length = v;
+            write_row(&row, "reached", v, "");
+            /* No hint: `value` memoises under an UNBUDGETED key, so the walk's
+             * budgeted lookups miss and it scans. That is affordable because
+             * --exact is the small-pool oracle; the ladder is the scaling path. */
+            walk_line(c, v, -1, line, sizeof line);
+        }
     } else {
         int incumbent = greedy > floor_at ? greedy : floor_at;
         int verified = greedy;               /* the longest length we hold a LINE for */
@@ -987,21 +1098,33 @@ int main(int argc, char **argv) {
             printf("starting from --floor %d rather than the greedy %d\n", floor_at, greedy);
         for (;;) {
             int need = incumbent + 1;
-            printf("trying %d ...\n", need);
+            printf("bar %d: is there a chain of %d? (best so far %d)\n",
+                   need, need, incumbent);
             fflush(stdout);
+            snprintf(PHASE, sizeof PHASE, "deciding whether %d is reachable", need);
             int witness = -1;
             double tt = wall_time();
+            long long before = 0;
+            for (int t = 0; t < nthreads; t++) before += ctxs[t]->nodes;
             int ok = root_can_reach(ctxs, nthreads, need, &witness);
             long long nodes = 0;
             for (int t = 0; t < nthreads; t++) nodes += ctxs[t]->nodes;
-            printf("  %d: %s  (%lld nodes, %.1fs)\n", need, ok ? "REACHED" : "no",
-                   nodes, wall_time() - tt);
+            printf("  bar %d: %s  (%lld nodes for this bar, %.1fs)\n", need,
+                   ok ? "REACHED -- rebuilding the line" : "NO -- nothing longer exists",
+                   nodes - before, wall_time() - tt);
             fflush(stdout);
             if (!ok) break;
             incumbent = need;
-            walk_line(c, incumbent, line, sizeof line);
+            /* THE LENGTH IS ESTABLISHED HERE, and the witness rebuild below can
+             * take longer than the decision did. Recording only after the walk
+             * meant a Ctrl-C in between threw away a proved result -- the same
+             * defect as writing the row only at the end, one level in. */
+            write_row(&row, "reached", incumbent, "");
+            double tw = wall_time();
+            walk_line(c, incumbent, witness, line, sizeof line);
             verified = incumbent;
-            printf("        NEW LONGEST: %d  %s\n", incumbent, line);
+            printf("        NEW LONGEST: %d words (line rebuilt in %.1fs)\n"
+                   "        %s\n", incumbent, wall_time() - tw, line);
             fflush(stdout);
             /* Flushed here, not at the end: this chain exists and is playable
              * whatever happens to the rest of the run. */
@@ -1012,9 +1135,9 @@ int main(int argc, char **argv) {
          * loudly if the floor was not in fact reachable -- reporting a length with
          * a shorter run's line beside it would be the worst of both. */
         if (incumbent > verified) {
-            printf("verifying the --floor %d ...\n", incumbent);
+            printf("verifying the --floor %d by producing its line ...\n", incumbent);
             fflush(stdout);
-            walk_line(c, incumbent, line, sizeof line);
+            walk_line(c, incumbent, -1, line, sizeof line);
         }
         length = incumbent;
     }

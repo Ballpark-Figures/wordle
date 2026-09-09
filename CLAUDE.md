@@ -2074,6 +2074,18 @@ still be a POSSIBLE ANSWER — consistent with every clue so far?". Run it with
   words the answer could not be (11 of the 16 plays in its best known line are
   guess-only junk like `bunjy`); `eldrowmax` maximises where every play is a live
   candidate. Same words, three objectives.
+  - **BOTH LANDED ON 16, AND THAT IS A COINCIDENCE, NOT AN AGREEMENT (2026-09-09).**
+    `antistall`'s `bully` line is 16 words; the first `eldrowmax` ladder also reached
+    16 (not yet final — bar 17 was untested). The two numbers are about DIFFERENT
+    GAMES and must never be quoted as confirming each other. The proof is the `bully`
+    line itself: **only 5 of its 16 words (`buddy buggy bulky bully bushy`) are in
+    the 2315 answer list at all**, so 11 of its plays are illegal here whatever the
+    clues. `eldrowmax`'s 16 is under the strictly tighter rule.
+  - **Asked "didn't we already find a 16?", CHECK WHICH SOLVER.** That question came
+    up and was answered about `eldrow` (which has never been run) while the 16 the
+    user remembered was `antistall`'s, recorded in
+    `data/shared/antiwordle/stall.longest.csv` — a correct memory made to look wrong
+    by answering the narrow question instead of asking which result was meant.
 - **THE POOL IS PART OF THE OBJECTIVE**, `--words`, defaulting to the 2315 mystery
   answers (the user's call, 2026-09-09: plays drawn from the possible answers, and
   the answer likewise from the 2315). Every pool word must be in the pattern
@@ -2102,8 +2114,29 @@ still be a POSSIBLE ANSWER — consistent with every clue so far?". Run it with
   diffs them. **The memo key carries the budget**, so every entry stays exact.
 - **NO DEPTH CAP AND NO BEAM** — the game has none and a restricted search would
   not be the maximum. `MAXD` is an array bound (a chain cannot outlast its pool).
-- **COST IS UNMEASURED as of 2026-09-09.** Price it with `--greedy` (seconds) and
-  then a `--target` at the greedy length plus one before committing to the ladder.
+- **MEASURED 2026-09-09 on the 2315 pool, 18 threads:** greedy 9 in seconds; the
+  ladder climbs 10, 11, 12, 13, 14, 15 in ~46s total, and **bar 16 decides in 29s**
+  (58437 root moves to try, of 151333 children). Whether 17 is reachable is OPEN.
+- **THE WITNESS REBUILD MUST USE THE SEARCH'S OWN WITNESS — this was a real defect,
+  not a slow path.** `root_can_reach` runs the root's children across every thread
+  and STOPS on the first success, so moves earlier in the canonical order are never
+  tested; a `walk_line` that re-derived the line by scanning that order then paid
+  full price for exactly those. MEASURED: bar 16 decided in 29s and its witness had
+  not been rebuilt **six minutes** later, which reads as a hang. Taking the move
+  from the search's witness at the root and from the TT below it (both VERIFIED —
+  the word must be live and the child must reach the remaining budget, with the
+  scan still underneath for an evicted entry) makes the whole run 29.1s including
+  the rebuild.
+- **THE LENGTH IS DETERMINISTIC; THE WITNESS LINE IS NOT.** The root loop stops on
+  the first success, so which successful moves get tested depends on timing and a
+  re-run can report a DIFFERENT chain of the SAME length (at `--threads 1` it is the
+  canonical first success and is reproducible). Say "a longest chain", never "the".
+- **EVERY IMPROVEMENT IS FLUSHED AS IT LANDS, and the length is recorded BEFORE the
+  witness.** `status` is `greedy` / `reached` (length proved, line not yet rebuilt) /
+  `improved` (with the line) / `final` (the ladder failed at length + 1, so nothing
+  longer exists). A killed run writes no `final` row, which is exactly how a reader
+  tells it from a finished one — and the `reached` row exists because the rebuild
+  can outlast the decision, so a Ctrl-C in between used to discard a proved result.
 - **`python3 tools/checkeldrowmax.py` is the GATE**: the value against
   `eldrow.longest_chain` plus one; the emitted line REPLAYED FROM THE STRINGS with
   `wordle.pattern` (every play consistent with every earlier clue, exactly ONE
