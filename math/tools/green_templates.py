@@ -22,9 +22,9 @@ does not import it.  A DIFFERENT question -- "a real board showing exactly N
 green tiles" -- carries the guess's greys and yellows too and gives a different,
 smaller count.  This is not that.
 
-FOUR AXES, ALL PART OF THE QUESTION, NONE DEFAULTED HERE (the wrapper carries
+FIVE AXES, ALL PART OF THE QUESTION, NONE DEFAULTED HERE (the wrapper carries
 a default a human reads and forwards it explicitly). --greens is the first;
-the other three are:
+the other four are:
 
   --pool     WHICH LIST UNIQUENESS IS JUDGED OVER.  `answers` counts matches
              among the 2315 curated mystery words; `guesses` counts them among
@@ -54,6 +54,33 @@ the other three are:
              under neither and appears only under `all`, and at N greens the
              mixed templates are the bulk of them.
 
+  --positions WHICH POSITION SET THE GREENS SIT IN.  `all` is every C(L,N) of
+             them; `1-3` keeps only the templates greening positions 1 and 3.
+             1-indexed and hyphen-joined, so it is written exactly as the CSV's
+             own `positions` column reads it back.  A third pure row filter --
+             it changes no count.  IT MUST NAME EXACTLY --greens POSITIONS and
+             this REFUSES otherwise rather than quietly reinterpreting one flag
+             in the light of the other.
+
+  --sort     IS NOT A RESTRICTION AND IS NOT PART OF THE QUESTION -- it reorders
+             the very same rows.  `template` is the position-then-letter order
+             (the deterministic default); `zipf` is DESCENDING word frequency,
+             most common word first.  A TIE FALLS BACK TO THE `template` ORDER
+             (position set, then letters), so tied rows keep exactly the relative
+             order the default sort would give them and the file stays
+             deterministic -- ties are common, since one word is often pinned by
+             several templates and they all carry its one frequency.  It lands in the filename anyway, because two runs
+             differing only in it would otherwise write different bytes under
+             one name.
+
+THE ZIPF IS SOURCED, NEVER RECOMPUTED.  Every row carries the pinned word's zipf,
+read from the committed `data/shared/words/guess_by_freq.txt` through
+`build_freq_wordlist.load_zipf` -- the module that OWNS that file's format, so
+there is no second copy of the parse.  zipf is log10(occurrences per billion),
+higher = more common; 4.0 is about 10 per million, 3.0 about 1 per million, and
+0.00 is a REAL VALUE meaning wordfreq's "large" list does not contain the word at
+all, which is true of thousands of the 12972.  Nothing here imports wordfreq.
+
   So the two cases asked for are (answers, answer) and (guesses, answer).  The
   second is the stricter one: unique among all 12972 legal words, AND that word
   happens to be an answer.
@@ -75,8 +102,10 @@ string-built reference and demanded equal, so the filter chain is checked and no
 merely the raw computation, and the vowel/consonant sets are proved to partition
 the alphabet.  A coverage tally FAILS if no template pinned anything, if --pool
 guesses never actually dropped a template that the answer pool would have kept,
-or if a --letters restriction dropped nothing -- so a pass cannot silently mean
-the harder pool or the restriction went untested.
+or if a --letters or --positions restriction dropped nothing -- so a pass cannot
+silently mean the harder pool or a restriction went untested.  Every pinned word
+must carry a zipf or the run fails, and a zipf sort is checked to be a
+PERMUTATION of the rows and genuinely non-increasing.
 
 An EMPTY row set after the filters is a legitimate RESULT, not a failure: the
 file is still written, so the emptiness is on the record.  Only an empty set
@@ -91,6 +120,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
+from build_freq_wordlist import load_zipf  # noqa: E402
 from wordle import load_words, to_codes  # noqa: E402
 
 _MATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
@@ -111,6 +141,42 @@ LETTER_DESC = {
     "consonants": ("consonants only: " + " ".join(sorted(CONSONANTS))
                    + " (y is NOT among them -- it is a vowel here)"),
 }
+
+
+def fmt_positions(positions):
+    """The CSV's own rendering of a position set: 1-indexed, hyphen-joined."""
+    return "-".join(str(p + 1) for p in positions)
+
+
+def parse_positions(spec, greens, word_len):
+    """`all` -> None, else a 0-indexed tuple. Refuses anything inconsistent.
+
+    It must name exactly --greens positions: a `--positions 1-3` beside a
+    `--greens 2` agrees, beside a `--greens 3` it does not, and reinterpreting
+    either flag in the light of the other would be one decision with two owners.
+    """
+    if spec == "all":
+        return None
+    try:
+        got = [int(p) for p in spec.split("-")]
+    except ValueError:
+        raise SystemExit("--positions must be `all` or 1-indexed positions "
+                         "joined by hyphens, e.g. 1-3 (as the CSV writes them)")
+    if len(set(got)) != len(got):
+        raise SystemExit("--positions %s repeats a position" % spec)
+    if any(not 1 <= g <= word_len for g in got):
+        raise SystemExit("--positions %s is outside 1..%d" % (spec, word_len))
+    if len(got) != greens:
+        raise SystemExit("--positions %s names %d position(s) but --greens is "
+                         "%d -- they must agree; this refuses rather than "
+                         "reinterpret one flag in the light of the other"
+                         % (spec, len(got), greens))
+    return tuple(sorted(g - 1 for g in got))
+
+
+def keep_positions(rows, positions):
+    """Restrict to templates greening exactly this position set."""
+    return rows if positions is None else [k for k in rows if k[0] == positions]
 
 
 def keep_letters(rows, letter_set):
@@ -235,7 +301,7 @@ def gate_letter_sets():
           % (len(VOWELS), len(CONSONANTS)))
 
 
-def gate_rows(ref, words, answer_set, require, letter_set, rows):
+def gate_rows(ref, words, answer_set, require, letter_set, positions, rows):
     """Re-derive the FINAL row set from the string-built reference.
 
     The filters are conjunctive and independent of each other, so applying them
@@ -246,12 +312,33 @@ def gate_rows(ref, words, answer_set, require, letter_set, rows):
     allowed = LETTER_SETS[letter_set]
     want = sorted(k for k, i in ref.items()
                   if all(c in allowed for c in k[1])
+                  and (positions is None or k[0] == positions)
                   and (require == "any" or words[i] in answer_set))
     if want != sorted(rows):
         raise SystemExit("GATE FAILED: %d rows after the filters, %d re-derived "
                          "from the strings" % (len(rows), len(want)))
-    print("gate: the %d-row output re-derived from the strings through both "
-          "filters, exact" % len(want))
+    print("gate: the %d-row output re-derived from the strings through every "
+          "filter, exact" % len(want))
+
+
+def gate_sort(rows, zipf_of, order):
+    """A sort must REORDER the rows, never change which rows there are.
+
+    Checked as a set, then -- for the zipf order -- that the sequence really is
+    non-increasing. A key that silently failed to find a word's frequency would
+    otherwise just look like an odd ordering.
+    """
+    if sorted(set(rows)) != sorted(rows):
+        raise SystemExit("GATE FAILED: the sorted rows repeat a template")
+    if order == "zipf":
+        zs = [zipf_of(k) for k in rows]
+        bad = [i for i in range(len(zs) - 1) if zs[i] < zs[i + 1]]
+        if bad:
+            raise SystemExit("GATE FAILED: zipf sort is not non-increasing at "
+                             "row %d (%.2f then %.2f)"
+                             % (bad[0], zs[bad[0]], zs[bad[0] + 1]))
+        print("gate: %d rows in non-increasing zipf order, %.2f down to %.2f"
+              % (len(zs), zs[0], zs[-1]) if zs else "gate: no rows to sort")
 
 
 def gate_scan(words, uniq, rng):
@@ -300,6 +387,12 @@ def main(argv):
     pool_name = _arg(argv, "--pool", ("answers", "guesses"))
     require = _arg(argv, "--require", ("answer", "any"))
     letter_set = _arg(argv, "--letters", ("all", "vowels", "consonants"))
+    order = _arg(argv, "--sort", ("template", "zipf"))
+    if "--positions" not in argv:
+        raise SystemExit("--positions is REQUIRED (`all`, or a 1-indexed set "
+                         "like 1-3). Use solver/run-green-templates.sh, which "
+                         "carries a default a human reads.")
+    pos_spec = argv[argv.index("--positions") + 1]
     if "--greens" not in argv:
         raise SystemExit("--greens N is REQUIRED -- N is part of the question "
                          "(a 2-green result and a 3-green result are different "
@@ -316,9 +409,20 @@ def main(argv):
     answers = load_words("mystery")
     words = answers if pool_name == "answers" else load_words("guess")
     answer_set = set(answers)
+    zipf = load_zipf()
+    missing = [w for w in words if w not in zipf]
+    if missing:
+        raise SystemExit("GATE FAILED: %d pool word(s) carry no zipf in the "
+                         "committed guess_by_freq.txt, e.g. %s -- regenerate it "
+                         "with build_freq_wordlist.py"
+                         % (len(missing), " ".join(missing[:5])))
 
     gate_letter_sets()
+    print("zipf: sourced for all %d pool words from the committed "
+          "guess_by_freq.txt" % len(words))
+    pos_filter = parse_positions(pos_spec, greens, len(words[0]))
     uniq, word_len, occupied = pin_single(words, greens)
+    assert word_len == len(words[0])
     total_templates = len(list(itertools.combinations(range(word_len), greens))) \
         * ALPHA ** greens
     print("%d words, %d greens: %d templates, %d match at least one word, "
@@ -344,27 +448,43 @@ def main(argv):
                          "answer" % (len(uniq) - len(rows)))
     before_letters = len(rows)
     rows = keep_letters(rows, letter_set)
+    before_positions = len(rows)
+    rows = keep_positions(rows, pos_filter)
 
-    gate_rows(ref, words, answer_set, require, letter_set, rows)
+    gate_rows(ref, words, answer_set, require, letter_set, pos_filter, rows)
 
     # Coverage tally -- a pass must not silently mean nothing was exercised.
     if pool_name == "guesses" and not dropped:
         raise SystemExit("GATE FAILED: the guess pool dropped no template the "
                          "answer pool would have kept, so the harder pool was "
                          "never actually exercised")
-    if letter_set != "all" and len(rows) == before_letters:
+    if letter_set != "all" and before_positions == before_letters:
         raise SystemExit("GATE FAILED: --letters %s dropped none of the %d rows, "
                          "so the restriction was never exercised"
                          % (letter_set, before_letters))
+    if pos_filter is not None and len(rows) == before_positions:
+        raise SystemExit("GATE FAILED: --positions %s dropped none of the %d "
+                         "rows, so the restriction was never exercised"
+                         % (pos_spec, before_positions))
     if not rows:
         # A legitimate RESULT under a restriction, not a bug. The file is still
         # written, so the emptiness is on the record rather than inferred from a
         # missing file.
         print("NO TEMPLATE SURVIVES: %d pinned a word, none kept under "
-              "--require %s --letters %s" % (len(uniq), require, letter_set))
-    elif letter_set != "all":
-        print("--letters %s kept %d of the %d rows"
-              % (letter_set, len(rows), before_letters))
+              "--require %s --letters %s --positions %s"
+              % (len(uniq), require, letter_set, pos_spec))
+    else:
+        if letter_set != "all":
+            print("--letters %s kept %d of the %d rows"
+                  % (letter_set, before_positions, before_letters))
+        if pos_filter is not None:
+            print("--positions %s kept %d of the %d rows"
+                  % (pos_spec, len(rows), before_positions))
+
+    zipf_of = (lambda k: zipf[words[uniq[k]]])
+    rows = (sorted(rows) if order == "template"
+            else sorted(rows, key=lambda k: (-zipf_of(k), k)))
+    gate_sort(rows, zipf_of, order)
 
     pinned = sorted({words[uniq[k]] for k in rows})
     print("%d rows kept (--require %s), pinning %d distinct words"
@@ -385,24 +505,34 @@ def main(argv):
                     "says nothing about them, and no guess, grey or yellow is "
                     "involved.\n" % (word_len - greens))
             f.write("# green letters: %s.\n" % LETTER_DESC[letter_set])
+            f.write("# positions: %s. rows sorted by %s.\n"
+                    % ("any of the %d sets"
+                       % len(list(itertools.combinations(range(word_len), greens)))
+                       if pos_filter is None else fmt_positions(pos_filter),
+                       "template (position then letter)" if order == "template"
+                       else "zipf DESCENDING, most common word first"))
+            f.write("# zipf is log10(occurrences per billion) from the committed "
+                    "guess_by_freq.txt; 0.00 means absent from wordfreq's list.\n")
             f.write("# settings greens=%d pool=%s require=%s letters=%s "
-                    "pool_size=%d rows=%d\n"
-                    % (greens, pool_name, require, letter_set, len(words),
-                       len(rows)))
-            f.write("template,positions,letters,word\n")
+                    "positions=%s sort=%s pool_size=%d rows=%d\n"
+                    % (greens, pool_name, require, letter_set, pos_spec, order,
+                       len(words), len(rows)))
+            f.write("template,positions,letters,word,zipf\n")
             for positions, letters in rows:
-                f.write("%s,%s,%s,%s\n"
+                word = words[uniq[(positions, letters)]]
+                f.write("%s,%s,%s,%s,%.2f\n"
                         % (show(positions, letters, word_len),
-                           "-".join(str(p + 1) for p in positions),
-                           "".join(letters), words[uniq[(positions, letters)]]))
+                           fmt_positions(positions), "".join(letters), word,
+                           zipf[word]))
         print("wrote %s" % os.path.relpath(out, _MATH))
 
-    print("\n%8s %10s %8s %8s" % ("template", "positions", "letters", "word"))
+    print("\n%8s %10s %8s %8s %6s"
+          % ("template", "positions", "letters", "word", "zipf"))
     for positions, letters in rows[:top]:
-        print("%8s %10s %8s %8s"
-              % (show(positions, letters, word_len),
-                 "-".join(str(p + 1) for p in positions), "".join(letters),
-                 words[uniq[(positions, letters)]]))
+        word = words[uniq[(positions, letters)]]
+        print("%8s %10s %8s %8s %6.2f"
+              % (show(positions, letters, word_len), fmt_positions(positions),
+                 "".join(letters), word, zipf[word]))
     if len(rows) > top:
         print("... %d more" % (len(rows) - top))
 
@@ -413,6 +543,15 @@ def main(argv):
     print("\n%d of the %d %s are pinned by at least one template"
           % (len(pinned), len(answers) if require == "answer" else len(words),
              "mystery answers" if require == "answer" else "pool words"))
+    if pinned:
+        zs = sorted((zipf[w] for w in pinned), reverse=True)
+        above = sum(1 for z in zs if z >= 2.5)
+        print("zipf of the pinned words: %.2f down to %.2f, median %.2f; "
+              "%d of %d at or above 2.50"
+              % (zs[0], zs[-1], zs[len(zs) // 2], above, len(zs)))
+        print("most common: %s"
+              % ", ".join("%s %.2f" % (w, zipf[w])
+                          for w in sorted(pinned, key=lambda w: (-zipf[w], w))[:8]))
     best = sorted(per_word.items(), key=lambda kv: (-kv[1], kv[0]))
     print("most-pinned: %s"
           % ", ".join("%s x%d" % (w, c) for w, c in best[:8]))
@@ -432,7 +571,7 @@ def main(argv):
               % (klass["vowels"], klass["consonants"], klass["mixed"]))
 
     by_positions = {}
-    for positions, _ in rows:
+    for positions, _tiles in rows:
         by_positions[positions] = by_positions.get(positions, 0) + 1
     print("\nby position set (1-indexed):")
     for positions in sorted(by_positions):

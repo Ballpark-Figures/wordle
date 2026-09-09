@@ -7,6 +7,8 @@
 #     bash solver/run-green-templates.sh --greens 3
 #     bash solver/run-green-templates.sh --letters vowels
 #     bash solver/run-green-templates.sh --pool guesses --letters consonants
+#     bash solver/run-green-templates.sh --positions 1-3
+#     bash solver/run-green-templates.sh --sort zipf
 #     bash solver/run-green-templates.sh --pool guesses --require any
 #
 # THE TWO CASES ASKED FOR:
@@ -27,7 +29,7 @@
 #   not involved.  "A real board showing exactly N greens" is a DIFFERENT and
 #   smaller question -- that board also carries the guess's greys and yellows.
 #
-#   FOUR AXES, ALL PART OF THE QUESTION.  --pool says which list uniqueness is
+#   FIVE AXES, ALL PART OF THE QUESTION.  --pool says which list uniqueness is
 #   judged over: `answers` (the 2315 curated answers) or `guesses` (all 12972
 #   legal words).  Those are different quantities -- `guesses` is strictly
 #   harder, since every answer is a legal guess, so pinning one word of 12972
@@ -45,6 +47,31 @@
 #   TO THE `all` ROWS: a template mixing the two classes (`.a..t`) is homogeneous
 #   under neither and appears only under `all`, and the mixed ones are the bulk.
 #
+#   --positions IS A THIRD ROW FILTER: `all` is every C(5,N) position set,
+#   `1-3` keeps only the templates greening positions 1 and 3.  1-indexed and
+#   hyphen-joined, written exactly as the CSV's own `positions` column reads
+#   back.  IT MUST NAME EXACTLY --greens POSITIONS -- `--positions 1-3` with
+#   `--greens 2` agrees, with `--greens 3` it does not, and the tool REFUSES
+#   rather than reinterpret one flag in the light of the other.
+#
+#   --sort IS NOT A RESTRICTION and is not part of the question: it reorders the
+#   very same rows.  `template` is position-then-letter (the deterministic
+#   default); `zipf` is DESCENDING word frequency, most common word first.  A TIE
+#   FALLS BACK TO THE `template` ORDER (position set, then letters), so tied rows
+#   keep exactly the relative order the default sort would give them and the file
+#   stays deterministic -- ties are common, since one word is often pinned by
+#   several templates and they all carry its one frequency.  It is in the filename anyway,
+#   because two runs differing only in it would write different bytes under one
+#   name.
+#
+#   EVERY ROW CARRIES ITS WORD'S ZIPF, SOURCED AND NEVER RECOMPUTED -- read from
+#   the committed data/shared/words/guess_by_freq.txt via
+#   build_freq_wordlist.load_zipf, the module that owns that file's format.  zipf
+#   is log10(occurrences per billion): 4.0 is about 10 per million, 3.0 about 1
+#   per million, and 0.00 is a REAL VALUE meaning wordfreq's "large" list does
+#   not have the word at all, which is true of thousands of the 12972.  Nothing
+#   in the run imports wordfreq.
+#
 #   Nothing searches or samples: a pure function of the committed word lists, so
 #   it is exact, has no standard error, and a re-run reproduces its file byte for
 #   byte.  It reads no pattern matrix, so it runs on a fresh clone.
@@ -58,22 +85,26 @@
 #   re-derived straight from that string-built reference and demanded equal, so
 #   the filter chain is checked too.  A coverage tally FAILS if nothing was
 #   pinned, if the guess pool never dropped a template the answer pool would have
-#   kept, or if a --letters restriction dropped nothing.  It exits nonzero rather
+#   kept, or if a --letters or --positions restriction dropped nothing.  Every
+#   pinned word must carry a zipf, and a zipf sort is checked to be a PERMUTATION
+#   of the rows and genuinely non-increasing.  It exits nonzero rather
 #   than reporting.  An EMPTY result after the filters is a legitimate RESULT and
 #   is still written, so the emptiness is on the record.
 #
 # USE THIS RATHER THAN CALLING tools/green_templates.py DIRECTLY.  The tool
-# refuses to run without --out and refuses to pick any of the four axes for you;
-# this forwards all four EXPLICITLY, so each decision has one owner, and it tees
-# a log naming the run.
+# refuses to run without --out and refuses to pick any of the axes for you; this
+# forwards them all EXPLICITLY, so each decision has one owner, and it tees a log
+# naming the run.
 #
-# Outputs data/shared/greentemplates/green_g<N>_<pool>_<require>[_<letters>].csv,
-# columns template,positions,letters,word -- positions 1-indexed and
-# hyphen-joined.  The `_<letters>` suffix appears only when the greens are
-# RESTRICTED, so the unrestricted files keep the names they already had and their
-# meaning is unchanged; every file also carries a machine-readable
-# `# settings greens=... pool=... require=... letters=...` line, so it says what
-# it is regardless of its name.  Log under data/local/greentemplates/.
+# Outputs
+# data/shared/greentemplates/green_g<N>_<pool>_<require>[_<letters>][_p<positions>][_zipf].csv,
+# columns template,positions,letters,word,zipf -- positions 1-indexed and
+# hyphen-joined.  Each optional suffix appears only when that axis is set away
+# from its unrestricted default, so the files already on disk keep the names they
+# had and their meaning is unchanged; every file also carries a machine-readable
+# `# settings greens=... pool=... require=... letters=... positions=... sort=...`
+# line, so it says what it is regardless of its name.  Log under
+# data/local/greentemplates/.
 
 set -u
 
@@ -85,6 +116,8 @@ GREENS=2
 POOL=answers
 REQUIRE=answer
 LETTERS=all
+POSITIONS=all
+SORT=template
 TOP=20
 
 while [ $# -gt 0 ]; do
@@ -92,7 +125,9 @@ while [ $# -gt 0 ]; do
         --greens)  GREENS="$2";  shift 2 ;;
         --pool)    POOL="$2";    shift 2 ;;
         --require) REQUIRE="$2"; shift 2 ;;
-        --letters) LETTERS="$2"; shift 2 ;;
+        --letters)   LETTERS="$2";   shift 2 ;;
+        --positions) POSITIONS="$2"; shift 2 ;;
+        --sort)      SORT="$2";      shift 2 ;;
         --top)     TOP="$2";     shift 2 ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
     esac
@@ -113,6 +148,16 @@ case "$LETTERS" in
     *) echo "--letters must be 'all' (the 26), 'vowels' (aeiouy -- y IS a vowel) or 'consonants' (the other 20 -- y is NOT one)" >&2
        exit 1 ;;
 esac
+case "$SORT" in
+    template|zipf) ;;
+    *) echo "--sort must be 'template' (position then letter) or 'zipf' (descending word frequency, most common first)" >&2
+       exit 1 ;;
+esac
+case "$POSITIONS" in
+    all|*[!0-9-]*) [ "$POSITIONS" = all ] || {
+        echo "--positions must be 'all' or 1-indexed positions joined by hyphens, e.g. 1-3" >&2
+        exit 1 ; } ;;
+esac
 case "$GREENS" in
     ''|*[!0-9]*) echo "--greens must be a positive integer" >&2; exit 1 ;;
 esac
@@ -131,10 +176,12 @@ PY=../.venv/bin/python
 # anything else, no file's meaning changes under anyone's feet.  The CSV carries
 # a `# settings` line naming every axis, so it self-describes either way.
 STEM=green_g${GREENS}_${POOL}_${REQUIRE}
-[ "$LETTERS" = all ] || STEM=${STEM}_${LETTERS}
+[ "$LETTERS" = all ]   || STEM=${STEM}_${LETTERS}
+[ "$POSITIONS" = all ] || STEM=${STEM}_p${POSITIONS}
+[ "$SORT" = template ] || STEM=${STEM}_${SORT}
 OUT=data/shared/greentemplates/${STEM}.csv
 
-MARKER="green_templates.py --pool $POOL --require $REQUIRE --letters $LETTERS --greens $GREENS"
+MARKER="green_templates.py --pool $POOL --require $REQUIRE --letters $LETTERS --positions $POSITIONS --sort $SORT --greens $GREENS"
 RUNNING=$(pgrep -f -- "$MARKER" 2>/dev/null | tr '\n' ' ')
 if [ -n "$RUNNING" ]; then
     echo "REFUSING: the same run is already going (pid $RUNNING)." >&2
@@ -146,9 +193,10 @@ LOC=data/local/greentemplates
 mkdir -p "$LOC" data/shared/greentemplates
 
 # BSD date has no -Is; this form works on both macOS and Linux.
-echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] green-templates: greens=$GREENS pool=$POOL require=$REQUIRE letters=$LETTERS" \
+echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] green-templates: greens=$GREENS pool=$POOL require=$REQUIRE letters=$LETTERS positions=$POSITIONS sort=$SORT" \
     | tee -a "$LOC/${STEM}.log"
 
 "$PY" -u tools/green_templates.py --pool "$POOL" --require "$REQUIRE" \
-    --letters "$LETTERS" --greens "$GREENS" --top "$TOP" --out "$OUT" 2>&1 \
+    --letters "$LETTERS" --positions "$POSITIONS" --sort "$SORT" \
+    --greens "$GREENS" --top "$TOP" --out "$OUT" 2>&1 \
     | tee -a "$LOC/${STEM}.log"

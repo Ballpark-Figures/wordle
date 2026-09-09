@@ -32,8 +32,6 @@ from __future__ import annotations
 import os
 import sys
 
-from wordfreq import zipf_frequency
-
 WORDLIST = "large"  # wordfreq's deep English list, as hangman uses
 
 # hangman's DEFAULT_ZIPF: "familiar to about half of players".
@@ -52,8 +50,32 @@ def read_words(path: str) -> list[str]:
         return [line.strip() for line in fh if line.strip()]
 
 
+def load_zipf(path: str = DEFAULT_RANKED) -> dict[str, float]:
+    """Read the COMMITTED ranking: {word: zipf} from `word<TAB>zipf` lines.
+
+    THE READER OF guess_by_freq.txt, and it lives here because this module owns
+    that file's format -- a second copy of the parse is how the two drift. It
+    imports nothing from wordfreq, so a consumer that only wants the numbers
+    (green_templates.py) does not take on that dependency or its data download;
+    the frequencies are SOURCED from the committed artifact, never recomputed.
+
+    A zipf of 0.00 is a real value, not a gap: it means wordfreq's "large" list
+    does not contain the word at all, which is true of thousands of the 12972.
+    """
+    out = {}
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            if not line.strip():
+                continue
+            word, _, zipf = line.partition("\t")
+            out[word.strip()] = float(zipf)
+    return out
+
+
 def rank(path: str) -> list[tuple[str, float]]:
     """Every word in `path` with its zipf, most common first (ties alphabetical)."""
+    from wordfreq import zipf_frequency  # heavy + a data download; only rank() needs it
+
     rows = [(w, zipf_frequency(w, "en", wordlist=WORDLIST)) for w in read_words(path)]
     rows.sort(key=lambda r: (-r[1], r[0]))
     return rows
