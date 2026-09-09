@@ -57,6 +57,7 @@ _POW3 = np.array([3 ** (WORD_LEN - 1 - i) for i in range(WORD_LEN)],
                  dtype=np.int64)
 
 
+@njit(cache=True)
 def turn_bound(k, nopen):
     """Runaway ASSERTION bound on a game's length -- not a cap, and not the cap.
 
