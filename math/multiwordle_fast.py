@@ -160,6 +160,29 @@ def turn2_table(pat, opener, pool):
     return out
 
 
+@njit(cache=True, parallel=True)
+def _root_kernel(pat, pool, alive, out):
+    for pi in prange(pool.shape[0]):
+        counts = np.zeros(N_PATTERNS, dtype=np.int64)
+        touched = np.empty(N_PATTERNS, dtype=np.int64)
+        out[pi] = _avg_row(pat, pool[pi], alive, 0, alive.shape[0], counts,
+                           touched)
+
+
+def root_values(pat, pool):
+    """`a(g)` for every pool word against the FULL answer set.
+
+    The expected answers remaining after playing g as an opener -- the same
+    quantity `minavg` minimises, evaluated at the root.  One pass over the whole
+    matrix (about 30M lookups), so it is cheap enough to use as a visit ORDER.
+    """
+    na = pat.shape[1]
+    out = np.empty(len(pool), dtype=np.float64)
+    _root_kernel(pat, np.asarray(pool, dtype=np.int64),
+                 np.arange(na, dtype=np.int64), out)
+    return out
+
+
 # --- the lexicographic choice ---------------------------------------------
 
 @njit(cache=True)

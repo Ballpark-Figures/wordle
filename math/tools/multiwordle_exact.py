@@ -29,6 +29,16 @@ WHY IT REFUSES EVERYTHING ELSE, rather than quietly doing something weaker:
 So this covers exactly one cell -- `minavg` at k=1 -- and says so rather than
 generalising into an approximation wearing an exact name.  Each row is the true
 mean; there is no standard error column because there is no error.
+
+THE VISIT ORDER IS DERIVED AND NAMED, not the file's.  A run this long will be
+halted, and openers-in-alphabetical-order means a halt leaves exact values for an
+arbitrary slice -- with the good openers as likely as not still unvisited (`trace`
+scores 3.44 and sits near the end of the guess list, well past a leader you would
+otherwise be looking at).  So openers are visited by ASCENDING EXPECTED ANSWERS
+REMAINING after the opener, the very quantity `minavg` minimises at the root, and
+the head of that order is where the good openers actually live.  `--order file`
+keeps the old behaviour.  It changes no VALUE -- every row is exact whenever it is
+written -- only which rows exist first.
 """
 
 import os
@@ -56,7 +66,7 @@ DETERMINISTIC = (mw.MINAVG,)
 
 def parse_args(argv):
     a = {"strategy": None, "k": 1, "openings": "guess", "top": None,
-         "out": None, "progress": 100, "dry_run": False}
+         "out": None, "progress": 100, "dry_run": False, "order": "root"}
     i = 0
     while i < len(argv):
         f = argv[i]
@@ -74,6 +84,8 @@ def parse_args(argv):
             a["out"] = False; i += 1
         elif f == "--progress":
             a["progress"] = int(argv[i + 1]); i += 2
+        elif f == "--order":
+            a["order"] = argv[i + 1]; i += 2
         elif f == "--dry-run":
             a["dry_run"] = True; i += 1
         else:
@@ -93,6 +105,9 @@ def parse_args(argv):
             "C(2315, %d) and cannot be enumerated.\nExact evaluation exists only "
             "at k=1; use the race for k>1."
             % (a["k"], a["k"], a["k"]))
+    if a["order"] not in ("root", "file"):
+        raise SystemExit("--order must be 'root' (ascending expected answers "
+                         "remaining) or 'file'")
     if a["out"] is None:
         raise SystemExit("--out is required (or --no-out).\nUse the wrapper: "
                          "bash solver/run-multiwordle-exact.sh")
@@ -116,6 +131,9 @@ def main(argv):
 
     print("exact: %s at k=1 over %d openings from %s"
           % (a["strategy"], len(field), a["openings"]))
+    print("  visiting in %s order" %
+          ("ascending expected answers remaining after the opener"
+           if a["order"] == "root" else "the list's own"))
     print("  every opener plays all %d answers -- these are TRUE means, not "
           "estimates" % na)
     if a["out"]:
@@ -127,8 +145,43 @@ def main(argv):
     pat = np.array(load_patterns())
     ans2g = mw.answer_to_guess(answers, guesses)
     pool = np.arange(len(guesses), dtype=np.int64)
+
+    if a["order"] == "root":
+        # Derived and named: the expected answers remaining after the opener,
+        # ascending -- one 30M-lookup pass, and it puts the openers worth seeing
+        # at the front so a halt leaves a meaningful prefix rather than a slice of
+        # the alphabet.  Ties keep the list's own order.
+        rv = mf.root_values(pat, np.array([guesses.index(o[0]) for o in field],
+                                          dtype=np.int64))
+        field = [field[i] for i in np.argsort(rv, kind="stable")]
+        print("  order computed: best %s (%.1f answers left), worst %s (%.1f)"
+              % (field[0][0], rv.min(), field[-1][0], rv.max()))
     # every answer, once each: the whole population, in answer-list order
     every = np.arange(na, dtype=np.int64).reshape(na, 1)
+
+    # THE FILE SELF-DESCRIBES ITS ORDER, and a resume will not silently mix two.
+    # Order changes no VALUE here -- every row is exact whenever it was written --
+    # so a file whose stamp merely predates the flag is continued with a note,
+    # not refused; an EXPLICIT disagreement is refused, since that would leave one
+    # file claiming an order it half has.
+    if a["out"] and os.path.exists(a["out"]):
+        stamp = None
+        with open(a["out"]) as f:
+            for line in f:
+                if not line.startswith("#"):
+                    break
+                if "order=" in line:
+                    stamp = line.split("order=")[1].split()[0]
+        if stamp is None:
+            print("  NOTE: %s was written before the visit order was recorded, "
+                  "so it holds an alphabetical prefix.\n"
+                  "  Its rows are exact regardless; the openers still to do will "
+                  "be visited in %s order." % (a["out"], a["order"]))
+        elif stamp != a["order"]:
+            raise SystemExit(
+                "%s was written in %r order and this run is %r -- pass --order %s "
+                "to continue it, or write to a new file."
+                % (a["out"], stamp, a["order"], stamp))
 
     done = load_done(a["out"]) if a["out"] else set()
     todo = [o for o in field if o[0] not in done]
@@ -141,7 +194,8 @@ def main(argv):
             fh.write("# multiwordle EXACT expected guesses, %s at k=1\n"
                      % a["strategy"])
             fh.write("# settings strategy=%s boards=1 answers=%d openings=%s "
-                     "top=%s\n" % (a["strategy"], na, a["openings"], a["top"]))
+                     "top=%s order=%s\n"
+                     % (a["strategy"], na, a["openings"], a["top"], a["order"]))
             fh.write("# every opener plays all %d answers once, so mean is the "
                      "TRUE expected guesses -- no sampling, no standard error, "
                      "and the best row is the best opener rather than a screen\n"

@@ -19,7 +19,9 @@
 # sampling.
 #
 # Resumable per opener: one flushed CSV row each, and a re-run skips what is
-# already there.
+# already there.  Openers are visited by ASCENDING EXPECTED ANSWERS REMAINING
+# after the opener -- derived and named, rather than the alphabet -- so a halt
+# leaves a prefix worth reading.  --order file restores the list's own order.
 
 set -u
 
@@ -37,6 +39,7 @@ while [ $# -gt 0 ]; do
         --openings|--words|--openings-from) OPENINGS="$2"; shift 2 ;;
         --top)           TOP="$2";      shift 2 ;;
         --progress)      EXTRA="$EXTRA --progress $2"; shift 2 ;;
+        --order)         EXTRA="$EXTRA --order $2";    shift 2 ;;
         --dry-run)       DRY=1;         shift ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
     esac
