@@ -966,7 +966,45 @@ k hidden answers, one per board, every guess played on every unsolved board at o
 **Nothing here searches or optimises** — it MEASURES one named heuristic by Monte
 Carlo, so its numbers carry a standard error and are not comparable with any
 `optturns`-family optimum.
-- **The strategy, exactly** (`math/multiwordle.py` states it and is the source of truth):
+- **THREE RULES, AND THEY ARE THREE DIFFERENT STRATEGIES** (`math/multiwordle.py`
+  states each exactly and is the source of truth). All three play the OPENING blind;
+  they differ only in what happens after it. `--strategy` is required by every tool
+  and lands in every filename; the WRAPPERS carry a default a human reads (`greedy`)
+  and forward it explicitly. Their numbers ARE comparable with each other (same game,
+  same lists, same unconstrained expected-guess quantity) and must still never be
+  tabled beside an `optturns`-family optimum.
+  - **`greedy`** — the original, unchanged and still the wrapper default: fewest
+    candidates, ties by BOARD INDEX, uniform random candidate.
+  - **`srank`** — pick the board by TILE COLOUR, not by a candidate count, which is
+    the whole point (a human can see greens and yellows and cannot count candidates).
+    Rank the unsolved boards by the singleton chance of the cumulative
+    `(greens, yellows)` composition they show — the **tree-states** reading, so the
+    ranking is indexed by the quantity it was tabulated under — take the best, break
+    ties UNIFORMLY AT RANDOM, then guess one of that board's candidates at random.
+    **It ignores candidate counts entirely**: 300 candidates with two greens outranks
+    two candidates with none. **At k=1 it IS `greedy`** (one board is trivially both),
+    so a k=1 `srank` run re-measures the committed k=1 `greedy` sweep — the gate uses
+    that as a differential instead.
+  - **`minavg`** — no board is targeted; a WORD is chosen. Minimise the sorted vector
+    of average answers remaining over the unsolved boards, lexicographically: smallest
+    first, then second smallest, and so on, final tie on the lowest guess index.
+    Pool is all 12972 guesses, unfiltered. **DETERMINISTIC** — a game is a function of
+    the k answers alone, so all the Monte Carlo variance is the answer draw.
+  - **`minavg`'s TERMINATION HAS A PRECONDITION the others do not**: the pool must
+    contain every answer word. `greedy`/`srank` always play a candidate of the board
+    they target, so that board strictly shrinks; `minavg` need not, and on a pool that
+    splits no board the state is unchanged and a deterministic rule replays one guess
+    FOREVER. Shipped pools are fine (every answer is a legal guess) and `MinAvg`
+    REFUSES an uncovered pool, but do not restrict that pool casually.
+  - **THE `srank` RANKING IS A FIXED EXTERNAL TABLE, pooled across levels**:
+    `data/shared/treestates/states_optturns_top1000.csv`, summing `singles` and
+    `cases` over every level per composition and ranking on the pooled ratio, as an
+    exact `Fraction` so a tie is a real tie (`(4,1)` and `(5,0)` are both exactly 1
+    and DO tie). Read by column NAME, so added columns are harmless. Note it carries
+    **21 compositions, not 20** — `(4 green, 1 yellow)` is unreachable as one reply but
+    reachable cumulatively. It was tabulated under single-board OPTIMAL TREES, so using
+    it to steer multiwordle is a modelling choice, not a derived optimum.
+- **The original strategy, exactly** — now `--strategy greedy`:
   a fixed OPENING SEQUENCE of one or more words played BLIND in order; then each
   turn take the unsolved board with the FEWEST remaining candidates (ties by BOARD
   INDEX), and guess one of its candidates UNIFORMLY AT RANDOM. A board is solved
@@ -1060,6 +1098,44 @@ Carlo, so its numbers carry a standard error and are not comparable with any
   read off the filename. **Compare down a column only**: a different opening is a
   different strategy, and same-size openings can come from rankings of very different
   quality.
+### The opener RACE (`run-multiwordle-race.sh`) — the cascade as one process
+The staged cascade above (sweep, cut at N SE, re-sweep survivors at the next rung
+with a fresh seed, repeat) run as a SINGLE resumable process:
+**`bash solver/run-multiwordle-race.sh --strategy srank -k 16`** (from `math/`),
+`--pairs` for the top 10000 of the pair ranking. Every opening starts on 100 games,
+anything more than `--sigma` (default **5**) behind the leader leaves the moment
+that becomes true, and the survivors keep playing on a doubling schedule.
+- **PAIRED FROM THE FIRST GAME, which is why it can cut this early.** Every opening
+  plays the identical games AND the identical coin flips — one float per decision,
+  never `integers(n)`, so two openings whose live sets differ in size cannot fall out
+  of step (the wordlesim lesson, ported). The cut uses the error on the DIFFERENCE;
+  each row also carries the opening's own unpaired error, so the gain is visible.
+  **So a race cell will not match a `run-multiwordle.sh` run at the same seed** — the
+  coupling is a different sampler, deliberately.
+- **A race ELIMINATES AGAINST A MOVING LEADER**, so a lucky first hundred games can
+  push a better opening out. The generous cut is a mitigation, not a proof. **The head
+  of a race is the best of the openings ENTERED, judged on the games played** — the
+  same "screen, not a winner" rule the sweeps carry, and `--pairs` inherits the pair
+  ranking's own caveat (a screen, for a different question, top 10000 only).
+- **TWO PHASES, and the switch is exact**: an int16 per-game history while the field
+  is wide, then pairwise `sum(d)`/`sum(d^2)` computed FROM it once the field is under
+  `--pair-at`, after which memory no longer depends on the game count. Verified equal
+  both ways, with the switch confirmed to actually fire.
+- **RESUMABLE MID-BLOCK.** It checkpoints atomically as it goes; Ctrl-C and re-run the
+  same command. Verified byte-identical to an uninterrupted run both after a clean
+  stop and after a SIGINT part-way through a block, and invariant to `--chunk`.
+- **The field is every legal guess, and ANSWER openings are tracked separately** —
+  the best surviving one is named in every status line and the last one's elimination
+  is called out, since the 2315 answers are a subset worth following in their own right.
+- **MEASURED first-block cost over all 12972 openings** (18 threads, 2026-09-09):
+  `srank` is seconds at every k; `minavg` is ~0.1 h at k=1 and k=2, 0.3 h at k=4,
+  0.6 h at k=8 and **1.9 h at k=16**. `minavg` searches 12972 words every turn; its
+  turn-2 search is memoised per opener (a 243x12972 table, 0.01 s to build) because
+  that is the one turn where every board's candidate set is still large.
+- **`--dry-run` resolves everything and stops before any game**, leaving no partial
+  CSV to be mistaken for a result that died. Use it for every wrapper change.
+- Data: standings + eliminations CSVs in `data/shared/multiwordle/race_*`,
+  checkpoint and log under `data/local/multiwordle/`.
 - **`python3 tools/checkmultiwordle.py` is the GATE**: it replays the same seeds
   through an independent implementation that keeps candidates as LISTS OF WORDS and
   recomputes every feedback from the strings with `wordle.pattern` — no matrix, no
@@ -1068,6 +1144,22 @@ Carlo, so its numbers carry a standard error and are not comparable with any
   BOARD TIE and FAILS if none did anywhere, so a passing run cannot silently mean the
   tie-break was never exercised. Run it alongside
   `solver/validate.sh` and `tools/checkpatterns.py`.
+  - **It covers all three rules by the same discipline — the oracle shares no
+    machinery with what it checks.** `srank`'s composition is re-derived by
+    `tree_states.state_from_strings`, which never looks at a tile; `minavg`'s
+    average-remaining is recomputed by bucketing candidate WORDS with
+    `wordle.pattern`, on the full 12972 pool at real states. It also diffs the numba
+    kernels against the reference guess for guess, pins the float ranking table as
+    having the same order AND tie classes as the exact Fractions, and checks the race
+    (elimination arithmetic, coupling, resume, phase switch).
+  - **COVERAGE IS ASSERTED, not hoped for.** It FAILS if `srank`'s random board
+    tie-break never fired, if `minavg`'s lexicographic tie-break never had to look past
+    the smallest value, if a board reached a composition the ranking lacks, if a
+    resumed race did not actually resume, or if the pairwise switch did not actually
+    fire. The `minavg`-refuses-an-uncovered-pool case is CONSTRUCTED, since the shipped
+    pool could never produce it.
+  - **It found the `minavg` non-termination bug on its first run** — the reason that
+    precondition is written down above rather than discovered by a hung sweep.
 
 ## FoxiMax (a miss ADDS a word) — a SIMULATION of one greedy heuristic
 [foximax.com](https://foximax.com/): hangman-style LETTER guessing where a letter that
