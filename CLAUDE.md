@@ -1082,6 +1082,21 @@ search under a different COST, not a program of its own. `sh build.sh` builds it
   `math/`), attached, tee'd log. `--opener W` (repeatable) prices ONE opener exactly
   instead of sweeping — much cheaper, exact for that opener, an upper bound on the
   optimum, and **the way to price the full sweep before launching it**.
+  - **`-k K` is a BEAM, and it restricts the ROOT too** (added 2026-09-09), so it
+    examines K OPENERS rather than 12972: the total is an **UPPER BOUND** and the
+    winner is **the best of the K examined**, never the optimal opener. Same caveat
+    every `--topk` sweep here carries. On the `--opener` path it beams only the
+    branching BELOW the named opener, so it bounds that opener's price instead —
+    the wrapper's warning says which, because the two are different claims.
+  - **Each K is a different strategy and gets its own CSV, log and table**
+    (`optimal_<stem>_d<D>_k<K>.csv`), exactly as each depth does. **K is in the TT
+    salt**, so a beam's table can never be read by another K or by the exact solver
+    — under `-k` the stored values are the best found within the restricted
+    branching, NOT exact optima. `K=0` is the exact sweep and keeps the unsuffixed
+    filenames, so runs made before the flag existed are untouched.
+  - **`--dry-run` resolves everything and stops before the solver starts**, printing
+    the files it WOULD write. Use it for every wrapper change: a partial CSV from a
+    "quick check" is indistinguishable from a real result that died.
   - **`--weights` takes a STEM, not a file:** `<stem>.txt` (the answer list) and
     `<stem>.weights`, both written together by **`python3 tools/freqweights.py --from
     <freqsearch csv> --stem <stem>`** so their ORDER cannot drift apart. The pattern
