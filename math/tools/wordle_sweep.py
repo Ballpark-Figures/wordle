@@ -277,8 +277,18 @@ def main(argv):
           % (len(todo), "openings of %d words" % sizes[0] if sizes[0] > 1 else "words",
              t, fallback, seed,
              ", pair-adaptive %d" % adapt if adapt else ", blind"))
+    if done and not todo:
+        # SAY SO PLAINLY.  This used to print "resuming: N words already in ..."
+        # and then "0 words in 0.0s", which reads like a failed run rather than a
+        # finished one -- and a re-run of an already-finished pass is the single
+        # easiest mistake to make when several cascades are in flight.
+        print("ALREADY COMPLETE: all %d openings are in %s" % (len(done), out))
+        print("  nothing to do.  The next pass reads THIS file with "
+              "--shortlist-from.")
+        return
     if done:
-        print("  resuming: %d words already in %s" % (len(done), out))
+        print("  resuming: %d of %d openings already in %s"
+              % (len(done), len(sweep_words), out))
 
     t0 = time.time()
     best = []
