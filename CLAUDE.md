@@ -1002,31 +1002,6 @@ subject to a guarantee. Do not put the two in one table.
   12972 guesses is **~0.9 s** (uniform weights; it gets cheaper as the adversary zeroes
   words). A phase loop is ~2 evaluations per knob, so ~9 min/loop at 281 knobs. Larger K
   is exponential in depth and has no transposition table yet.
-- **`run-topk-eval.sh` evaluates the guesser ONCE — the BASELINE an adversarial
-  number is quoted against.** `bash solver/run-topk-eval.sh [-k K] [--weights
-  uniform|<stem>]` (from `math/`). **The WEIGHTING is the objective and has no
-  default in the tool** (the greens scar); the wrapper carries `uniform` as a
-  default a human reads and forwards it explicitly. `uniform` is the hill-climb's
-  all-ones starting point over `custom.txt` (**4282** words — the 53 zero-weight
-  drops are a CONSEQUENCE of the adversarial run and do not exist here); a
-  `<stem>` is a `freqweights.py` pair, whose own `.txt` then supplies the list.
-  Each (K, weighting) is a different question and gets its own CSV under
-  `data/shared/topkeval/`. **No depth cap** — expected guesses OUTRIGHT, never to
-  be tabled with an `optturns`/`wturns` total.
-  - **THE FREE ORACLE: `-k 1 --weights data/shared/freqsearch/adv_topk1` must
-    reproduce the LAST `expected_guesses` in `data/shared/freqsearch/topk1.csv`**
-    (3.978171252747317). Same guesser, same weights — a disagreement is a bug in
-    the weight reconstruction or the driver, never a number that moved.
-  - **It needs the SQUARE 12972x12972 matrix** (`build_patterns.py --full`),
-    gitignored under `local/`, so wrapper and gate both refuse with that command.
-    `--dry-run` REPORTS the missing matrix rather than exiting on it.
-  - **`python3 math/tools/checktopkeval.py` is its GATE**, on a miniature problem
-    needing neither the big matrix nor numba: the stem reader refuses two files
-    that disagree on ORDER, `uniform` is exactly all-ones, a zero weight DROPS a
-    word rather than merely costing nothing, the CSV agrees with what the run
-    printed, and six refusals. **Coverage is asserted** (it fails if weighted and
-    uniform never differed); the one end-to-end check SKIPS without the matrix and
-    is reported as skipped, never as passed.
 - **The gates: `python3 math/tools/checktopk.py` and `math/tools/checkfreqsearch.py`.**
   The first diffs the numba kernel against a pure-numpy reference implementing the
   identical rules (k=1/2/3, exact agreement), checks the pattern slice against
