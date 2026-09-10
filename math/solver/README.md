@@ -1003,17 +1003,42 @@ CSV). Run it alongside `solver/validate.sh` and `tools/checkpatterns.py`.
 ## One random guess at turn k (`--kth-random`)
 
 What does a single blunder cost in an otherwise perfect game? Guesses 1..k-1
-follow the committed optimal tree of an opener, guess **k is drawn uniformly
-from all 12972 legal words** (consistent with the replies or not), and from
-k+1 the exact search plays optimally again.
+follow the committed optimal tree of an opener, guess **k is drawn uniformly at
+random**, and from k+1 the exact search plays optimally again.
 
 ```sh
 # from math/
 bash solver/run-kth-random.sh --depth 6 -k 3
-bash solver/run-kth-random.sh --depth 6 --all          # k = 1..6, resumable
+bash solver/run-kth-random.sh --depth 6 --all                     # k = 2..6
+bash solver/run-kth-random.sh --depth 6 --all --pool compatible
 bash solver/run-kth-random.sh --depth 6 -k 2 --opener crane
 bash solver/run-kth-random.sh --depth 6 --all --dry-run
 ```
+
+**`--pool` says what "at random" means, and it is part of the objective** — no
+default in the binary, a human-readable one in the wrapper, and it lands in
+every filename.
+
+| pool | the random guess is drawn from | k = 1 is then |
+|---|---|---|
+| `all` | every one of the 12972 legal words, consistent or not | the sweep averaged over all 12972 openers, **3.62590** |
+| `compatible` | only words still consistent with the replies — the candidate set itself, which at k = 1 is the 2315 answers | the sweep averaged over the answer words, **3.60730** |
+
+`compatible` is about **830× cheaper at k = 2** (the random guess ranges over the
+state, at most 221 words, not over 12972) — measured 4.7 s on 8 threads for the
+one cell `all` finds expensive.
+
+It also **makes the objective rational rather than integer**, which is not a
+presentational detail. Under `all` every answer draws from the same 12972 words,
+so the experiment is a rectangle and the total is an integer over 2315 × 12972.
+Under `compatible` each answer draws from its own state and states differ in
+size, so answer *a* carries weight 1/|S_a| — at k = 2 the reduced fraction has a
+27-digit denominator. So `mean` is a long double, the integer grid columns are
+left **blank** under `compatible`, and the per-state file beside the summary
+(`states_<opener>_d<D>_k<K>_<pool>.csv` — n, m, u, infeasible, all integers) is
+the exact record the value rebuilds from. Under `all` the solver computes the
+mean both ways and refuses to report if they disagree, so the rectangle is a
+standing check on the general case.
 
 **Exact, not sampled.** Every (answer, random word) pair is enumerated —
 2315 × 12972 = 30,030,180 — so the output is an integer total over that grid.
@@ -1033,8 +1058,9 @@ Two rows are known in advance, and the gate uses both as oracles:
 
 | k | what it must be | why |
 |---|---|---|
-| 1 | the opener sweep averaged — 8393.9652 total, **3.62590** | no prefix is played, so this is every opener's own optimal total |
-| ≥ 6 (salet) | 7920 × 12972, **3.42117** | salet's tree is depth 5, so no live game is left to spoil |
+| 1, `all` | **3.62590** | no prefix is played, so this is the sweep averaged over all 12972 openers |
+| 1, `compatible` | **3.60730** | the same sweep, averaged over the 2315 answer words |
+| ≥ 6 (salet) | **3.42117**, either pool | salet's tree is depth 5, so no live game is left to spoil |
 
 `k = 1` therefore **refuses `--tree-file`**: the number is opener-independent,
 and taking a tree would file it under an opener's name. **`--all` skips k = 1**
@@ -1051,8 +1077,9 @@ tree path and its sha. The reader checks the file three ways on every run: one
 opener throughout, one guess per pattern prefix, and each group equal to the
 answers its prefix leaves consistent.
 
-Cost is dominated by k = 2 (289,636 distinct residual states of up to 221
-candidates at a 4-guess cap); k = 4 runs in 0.2 s and k = 5/6 are instant.
+Under `all`, cost is dominated by k = 2 (289,636 distinct residual states of up
+to 221 candidates at a 4-guess cap); k = 4 runs in 0.2 s and k = 5/6 are
+instant. Under `compatible` every cell is seconds.
 Data lands in `data/shared/kthrandom/<opener>_d<D>.csv`, one row per k, with
 the log under `data/local/kthrandom/`. Gate: `python3 tools/checkkthrandom.py`.
 

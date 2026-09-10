@@ -1241,13 +1241,40 @@ from `math/`, attached, tee'd log; `--dry-run` resolves and stops.
   - Like every optturns-family total this is an optimum SUBJECT TO a guarantee, so
     it must never be tabled beside `wordlesim`/`multiwordle`/`foximax` means, which
     are expected guesses OUTRIGHT.
-- **THE RANDOM WORD IS UNIFORM OVER ALL 12972, consistent or not** (user's call) —
-  that is what "completely random" means here, and it is what makes k=1 the average
-  over every possible starting word.
+- **`--random-pool` SAYS WHAT "AT RANDOM" MEANS AND IS PART OF THE OBJECTIVE** —
+  no default in the binary, a human-readable one in the wrapper, and it is in every
+  filename. Two different experiments, both live (user's calls, 2026-09-10):
+  - **`all`** — uniform over ALL 12972 legal words, consistent with the replies or
+    not. k=1 is then the average over every possible starting word: **3.62590**.
+  - **`compatible`** — uniform over the words still CONSISTENT with every reply,
+    i.e. the candidate set itself, which at k=1 is all 2315 answer words. k=1 is
+    then the same sweep averaged over just the answer words: **3.60730**.
+  - **`compatible` IS ~830x CHEAPER at k=2** and seconds everywhere: the random
+    guess ranges over the state (at most 221 words) rather than over 12972.
+    MEASURED: k=2 at depth 6 takes **4.7 s** on 8 threads, against the k=2 `all`
+    cell being the only expensive one in the whole grid.
+  - **`compatible` MAKES THE OBJECTIVE RATIONAL, NOT INTEGER, and that is real.**
+    Under `all` every answer draws from the same 12972 words, so the experiment is
+    a RECTANGLE and the total is an integer over 2315 x 12972. Under `compatible`
+    each answer draws from ITS OWN state and states differ in size, so answer `a`
+    carries weight `1/|S_a|` and the mean is a sum of fractions with no small
+    common denominator — MEASURED at k=2 the reduced fraction has a **27-digit**
+    numerator and denominator. So the summary CSV's `mean` is a long double (good
+    to ~1e-13), its integer grid columns are left **BLANK** under `compatible`
+    rather than filled with a number of a different kind, and the per-state file
+    `states_<opener>_d<D>_k<K>_<pool>.csv` — n, m, u, infeasible, all integers —
+    is the EXACT record the value can be rebuilt from. `checkkthrandom.py` does
+    exactly that rebuild and requires it to equal the reference's own Fraction.
+  - **Under `all` the C computes the mean BOTH ways and refuses to report if they
+    disagree** — the rectangle's exact integer total against the same weighted sum
+    the rational path uses — so the cheap case is a standing check on the general
+    one.
 - **TWO ROWS ARE KNOWN IN ADVANCE AND ARE THE GATE'S ORACLES.**
-  - **k=1 IS the opener sweep averaged**: with no prefix to play, the total must
-    equal every opener's own committed total summed — mean **3.62590** (mean total
-    8393.9652 over the 12972). So k=1 needs no tree and **REFUSES `--tree-file`**:
+  - **k=1 IS the opener sweep averaged**, over the opener set the POOL implies:
+    all 12972 under `all` (mean **3.62590**, mean total 8393.9652), the 2315 answer
+    words under `compatible` (mean **3.60730**). Quoting one for the other is the
+    mistake gate check F exists to catch. So k=1 needs no tree and **REFUSES
+    `--tree-file`**:
     the number is opener-independent, and accepting one would file it under an
     opener's name. Its CSV row records the opener as `-`.
     - **`--all` DELIBERATELY SKIPS k=1 and says so.** Computing it means solving
@@ -1281,15 +1308,18 @@ from `math/`, attached, tee'd log; `--dry-run` resolves and stops.
   (a k already on file is skipped, not appended twice); log under
   `math/data/local/kthrandom/`. Nothing writes a `tt.bin` — see § `--tt-save`.
 - **`python3 tools/checkkthrandom.py` is the GATE**, and it is MUTATION-TESTED (an
-  infeasible pair still charged its k, a forgotten all-green bucket and an
-  off-by-one in the cap were each caught). It diffs the C against a reference that
+  infeasible pair still charged its k, a forgotten all-green bucket, an off-by-one
+  in the cap, and an ANSWER index used as a GUESS index in the `compatible` pool
+  were each caught). It diffs the C against a reference that
   recomputes every pattern FROM THE STRINGS, re-derives each state by FILTERING
   rather than grouping, and plays **PER PAIR** where the C sums **PER BUCKET** — two
   routes to one integer. Plus the real-list k=6 oracle, the seven refusals, four
   deliberately broken trees, and a **COVERAGE TALLY that FAILS** unless an
   infeasible pair, an early finish, a random word that WAS the answer and a
-  multi-candidate state all actually occurred. Run it alongside
-  `solver/validate.sh` and `tools/checkpatterns.py`.
+  multi-candidate state all actually occurred — **and unless the two pools actually
+  gave different answers**, since twenty passing diffs would otherwise say nothing
+  about which pool the C drew from. Run it alongside `solver/validate.sh` and
+  `tools/checkpatterns.py`.
 
 ## Multiwordle (k boards at once) — a SIMULATION, not a solver
 k hidden answers, one per board, every guess played on every unsolved board at once.

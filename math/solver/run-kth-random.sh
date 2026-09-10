@@ -3,14 +3,35 @@
 #
 #     bash solver/run-kth-random.sh --depth 6 -k 3
 #     bash solver/run-kth-random.sh --depth 6 --all
+#     bash solver/run-kth-random.sh --depth 6 --all --pool compatible
 #     bash solver/run-kth-random.sh --depth 6 -k 2 --opener crane
 #     bash solver/run-kth-random.sh --depth 6 --all --dry-run
 #
 # THE EXPERIMENT.  Guesses 1..k-1 follow the committed OPTIMAL TREE of --opener
-# (salet by default).  Guess k is a word drawn UNIFORMLY FROM ALL 12972 LEGAL
-# WORDS -- consistent with the replies or not, which is what "completely random"
-# means here and what makes k=1 the average over every possible starting word.
-# From guess k+1 the exact solver plays optimally again.
+# (salet by default).  Guess k is a word drawn UNIFORMLY AT RANDOM.  From guess
+# k+1 the exact solver plays optimally again.
+#
+# --pool SAYS WHAT "AT RANDOM" MEANS, AND IT IS PART OF THE OBJECTIVE.  Two
+# different experiments, both live, each with its own files:
+#
+#   all         every one of the 12972 legal words, consistent with the replies
+#               or not.  k=1 is then the average over every possible starting
+#               word: mean 3.62590.
+#   compatible  only words still CONSISTENT with every reply -- i.e. the
+#               candidate set itself, which at k=1 is all 2315 answer words.
+#               k=1 is then the sweep averaged over the answer words: 3.60730.
+#
+# COMPATIBLE IS ENORMOUSLY CHEAPER, because the random guess ranges over the
+# state (at most a few hundred words) rather than over 12972 -- about 830x less
+# work at k=2, which is the only cell `all` finds expensive.
+#
+# IT ALSO MAKES THE OBJECTIVE RATIONAL RATHER THAN INTEGER.  Under `all` every
+# answer draws from the same 12972 words, so the experiment is a rectangle and
+# the total is an integer over 2315 x 12972.  Under `compatible` each answer
+# draws from ITS OWN state and states differ in size, so answer a carries weight
+# 1/|S_a| and there is no small common denominator.  The summary CSV therefore
+# leaves its integer grid columns BLANK under `compatible` and the per-state
+# file beside it holds the integers the mean was summed from, exactly.
 #
 # IT IS EXACT, NOT SAMPLED.  Every (answer, random word) pair is enumerated --
 # 2315 x 12972 = 30,030,180 of them -- so the result is an integer total over
@@ -59,6 +80,7 @@ DEPTH=""
 KVAL=""
 ALL=0
 OPENER=salet          # a default a HUMAN reads, forwarded explicitly below
+POOL=all              # likewise: the binary refuses without it, this passes it on
 THREADS=18
 TTBITS=27
 DRY=0
@@ -69,6 +91,7 @@ while [ $# -gt 0 ]; do
         -k|--kth)  KVAL="$2";    shift 2 ;;
         --all)     ALL=1;        shift ;;
         --opener)  OPENER="$2";  shift 2 ;;
+        --pool)    POOL="$2";    shift 2 ;;
         --threads) THREADS="$2"; shift 2 ;;
         --tt-bits) TTBITS="$2";  shift 2 ;;
         --dry-run) DRY=1;        shift ;;
@@ -77,8 +100,15 @@ while [ $# -gt 0 ]; do
 done
 
 usage() {
-    echo "usage: bash solver/run-kth-random.sh --depth D (-k K | --all) [--opener W] [--dry-run]" >&2
+    echo "usage: bash solver/run-kth-random.sh --depth D (-k K | --all)" \
+         "[--pool all|compatible] [--opener W] [--dry-run]" >&2
 }
+case "$POOL" in
+    all|compatible) ;;
+    *) echo "--pool must be 'all' (every legal word) or 'compatible' (only words" >&2
+       echo "  still consistent with the replies) -- they are different experiments" >&2
+       exit 1 ;;
+esac
 case "$DEPTH" in
     ''|*[!0-9]*|0) echo "--depth is required and must be a positive number (the cap IS the objective)" >&2
                    usage; exit 1 ;;
@@ -116,8 +146,8 @@ if [ -z "$TREE" ]; then
 fi
 
 OUTDIR=data/shared/kthrandom
-LOC=data/local/kthrandom/${OPENER}_d${DEPTH}
-OUT=$OUTDIR/${OPENER}_d${DEPTH}.csv
+LOC=data/local/kthrandom/${OPENER}_d${DEPTH}_${POOL}
+OUT=$OUTDIR/${OPENER}_d${DEPTH}_${POOL}.csv
 LOG=$LOC/run.log
 
 # --all starts at 2, NOT 1 -- see the note at the top.  k=1 is the whole opener
@@ -130,9 +160,11 @@ if [ "$DRY" = 1 ]; then
     echo "  tree     : $TREE ($(shasum "$TREE" | cut -c1-12))"
     echo "  depth    : $DEPTH"
     echo "  k values : $(echo $KLIST | tr '\n' ' ')"
-    [ "$ALL" = 1 ] && echo "             (--all skips k=1: it is the full 12972-opener sweep," \
+    [ "$ALL" = 1 ] && echo "             (--all skips k=1: it is the opener sweep over again," \
                           "already in data/shared/optturns/opener_totals.csv)"
+    echo "  pool     : $POOL"
     echo "  csv      : $OUT"
+    echo "  states   : $OUTDIR/states_${OPENER}_d${DEPTH}_k<K>_${POOL}.csv"
     echo "  log      : $LOG"
     echo "  threads  : $THREADS   tt-bits: $TTBITS"
     exit 0
@@ -151,14 +183,18 @@ guard_output optturns "$OUT" || exit 1
 WARM=""
 [ -f "$LOC/tt.bin" ] && WARM="--tt-load $LOC/tt.bin"
 
-echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] kth-random: opener=$OPENER depth=$DEPTH k=$(echo $KLIST | tr '\n' ' ')" \
+echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] kth-random: opener=$OPENER depth=$DEPTH pool=$POOL k=$(echo $KLIST | tr '\n' ' ')" \
     | tee -a "$LOG"
 echo "  tree: $TREE  sha=$(shasum "$TREE" | cut -c1-12)" | tee -a "$LOG"
 
 if [ "$ALL" = 1 ]; then
-    echo "  note: --all skips k=1 -- it is the full 12972-opener sweep and is already" \
+    if [ "$POOL" = all ]; then K1="all 12972 openers"; K1M=3.62590
+    else                        K1="the 2315 answer-word openers"; K1M=3.60730; fi
+    echo "  note: --all skips k=1 -- it means solving $K1 at depth $DEPTH, which is" \
         | tee -a "$LOG"
-    echo "        answered by data/shared/optturns/opener_totals.csv (mean 3.62590)." \
+    echo "        the opener sweep over again, and is already answered by" \
+        | tee -a "$LOG"
+    echo "        data/shared/optturns/opener_totals.csv (mean $K1M)." \
         | tee -a "$LOG"
     echo "        Ask for it explicitly with -k 1 if you want it recomputed here." \
         | tee -a "$LOG"
@@ -168,8 +204,12 @@ for K in $KLIST; do
     # k=1 has no prefix, so the binary REFUSES a tree there rather than filing an
     # opener-independent number under an opener's name.
     if [ "$K" = 1 ]; then TREEFLAG=""; else TREEFLAG="--tree-file $TREE"; fi
-    ./solver/optturns --kth-random "$K" --depth "$DEPTH" $TREEFLAG \
-        --out "$OUT" --tt-bits "$TTBITS" --threads "$THREADS" \
+    # The per-state integers are the EXACT record under --pool compatible, where
+    # the mean is a sum of fractions with no small common denominator, so they
+    # are committed beside the summary rather than left in local/.
+    ./solver/optturns --kth-random "$K" --depth "$DEPTH" --random-pool "$POOL" $TREEFLAG \
+        --out "$OUT" --kth-states "$OUTDIR/states_${OPENER}_d${DEPTH}_k${K}_${POOL}.csv" \
+        --tt-bits "$TTBITS" --threads "$THREADS" \
         $WARM \
         2>&1 | tee -a "$LOG"
 done

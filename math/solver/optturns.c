@@ -50,6 +50,7 @@
 #include <stdint.h>
 #include <time.h>
 #include <ctype.h>
+#include <math.h>            /* fabs, for the kth-random cross-check */
 #include <sys/stat.h>
 #ifdef _OPENMP
 #include <omp.h>
@@ -2359,14 +2360,41 @@ static int group_states(TreeLine *lines, int nl, int kpre, KState **out_states,
     return 0;
 }
 
+/* THE POOL THE RANDOM GUESS COMES FROM IS PART OF THE OBJECTIVE, so it has no
+ * default and lands in every filename.  Two very different experiments:
+ *
+ *   all         uniform over ALL NG legal words, consistent with the replies or
+ *               not.  At k=1 that makes the answer the mean over every possible
+ *               starting word -- the whole --sweep CSV averaged.
+ *   compatible  uniform over the words still CONSISTENT with every reply, which
+ *               is the candidate set itself.  At k=1 that is the 2315 answers,
+ *               so the answer is the sweep averaged over just the answer words.
+ *
+ * THE SECOND POOL MAKES THE OBJECTIVE RATIONAL RATHER THAN INTEGER, and that is
+ * not a presentational detail.  Under `all` every answer draws from the same NG
+ * words, so the experiment is a rectangle and the total is an integer over
+ * NA x NG.  Under `compatible` each answer draws from ITS OWN state, and states
+ * have different sizes -- so answer a carries weight 1/|S_a| and the mean is a
+ * sum of fractions whose denominators are the state sizes.  There is no small
+ * common denominator (the sizes run to 221), so the summary reports the value in
+ * long double and the per-state file `--kth-states` holds the INTEGERS it was
+ * summed from; tools/checkkthrandom.py rebuilds the exact Fraction from those
+ * and requires the two to agree.  The integer grid columns of the summary are
+ * written only under `all`, where they mean something, and left BLANK under
+ * `compatible` rather than filled with a number of a different kind. */
+#define POOL_ALL 0
+#define POOL_COMPATIBLE 1
+
 /* Per-thread partition scratch.  Pattern-indexed and kept ZERO between uses --
  * the same invariant Ctx->cnt keeps -- so only the patterns actually seen are
  * ever touched and a 6-candidate state does not pay a memset of NPAT. */
 typedef struct { int *cnt, *start, *fill, *seen; uint16_t *buf; } KScratch;
 
-static int kth_random(const char *treefile, int K, int depth, const char *outpath) {
+static int kth_random(const char *treefile, int K, int depth, const char *outpath,
+                      int pool, const char *statepath) {
     int kpre = K - 1;
     int dres = depth - K;                       /* guesses left AFTER the random one */
+    const char *poolname = pool == POOL_ALL ? "all" : "compatible";
 
     KState *states = NULL;
     int nstate = 0, early_count = 0, live = 0, opener = -1;
@@ -2392,13 +2420,26 @@ static int kth_random(const char *treefile, int K, int depth, const char *outpat
 
     int maxn = 0;
     for (int s = 0; s < nstate; s++) if (states[s].n > maxn) maxn = states[s].n;
-    fprintf(stderr, "kth-random: opener %s  k=%d  depth=%d\n",
-            opener >= 0 ? GWORD[opener] : "(none -- k=1 has no prefix)", K, depth);
+    fprintf(stderr, "kth-random: opener %s  k=%d  depth=%d  pool=%s\n",
+            opener >= 0 ? GWORD[opener] : "(none -- k=1 has no prefix)", K, depth,
+            poolname);
     fprintf(stderr, "kth-random: %d states at ply %d; %d answers still live "
             "(largest state %d), %d finished earlier\n",
             nstate, kpre, live, maxn, early_count);
     fprintf(stderr, "kth-random: %d further guesses allowed after the random one\n", dres);
     fflush(stderr);
+
+    FILE *sf = NULL;
+    if (statepath) {
+        sf = fopen(statepath, "w");
+        if (!sf) { fprintf(stderr, "cannot write %s\n", statepath); return 1; }
+        /* THE EXACT RECORD.  n = candidates in the state, m = words the random
+         * guess is drawn from, u = summed optimal continuation over the feasible
+         * non-winning buckets, infeasible = (answer, word) pairs the cap rules
+         * out.  Every column an integer, so the rational mean above can be
+         * rebuilt exactly from this file however it was printed. */
+        fprintf(sf, "state,n,m,u,infeasible\n");
+    }
 
     int nth = 1;
 #ifdef _OPENMP
@@ -2416,19 +2457,33 @@ static int kth_random(const char *treefile, int K, int depth, const char *outpat
         if (!ctxs[t] || !scr[t].buf) { fprintf(stderr, "out of memory: thread state\n"); return 1; }
     }
 
-    long long feas_extra = 0, infeas_pairs = 0;
+    /* The ANSWER-weighted accounting, which both pools share.  Each answer
+     * carries weight 1 and spreads it evenly over the m words its own pool
+     * offers, so a state contributes with denominator m -- and under `all`,
+     * where every m is NG, that collapses to the plain integer grid below. */
+    long double wnum = (long double)early_score;   /* summed score, feasible only */
+    long double wden = (long double)early_count;   /* summed weight, feasible only */
+    long double winf = 0.0L;                       /* summed weight, infeasible */
+    long long feas_extra = 0, infeas_pairs = 0;    /* exact, meaningful under `all` */
     double t0 = now_s();
-    long long done = 0, work = (long long)live * NG;
+    long long done = 0, work = 0;
+    for (int s = 0; s < nstate; s++)
+        work += (long long)states[s].n * (pool == POOL_ALL ? NG : states[s].n);
     int step = nstate > 200 ? nstate / 100 : 1;
 
     for (int s = 0; s < nstate; s++) {
         const uint16_t *S = states[s].S;
         int n = states[s].n;
+        int m = (pool == POOL_ALL) ? NG : n;
         long long fe = 0, ip = 0;
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic, 32) reduction(+:fe,ip)
 #endif
-        for (int r = 0; r < NG; r++) {
+        for (int j = 0; j < m; j++) {
+            /* `all` walks the guess list; `compatible` walks the state's own
+             * members, which have to cross into GUESS space first -- an answer
+             * index would read the wrong row of PAT and score a different game. */
+            int r = (pool == POOL_ALL) ? j : ANS2G[S[j]];
             int tid = 0;
 #ifdef _OPENMP
             tid = omp_get_thread_num();
@@ -2449,20 +2504,25 @@ static int kth_random(const char *treefile, int K, int depth, const char *outpat
             for (int i = 0; i < n; i++) k->buf[k->fill[row[S[i]]]++] = S[i];
             for (int t = 0; t < nseen; t++) {
                 int p = k->seen[t];
-                int m = k->cnt[p];
+                int mm = k->cnt[p];
                 k->cnt[p] = 0;                  /* restore the zero invariant */
                 if (p == ALL_GREEN) continue;   /* the random word WAS the answer */
                 /* dres == 0 leaves no guess to name anything, so every bucket
                  * not already won is infeasible.  solve() would answer 1 for a
                  * singleton at any depth, which is exactly wrong here. */
                 int v = (dres <= 0) ? INF
-                                    : solve(k->buf + k->start[p], m, dres, &CONS_NONE, ctx);
-                if (v >= INF) ip += m; else fe += v;
+                                    : solve(k->buf + k->start[p], mm, dres, &CONS_NONE, ctx);
+                if (v >= INF) ip += mm; else fe += v;
             }
         }
         feas_extra += fe;
         infeas_pairs += ip;
-        done += (long long)n * NG;
+        long long pairs = (long long)n * m;
+        wnum += (long double)((long long)K * (pairs - ip) + fe) / (long double)m;
+        wden += (long double)(pairs - ip) / (long double)m;
+        winf += (long double)ip / (long double)m;
+        if (sf) fprintf(sf, "%d,%d,%d,%lld,%lld\n", s, n, m, fe, ip);
+        done += pairs;
 
         if (s % step == 0 || s == nstate - 1) {
             double el = now_s() - t0;
@@ -2473,6 +2533,7 @@ static int kth_random(const char *treefile, int K, int depth, const char *outpat
             fflush(stderr);
         }
     }
+    if (sf) fclose(sf);
 
     long long g_nodes = 0;
     for (int t = 0; t < nth; t++) {
@@ -2488,36 +2549,53 @@ static int kth_random(const char *treefile, int K, int depth, const char *outpat
      *                                     its bucket under the cap `dres`
      * and summing that last term over a whole bucket is exactly solve()'s value
      * for it.  So every live pair pays K, and the feasible ones add their
-     * bucket's total; the all-green bucket adds nothing, the game being over. */
+     * bucket's total; the all-green bucket adds nothing, the game being over.
+     *
+     * A pair the cap rules out has NO optimum, so it leaves the mean entirely --
+     * but it cannot cost less than depth+1 either, which is what makes lb_mean a
+     * SOUND LOWER BOUND on the unconditional mean rather than a guess at one. */
+    double mean = wden > 0 ? (double)(wnum / wden) : 0.0;
+    double lb_mean = (double)((wnum + (long double)(depth + 1) * winf) / (long double)NA);
+    double pct_inf = (double)(100.0L * winf / (long double)NA);
+    long long won_at_k = live;                  /* one r per live answer: its own word */
+
+    /* Under `all` the same quantities are exact integers over the NA x NG grid.
+     * Computing them BOTH ways and requiring they agree makes the rectangular
+     * case a standing check on the rational one, for free. */
     long long total_pairs = (long long)NA * NG;
     long long live_pairs  = (long long)live * NG;
-    long long early_pairs = (long long)early_count * NG;
     long long feas_pairs  = total_pairs - infeas_pairs;
     long long feas_total  = early_score * NG
                           + (long long)K * (live_pairs - infeas_pairs) + feas_extra;
-    /* A pair the cap rules out has NO optimum, so it cannot enter the mean --
-     * but it cannot cost less than depth+1 either, which makes this a SOUND
-     * lower bound on the unconditional mean rather than a guess at one. */
-    long long lb_total = feas_total + (long long)(depth + 1) * infeas_pairs;
-    long long won_at_k = live;                  /* one r per live answer: its own word */
+    long long lb_total    = feas_total + (long long)(depth + 1) * infeas_pairs;
+    if (pool == POOL_ALL) {
+        double exact = (double)feas_total / (double)feas_pairs;
+        if (fabs(exact - mean) > 1e-9) {
+            fprintf(stderr, "kth-random: the weighted mean %.12f disagrees with the "
+                    "exact integer mean %.12f -- the two accountings have parted "
+                    "company\n", mean, exact);
+            return 1;
+        }
+        mean = exact;
+        lb_mean = (double)lb_total / (double)total_pairs;
+        pct_inf = 100.0 * infeas_pairs / total_pairs;
+    }
 
-    double mean = feas_pairs ? (double)feas_total / (double)feas_pairs : 0.0;
-    double lb_mean = (double)lb_total / (double)total_pairs;
-    double secs = now_s() - t0;
-
-    printf("k=%d  depth=%d  opener=%s  pairs=%lld\n", K, depth,
-           opener >= 0 ? GWORD[opener] : "-", total_pairs);
-    printf("      total=%lld  mean=%.6f  over %lld feasible pairs\n",
-           feas_total, mean, feas_pairs);
-    if (infeas_pairs)
-        printf("      INFEASIBLE within %d: %lld pairs (%.4f%%) -- so the "
-               "unconditional mean is >= %.6f\n",
-               depth, infeas_pairs, 100.0 * infeas_pairs / total_pairs, lb_mean);
+    printf("k=%d  depth=%d  pool=%s  opener=%s\n", K, depth, poolname,
+           opener >= 0 ? GWORD[opener] : "-");
+    if (pool == POOL_ALL)
+        printf("      total=%lld  mean=%.6f  over %lld feasible pairs of %lld\n",
+               feas_total, mean, feas_pairs, total_pairs);
+    else
+        printf("      mean=%.6f  over %.4Lf of the 2315 answers' weight\n", mean, wden);
+    if (winf > 0)
+        printf("      INFEASIBLE within %d: %.4f%% of the weight -- so the "
+               "unconditional mean is >= %.6f\n", depth, pct_inf, lb_mean);
     else
         printf("      no infeasible pair, so the mean is unconditional\n");
-    printf("      won at guess %d: %lld pairs;  finished before it: %lld pairs\n",
-           K, won_at_k, early_pairs);
-    printf("      (%.1fs, %lld nodes, TT %.2f%% hit)\n", secs, g_nodes,
+    printf("      won at guess %d: %lld answers;  finished before it: %d answers\n",
+           K, won_at_k, early_count);
+    printf("      (%.1fs, %lld nodes, TT %.2f%% hit)\n", now_s() - t0, g_nodes,
            100.0 * g_hit / (g_probe ? g_probe : 1));
     fflush(stdout);
 
@@ -2528,32 +2606,41 @@ static int kth_random(const char *treefile, int K, int depth, const char *outpat
         FILE *out = fopen(outpath, "a");
         if (!out) { fprintf(stderr, "cannot append to %s\n", outpath); return 1; }
         if (fresh)
-            fprintf(out, "opener,k,depth,pairs,feasible_pairs,infeasible_pairs,"
-                         "pct_infeasible,total,mean,lb_total,lb_mean,won_at_k,"
-                         "early_pairs,states,seconds\n");
-        fprintf(out, "%s,%d,%d,%lld,%lld,%lld,%.6f,%lld,%.6f,%lld,%.6f,%lld,%lld,%d,%.1f\n",
-                opener >= 0 ? GWORD[opener] : "-", K, depth, total_pairs,
-                feas_pairs, infeas_pairs, 100.0 * infeas_pairs / total_pairs,
-                feas_total, mean, lb_total, lb_mean, won_at_k, early_pairs,
-                nstate, secs);
+            fprintf(out, "opener,k,depth,pool,pct_infeasible,mean,lb_mean,won_at_k,"
+                         "early_answers,states,pairs,feasible_pairs,infeasible_pairs,"
+                         "total,lb_total,seconds\n");
+        fprintf(out, "%s,%d,%d,%s,%.6f,%.6f,%.6f,%lld,%d,%d,",
+                opener >= 0 ? GWORD[opener] : "-", K, depth, poolname,
+                pct_inf, mean, lb_mean, won_at_k, early_count, nstate);
+        /* The integer grid columns mean something only on the rectangle, so
+         * under `compatible` they are left BLANK rather than filled with a
+         * number of a different kind -- the same convention an INFEASIBLE sweep
+         * row uses. tools/checkkthrandom.py rebuilds the exact value from the
+         * per-state file instead. */
+        if (pool == POOL_ALL)
+            fprintf(out, "%lld,%lld,%lld,%lld,%lld,", total_pairs, feas_pairs,
+                    infeas_pairs, feas_total, lb_total);
+        else
+            fprintf(out, ",,,,,");
+        fprintf(out, "%.1f\n", now_s() - t0);
         fclose(out);
     }
     return 0;
 }
 
-/* Has this (k, depth) already been written?  One invocation computes ONE k, so
- * a run whose row is already on file has nothing to do -- and recomputing it
- * would append a duplicate rather than resume. */
-static int kth_already_done(const char *outpath, int K, int depth) {
+/* Has this (k, depth, pool) already been written?  One invocation computes ONE
+ * cell, so a run whose row is already on file has nothing to do -- and
+ * recomputing it would append a duplicate rather than resume. */
+static int kth_already_done(const char *outpath, int K, int depth, const char *poolname) {
     FILE *f = fopen(outpath, "r");
     if (!f) return 0;
     char line[512];
     int found = 0;
     while (fgets(line, sizeof line, f)) {
-        char w[64];
+        char w[64], p[32];
         int k, d;
-        if (sscanf(line, "%63[^,],%d,%d,", w, &k, &d) == 3 && k == K && d == depth)
-            { found = 1; break; }
+        if (sscanf(line, "%63[^,],%d,%d,%31[^,],", w, &k, &d, p) == 4
+            && k == K && d == depth && !strcmp(p, poolname)) { found = 1; break; }
     }
     fclose(f);
     return found;
@@ -2679,6 +2766,8 @@ int main(int argc, char **argv) {
     int nopen = 0;
     int kthk = 0;                       /* --kth-random K: 0 means the mode is off */
     const char *treefile = NULL;        /* the committed optimal tree it plays first */
+    const char *poolname = NULL;        /* --random-pool: where the random guess comes from */
+    const char *kthstates = NULL;       /* --kth-states: the per-state integers, exactly */
     const char *outpath = NULL, *treedir = NULL;
     const char *ttload = NULL, *ttsave = NULL, *guesslist = NULL;
     const char *answerlist = NULL, *patpath = NULL;
@@ -2711,6 +2800,8 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--pair-adaptive") && i + 1 < argc) PAIR_ADAPT = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--kth-random") && i + 1 < argc) kthk = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--tree-file") && i + 1 < argc) treefile = argv[++i];
+        else if (!strcmp(argv[i], "--random-pool") && i + 1 < argc) poolname = argv[++i];
+        else if (!strcmp(argv[i], "--kth-states") && i + 1 < argc) kthstates = argv[++i];
         /* kept as the N=1 alias so runs already launched with it keep working */
         else if (!strcmp(argv[i], "--pair-early-finish")) PAIR_ADAPT = 1;
         else if (!strcmp(argv[i], "--optimal-only")) optonly = 1;
@@ -2825,6 +2916,22 @@ int main(int argc, char **argv) {
             fprintf(stderr, "--kth-random 1 plays no guess before the random one, so it "
                     "has no opener and --tree-file cannot affect it.  Drop the flag: the "
                     "k=1 answer is the mean of every opener's own optimal total\n");
+            return 1;
+        }
+        /* THE POOL IS PART OF THE OBJECTIVE, so there is nothing honest to
+         * default to: `all` and `compatible` are two different experiments whose
+         * k=1 answers already differ (3.62590 against 3.60730).  The wrapper
+         * carries a default a human reads and forwards it explicitly. */
+        if (!poolname) {
+            fprintf(stderr, "--kth-random needs --random-pool all|compatible: where the "
+                    "random guess is drawn from IS the experiment, and the two give "
+                    "different numbers.  Use solver/run-kth-random.sh.\n");
+            return 1;
+        }
+        if (strcmp(poolname, "all") && strcmp(poolname, "compatible")) {
+            fprintf(stderr, "--random-pool must be 'all' (every legal word) or "
+                    "'compatible' (only words still consistent with the replies), "
+                    "not '%s'\n", poolname);
             return 1;
         }
         if (kthk > 1 && !treefile) {
@@ -3159,12 +3266,14 @@ int main(int argc, char **argv) {
                     "Use solver/run-kth-random.sh.\n");
             return 1;
         }
-        if (kth_already_done(outpath, kthk, depth)) {
-            fprintf(stderr, "resume: k=%d depth=%d is already in %s -- nothing to do\n",
-                    kthk, depth, outpath);
+        if (kth_already_done(outpath, kthk, depth, poolname)) {
+            fprintf(stderr, "resume: k=%d depth=%d pool=%s is already in %s -- "
+                    "nothing to do\n", kthk, depth, poolname, outpath);
             return 0;
         }
-        return kth_random(treefile, kthk, depth, outpath);
+        return kth_random(treefile, kthk, depth, outpath,
+                          strcmp(poolname, "all") ? POOL_COMPATIBLE : POOL_ALL,
+                          kthstates);
     }
 
     if (nopen > 0) {

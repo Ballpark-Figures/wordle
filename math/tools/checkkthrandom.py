@@ -18,13 +18,20 @@ printing a plausible number, so none of them is trusted:
      gets depth-k guesses and INFEASIBLE is an expected result -- and an
      infeasible pair has no optimum at all, so it must leave the mean rather
      than enter it at some large value.
+  4. THE POOL.  `--random-pool all` draws from every legal word and is a
+     RECTANGLE -- every answer sees the same 12972, so the total is an integer.
+     `compatible` draws from the words still consistent, i.e. the state itself,
+     so each answer's draw has its own denominator |S_a| and the mean is a sum
+     of fractions.  The C sums that in long double; the reference below rebuilds
+     it as an exact Fraction and they must agree.
 
 Five checks:
 
   A. THE DEGENERATE END, on the REAL lists and free.  A k past the tree's own
-     depth leaves no live game for the random guess to spoil, so the total must
-     be exactly the opener's own total times the guess count -- salet: 7920 x
-     12972.  Instant, and it exercises the real tree reader.
+     depth leaves no live game for the random guess to spoil, so the mean must
+     be exactly the opener's own -- salet 7920/2315 = 3.42117 -- under BOTH
+     pools, since there is no random guess left to draw.  Instant, and it
+     exercises the real tree reader.
 
   B. THE SEARCH AND THE ACCOUNTING, against brute force.  A miniature complete
      `--data` directory, so the mode reads a small problem by its NORMAL path,
@@ -47,10 +54,11 @@ Five checks:
      handing it trees deliberately broken in each way.
 
   F. THE STANDING ORACLE, opportunistically.  If a real k=1 row has been
-     computed, it must equal the committed opener_totals.csv summed over every
-     opener: with no prefix to play, k=1 IS the opener sweep averaged.  Skipped
-     with a note when that row does not exist yet, since computing it is a run
-     of its own.
+     computed, it must equal the committed opener_totals.csv averaged over the
+     right opener set: with no prefix to play, k=1 IS the opener sweep averaged
+     -- over all 12972 under `all`, over the 2315 answer words under
+     `compatible`.  Skipped with a note when no such row exists yet, since
+     computing one is a run of its own.
 
 Run it alongside `bash solver/validate.sh` and `python3 tools/checkpatterns.py`.
 """
@@ -63,6 +71,7 @@ import os
 import subprocess
 import sys
 import tempfile
+from fractions import Fraction
 
 import numpy as np
 
@@ -231,19 +240,28 @@ def pat_str(code):
     return "".join(reversed(out))
 
 
-def reference(tree, K, depth):
+def reference(tree, K, depth, pool):
     """The whole quantity, per PAIR, with the state re-derived by FILTERING.
 
-    Returns (feasible total, infeasible pair count, coverage tally)."""
-    na, ng = len(MINI_ANSWERS), len(MINI_GUESSES)
+    Returns (exact mean as a Fraction, exact integer total or None, infeasible
+    pair count, coverage tally).
+
+    The ANSWER-weighted mean is the honest one under either pool: each answer
+    carries weight 1 and spreads it evenly over the words ITS OWN pool offers.
+    Under `all` every pool is the same 12972, so that collapses to a plain
+    integer total over the rectangle -- returned alongside, because the C
+    computes it that way and the two must agree."""
     kpre = K - 1
     dres = depth - K
+    num, den, inf_w = Fraction(0), Fraction(0), Fraction(0)
     total, infeas = 0, 0
     cov = {"early": 0, "won_at_k": 0, "infeasible": 0, "big_state": 0}
     for a, aw in enumerate(MINI_ANSWERS):
         n, steps = tree[aw]
         if n <= kpre:
-            total += n * ng                     # r is never played
+            total += n * len(MINI_GUESSES)      # r is never played
+            num += n
+            den += 1
             cov["early"] += 1
             continue
         prefix = steps[:kpre]
@@ -254,19 +272,29 @@ def reference(tree, K, depth):
         assert a in S
         if len(S) >= 2:
             cov["big_state"] += 1
-        for r in range(ng):
+        pool_g = (range(len(MINI_GUESSES)) if pool == "all"
+                  else [MINI_GUESSES.index(MINI_ANSWERS[x]) for x in S])
+        m = len(pool_g)
+        for r in pool_g:
             if MINI_GUESSES[r] == aw:
                 total += K                      # the random word WAS the answer
+                num += Fraction(K, m)
+                den += Fraction(1, m)
                 cov["won_at_k"] += 1
                 continue
             B = _bucket(r, a, S)
             c = play_cost(B, dres, a) if dres >= 1 else None
             if c is None:
                 infeas += 1
+                inf_w += Fraction(1, m)
                 cov["infeasible"] += 1
             else:
                 total += K + c
-    return total, infeas, cov
+                num += Fraction(K + c, m)
+                den += Fraction(1, m)
+    mean = num / den if den else Fraction(0)
+    lb = (num + (depth + 1) * inf_w) / len(MINI_ANSWERS)
+    return mean, lb, (total if pool == "all" else None), infeas, cov
 
 
 # --------------------------------------------------------------------- checks
@@ -280,47 +308,104 @@ def check_degenerate_end():
         print("   skip  no committed salet tree")
         return
     with tempfile.TemporaryDirectory(prefix="checkkth-real-") as tmp:
-        out = os.path.join(tmp, "k.csv")
-        r = run(["--kth-random", "6", "--depth", "6", "--tree-file", tree,
-                 "--out", out, "--tt-bits", "20"])
-        if r.returncode != 0 or not os.path.exists(out):
-            bad("k=6 on the real lists: %s" % (r.stderr.strip().splitlines() or [""])[-1])
-            return
-        row = read_csv(out)[0]
-        want = 7920 * 12972
-        if int(row["total"]) != want:
-            bad("k=6 total %s, expected %d (salet 7920 x 12972)" % (row["total"], want))
-        elif int(row["infeasible_pairs"]) != 0:
-            bad("k=6 reported %s infeasible pairs; the tree resolves every answer"
-                % row["infeasible_pairs"])
-        else:
-            ok("k=6 = 7920 x 12972 = %d, mean %s" % (want, row["mean"]))
+        for pool in ("all", "compatible"):
+            out = os.path.join(tmp, "k_%s.csv" % pool)
+            r = run(["--kth-random", "6", "--depth", "6", "--random-pool", pool,
+                     "--tree-file", tree, "--out", out, "--tt-bits", "20"])
+            if r.returncode != 0 or not os.path.exists(out):
+                bad("k=6 %s on the real lists: %s"
+                    % (pool, (r.stderr.strip().splitlines() or [""])[-1]))
+                continue
+            row = read_csv(out)[0]
+            if abs(float(row["mean"]) - 7920 / 2315) > 5.01e-7:
+                bad("k=6 %s mean %s, expected salet's own 3.421166" % (pool, row["mean"]))
+            elif pool == "all" and int(row["total"]) != 7920 * 12972:
+                bad("k=6 all total %s, expected %d (salet 7920 x 12972)"
+                    % (row["total"], 7920 * 12972))
+            elif float(row["pct_infeasible"]) != 0.0:
+                bad("k=6 %s reported infeasible weight; the tree resolves every answer"
+                    % pool)
+            else:
+                ok("k=6 %s = salet's own 7920/2315 = %s" % (pool, row["mean"]))
 
 
-def check_search(tmp, tree_path, tree, cases, label, seen):
+SEEN_MEANS = {}          # (opener, k, depth) -> {pool: exact mean}
+
+
+def check_search(tmp, tree_path, tree, cases, label, seen, pool):
     """B: the C against the per-pair reference, folding into the coverage tally."""
     for K, depth in cases:
         opt.cache_clear()
-        want_total, want_infeas, cov = reference(tree, K, depth)
+        want_mean, want_lb, want_total, want_infeas, cov = reference(tree, K, depth, pool)
         for k in seen:
             seen[k] += cov[k]
-        out = os.path.join(tmp, "%s_k%d_d%d.csv" % (label, K, depth))
-        args = ["--kth-random", str(K), "--depth", str(depth), "--out", out]
+        SEEN_MEANS.setdefault((label, K, depth), {})[pool] = want_mean
+        tag = "%s_%s_k%d_d%d" % (label, pool, K, depth)
+        out = os.path.join(tmp, tag + ".csv")
+        states = os.path.join(tmp, tag + "_states.csv")
+        args = ["--kth-random", str(K), "--depth", str(depth), "--random-pool", pool,
+                "--out", out, "--kth-states", states]
         if K > 1:
             args += ["--tree-file", tree_path]
         r = run(args, data=tmp)
         if r.returncode != 0 or not os.path.exists(out):
-            bad("%s k=%d depth=%d did not run: %s"
-                % (label, K, depth, (r.stderr.strip().splitlines() or [""])[-1]))
+            bad("%s %s k=%d depth=%d did not run: %s"
+                % (label, pool, K, depth, (r.stderr.strip().splitlines() or [""])[-1]))
             continue
         row = read_csv(out)[0]
-        got_total, got_infeas = int(row["total"]), int(row["infeasible_pairs"])
-        if got_total != want_total or got_infeas != want_infeas:
-            bad("%s k=%d depth=%d: total %d/%d, infeasible %d/%d (C/reference)"
-                % (label, K, depth, got_total, want_total, got_infeas, want_infeas))
+        why = []
+        # The CSV carries six decimals, so the most it can be out by is half a
+        # unit in the last place.  That is all this compares; the EXACT value is
+        # checked against the per-state integers just below, which is where a
+        # real disagreement would show.
+        SIXDP = 5.01e-7
+        if abs(float(row["mean"]) - float(want_mean)) > SIXDP:
+            why.append("mean %s/%.9f" % (row["mean"], float(want_mean)))
+        if abs(float(row["lb_mean"]) - float(want_lb)) > SIXDP:
+            why.append("lb_mean %s/%.9f" % (row["lb_mean"], float(want_lb)))
+        if want_total is not None and int(row["total"]) != want_total:
+            why.append("total %s/%d" % (row["total"], want_total))
+        if want_total is None and row["total"] != "":
+            why.append("an integer grid total was written for a pool that has none")
+        # THE EXACT CHECK.  Rebuild the mean as a Fraction from the per-state
+        # INTEGERS the C wrote, which is the only representation of it that is
+        # not a double, and require it to be the reference's exact value.
+        exact = exact_from_states(states, K, tree, depth)
+        if exact is None:
+            why.append("no per-state file")
+        elif exact != want_mean:
+            why.append("exact %s/%s" % (exact, want_mean))
+        got_infeas = row["infeasible_pairs"]
+        if pool == "all" and int(got_infeas) != want_infeas:
+            why.append("infeasible %s/%d" % (got_infeas, want_infeas))
+        if why:
+            bad("%s %s k=%d depth=%d: %s (C/reference)"
+                % (label, pool, K, depth, "; ".join(why)))
         else:
-            ok("%s k=%d depth=%d: total %d, %d infeasible pairs"
-               % (label, K, depth, got_total, got_infeas))
+            ok("%s %s k=%d depth=%d: mean %s exact %s"
+               % (label, pool, K, depth, row["mean"], want_mean))
+
+
+def exact_from_states(path, K, tree, depth):
+    """The mean rebuilt as an exact Fraction from the C's per-state INTEGERS.
+
+    This is what makes the long-double summary trustworthy: the committed
+    per-state file is integers only, so the rational value is recoverable
+    however it was printed.  The early-finishing answers are not in that file --
+    they never reach the random guess -- so they come from the tree."""
+    if not os.path.exists(path):
+        return None
+    num, den = Fraction(0), Fraction(0)
+    for row in read_csv(path):
+        n, m = int(row["n"]), int(row["m"])
+        u, inf = int(row["u"]), int(row["infeasible"])
+        num += Fraction(K * (n * m - inf) + u, m)
+        den += Fraction(n * m - inf, m)
+    for aw, (n, steps) in tree.items():
+        if n <= K - 1:
+            num += n
+            den += 1
+    return num / den if den else None
 def check_coverage(seen):
     """C: a run that never met the awkward cases proves nothing about them."""
     print("C. coverage, asserted")
@@ -332,27 +417,43 @@ def check_coverage(seen):
             ok("%s occurred (%d)" % (msg, seen[name]))
         else:
             bad("%s NEVER occurred -- the check proves nothing about it" % msg)
+    # THE POOL HAS TO MATTER SOMEWHERE.  If every case happened to give the same
+    # answer under both pools, twenty passing diffs would say nothing at all
+    # about which pool the C actually drew from.
+    differed = [key for key, v in SEEN_MEANS.items()
+                if len(v) == 2 and v["all"] != v["compatible"]]
+    if differed:
+        ok("the two pools gave different answers (%d of %d cases)"
+           % (len(differed), len(SEEN_MEANS)))
+    else:
+        bad("the two pools NEVER differed -- nothing here distinguishes them")
 
 
 def check_refusals(tmp, tree_path):
     """D: every input that would quietly mean something else must EXIT."""
     print("D. the refusals")
     out = os.path.join(tmp, "refuse.csv")
+    P = ["--random-pool", "all"]
     cases = [
         ("no --out", ["--kth-random", "2", "--depth", "4",
-                      "--tree-file", tree_path], OPTTURNS),
+                      "--tree-file", tree_path] + P, OPTTURNS),
         ("no --depth", ["--kth-random", "2", "--tree-file", tree_path,
-                        "--out", out], OPTTURNS),
+                        "--out", out] + P, OPTTURNS),
+        ("no --random-pool", ["--kth-random", "2", "--depth", "4",
+                              "--tree-file", tree_path, "--out", out], OPTTURNS),
+        ("an unknown --random-pool", ["--kth-random", "2", "--depth", "4",
+                                      "--random-pool", "answers",
+                                      "--tree-file", tree_path, "--out", out], OPTTURNS),
         ("k past the cap", ["--kth-random", "5", "--depth", "4",
-                            "--tree-file", tree_path, "--out", out], OPTTURNS),
+                            "--tree-file", tree_path, "--out", out] + P, OPTTURNS),
         ("k=1 with a tree", ["--kth-random", "1", "--depth", "4",
-                             "--tree-file", tree_path, "--out", out], OPTTURNS),
+                             "--tree-file", tree_path, "--out", out] + P, OPTTURNS),
         ("k>1 with no tree", ["--kth-random", "2", "--depth", "4",
-                              "--out", out], OPTTURNS),
+                              "--out", out] + P, OPTTURNS),
         ("--topk", ["--kth-random", "2", "--depth", "4", "--topk", "3",
-                    "--tree-file", tree_path, "--out", out], OPTTURNS),
+                    "--tree-file", tree_path, "--out", out] + P, OPTTURNS),
         ("a non-normal binary", ["--kth-random", "2", "--depth", "4",
-                                 "--tree-file", tree_path, "--out", out], HARDTURNS),
+                                 "--tree-file", tree_path, "--out", out] + P, HARDTURNS),
     ]
     for name, args, binary in cases:
         if not os.path.exists(binary):
@@ -399,7 +500,7 @@ def check_broken_trees(tmp, tree_path):
         with open(path, "w") as f:
             f.write("\n".join(_render(*r) for r in rows) + "\n")
         r = run(["--kth-random", str(K), "--depth", str(depth),
-                 "--tree-file", path, "--out", out], data=tmp)
+                 "--random-pool", "all", "--tree-file", path, "--out", out], data=tmp)
         if r.returncode == 0:
             bad("%s was ACCEPTED" % name)
         else:
@@ -467,18 +568,29 @@ def check_standing_oracle():
         print("   skip  no k=1 row computed yet "
               "(bash solver/run-kth-random.sh --depth 6 -k 1)")
         return
-    totals = {r["word"]: r["total"] for r in paths.read_rows(paths.CSV_PATH)
+    totals = {r["word"]: int(r["total"]) for r in paths.read_rows(paths.CSV_PATH)
               if r.get("total")}
-    want = sum(int(v) for v in totals.values())
+    if len(totals) < 12972:
+        print("   skip  the opener sweep CSV is not complete (%d rows)" % len(totals))
+        return
+    answers = set(open(paths.MYSTERY_WORDS).read().split())
+    # `all` draws from every legal word, so k=1 is the sweep over all 12972;
+    # `compatible` draws from the words still consistent, which at k=1 is the
+    # 2315 answers -- so it is the SAME sweep averaged over a different opener
+    # set, and quoting one for the other is the mistake this catches.
+    want = {"all": sum(totals.values()) / len(totals) / 2315,
+            "compatible": (sum(v for w, v in totals.items() if w in answers)
+                           / len(answers) / 2315)}
     for name, row in found:
-        if len(totals) != int(row["pairs"]) // 2315:
-            print("   skip  %s: the sweep CSV is not complete" % name)
+        pool = row.get("pool")
+        if pool not in want:
+            bad("%s has a k=1 row with pool %r" % (name, pool))
             continue
-        if int(row["total"]) != want:
-            bad("%s k=1 total %s, but the opener sweep sums to %d"
-                % (name, row["total"], want))
+        if abs(float(row["mean"]) - want[pool]) > 5.01e-7:
+            bad("%s k=1 %s mean %s, but the opener sweep averages to %.6f"
+                % (name, pool, row["mean"], want[pool]))
         else:
-            ok("%s k=1 = %d = every opener's own optimal total, summed" % (name, want))
+            ok("%s k=1 %s = %.6f = the opener sweep averaged" % (name, pool, want[pool]))
 
 
 def main():
@@ -508,10 +620,13 @@ def main():
 
         print("B. the search and the accounting, against brute force")
         seen = {"early": 0, "won_at_k": 0, "infeasible": 0, "big_state": 0}
-        for opener, cases in (("crane", [(1, 4), (2, 4), (3, 4), (4, 4), (2, 3), (3, 3)]),
-                              ("roast", [(2, 4), (3, 4), (4, 4), (2, 3)])):
-            check_search(tmp, paths_by_opener[opener], read_tree(paths_by_opener[opener]),
-                         cases, opener, seen)
+        for pool in ("all", "compatible"):
+            for opener, cases in (("crane", [(1, 4), (2, 4), (3, 4), (4, 4),
+                                             (2, 3), (3, 3)]),
+                                  ("roast", [(2, 4), (3, 4), (4, 4), (2, 3)])):
+                check_search(tmp, paths_by_opener[opener],
+                             read_tree(paths_by_opener[opener]),
+                             cases, opener, seen, pool)
         check_coverage(seen)
         check_refusals(tmp, paths_by_opener["crane"])
         check_broken_trees(tmp, paths_by_opener["roast"])
