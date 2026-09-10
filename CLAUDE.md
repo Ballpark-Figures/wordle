@@ -1459,6 +1459,9 @@ Carlo, so its numbers carry a standard error and are not comparable with any
   different strategy, and same-size openings can come from rankings of very different
   quality.
 ### The opener RACE (`run-multiwordle-race.sh`) — the cascade as one process
+**Its estimator and its cut now live in `tools/race_stats.py`, shared with the
+wordlesim race** (see that section); the loop below stays its own, because only
+this one has a per-opening setup table to amortise.
 The staged cascade above (sweep, cut at N SE, re-sweep survivors at the next rung
 with a fresh seed, repeat) run as a SINGLE resumable process:
 **`bash solver/run-multiwordle-race.sh --strategy srank -k 16`** (from `math/`),
@@ -2044,6 +2047,68 @@ differences instead.
   coupled games are legal (every guess consistent, ending on the answer),
   `mean(A-B)` equals `mean(A)-mean(B)` exactly, and pairing must actually reduce
   the spread.
+
+### The opener RACE (`run-wordle-race.sh`) — the cascade as ONE process
+The `wordlesim` analogue of the multiwordle race, and the way to find a good
+opener now. **`bash solver/run-wordle-race.sh --fallback answer|guess
+[--second-from TABLE.csv]`** (from `math/`), attached, tee'd log, resumable —
+Ctrl-C and re-run the same command. Every opener starts on 100 games, anything
+more than `--sigma` (default **5**) PAIRED sigma behind the leader leaves the
+moment that becomes true, and the survivors double.
+- **IT REPLACES THE STAGED CASCADE**, which is still there and still works
+  (`run-wordle-sweep.sh --shortlist-from …` pass by pass, then
+  `run-wordle-paired.sh`) — same statistics, one process instead of a dozen
+  commands with the ladder and the seed advanced by hand.
+- **PAIRED FROM THE FIRST GAME**, which is why it can cut this early: every
+  opener plays the identical games AND the identical coin flips — one float per
+  decision, never `integers(n)`, the wordlesim lesson — so the cut uses the error
+  on the DIFFERENCE. Both errors are in every row. **So a race cell will NOT
+  match a sweep cell or a `run-wordle-sim.sh` run at the same seed**: the sweep
+  couples the ANSWERS only and draws its picks with `integers`. Same quantity,
+  different sampler, deliberately.
+- **IT IS A SCREEN AND IT ELIMINATES AGAINST A MOVING LEADER**, so a lucky first
+  hundred games can push a better opener out. The head of a race is **the best of
+  the openers ENTERED, judged on the games actually played** — never "the best
+  opener". The generous cut is a mitigation, not a proof.
+- **IT RANKS ON THE MEAN ONLY.** The win rate is reported per opener; nothing
+  cuts on it. The sweep's parallel `--rank win_rate` is deliberately absent
+  rather than half-built.
+- **`--fallback` is REQUIRED and `--second-from` is the other half of the
+  strategy** — with a table every opener plays its own predetermined second word
+  at the threshold, without one the opener is blind and the follow-up takes over.
+  Both are in the filename, and a table with no row for an opener in the field is
+  refused UP FRONT, so the `mystery` table cannot be raced over the 12972.
+- **`tools/race_stats.py` IS SHARED WITH THE MULTIWORDLE RACE** — the paired
+  difference, both standard errors, the block schedule, the pairwise switch and
+  the cut. Those are the one thing two races must not define twice. **The LOOP is
+  deliberately NOT shared**: multiwordle's has to amortise `minavg`'s per-opening
+  turn-2 table and this one has no setup at all, so one loop serving both would be
+  the § shared-helper failure rather than reuse. (Extracted 2026-09-10 and
+  verified bit-identical to the pre-extraction functions over 200 random
+  histories, with `checkmultiwordle.py` passing in full; the checkpoint format is
+  untouched, so a race halted before it resumes into it unchanged.)
+- **THE CHUNK SIZE IS A CHECKPOINT INTERVAL, NOT A PARAMETER OF THE ANSWER** —
+  games are seeded by INDEX, so any chunking plays the same games in the same
+  order. It is sized from the measured cost of the last chunk, since a field of
+  12972 and a field of 3 want very different numbers, and the gate asserts a
+  `--chunk 97` race equals a `--chunk 5` one.
+- **MEASURED 2026-09-10: the first block — all 12972 openers x 100 games under
+  the `answer` follow-up — takes 11 s and eliminates 2342 openers outright**,
+  leaving 10630. **THE TAIL IS THE EXPENSIVE PART, not the field**: once two or
+  three are left they play millions of games until one is 5 sigma clear (a
+  300-opener test ran to 3.28M). `--max-games N` bounds that, and stopping early
+  is fine — the standings are a real ranking of whatever has been played.
+- **THE STANDINGS ARE SWEEP-SHAPED** (`word,trials,mean,stderr,…` plus the same
+  `# settings` and `# lineage` lines), so `sweep_shortlist.py` and
+  `paired_compare.py` read a race exactly as they read a sweep — a finished race
+  can hand its survivors straight to a paired round.
+- Data: standings + eliminations in `data/shared/wordlesim/race_*`, checkpoint
+  and log under `data/local/wordlesim/`.
+- **Gated in `checkwordlesim.py`**: the games are a function of (seed, game
+  index) alone, regrowing the coin-flip array extends the same stream, the cursor
+  reproduces its row, a chunk equals the same games played one at a time, and a
+  resume, the pairwise switch and the chunk size all change nothing. Mutation-
+  tested by seeding the games per chunk instead of per index.
 
 ### `gray-second` — a PREDETERMINED second word, played only on enough greys
 A `wordlesim` strategy, and a table that feeds it (the user's, 2026-09-10): play
