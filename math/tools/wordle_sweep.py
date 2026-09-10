@@ -24,6 +24,16 @@ to a singleton -- so the best pair for THIS objective need not be near its head,
 and a pair outside the top N is never examined at all.  Say "the best of the N
 screened", never "the best pair".
 
+--second-from SWEEPS A DIFFERENT RULE, and it is opt-in.  Given a second-word
+table (math/secondword.py, built by solver/run-second-word.sh) every swept opener
+is played under `SecondWordOnGrays` instead of `FixedOpening`: the opener, then
+THAT opener's predetermined word whenever the reply shows the table's threshold
+worth of greys, then the follow-up.  It is a different strategy, so it lands in
+the stem and in the `# settings` line, and a later pass INHERITS it from its
+source -- the scar that split the win-rate cascade into two strategies spliced
+together.  The table's own opener pool is checked against the list being swept,
+so a `mystery` table cannot be swept over the 12972 by accident.
+
 THE FOLLOW-UP IS PART OF THE QUESTION, not a detail: "which opener is best" has a
 different answer under a random compatible ANSWER than under a random compatible
 GUESS, because the opener is feeding a different player.  So it is required, it
@@ -77,8 +87,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from build_patterns import load_patterns  # noqa: E402
 from wordle import load_words  # noqa: E402
 from wordle_sim import summarise  # noqa: E402
+from secondword import read_table  # noqa: E402
 from wordlesim import (WIN_WITHIN, answer_to_guess, draw_answer,  # noqa: E402
-                       make_opening_rule, make_tail, play_game)
+                       make_opening_rule, make_tail, play_game,
+                       second_rule_for)
 
 COLUMNS = ("word,trials,mean,stderr,sd,min,median,max,"
            "win_rate,win_rate_stderr,wins,seconds")
@@ -90,6 +102,7 @@ def parse_args(argv):
     t = None
     fallback = None
     adapt = 0
+    second_from = ""
     root = ""
     passno = 1
     source = ""
@@ -115,6 +128,8 @@ def parse_args(argv):
             source = argv[i + 1]; i += 2
         elif a == "--pair-adaptive":
             adapt = int(argv[i + 1]); i += 2
+        elif a == "--second-from":
+            second_from = argv[i + 1]; i += 2
         elif a == "--fallback":
             fallback = argv[i + 1]; i += 2
         elif a == "--seed":
@@ -146,8 +161,15 @@ def parse_args(argv):
             "Use the wrapper, which sets it: bash solver/run-wordle-sweep.sh")
     if rank not in ("mean", "win_rate"):
         raise SystemExit("--rank must be 'mean' or 'win_rate'")
+    if second_from and adapt:
+        # Two rules for the same turn.  --pair-adaptive abandons a blind opening
+        # once the field is tiny; this plays a fixed word off the opener's reply.
+        # Whatever the combination would mean, it is a THIRD strategy and would
+        # need its own name and its own filename.
+        raise SystemExit("--second-from and --pair-adaptive are two different "
+                         "rules for the second word; pick one")
     return (t, fallback, adapt, seed, words, limit, win_within, out, progress,
-            root, passno, source, rank)
+            root, passno, source, rank, second_from)
 
 
 def load_done(path):
@@ -164,16 +186,23 @@ def load_done(path):
     return done
 
 
-def sweep_word(pat, ans2g, na, t, seed, opening_g, tail, win_within, adapt=0):
+def sweep_word(pat, ans2g, na, t, seed, opening_g, tail, win_within, adapt=0,
+               make_rule=None):
     """One opening's t games, against the seed's fixed sequence of answer draws.
 
     `opening_g` is a list of guess indices -- one for a plain opener sweep, more
     for an opening.  The draw stream is re-seeded here, so every entry of the
     sweep faces the identical games however many words it plays.
+
+    `make_rule` swaps in a DIFFERENT rule for the same opening -- what
+    --second-from does -- and is built once in main() so this loop does not know
+    which strategy is being swept.  Left out, it is the blind/adaptive opening
+    every earlier sweep here ran, unchanged.
     """
     draw_rng = np.random.default_rng(seed)
     pick_rng = np.random.default_rng(seed + PICK_OFFSET)
-    rule = make_opening_rule(opening_g, tail=tail, adapt=adapt)
+    rule = (make_rule(opening_g) if make_rule
+            else make_opening_rule(opening_g, tail=tail, adapt=adapt))
     scores = []
     for _ in range(t):
         answer_idx = draw_answer(na, draw_rng)
@@ -184,7 +213,7 @@ def sweep_word(pat, ans2g, na, t, seed, opening_g, tail, win_within, adapt=0):
 
 def main(argv):
     (t, fallback, adapt, seed, words, limit, win_within, out, progress,
-     root, passno, source, rank) = parse_args(argv)
+     root, passno, source, rank, second_from) = parse_args(argv)
 
     guesses = load_words("guess")
     answers = load_words("mystery")
@@ -217,6 +246,17 @@ def main(argv):
         raise SystemExit("--pair-adaptive needs an opening of at least 2 words: "
                          "there is no later word to abandon")
 
+    # --second-from: the rule is built per opener from the TABLE, and the table
+    # is read once.  second_rule_for refuses an opener it has no row for, which
+    # is what stops one variant's table being swept over the other's word list.
+    table = make_rule = None
+    if second_from:
+        if sizes[0] != 1:
+            raise SystemExit("--second-from sweeps ONE opener per entry; this "
+                             "list holds openings of %d words" % sizes[0])
+        table = read_table(second_from)
+        make_rule = lambda opening_g: second_rule_for(opening_g, table, guesses)
+
     pat = np.array(load_patterns())
     ans2g = answer_to_guess(answers, guesses)
     tail = make_tail(fallback, guesses, answers, ans2g)
@@ -224,6 +264,19 @@ def main(argv):
 
     if limit is not None:
         sweep_words = sweep_words[:limit]
+    if table:
+        # UP FRONT, not when the sweep reaches the first opener with no row: a
+        # table built over one pool and swept over another would otherwise write
+        # rows for a while and then die, leaving a partial CSV that looks like a
+        # run someone killed.
+        missing = [w for w in sweep_words if w.split()[0] not in table.rows]
+        if missing:
+            raise SystemExit(
+                "%d of the %d openings have no row in %s (e.g. %s).\n"
+                "It was built over the %s opener pool -- sweep the matching word "
+                "list, or build the table for this one."
+                % (len(missing), len(sweep_words), second_from,
+                   " ".join(missing[:5]), table.openers))
     done = load_done(out)
     todo = [w for w in sweep_words if " ".join(w.split()) not in done]
 
@@ -247,10 +300,21 @@ def main(argv):
             # to reproduce this run's STRATEGY, in one line that no rewording of
             # the paragraphs below can break.
             fh.write("# settings follow_up=%s pair_adaptive=%d win_within=%d "
-                     "trials=%d seed=%d words=%d rank=%s\n"
+                     "trials=%d seed=%d words=%d rank=%s second_table=%s "
+                     "min_grays=%d\n"
                      % (fallback, adapt, win_within, t, seed, len(sweep_words),
-                        rank))
-            if adapt:
+                        rank, second_from or "-",
+                        table.min_grays if table else 0))
+            if table:
+                fh.write("# each opener plays the PREDETERMINED second word from "
+                         "%s whenever its\n# reply shows at least %d greys, and "
+                         "declines to the follow-up otherwise\n"
+                         "# (math/secondword.py; pools openers=%s seconds=%s)\n"
+                         % (second_from, table.min_grays, table.openers,
+                            table.seconds))
+            if table:
+                pass                       # the table's own lines above say it
+            elif adapt:
                 fh.write("# %d-word openings, played in order but ABANDONED once "
                          "the follow-up is down to %d\n# or fewer words "
                          "(--pair-adaptive, the rule in data/shared/PAIRS.md); "
@@ -276,7 +340,8 @@ def main(argv):
     print("sweep: %d %s x %d trials, follow-up %s, seed %d%s"
           % (len(todo), "openings of %d words" % sizes[0] if sizes[0] > 1 else "words",
              t, fallback, seed,
-             ", pair-adaptive %d" % adapt if adapt else ", blind"))
+             ", second word at %d+ greys from %s" % (table.min_grays, second_from)
+             if table else (", pair-adaptive %d" % adapt if adapt else ", blind")))
     if done and not todo:
         # SAY SO PLAINLY.  This used to print "resuming: N words already in ..."
         # and then "0 words in 0.0s", which reads like a failed run rather than a
@@ -295,7 +360,7 @@ def main(argv):
     for i, w in enumerate(todo):
         w0 = time.time()
         st = sweep_word(pat, ans2g, na, t, seed, [pos[x] for x in w.split()],
-                        tail, win_within, adapt)
+                        tail, win_within, adapt, make_rule)
         dt = time.time() - w0
         if fh:
             fh.write("%s,%d,%.6f,%.6f,%.6f,%d,%.1f,%d,%.6f,%.6f,%d,%.3f\n"

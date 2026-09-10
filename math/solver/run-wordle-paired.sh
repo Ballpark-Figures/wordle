@@ -12,7 +12,8 @@
 # difference.  tools/paired_compare.py states the estimator and the couplings.
 #
 # EVERYTHING IS READ FROM THE SOURCE FILE: the finalists, the follow-up, the
-# --pair-adaptive threshold, the trial count and the seed.  Comparing finalists
+# --pair-adaptive threshold, the SECOND-WORD TABLE (--second-from, if the
+# cascade ran under one), the trial count and the seed.  Comparing finalists
 # under a different strategy from the one that selected them would be a different
 # experiment wearing the same name, so the sweep's own settings are the defaults.
 # The SEED is the one exception -- it advances by one, because the finalists were

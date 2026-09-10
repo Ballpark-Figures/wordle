@@ -53,7 +53,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 from build_patterns import load_patterns  # noqa: E402
 from wordle import ALL_GREEN, load_words  # noqa: E402
-from wordlesim import (answer_to_guess, make_opening_rule,  # noqa: E402
+from secondword import read_table  # noqa: E402
+from wordlesim import (answer_to_guess, make_opening_rule, second_rule_for,  # noqa: E402
                        make_tail, draw_answer)
 
 
@@ -127,6 +128,11 @@ def read_sweep_settings(path):
     out = {"openings": rows}
     r = re.search(r"# settings .*rank=(\w+)", blob)
     out["rank"] = r.group(1) if r else "mean"
+    # THE SECOND-WORD TABLE IS PART OF THE STRATEGY, so it travels with the
+    # settings exactly as the follow-up and pair_adaptive do.  Absent (every file
+    # written before it existed) means the blind rule, which is what "-" records.
+    r = re.search(r"# settings .*second_table=(\S+)", blob)
+    out["second_table"] = "" if not r or r.group(1) == "-" else r.group(1)
     m = re.search(r"# settings follow_up=(\w+) pair_adaptive=(\d+) "
                   r"win_within=(\d+) trials=(\d+) seed=(\d+)", blob)
     if m:
@@ -174,6 +180,7 @@ def parse_args(argv):
     src = sweep = out = None
     fallback = None
     adapt = None
+    second_from = None
     t = None
     seed = None
     top = None
@@ -207,6 +214,8 @@ def parse_args(argv):
             fallback = argv[i + 1]; i += 2
         elif a == "--pair-adaptive":
             adapt = int(argv[i + 1]); i += 2
+        elif a == "--second-from":
+            second_from = argv[i + 1]; i += 2
         elif a in ("-t", "--trials"):
             t = int(argv[i + 1]); i += 2
         elif a == "--seed":
@@ -229,6 +238,10 @@ def parse_args(argv):
             fallback = meta["fallback"]
         if adapt is None:
             adapt = meta["adapt"]
+        if second_from is None:
+            # the finalists were selected UNDER this table; comparing them
+            # without it would settle a different strategy's shortlist
+            second_from = meta.get("second_table", "")
         if rank is None:
             # the ranking belongs to the CASCADE, not to one command
             rank = meta.get("rank", "mean")
@@ -252,6 +265,12 @@ def parse_args(argv):
             seed = meta["seed"] + 1
     if adapt is None:
         adapt = 0
+    if second_from is None:
+        second_from = ""
+    if second_from and adapt:
+        raise SystemExit("--second-from and --pair-adaptive are two different "
+                         "rules for the second word; pick one")
+    table = read_table(second_from) if second_from else None
     if rank is None:
         rank = "mean"
     if rank not in ("mean", "win_rate"):
@@ -283,18 +302,20 @@ def parse_args(argv):
             fallback, root, meta["pass"] if meta else 0, rnd, t, seed)
         if adapt:
             stem += "_adapt%d" % adapt
+        if table:
+            stem += "_g%d" % table.min_grays
         if rank != "mean":
             stem += "_win"
         print(stem)
         print(len(openings))
         raise SystemExit(0)
     return (sweep or src, openings, fallback, adapt, t, seed, out, progress,
-            meta, sigma_cut, rank)
+            meta, sigma_cut, rank, second_from, table)
 
 
 def main(argv):
     (src, openings, fallback, adapt, t, seed, out, progress, meta,
-     sigma_cut, rank) = parse_args(argv)
+     sigma_cut, rank, second_from, table) = parse_args(argv)
 
     guesses = load_words("guess")
     answers = load_words("mystery")
@@ -311,8 +332,20 @@ def main(argv):
 
     base = make_tail(fallback, guesses, answers, ans2g)
     tail = CoupledDraw(base)
-    rules = [make_opening_rule([pos[w] for w in o.split()], tail=tail, adapt=adapt)
-             for o in openings]
+    # ONE PLACE BUILDS THE RULE, and it is the sweep's -- so the finalists are
+    # played under exactly the strategy that selected them.
+    if table:
+        missing = [o for o in openings if o.split()[0] not in table.rows]
+        if missing:
+            raise SystemExit("%s has no row for %s -- it was built over the %s "
+                             "opener pool" % (second_from, " ".join(missing[:5]),
+                                              table.openers))
+        rules = [second_rule_for([pos[w] for w in o.split()], table, guesses)
+                 for o in openings]
+    else:
+        rules = [make_opening_rule([pos[w] for w in o.split()], tail=tail,
+                                   adapt=adapt)
+                 for o in openings]
     n = len(openings)
 
     # pairwise accumulators: no per-game storage, so t can be as large as it likes
@@ -323,7 +356,10 @@ def main(argv):
     answer_rng = np.random.default_rng(seed)
 
     print("paired compare: %d openings, %d games each, follow-up %s, "
-          "pair-adaptive %d, seed %d" % (n, t, fallback, adapt, seed), flush=True)
+          "%s, seed %d"
+          % (n, t, fallback,
+             ("second word at %d+ greys from %s" % (table.min_grays, second_from))
+             if table else "pair-adaptive %d" % adapt, seed), flush=True)
     print("  answers AND the follow-up's coin flips are coupled across openings",
           flush=True)
     t0 = time.time()
@@ -363,9 +399,15 @@ def main(argv):
 
     lead = order[0]
     lines = []
+    # NAME THE STRATEGY, not just its adaptive threshold: this prose is what a
+    # human reads off the file, and "pair-adaptive 0" beside a second-word table
+    # describes the blind rule the run did NOT use.
     lines.append("paired comparison of %d openings, %d games, follow-up %s, "
-                 "pair-adaptive %d, seed %d, ranked on %s"
-                 % (n, t, fallback, adapt, seed,
+                 "%s, seed %d, ranked on %s"
+                 % (n, t, fallback,
+                    ("second word at %d+ greys from %s"
+                     % (table.min_grays, os.path.basename(second_from)))
+                    if table else "pair-adaptive %d" % adapt, seed,
                     "WIN RATE" if rank == "win_rate" else "mean guesses"))
     if meta:
         lines.append("settings and finalists taken from %s (root %s, pass %d)"
@@ -409,8 +451,10 @@ def main(argv):
         # the same machine-readable lines a sweep writes, so THIS file can be the
         # source of the next round: settings, lineage, and which round it is
         f.write("# settings follow_up=%s pair_adaptive=%d win_within=6 "
-                "trials=%d seed=%d words=%d rank=%s\n"
-                % (fallback, adapt, t, seed, n, rank))
+                "trials=%d seed=%d words=%d rank=%s second_table=%s "
+                "min_grays=%d\n"
+                % (fallback, adapt, t, seed, n, rank, second_from or "-",
+                   table.min_grays if table else 0))
         f.write("# lineage root=%s pass=%d round=%d source=%s\n"
                 % (meta["root"] if meta else "openings",
                    meta["pass"] if meta else 0, rnd,

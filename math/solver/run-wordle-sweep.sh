@@ -170,6 +170,7 @@ BOTHORDERS=0
 ALLORDERS=0
 BESTORDER=-1        # -1 = decide from --pair-adaptive; 0/1 = the user said so
 ADAPT=0
+SECONDFROM=""
 DRYRUN=0
 ROOT=""
 PASSNO=1
@@ -196,6 +197,7 @@ while [ $# -gt 0 ]; do
         --best-order)       BESTORDER=1;     shift 1 ;;
         --no-best-order)    BESTORDER=0;     shift 1 ;;
         --pair-adaptive)    ADAPT="$2";      shift 2 ;;
+        --second-from)      SECONDFROM="$2"; shift 2 ;;
         --rank)             RANK="$2";       shift 2 ;;
         --dry-run)          DRYRUN=1;        shift 1 ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
@@ -233,6 +235,20 @@ case "$ADAPT" in
     ''|*[!0-9]*) echo "--pair-adaptive must be a non-negative number of words" >&2
                  exit 1 ;;
 esac
+# --second-from names a strategy, so it is validated here and lands in the stem.
+# It is REFUSED alongside --pair-adaptive: both are rules for the second word,
+# and whatever the combination would mean it is a THIRD strategy needing its own
+# name.  The threshold comes off the table's OWN stamp rather than being retyped
+# -- one owner for the objective, and a table that cannot say what it is gets
+# refused by tools/secondword.py before any games are played.
+MINGRAYS=0
+if [ -n "$SECONDFROM" ]; then
+    if [ "$ADAPT" != 0 ]; then
+        echo "--second-from and --pair-adaptive are two different rules for the" >&2
+        echo "  second word; pick one." >&2
+        exit 1
+    fi
+fi
 # ONE FLAG, ONE MEANING.  Ranking by win rate and CUTTING by win rate are the
 # same decision -- a cascade that cut on one and reported the other would be
 # neither -- so --rank sets both, and it is in the stem because a win-rate
@@ -345,6 +361,16 @@ if [ -n "$OPENFROM" ]; then
     ROOT=$(echo "$ROOT" | sed -E 's/(_se[0-9]+|_adapt[0-9]+)+$//')
 fi
 
+# STAGE 1 OVER A PLAIN WORD LIST: the lineage root is the LIST.  It used to be
+# left empty, which put a double underscore in the stem and -- the part that
+# mattered -- gave `--words guess` and `--words mystery` THE SAME FILENAME, so a
+# mystery sweep would resume from a guess sweep's rows and silently mix two word
+# lists into one file.  Nothing on disk carries the empty form: every committed
+# single-word sweep predates the lineage scheme entirely.
+if [ -z "$SHORTFROM" ] && [ -z "$OPENFROM" ] && [ -z "$ROOT" ]; then
+    ROOT=$(basename "$WORDS" .txt)
+fi
+
 if [ -n "$SHORTFROM" ]; then
     [ -f "$SHORTFROM" ] || { echo "no such sweep: $SHORTFROM" >&2; exit 1; }
     [ "$WORDS" = "guess" ] || {
@@ -370,6 +396,25 @@ if [ -n "$SHORTFROM" ]; then
     if [ -n "$SRCADAPT" ] && [ "$ADAPT" = 0 ] && [ "$SRCADAPT" != 0 ]; then
         ADAPT="$SRCADAPT"
         echo "pair-adaptive: inherited $ADAPT from the source"
+    fi
+    # THE SECOND-WORD TABLE IS A PROPERTY OF THE CASCADE TOO.  Same scar, same
+    # cure: a pass that dropped it would screen one strategy and test another on
+    # the shortlist the first had chosen, and the stem would not even say so.
+    SRCSECOND=$(sed -n 's/^# settings .*second_table=\([^ ]*\).*/\1/p' "$SHORTFROM" | head -1)
+    if [ -n "$SRCSECOND" ] && [ "$SRCSECOND" != "-" ]; then
+        if [ -z "$SECONDFROM" ]; then
+            SECONDFROM="$SRCSECOND"
+            echo "second-word table: inherited $SECONDFROM from the source"
+        elif [ "$SECONDFROM" != "$SRCSECOND" ]; then
+            echo "REFUSING: $SRCSTEM was swept with the table $SRCSECOND, but this" >&2
+            echo "  pass was given $SECONDFROM.  A cascade is ONE strategy all the" >&2
+            echo "  way down; two tables would splice two of them together." >&2
+            exit 1
+        fi
+    elif [ -n "$SECONDFROM" ] && [ -n "$SRCSECOND" ]; then
+        echo "REFUSING: $SRCSTEM was swept WITHOUT a second-word table, so its" >&2
+        echo "  shortlist was chosen under a different strategy from this one." >&2
+        exit 1
     fi
     SRCRANK=$(sed -n 's/^# settings .*rank=\([a-z_]*\).*/\1/p' "$SHORTFROM" | head -1)
     if [ -n "$SRCRANK" ] && [ "$RANK" = mean ]; then
@@ -481,7 +526,19 @@ echo "pass $STAGE: a progress line every $PROGRESS word(s)"
 # RECOVERED from an old nested stem -- everything after `openings_`, with the
 # accumulated `_se<N>`/`_adapt<N>` suffixes stripped -- so the cascades already in
 # flight under the old names continue without being restarted.
+if [ -n "$SECONDFROM" ]; then
+    [ -f "$SECONDFROM" ] || { echo "no such second-word table: $SECONDFROM" >&2
+                              echo "  Build one: bash solver/run-second-word.sh" >&2
+                              exit 1; }
+    MINGRAYS=$(sed -n 's/^# settings .*min_grays=\([0-9]*\).*/\1/p' "$SECONDFROM" | head -1)
+    [ -n "$MINGRAYS" ] || { echo "$SECONDFROM carries no '# settings' stamp, so it" >&2
+                            echo "  cannot say which threshold it was built at." >&2
+                            exit 1; }
+fi
 STEM="sweep_${FALLBACK}_${ROOT}_p${PASSNO}_t${T}_s${SEED}"
+# The threshold is the objective, so it is in the name -- and a cascade under a
+# table is a different experiment from a blind one off the same root and pass.
+[ -z "$SECONDFROM" ] || STEM="${STEM}_g${MINGRAYS}"
 # N is part of the objective, so it is in the name; 0 keeps the blind stem every
 # earlier sweep already used.
 [ "$ADAPT" = 0 ] || STEM="${STEM}_adapt${ADAPT}"
@@ -512,6 +569,7 @@ if [ "$DRYRUN" = 1 ]; then
     echo "  words   $WORDS"
     echo "  lineage root $ROOT, pass $PASSNO"
     echo "  trials  $T   seed $SEED   follow-up $FALLBACK   pair-adaptive $ADAPT   rank $RANK"
+    [ -z "$SECONDFROM" ] || echo "  second  $SECONDFROM (fires at $MINGRAYS+ greys)"
     echo "  progress every $PROGRESS opening(s)"
     exit 0
 fi
@@ -525,6 +583,7 @@ FLAGS="-t $T --fallback $FALLBACK --seed $SEED --words $WORDS --win-within $WIN 
 FLAGS="$FLAGS --root $ROOT --pass $PASSNO"
 [ -n "$SHORTFROM" ] && FLAGS="$FLAGS --source $(basename "$SHORTFROM")"
 [ "$ADAPT" = 0 ] || FLAGS="$FLAGS --pair-adaptive $ADAPT"
+[ -z "$SECONDFROM" ] || FLAGS="$FLAGS --second-from $SECONDFROM"
 [ "$RANK" = mean ] || FLAGS="$FLAGS --rank $RANK"
 [ -n "$LIMIT" ] && FLAGS="$FLAGS --limit $LIMIT"
 FLAGS="$FLAGS --progress $PROGRESS"
