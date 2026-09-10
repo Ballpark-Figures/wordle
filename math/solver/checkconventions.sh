@@ -125,6 +125,22 @@ $(sed -n '/^if \[ \$# -eq 0 \]/,/^fi/p' solver/build.sh | grep '^ *gcc ')
 EOF
 [ "$ompfail" -eq 0 ] && echo "   ok   every solver in build.sh is parallel or explains itself"
 
+# ------------------------------------- 7. no wrapper clobbers a shell built-in
+# `GROUPS` is a bash BUILT-IN ARRAY of the user's group ids.  Assigning to it
+# writes element 0 and reading `$GROUPS` back gives a gid -- 20 (`staff`) on
+# macOS -- so a wrapper that used it for its own list silently built its command
+# line out of a group number.  It looks exactly like a quoting bug and cost half
+# an hour.  The others here are the same shape: assign them and the shell's own
+# behaviour changes under you.
+echo "7. no wrapper assigns a shell built-in variable"
+builtin_re='^[[:space:]]*(GROUPS|SECONDS|RANDOM|LINENO|PWD|OLDPWD|IFS|PPID|UID|EUID|BASH_[A-Z]*|FUNCNAME|HOSTNAME|SHLVL|OPTARG|OPTIND|REPLY|HISTFILE)='
+if grep -nE "$builtin_re" solver/run-*.sh >/dev/null 2>&1; then
+    grep -nE "$builtin_re" solver/run-*.sh
+    bad "a wrapper assigns a shell built-in variable (see the lines above)"
+else
+    echo "   ok   no wrapper assigns one"
+fi
+
 echo
 if [ "$fail" -eq 0 ]; then echo "all solver conventions hold"; else echo "CONVENTION FAILURES -- see above"; fi
 exit $fail

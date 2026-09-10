@@ -5,6 +5,8 @@
 #     bash solver/run-second-word.sh                          # from math/, or anywhere
 #     bash solver/run-second-word.sh --variant mystery
 #     bash solver/run-second-word.sh --min-grays 4
+#     bash solver/run-second-word.sh --by-grays 3          # a word PER grey count
+#     bash solver/run-second-word.sh --group e5 --group e4+e3
 #     bash solver/run-second-word.sh --limit 500 --dry-run
 #
 # WHAT IT COMPUTES.  For every opener, the one word to commit to in advance for
@@ -14,6 +16,15 @@
 # sum of squared joint-bucket sizes over the qualifying replies, divided by how
 # many answers qualify.  math/secondword.py states it exactly and is the source
 # of truth; solver/secondword.c implements it.
+#
+# --group SPEC IS THE GENERAL FORM: one bucket of replies with its OWN second
+# word, repeated for a partition.  A spec is terms joined by `+`: g<N> (greys >=
+# N), e<N> (greys == N exactly), <G>g<Y>y (that composition).  So a separate word
+# for five, four and three greys is --group e5 --group e4 --group e3, which
+# --by-grays 3 writes out for you.  GROUPS MUST BE DISJOINT -- a reply in two of
+# them would have two predetermined words and no rule for choosing -- and a reply
+# in no group DECLINES to the follow-up.  --min-grays / --fire are the one-group
+# sugar and are unchanged.
 #
 # --fire G,Y ADDS ONE COMPOSITION to the firing condition, on top of the
 # --min-grays threshold.  `--min-grays 3 --fire 0,3` fires on every reply with
@@ -63,6 +74,12 @@ MATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VARIANT=guess
 MINGRAYS=3
 FIRE=""
+# NOT `GROUPS`: bash has a BUILT-IN array of that name holding the user's group
+# ids, so assigning to it writes element 0 and reading it back gives a gid (20,
+# `staff`, on macOS).  It fails silently and looks like a quoting bug.
+GSPECS=""
+BYGRAYS=""
+GIVEN=0
 LIMIT=0
 THREADS=0
 DRY=0
@@ -72,6 +89,8 @@ while [ $# -gt 0 ]; do
         --variant)    VARIANT="$2"; shift 2 ;;
         --min-grays)  MINGRAYS="$2"; shift 2 ;;
         --fire)       FIRE="$FIRE --fire $2"; shift 2 ;;
+        --group)      GSPECS="$GSPECS --group $2"; GIVEN=1; shift 2 ;;
+        --by-grays)   BYGRAYS="$2"; GIVEN=1; shift 2 ;;
         --limit)      LIMIT="$2"; shift 2 ;;
         --threads)    THREADS="$2"; shift 2 ;;
         --dry-run)    DRY=1; shift ;;
@@ -85,12 +104,33 @@ case "$VARIANT" in
     *) echo "--variant must be 'guess' (the 12972) or 'mystery' (the 2315)" >&2
        exit 1 ;;
 esac
-case "$MINGRAYS" in
-    ''|*[!0-9]*) echo "--min-grays must be a number of grey tiles (0-5)" >&2; exit 1 ;;
-esac
-if [ "$MINGRAYS" -lt 1 ] || [ "$MINGRAYS" -gt 5 ]; then
-    echo "--min-grays $MINGRAYS: a reply has 5 tiles, and 0 would fire every game" >&2
-    exit 1
+# --by-grays N is the sugar for "a SEPARATE word for each grey count from 5 down
+# to N", which is the same partition written out as --group e5 --group e4 ...
+if [ -n "$BYGRAYS" ]; then
+    case "$BYGRAYS" in
+        ''|*[!0-9]*) echo "--by-grays must be a number of grey tiles" >&2; exit 1 ;;
+    esac
+    n=5
+    while [ "$n" -ge "$BYGRAYS" ]; do
+        GSPECS="$GSPECS --group e$n"
+        n=$((n - 1))
+    done
+fi
+if [ "$GIVEN" = 0 ]; then
+    case "$MINGRAYS" in
+        ''|*[!0-9]*) echo "--min-grays must be a number of grey tiles (0-5)" >&2
+                     exit 1 ;;
+    esac
+    if [ "$MINGRAYS" -lt 1 ] || [ "$MINGRAYS" -gt 5 ]; then
+        echo "--min-grays $MINGRAYS: a reply has 5 tiles, and 0 would fire every game" >&2
+        exit 1
+    fi
+    SPEC="--min-grays $MINGRAYS$FIRE"
+else
+    [ -z "$FIRE" ] || { echo "--fire is sugar for the one-group case; inside a "\
+        "--group partition, put the composition in the group's own spec" >&2
+        exit 1; }
+    SPEC="$GSPECS"
 fi
 case "$LIMIT" in
     ''|*[!0-9]*) echo "--limit must be a number of openers" >&2; exit 1 ;;
@@ -112,13 +152,13 @@ LOC=data/local/secondword
 # in shell: the canonical label drops an --fire the threshold already covers and
 # sorts the rest, so two spellings of one rule cannot make two filenames -- and
 # that canonicalisation has exactly one owner.
-LABEL=$($BIN --min-grays $MINGRAYS$FIRE --print-label) || exit 1
+LABEL=$($BIN $SPEC --print-label) || exit 1
 STEM="second_${VARIANT}_${LABEL}"
 [ "$LIMIT" = 0 ] || STEM="${STEM}_limit${LIMIT}"
 OUT="$OUTDIR/$STEM.csv"
 LOG="$LOC/$STEM.log"
 
-FLAGS="--min-grays $MINGRAYS$FIRE --openers $POOL --seconds $POOL"
+FLAGS="$SPEC --openers $POOL --seconds $POOL"
 FLAGS="$FLAGS --openers-name $VARIANT --seconds-name $VARIANT"
 [ "$LIMIT" = 0 ]   || FLAGS="$FLAGS --limit $LIMIT"
 [ "$THREADS" = 0 ] || FLAGS="$FLAGS --threads $THREADS"

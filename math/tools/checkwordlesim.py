@@ -93,7 +93,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 from build_patterns import load_patterns  # noqa: E402
 from wordle import ALL_GREEN, load_words, pattern  # noqa: E402
-from secondword import Table, fire_set, gray_counts  # noqa: E402
+from secondword import (Table, fire_groups, fire_set,  # noqa: E402
+                        gray_counts)
 from wordlesim import (WIN_WITHIN, CoupledDraw, answer_to_guess,  # noqa: E402
                        draw_answer,
                        fixed_opening, make_opening_rule, make_strategy,
@@ -1035,11 +1036,17 @@ def main(argv):
     gs_opener_g, gs_second_g, GS_MIN = 0, 1, 3
     GS_MASK, GS_LABEL = fire_set(GS_MIN)
     gs_fires = lambda tiles: sum(1 for t in tiles if t == 0) >= GS_MIN
+    def by_code(second_g, mask=GS_MASK):
+        """The rule as the table hands it over: reply code -> guess index."""
+        a = np.full(len(mask), -1, dtype=np.int32)
+        if second_g is not None:
+            a[mask] = second_g
+        return a
     gs_opener, gs_second = guesses[gs_opener_g], guesses[gs_second_g]
     gs_fired = gs_declined = 0
     for tname, pool in (("answer", answers), ("guess", guesses)):
         gtail = make_tail(tname, guesses, answers, ans2g)
-        rule = make_second_rule(gs_opener_g, gs_second_g, GS_MASK)
+        rule = make_second_rule(gs_opener_g, by_code(gs_second_g))
         for seed in range(min(games, 80 if tname == "answer" else guess_games)):
             fast_rng = np.random.default_rng(7000 + seed)
             ref_rng = np.random.default_rng(7000 + seed)
@@ -1090,7 +1097,7 @@ def main(argv):
                         "the threshold was not exercised at its edge" % GS_MIN)
     else:
         btail = make_tail("answer", guesses, answers, ans2g)
-        rule = make_second_rule(gs_opener_g, gs_second_g, GS_MASK)
+        rule = make_second_rule(gs_opener_g, by_code(gs_second_g))
         for n, a_idx in sorted(boundary.items()):
             # the tiles are recounted from the STRINGS, so the case really is the
             # one it claims to be
@@ -1114,7 +1121,7 @@ def main(argv):
     # constructed too, because random play meets them rarely and the whole rule
     # turns on telling them apart.
     cmask, clabel = fire_set(GS_MIN, [(0, 3)])
-    crule = make_second_rule(gs_opener_g, gs_second_g, cmask)
+    crule = make_second_rule(gs_opener_g, by_code(gs_second_g, cmask))
     ctail2 = make_tail("answer", guesses, answers, ans2g)
     want = {(0, 3): True, (1, 2): False, (2, 1): False, (3, 0): False}
     seen = {}
@@ -1143,7 +1150,7 @@ def main(argv):
     # AN EMPTY TABLE ROW MAKES IT THE PLAIN OPENER.  An opener no answer can give
     # that many greys has nothing to choose, and the rule must then never speak
     # after turn one rather than play something arbitrary.
-    empty_rule = make_second_rule(gs_opener_g, None, GS_MASK)
+    empty_rule = make_second_rule(gs_opener_g, by_code(None))
     etail = make_tail("answer", guesses, answers, ans2g)
     plain = make_opening_rule([gs_opener_g], tail=etail, adapt=0)
     for seed in range(20):
@@ -1161,8 +1168,10 @@ def main(argv):
     # THE TABLE PATH, AND WHAT IT REFUSES.  second_rule_for is what the sweep and
     # the paired comparison both call, so it is checked rather than the class.
     tbl = Table(path="(synthetic)", min_grays=GS_MIN, fire=GS_LABEL,
-                openers="guess", seconds="guess", answers=len(answers),
-                rows={gs_opener: gs_second, guesses[2]: None})
+                groups=[(GS_LABEL, GS_MASK)], openers="guess", seconds="guess",
+                answers=len(answers),
+                rows={gs_opener: {GS_LABEL: gs_second},
+                      guesses[2]: {GS_LABEL: None}})
     r = second_rule_for([gs_opener_g], tbl, guesses)
     if r(turn=0, alive=None, played=[], replies=[], rng=None) != gs_opener_g:
         failures.append("second_rule_for did not open with its own word")
@@ -1175,22 +1184,22 @@ def main(argv):
         except SystemExit:
             gs_refusals += 1
     try:
-        make_second_rule(gs_opener_g, gs_opener_g, GS_MASK)
+        make_second_rule(gs_opener_g, by_code(gs_opener_g))
         failures.append("the rule accepted a second word equal to the opener")
     except ValueError:
         gs_refusals += 1
-    for label, cond in (("a condition that never fires",
-                         np.zeros(len(GS_MASK), dtype=bool)),
-                        ("a condition that always fires",
-                         np.ones(len(GS_MASK), dtype=bool))):
-        try:
-            make_second_rule(gs_opener_g, gs_second_g, cond)
-            failures.append("the rule accepted %s" % label)
-        except ValueError:
-            gs_refusals += 1
+    # A CONDITION COVERING EVERY REPLY is a blind two-word opening, and it is
+    # refused where the CONDITION is built -- once, by the table -- rather than
+    # per opener, because a rule that never fires is legitimate: it is one opener
+    # whose rows are all empty, and a sweep must not abort on it.
+    try:
+        fire_groups(["g0"])
+        failures.append("a condition covering every reply was accepted")
+    except SystemExit:
+        gs_refusals += 1
     print("gray-second refusals: %d (a two-word opening, an opener the table has "
-          "no row for, a repeat of the opener, and conditions that never or "
-          "always fire)" % gs_refusals)
+          "no row for, a repeat of the opener, and a condition covering every "
+          "reply)" % gs_refusals)
 
     # THE SWEEP RUNS THE SAME RULE.  sweep_word's make_rule hook is the only way
     # the strategy reaches a sweep, so it is diffed against the rule built here --
@@ -1204,7 +1213,7 @@ def main(argv):
     direct = []
     draw_rng = np.random.default_rng(11)
     pick_rng = np.random.default_rng(11 + PICK_OFFSET)
-    direct_rule = make_second_rule(gs_opener_g, gs_second_g, GS_MASK)
+    direct_rule = make_second_rule(gs_opener_g, by_code(gs_second_g))
     for _ in range(40):
         a_idx = draw_answer(len(answers), draw_rng)
         pl, _ = play_game(pat, ans2g, a_idx, direct_rule, etail, pick_rng)

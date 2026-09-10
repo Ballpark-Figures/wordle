@@ -52,8 +52,8 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
-from secondword import (best_second, fire_set, parse_fire_label,  # noqa: E402
-                        read_table)
+from secondword import (best_second, fire_groups, fire_set,  # noqa: E402
+                        parse_fire_label, read_table, word_by_code)
 from wordle import load_words, pattern  # noqa: E402
 
 MATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
@@ -180,17 +180,26 @@ def run(args, expect_fail=False):
     return p.returncode, p.stderr
 
 
-def read_rows(path):
-    """The table's data rows as {opener: (second, score, nq, nbuckets, ties)}."""
-    out = {}
+def read_rows(path, group=None):
+    """One group's rows, as {opener: (second, score, nq, nbuckets, ties)}.
+
+    `group` picks which one; None takes the only group there is, and fails loudly
+    rather than silently reading the first of several.
+    """
+    out, seen = {}, set()
     with open(path) as f:
         for line in f:
             if line.startswith("#") or line.startswith("opener,"):
                 continue
             p = line.rstrip("\n").split(",")
-            out[p[0]] = (p[1] or None,
-                         int(p[3]) if p[3] else 0,
-                         int(p[4]), int(p[5]), int(p[6]))
+            seen.add(p[1])
+            if group is not None and p[1] != group:
+                continue
+            out[p[0]] = (p[2] or None,
+                         int(p[4]) if p[4] else 0,
+                         int(p[5]), int(p[6]), int(p[7]))
+    if group is None and len(seen) > 1:
+        raise AssertionError("%s has %d groups; name one" % (path, len(seen)))
     return out
 
 
@@ -304,7 +313,7 @@ def check_mini():
         print("   ok   %d openers have no qualifying answer and an empty row"
               % len(blanks))
     tbl = read_table(out, fire="g5")
-    if tbl.rows[with_e[0]] is not None:
+    if tbl.rows[with_e[0]]["g5"] is not None:
         bad("the reader should give None for an empty second word")
 
 
@@ -403,10 +412,59 @@ def check_fire():
             continue
         # and the LABEL must rebuild the same set, or a reader would filter
         # differently from the run that wrote the table
-        if not np.array_equal(parse_fire_label(got), want_mask):
+        rebuilt = np.zeros_like(want_mask)
+        for _, gm in parse_fire_label(got):
+            rebuilt |= gm
+        if not np.array_equal(rebuilt, want_mask):
             bad("the label %r does not rebuild its own set" % got)
     print("   ok   %d firing conditions: the C and Python agree on the set and "
           "its name, and every name rebuilds its set" % len(specs))
+
+    # THE PARTITION FORM, where the reply's bucket selects the word.  The specs
+    # are deliberately typed out of order and non-canonically, because the label
+    # is what names the file: if the two sides canonicalised differently, one
+    # rule would have two names and the tables would not be interchangeable.
+    partitions = [
+        (["e5", "e4", "e3"], "e3.e4.e5"),
+        (["e3", "e5", "e4"], "e3.e4.e5"),        # order must not matter
+        (["0g3y+g3", "e1"], "e1.g3+0g3y"),       # nor must term order
+        (["e5", "e4"], "e4.e5"),
+        (["g4", "e3"], "e3.g4"),
+    ]
+    for specs_in, want in partitions:
+        groups, label = fire_groups(specs_in)
+        if label != want:
+            bad("python calls %s %r, expected %r" % (specs_in, label, want))
+            continue
+        args = []
+        for sp in specs_in:
+            args += ["--group", sp]
+        p = subprocess.run([BINARY] + args + ["--print-label"], cwd=MATH,
+                           capture_output=True, text=True)
+        if p.stdout.strip() != want:
+            bad("the C calls %s %r, python %r" % (specs_in, p.stdout.strip(), want))
+        rebuilt = parse_fire_label(want)
+        if [k for k, _ in rebuilt] != [k for k, _ in groups]:
+            bad("the label %r does not rebuild its own groups" % want)
+    print("   ok   %d partitions: the C and Python agree on the groups and the "
+          "name, whatever the order or spelling" % len(partitions))
+
+    # AN OVERLAP IS REFUSED ON BOTH SIDES: a reply in two groups would have two
+    # predetermined words and no rule for choosing between them.
+    for specs_in in (["g3", "e4"], ["e3", "g3"], ["0g3y", "e2"]):
+        try:
+            fire_groups(specs_in)
+            bad("python accepted the overlapping groups %s" % specs_in)
+        except SystemExit:
+            pass
+        args = []
+        for sp in specs_in:
+            args += ["--group", sp]
+        p = subprocess.run([BINARY] + args + ["--print-label"], cwd=MATH,
+                           capture_output=True, text=True)
+        if p.returncode == 0:
+            bad("the C accepted the overlapping groups %s" % specs_in)
+    print("   ok   overlapping groups are refused by both")
 
     # A NON-CANONICAL LABEL IS REFUSED, not silently normalised: it would name a
     # file that no rebuild of the rule would ever produce again.
@@ -463,6 +521,38 @@ def check_fire():
     else:
         bad("no added composition changed any opener's second word, so nothing "
             "shows the set reaching the argmin rather than only the filter")
+    # A REAL PARTITION RUN, each group diffed against the strings separately --
+    # and the groups must actually CHOOSE DIFFERENT WORDS somewhere, or a
+    # per-bucket rule is the single-word rule wearing a longer name.
+    part = os.path.join(tmp, "partition.csv")
+    run(["--data", tmp, "--group", "e5", "--group", "e4", "--group", "e3",
+         "--out", part, "--threads", "2"])
+    per = {}
+    for spec, n in (("e5", 5), ("e4", 4), ("e3", 3)):
+        rws = read_rows(part, spec)
+        compare(rws, MINI_GUESSES, MINI_ANSWERS, MINI_GUESSES,
+                grays_at_least(n) if False else (lambda k: lambda t:
+                    sum(1 for x in t if x == 0) == k)(n), "partition", spec)
+        per[spec] = rws
+    split = [w for w in per["e3"]
+             if len({per[g][w][0] for g in per if per[g][w][0]}) > 1]
+    if not split:
+        bad("every group chose the same second word for every opener, so the "
+            "partition is the one-group rule under another name")
+    else:
+        notes["partition-differs"] += 1
+        print("   ok   the groups choose different words (%d of %d openers)"
+              % (len(split), len(per["e3"])))
+    # every answer belongs to exactly one group, so the group sizes must add up
+    for w in per["e3"]:
+        tot = sum(per[g][w][2] for g in per)
+        want = sum(1 for a in MINI_ANSWERS
+                   if sum(1 for t in tiles_from_strings(w, a) if t == 0) >= 3)
+        if tot != want:
+            bad("%s: the groups cover %d answers, the threshold %d" % (w, tot, want))
+            break
+    print("   ok   the groups partition the firing replies exactly")
+
     # the stamp must carry the condition, and the reader must hold it to it
     t = read_table(fired, fire="g3+0g3y")
     if t.min_grays != 3:
@@ -547,6 +637,7 @@ def main(argv):
         "tie-break": "a tie broken against the pool's own order",
         "fire-grew": "an added composition qualifying more answers",
         "fire-moved": "an added composition changing a chosen second word",
+        "partition-differs": "a partition choosing different words per group",
     }
     for key, what in need.items():
         if notes[key]:

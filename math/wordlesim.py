@@ -71,7 +71,7 @@ from collections import namedtuple
 
 import numpy as np
 
-from secondword import gray_counts, parse_fire_label, read_table
+from secondword import gray_counts, read_table, word_by_code
 from wordle import ALL_GREEN
 
 # How many guesses a game may take before we call the invariant broken.  Not a
@@ -443,77 +443,65 @@ def make_opening_rule(opening_g, tail=None, adapt=0):
     return FixedOpening(opening_g)
 
 
-class SecondWordOnGrays:
-    """Open, and if the reply shows enough GREYS play a word committed to up front.
+class SecondWordByReply:
+    """Open, and let the REPLY choose a word committed to up front.
 
-    THE STRATEGY (the user's, 2026-09-10).  Play the opener.  If its reply FIRES
-    -- a set of (greens, yellows) compositions, `--min-grays N` being the sugar
-    for "at least N greys" -- play THIS opener's predetermined second word
-    -- one word, chosen before the game by minimising the expected number of
-    answers still consistent after both, over exactly the games where the rule
-    fires.  math/secondword.py states that objective and solver/secondword.c
-    computes the table; nothing is decided here at run time.  Any other reply, and
-    every turn from the third on, is the follow-up's: a random compatible word.
+    THE STRATEGY (the user's, 2026-09-10, in three steps).  Play the opener.  The
+    reply's bucket then selects a word decided before the game -- one word per
+    bucket, chosen by minimising the answers left over that bucket's own cases
+    (math/secondword.py).  A reply in no bucket declines, and so does every turn
+    from the third on: the follow-up plays a random compatible word.
 
-    SO THE RULE SPEAKS ON TWO TURNS AND HANDS BACK.  Turn 1 is the opener, turn 2
-    is either the table's word or a decline, and after that it declines forever.
-    Which follow-up fills in is a separate axis and is part of the strategy --
-    `--fallback` names it and it lands in the filename, exactly as for a plain
-    opener.
+    ONE ARRAY IS THE WHOLE RULE: `by_code[reply]` is the guess index to play, or
+    -1 to decline.  It is built from the table's own groups, so the rule cannot
+    disagree with the table it came from -- and the earlier single-word versions
+    are just an array with one word repeated across the firing codes.
 
     THE SECOND WORD IS PLAYED BLIND, and usually is NOT a word the answer could
     still be.  That is the point of predetermining it: it was chosen to SPLIT
     what is left, not to win.  Nothing stops it being a live candidate when it
     happens to be one; nothing arranges for it either.
 
-    THE COMPOSITION IS COUNTED FROM THE REPLY'S TILES.  A repeated letter shown
-    grey counts as a grey, because that is what the player sees.  All-green has
-    no greys and ends the game anyway, so a first-guess win can never trigger it.
-
-    THE TABLE IS AN INPUT, and a mismatched one is refused rather than used: the
-    threshold and both pools are in its own stamp, and `secondword.read_table`
-    checks them.  An opener whose table row is EMPTY -- no answer gives it that
-    many greys -- makes this the plain opener, since the rule can never fire.
+    THE COMPOSITION IS WHAT THE PLAYER SEES.  A repeated letter shown grey counts
+    as a grey.  All-green ends the game before turn two, so a first-guess win can
+    never trigger this.
     """
 
-    def __init__(self, opener_g, second_g, fire):
+    def __init__(self, opener_g, by_code):
         self.opener_g = int(opener_g)
-        self.second_g = None if second_g is None else int(second_g)
-        # THE FIRING CONDITION IS A MASK OVER PATTERN CODES, built once from the
-        # table's own label (secondword.fire_set), so the rule fires on exactly
-        # the replies the table's second word was CHOSEN for.  One definition,
-        # read from the artifact, rather than a threshold repeated here.
-        self.fire = np.asarray(fire, dtype=bool)
-        if not self.fire.any():
-            raise ValueError("a firing condition that never fires is the plain "
-                             "opener; use that instead")
-        if self.fire.all():
-            raise ValueError("a firing condition that always fires is a blind "
-                             "two-word opening, not this rule")
-        if self.second_g == self.opener_g:
-            raise ValueError("the second word repeats the opener, which can only "
+        self.by_code = np.asarray(by_code, dtype=np.int32)
+        if (self.by_code == self.opener_g).any():
+            raise ValueError("a second word repeats the opener, which can only "
                              "reproduce the reply already seen")
+        # A RULE THAT NEVER FIRES IS LEGITIMATE, and it is not this rule being
+        # misused: it is one opener whose table rows are all empty, because no
+        # answer gives it a qualifying reply.  The strategy is then the plain
+        # opener for that word, and a sweep over 12972 of them must not abort on
+        # it.  Whether the CONDITION as a whole is sensible -- covering every
+        # reply would be a blind two-word opening -- is a property of the table,
+        # checked once by secondword.fire_groups, not per opener here.
 
     def __call__(self, turn, alive, played, replies, rng):
         if turn == 0:
             return self.opener_g
-        if turn == 1 and self.second_g is not None:
-            if self.fire[replies[0]]:
-                return self.second_g
+        if turn == 1:
+            g = int(self.by_code[replies[0]])
+            if g >= 0:
+                return g
         return None
 
 
-def make_second_rule(opener_g, second_g, fire):
-    """The gray-second rule for GUESS INDICES: the one place it is built.
+def make_second_rule(opener_g, by_code):
+    """The reply-selected second-word rule, by GUESS INDEX: built in one place.
 
     The single-run registry entry and the opener SWEEP both end here, so the two
     cannot drift into being two slightly different strategies under one name --
     the same discipline `make_opening_rule` keeps for blind openings.
     """
-    return SecondWordOnGrays(opener_g, second_g, fire)
+    return SecondWordByReply(opener_g, by_code)
 
 
-def second_rule_for(opening_g, table, guesses, fire=None):
+def second_rule_for(opening_g, table, guesses):
     """Build the rule for one opener out of a loaded second-word table.
 
     `opening_g` is the sweep's list of guess indices, which must hold exactly one
@@ -524,7 +512,7 @@ def second_rule_for(opening_g, table, guesses, fire=None):
     """
     if len(opening_g) != 1:
         raise SystemExit(
-            "the gray-second strategy takes ONE opener, not %d words: it chooses "
+            "this strategy takes ONE opener, not %d words: it chooses "
             "the second word from the FIRST word's reply, so a blind multi-word "
             "opening is a different strategy." % len(opening_g))
     word = guesses[int(opening_g[0])]
@@ -534,11 +522,8 @@ def second_rule_for(opening_g, table, guesses, fire=None):
             "pool -- sweeping a different pool with it would run the strategy on "
             "openers it never chose a second word for." % (table.path, word,
                                                            table.openers))
-    second = table.rows[word]
     return make_second_rule(int(opening_g[0]),
-                            guesses.index(second) if second else None,
-                            parse_fire_label(table.fire) if fire is None
-                            else fire)
+                            word_by_code(table, word, guesses))
 
 
 def _resolve_opening(guesses, words, name):
@@ -623,10 +608,11 @@ STRATEGIES = {
     "opener":       Strategy(_make_opener, None),
     # The same, for an opening of ANY length played blind -- a pair, a triple.
     "opening":      Strategy(_make_opening, None),
-    # One opener, then a PREDETERMINED second word played only when the reply
-    # shows enough greys -- SecondWordOnGrays above, and math/secondword.py for
-    # the table.  Pins no follow-up either: it is the same question again, asked
-    # of a different player.
+    # One opener, then a PREDETERMINED second word SELECTED BY THE REPLY --
+    # SecondWordByReply above, and math/secondword.py for the table.  Pins no
+    # follow-up either: it is the same question again, asked of a different
+    # player.  The NAME is the one it was born with, when the rule was a single
+    # word above a grey threshold; the table it reads says what it does now.
     "gray-second":  Strategy(_make_gray_second, None),
 }
 

@@ -67,6 +67,7 @@ that is the simulation the table feeds.  Report `expected` as what it is.
 """
 
 import os
+import re
 from collections import namedtuple
 
 import numpy as np
@@ -120,63 +121,146 @@ def compositions(word_len=WORD_LEN):
     return g, y, np.int8(word_len) - g - y
 
 
-def fire_set(min_grays, extra=(), word_len=WORD_LEN):
-    """THE FIRING CONDITION, as a set of (greens, yellows) COMPOSITIONS.
+def group_mask(spec, word_len=WORD_LEN):
+    """The compositions one GROUP covers: (mask over pattern codes, canonical spec).
 
-    WHY A SET AND NOT A THRESHOLD (the user's, 2026-09-10).  "At least N greys"
-    was the first shape of this rule and it is still the common case, but it
-    cannot say the thing that turned out to matter: two greys with three YELLOWS
-    is nearly uninformative, while two greys with three GREENS has pinned three
-    positions.  Those two replies do not belong on the same side of the line
-    just because they have the same number of greys.  So the rule is a SET of
-    compositions, and `min_grays` is sugar for "every composition with at least N
-    greys" -- which keeps every earlier table exactly what it was.
+    A group spec is one or more TERMS joined by `+`:
 
-    Returns (mask over pattern codes, canonical label).  The LABEL is a function
-    of the SET, not of how it was typed: an `extra` already covered by the
-    threshold is dropped, and the rest are sorted, so two spellings of one rule
-    cannot produce two filenames.
+        g<N>        greys >= N          (the original threshold)
+        e<N>        greys == N exactly  (what a per-grey-count rule wants)
+        <G>g<Y>y    exactly that composition, e.g. 0g3y
+
+    So `g3` is everything with three or more greys, `e5` is the all-grey reply
+    alone, and `g3+0g3y` is the threshold plus the three-yellow two-grey reply.
+
+    THE SPEC IS CANONICALISED, and a REDUNDANT TERM IS REFUSED rather than
+    quietly dropped: `g3+0g0y` covers exactly what `g3` covers, so allowing it
+    would give one rule two names -- and therefore two tables that a reader would
+    have to tell apart by hand.  Terms are sorted, so order cannot do the same.
     """
     g, y, gr = compositions(word_len)
-    mask = gr >= min_grays
-    keep = []
+    terms = {}
+    for term in spec.split("+"):
+        if re.fullmatch(r"g\d+", term):
+            m = gr >= int(term[1:])
+            key = (0, int(term[1:]))
+        elif re.fullmatch(r"e\d+", term):
+            m = gr == int(term[1:])
+            key = (1, int(term[1:]))
+        elif re.fullmatch(r"\d+g\d+y", term):
+            gg, yy = (int(x) for x in re.findall(r"\d+", term))
+            if gg + yy > word_len:
+                raise SystemExit("(%d green, %d yellow) is more than %d tiles"
+                                 % (gg, yy, word_len))
+            m = (g == gg) & (y == yy)
+            key = (2, gg * (word_len + 1) + yy)
+        else:
+            raise SystemExit("cannot read the group %r: a term is g<N>, e<N> or "
+                             "<G>g<Y>y, joined by +" % spec)
+        if not m.any():
+            raise SystemExit("the term %r in %r covers no reply at all"
+                             % (term, spec))
+        if term in terms:
+            raise SystemExit("the group %r repeats the term %r" % (spec, term))
+        terms[term] = (key, m)
+    mask = np.zeros(len(g), dtype=bool)
+    for _, m in terms.values():
+        mask |= m
+    for term, (_, m) in terms.items():
+        rest = np.zeros(len(g), dtype=bool)
+        for other, (_, om) in terms.items():
+            if other != term:
+                rest |= om
+        if (m & ~rest).sum() == 0:
+            raise SystemExit("the term %r adds nothing to the group %r -- one "
+                             "rule would have two names" % (term, spec))
+    canon = "+".join(sorted(terms, key=lambda t: terms[t][0]))
+    return mask, canon
+
+
+def fire_groups(specs, word_len=WORD_LEN):
+    """THE FIRING CONDITION: an ordered list of DISJOINT groups, each of which
+    gets its OWN predetermined second word.
+
+    WHY GROUPS AND NOT ONE SET (the user's, 2026-09-10).  This started as "at
+    least N greys, play this word", became "at least N greys OR this composition"
+    when it turned out two greys with three YELLOWS is nothing like two greys with
+    three GREENS, and is now the general form: the reply's bucket SELECTS the
+    word.  A separate word for five, four and three greys is `e5 e4 e3`; the old
+    single-word rules are the one-group case and still mean exactly what they
+    meant.
+
+    THE GROUPS MUST BE DISJOINT, and that is not a nicety: a reply in two groups
+    would have two predetermined words and no rule for choosing between them.
+    Everything in no group DECLINES to the follow-up.
+
+    Returns (list of (spec, mask), canonical label).  The label is a function of
+    the PARTITION, not of how it was typed -- the specs are sorted -- so two
+    spellings of one rule cannot make two filenames.
+    """
+    if not specs:
+        raise SystemExit("a firing condition needs at least one --group")
+    seen = {}
+    for raw in specs:
+        m, spec = group_mask(raw, word_len)
+        for other, om in seen.items():
+            if (m & om).any():
+                raise SystemExit(
+                    "the groups %r and %r overlap: a reply in both would have "
+                    "two predetermined words and no rule for choosing" 
+                    % (other, spec))
+        if spec in seen:
+            continue
+        seen[spec] = m
+    order = sorted(seen)
+    covered = np.zeros(n_patterns(word_len), dtype=bool)
+    for k in order:
+        covered |= seen[k]
+    if covered.all():
+        raise SystemExit(
+            "this condition fires on EVERY reply, which is a blind two-word "
+            "opening rather than a rule that chooses when to commit -- the "
+            "`opening` strategy already is that")
+    return [(k, seen[k]) for k in order], ".".join(order)
+
+
+def fire_set(min_grays, extra=(), word_len=WORD_LEN):
+    """The ONE-GROUP case, kept because it is the common one: "at least N greys",
+    optionally plus whole compositions.  Returns (mask, label), as before.
+    """
+    spec = "g%d" % min_grays
+    g, y, gr = compositions(word_len)
     for gg, yy in sorted({(int(a), int(b)) for a, b in extra}):
         if gg + yy > word_len:
             raise SystemExit("(%d green, %d yellow) is more than %d tiles"
                              % (gg, yy, word_len))
         if word_len - gg - yy >= min_grays:
             continue                      # already fires; not part of the label
-        keep.append((gg, yy))
-        mask |= (g == gg) & (y == yy)
-    label = "g%d" % min_grays
-    for gg, yy in keep:
-        label += "+%dg%dy" % (gg, yy)
-    return mask, label
+        spec += "+%dg%dy" % (gg, yy)
+    return group_mask(spec, word_len)
 
 
 def parse_fire_label(label, word_len=WORD_LEN):
-    """The inverse of `fire_set`'s label: the mask a table was built under.
+    """The inverse of the canonical label: the GROUPS a table was built under.
 
     A table records the label, so a reader rebuilds the exact firing condition
-    from it rather than being told a threshold and guessing the rest.
+    from it rather than being told a threshold and guessing the rest.  Returns
+    the same (groups, label) shape `fire_groups` does, and REFUSES a label that
+    is not canonical -- it would name a file no rebuild of the rule would produce.
     """
-    parts = label.split("+")
-    if not parts[0].startswith("g") or not parts[0][1:].isdigit():
-        raise SystemExit("cannot read the firing condition %r: it should start "
-                         "with g<N>" % label)
-    extra = []
-    for p in parts[1:]:
-        head, _, tail = p.partition("g")
-        yy, _, rest = tail.partition("y")
-        if not (head.isdigit() and yy.isdigit() and rest == ""):
-            raise SystemExit("cannot read the firing condition %r at %r"
-                             % (label, p))
-        extra.append((int(head), int(yy)))
-    mask, canon = fire_set(int(parts[0][1:]), extra, word_len)
+    groups, canon = fire_groups(label.split("."), word_len)
     if canon != label:
         raise SystemExit("the firing condition %r is not canonical (it means "
                          "%r) -- rebuild the table" % (label, canon))
-    return mask
+    return groups
+
+
+def fire_mask(label, word_len=WORD_LEN):
+    """Every code that fires, across all groups -- when only "does it fire" matters."""
+    m = np.zeros(n_patterns(word_len), dtype=bool)
+    for _, gm in parse_fire_label(label, word_len):
+        m |= gm
+    return m
 
 
 def qualifying(pat_row, mask):
@@ -229,12 +313,13 @@ def best_second(pat, opener, mask, seconds=None):
 
 # --- the table -------------------------------------------------------------
 
-COLUMNS = "opener,second,expected,score,qualifying,buckets,ties"
+COLUMNS = "opener,fires,second,expected,score,qualifying,buckets,ties"
 
-Table = namedtuple("Table", "path min_grays fire openers seconds answers rows")
+Table = namedtuple("Table",
+                   "path min_grays fire groups openers seconds answers rows")
 
 
-def stamp_line(min_grays, fire, openers, seconds, answers, nsecond):
+def stamp_line(fire, openers, seconds, answers, nsecond, min_grays=None):
     """The machine-readable line every table carries as its second line.
 
     A FILENAME CANNOT CHECK ITSELF -- the greens scar, where results written
@@ -243,28 +328,30 @@ def stamp_line(min_grays, fire, openers, seconds, answers, nsecond):
     and in this line for a program, and a reader refuses a table whose stamp does
     not match what it asked for.
     """
-    return ("# settings min_grays=%d fire=%s openers=%s seconds=%s answers=%d "
+    head = "" if min_grays is None else "min_grays=%d " % min_grays
+    return ("# settings %sfire=%s openers=%s seconds=%s answers=%d "
             "second_pool=%d\n"
-            % (min_grays, fire, openers, seconds, answers, nsecond))
+            % (head, fire, openers, seconds, answers, nsecond))
 
 
 def read_table(path, fire=None, openers=None, seconds=None):
     """Read a second-word table, refusing one that is not what was asked for.
 
-    Returns a `Table` whose `rows` maps opener word -> second word, with None for
-    an opener that had no qualifying cases.  Any of `fire`/`openers`/`seconds`
-    given is CHECKED against the stamp rather than assumed.
+    Returns a `Table` whose `rows` maps opener word -> {group spec -> second
+    word}, with None for a group that had no qualifying cases.  Any of
+    `fire`/`openers`/`seconds` given is CHECKED against the stamp rather than
+    assumed.
 
-    A table written before the firing condition became a SET carries only
-    `min_grays`, which means exactly `g<N>` -- so those tables keep working and
-    keep meaning what they meant.
+    A table written before the firing condition became a PARTITION has no
+    `fires` column and carries a single group, which is exactly what its label
+    says -- so every earlier table keeps working and keeps meaning what it meant.
     """
     if not os.path.exists(path):
         raise SystemExit(
             "no second-word table at %s\n"
             "Build it with: bash solver/run-second-word.sh --variant guess "
             "--min-grays 3" % path)
-    meta, rows = {}, {}
+    meta, rows, cols = {}, {}, None
     with open(path) as f:
         for line in f:
             if line.startswith("# settings "):
@@ -272,20 +359,29 @@ def read_table(path, fire=None, openers=None, seconds=None):
                     k, _, v = field.partition("=")
                     meta[k] = v
                 continue
-            if line.startswith("#") or line.startswith("opener,"):
+            if line.startswith("#"):
                 continue
             parts = line.rstrip("\n").split(",")
+            if cols is None and parts[0] == "opener":
+                cols = parts
+                continue
             if len(parts) < 2 or not parts[0]:
                 continue
-            rows[parts[0]] = parts[1] or None
-    if "min_grays" not in meta:
+            if cols and "fires" in cols:
+                spec, second = parts[1], parts[2] or None
+            else:
+                spec, second = None, parts[1] or None
+            rows.setdefault(parts[0], {})[spec] = second
+    if "fire" not in meta and "min_grays" not in meta:
         raise SystemExit(
-            "%s carries no '# settings' stamp, so it cannot say which threshold "
+            "%s carries no '# settings' stamp, so it cannot say which condition "
             "or which pools it was built under.\nRefusing it rather than "
             "guessing -- rebuild it with solver/run-second-word.sh." % path)
-    got = int(meta["min_grays"])
-    got_fire = meta.get("fire", "g%d" % got)
-    parse_fire_label(got_fire)              # refuse a label we cannot rebuild
+    got = int(meta["min_grays"]) if "min_grays" in meta else None
+    # A table written before the condition became a partition carries only the
+    # threshold, which means exactly the one group `g<N>`.
+    got_fire = meta.get("fire", "g%s" % got)
+    groups = parse_fire_label(got_fire)     # refuse a label we cannot rebuild
     if fire is not None and got_fire != fire:
         raise SystemExit("%s fires on %s, not %s -- a different strategy under "
                          "the same name" % (path, got_fire, fire))
@@ -296,7 +392,40 @@ def read_table(path, fire=None, openers=None, seconds=None):
                              % (path, name, meta.get(name), want))
     if not rows:
         raise SystemExit("%s has no rows" % path)
-    return Table(path=path, min_grays=got, fire=got_fire,
+    # A one-group table written before the `fires` column keys its row on None;
+    # name it, so every reader downstream sees one shape.
+    if len(groups) == 1:
+        only = groups[0][0]
+        for w in rows:
+            if None in rows[w]:
+                rows[w] = {only: rows[w][None]}
+    missing = [w for w in rows if sorted(rows[w]) != sorted(k for k, _ in groups)]
+    if missing:
+        raise SystemExit("%s has no row for every group of %s (e.g. %s) -- it "
+                         "was not built under this condition"
+                         % (path, got_fire, missing[0]))
+    return Table(path=path, min_grays=got, fire=got_fire, groups=groups,
                  openers=meta.get("openers", "?"),
                  seconds=meta.get("seconds", "?"),
                  answers=int(meta.get("answers", 0)), rows=rows)
+
+
+def word_by_code(table, opener, guesses, word_len=WORD_LEN):
+    """The rule itself, as a lookup: reply CODE -> guess index, or -1.
+
+    One array, built once from the table's own groups, so the rule is a single
+    indexing operation and cannot disagree with the table it came from.  A group
+    whose second word is empty -- nothing qualified -- simply declines, exactly
+    as an unlisted reply does.
+    """
+    out = np.full(n_patterns(word_len), -1, dtype=np.int32)
+    for spec, mask in table.groups:
+        second = table.rows[opener][spec]
+        if second is None:
+            continue
+        try:
+            out[mask] = guesses.index(second)
+        except ValueError:
+            raise SystemExit("%s: the second word %r for group %s is not a legal "
+                             "guess" % (table.path, second, spec))
+    return out

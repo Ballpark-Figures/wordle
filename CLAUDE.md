@@ -2129,8 +2129,28 @@ the source of truth; `solver/secondword.c` computes the table.
   after two guesses, never what the game goes on to take; only the simulation the
   table feeds says that. And the sim's own mean is expected guesses **outright**
   — never table it beside an `optturns`-family total.
-- **THE FIRING CONDITION IS A SET OF (greens, yellows) COMPOSITIONS, and
-  `--min-grays N` is SUGAR for "at least N greys"** (user's call, 2026-09-10).
+- **THE FIRING CONDITION IS A PARTITION INTO GROUPS, EACH WITH ITS OWN SECOND
+  WORD** (user's call, 2026-09-10, the third step of the same idea). The reply's
+  bucket SELECTS the word: `--group e5 --group e4 --group e3` gives a separate
+  predetermined word for five, four and three greys, and `--by-grays 3` is the
+  sugar that writes that out. A group spec is terms joined by `+`: `g<N>` (greys
+  >= N), `e<N>` (greys == N exactly), `<G>g<Y>y` (that composition).
+  - **GROUPS MUST BE DISJOINT** — a reply in two would have two predetermined
+    words and no rule for choosing — and a reply in NO group declines to the
+    follow-up. A condition covering EVERY reply is refused: that is a blind
+    two-word opening, which the `opening` strategy already is.
+  - **THE RULE IS ONE ARRAY**, `by_code[reply] -> guess index or -1`, built from
+    the table's own groups. The single-word rules are that array with one word
+    repeated, so every earlier variant is the one-group case, unchanged.
+  - **A REDUNDANT TERM IS REFUSED, NOT DROPPED** (`g3+0g0y` covers exactly what
+    `g3` covers), terms within a group are sorted, and the groups are sorted by
+    their CANONICAL spec — so one rule cannot have two names, and therefore
+    cannot have two tables a reader must tell apart by hand.
+  - **MEASURED: 500 openers x 3 groups in 1.6 s**, so a full partition table is
+    about the same minute as a single-group one — every answer falls in exactly
+    one group, so the total work barely moves.
+- **`--min-grays N` IS THE ONE-GROUP SUGAR for "at least N greys"**, and
+  `--fire G,Y` adds a composition to it (user's call, 2026-09-10).
   A threshold on the grey count alone cannot say the thing that turned out to
   matter: two greys with three YELLOWS is nearly uninformative, while two greys
   with three GREENS has pinned three positions, and those do not belong on the

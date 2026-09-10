@@ -65,7 +65,10 @@ static uint8_t *PAT;                 /* NG * NA, row-major */
 static char   (*GWORD)[WBUF];
 static int8_t   GRAYS[NPAT];         /* grey-tile count of every pattern code */
 static int8_t   GREENS[NPAT], YELLOWS[NPAT];
-static uint8_t  FIRE[NPAT];          /* does this reply fire the rule? */
+#define MAXGROUP 32
+static uint8_t  GFIRE[MAXGROUP][NPAT];   /* which replies each GROUP covers */
+static char     GSPEC[MAXGROUP][64];     /* its canonical spec */
+static int      NGROUP;
 #define MAXEXTRA 32
 static int      EXG[MAXEXTRA], EXY[MAXEXTRA], NEXTRA;
 
@@ -92,45 +95,162 @@ static void build_grays(void) {
     }
 }
 
-/* ---- THE FIRING CONDITION, as a SET OF COMPOSITIONS ----------------------
- * "At least N greys" was the first shape of this rule and is still the common
- * case, but it cannot express the thing that matters: two greys with three
- * YELLOWS is nearly uninformative, while two greys with three GREENS has pinned
- * three positions, and those two replies do not belong on the same side of the
- * line just because they have the same grey count.  So the condition is a set of
- * (greens, yellows) compositions, and --min-grays is sugar for "every
- * composition with at least N greys".  math/secondword.py states it and computes
- * the same set in Python; tools/checksecondword.py diffs the two, label included.
+/* ---- THE FIRING CONDITION, as a PARTITION INTO GROUPS --------------------
+ * This started as "at least N greys, play this word"; became "at least N greys
+ * OR this composition" when two greys with three YELLOWS turned out to be
+ * nothing like two greys with three GREENS; and is now the general form: the
+ * reply's bucket SELECTS the word.  A separate word for five, four and three
+ * greys is `--group e5 --group e4 --group e3`, and the single-word rules are the
+ * one-group case, unchanged.
  *
- * THE LABEL IS A FUNCTION OF THE SET, NOT OF HOW IT WAS TYPED: an --fire already
- * covered by the threshold is dropped and the rest are sorted, so two spellings
- * of one rule cannot produce two filenames -- and therefore cannot produce two
- * tables that a reader would have to tell apart by hand. */
-static void build_fire(int min_grays, char *label, size_t lsz) {
-    for (int i = 1; i < NEXTRA; i++)             /* insertion sort, tiny */
-        for (int j = i; j > 0 && (EXG[j - 1] > EXG[j]
-                 || (EXG[j - 1] == EXG[j] && EXY[j - 1] > EXY[j])); j--) {
-            int t = EXG[j]; EXG[j] = EXG[j - 1]; EXG[j - 1] = t;
-            t = EXY[j]; EXY[j] = EXY[j - 1]; EXY[j - 1] = t;
+ * A GROUP SPEC is terms joined by '+':  g<N> greys >= N,  e<N> greys == N,
+ * <G>g<Y>y that exact composition.  GROUPS MUST BE DISJOINT -- a reply in two
+ * groups would have two predetermined words and no rule for choosing -- and
+ * anything in no group DECLINES to the follow-up.
+ *
+ * math/secondword.py builds the same partition and the same canonical label in
+ * Python; tools/checksecondword.py diffs the two, label included.  THE LABEL IS
+ * A FUNCTION OF THE PARTITION, not of how it was typed: the specs are sorted,
+ * so two spellings of one rule cannot make two filenames -- and therefore cannot
+ * make two tables a reader would have to tell apart by hand. */
+typedef struct { int kind, key; char text[24]; uint8_t m[NPAT]; } Term;
+
+static int cmp_term(const void *a, const void *b) {
+    const Term *x = a, *y = b;
+    if (x->kind != y->kind) return x->kind - y->kind;
+    return x->key - y->key;
+}
+
+/* Parse a group spec into its mask AND its canonical text.  A REDUNDANT TERM IS
+ * REFUSED rather than quietly dropped -- `g3+0g0y` covers exactly what `g3`
+ * covers, and one rule with two names is one rule with two tables.  Terms are
+ * sorted, so order cannot do the same. */
+static int parse_group(const char *spec, uint8_t *out, char *canon, size_t csz) {
+    Term t[16];
+    int nt = 0;
+    const char *p = spec;
+    while (*p) {
+        const char *end = strchr(p, '+');
+        size_t len = end ? (size_t)(end - p) : strlen(p);
+        if (len == 0 || len >= sizeof t[0].text || nt >= 16) return 0;
+        Term *v = &t[nt];
+        memcpy(v->text, p, len); v->text[len] = 0;
+        for (int c = 0; c < NPAT; c++) v->m[c] = 0;
+        int n, g, y;
+        if (v->text[0] == 'g' && strspn(v->text + 1, "0123456789") == len - 1
+                && len > 1) {
+            n = atoi(v->text + 1); v->kind = 0; v->key = n;
+            for (int c = 0; c < NPAT; c++) if (GRAYS[c] >= n) v->m[c] = 1;
+        } else if (v->text[0] == 'e' && strspn(v->text + 1, "0123456789") == len - 1
+                   && len > 1) {
+            n = atoi(v->text + 1); v->kind = 1; v->key = n;
+            for (int c = 0; c < NPAT; c++) if (GRAYS[c] == n) v->m[c] = 1;
+        } else if (sscanf(v->text, "%dg%dy", &g, &y) == 2) {
+            if (g + y > WORDLEN) return 0;
+            v->kind = 2; v->key = g * (WORDLEN + 1) + y;
+            for (int c = 0; c < NPAT; c++)
+                if (GREENS[c] == g && YELLOWS[c] == y) v->m[c] = 1;
+        } else {
+            return 0;
         }
-    for (int code = 0; code < NPAT; code++)
-        FIRE[code] = GRAYS[code] >= min_grays;
-    int n = snprintf(label, lsz, "g%d", min_grays);
-    int prev_g = -1, prev_y = -1;
-    for (int e = 0; e < NEXTRA; e++) {
-        int g = EXG[e], y = EXY[e];
-        if (g + y > WORDLEN) {
-            fprintf(stderr, "(%d green, %d yellow) is more than %d tiles\n",
-                    g, y, WORDLEN);
+        int any = 0;
+        for (int c = 0; c < NPAT; c++) any |= v->m[c];
+        if (!any) return 0;                    /* a term covering no reply */
+        for (int i = 0; i < nt; i++)
+            if (!strcmp(t[i].text, v->text)) return 0;   /* a repeated term */
+        nt++;
+        p = end ? end + 1 : p + len;
+    }
+    if (!nt) return 0;
+    for (int i = 0; i < nt; i++) {             /* no term may be redundant */
+        int adds = 0;
+        for (int c = 0; c < NPAT && !adds; c++) {
+            if (!t[i].m[c]) continue;
+            int covered = 0;
+            for (int j = 0; j < nt && !covered; j++)
+                if (j != i && t[j].m[c]) covered = 1;
+            if (!covered) adds = 1;
+        }
+        if (!adds) {
+            fprintf(stderr, "the term '%s' adds nothing to the group '%s' -- one "
+                    "rule would have two names\n", t[i].text, spec);
             exit(1);
         }
-        if (WORDLEN - g - y >= min_grays) continue;   /* already fires */
-        if (g == prev_g && y == prev_y) continue;     /* a repeat is one entry */
-        prev_g = g; prev_y = y;
-        for (int code = 0; code < NPAT; code++)
-            if (GREENS[code] == g && YELLOWS[code] == y) FIRE[code] = 1;
-        n += snprintf(label + n, lsz - (size_t)n, "+%dg%dy", g, y);
     }
+    qsort(t, (size_t)nt, sizeof t[0], cmp_term);
+    for (int c = 0; c < NPAT; c++) out[c] = 0;
+    size_t n = 0;
+    for (int i = 0; i < nt; i++) {
+        for (int c = 0; c < NPAT; c++) out[c] |= t[i].m[c];
+        n += (size_t)snprintf(canon + n, csz - n, "%s%s", i ? "+" : "", t[i].text);
+    }
+    return 1;
+}
+
+static int cmp_spec(const void *a, const void *b) {
+    return strcmp((const char *)a, (const char *)b);
+}
+
+/* Resolve the groups given on the command line -- plus the --min-grays/--fire
+ * sugar, which is the one-group case -- into GFIRE/GSPEC and the label. */
+static void build_fire(int min_grays, char *label, size_t lsz) {
+    if (NGROUP == 0) {                          /* the sugar: one group */
+        char spec[64];
+        int n = snprintf(spec, sizeof spec, "g%d", min_grays);
+        for (int i = 1; i < NEXTRA; i++)        /* insertion sort, tiny */
+            for (int j = i; j > 0 && (EXG[j - 1] > EXG[j]
+                     || (EXG[j - 1] == EXG[j] && EXY[j - 1] > EXY[j])); j--) {
+                int t = EXG[j]; EXG[j] = EXG[j - 1]; EXG[j - 1] = t;
+                t = EXY[j]; EXY[j] = EXY[j - 1]; EXY[j - 1] = t;
+            }
+        int prev_g = -1, prev_y = -1;
+        for (int e = 0; e < NEXTRA; e++) {
+            int g = EXG[e], y = EXY[e];
+            if (g + y > WORDLEN) {
+                fprintf(stderr, "(%d green, %d yellow) is more than %d tiles\n",
+                        g, y, WORDLEN);
+                exit(1);
+            }
+            if (WORDLEN - g - y >= min_grays) continue;   /* already covered */
+            if (g == prev_g && y == prev_y) continue;     /* a repeat is one */
+            prev_g = g; prev_y = y;
+            n += snprintf(spec + n, sizeof spec - (size_t)n, "+%dg%dy", g, y);
+        }
+        snprintf(GSPEC[NGROUP++], sizeof GSPEC[0], "%s", spec);
+    }
+    /* CANONICALISE EACH SPEC FIRST, THEN SORT.  Sorting the typed text would
+     * order the groups differently from Python, which sorts what the specs MEAN
+     * -- and the label is what names the file. */
+    for (int i = 0; i < NGROUP; i++) {
+        char canon[64];
+        if (!parse_group(GSPEC[i], GFIRE[i], canon, sizeof canon)) {
+            fprintf(stderr, "cannot read the group '%s', or it covers no reply: "
+                    "a term is g<N>, e<N> or <G>g<Y>y, joined by +\n", GSPEC[i]);
+            exit(1);
+        }
+        snprintf(GSPEC[i], sizeof GSPEC[0], "%s", canon);
+    }
+    qsort(GSPEC, (size_t)NGROUP, sizeof GSPEC[0], cmp_spec);
+    int kept = 0;
+    for (int i = 0; i < NGROUP; i++) {
+        if (i && !strcmp(GSPEC[i], GSPEC[kept - 1])) continue;   /* a repeat */
+        if (kept != i) snprintf(GSPEC[kept], sizeof GSPEC[0], "%s", GSPEC[i]);
+        char canon[64];
+        parse_group(GSPEC[kept], GFIRE[kept], canon, sizeof canon);
+        for (int j = 0; j < kept; j++)
+            for (int c = 0; c < NPAT; c++)
+                if (GFIRE[j][c] && GFIRE[kept][c]) {
+                    fprintf(stderr, "the groups '%s' and '%s' overlap: a reply in "
+                            "both would have two predetermined words and no rule "
+                            "for choosing\n", GSPEC[j], GSPEC[kept]);
+                    exit(1);
+                }
+        kept++;
+    }
+    NGROUP = kept;
+    size_t n = 0;
+    for (int i = 0; i < NGROUP; i++)
+        n += (size_t)snprintf(label + n, lsz - n, "%s%s", i ? "." : "", GSPEC[i]);
 }
 
 static int load_words(const char *path, char (*out)[WBUF]) {
@@ -214,7 +334,7 @@ static int *load_pool(const char *path, int *count, const char *what) {
 }
 
 typedef struct {
-    int32_t opener, second, nq, nbuckets, ties;
+    int32_t opener, group, second, nq, nbuckets, ties;
     int64_t score;
 } Row;
 
@@ -260,6 +380,15 @@ int main(int argc, char **argv) {
         }
         /* Resolve the firing condition and print its canonical name, so the
          * wrapper can name the file without re-deriving the rule in shell. */
+        /* --group SPEC: one bucket of replies with its own second word.  Repeat
+         * it for a partition; --min-grays / --fire are the one-group sugar. */
+        else if (!strcmp(argv[i], "--group") && i + 1 < argc) {
+            if (NGROUP >= MAXGROUP) {
+                fprintf(stderr, "at most %d groups\n", MAXGROUP);
+                return 1;
+            }
+            snprintf(GSPEC[NGROUP++], sizeof GSPEC[0], "%s", argv[++i]);
+        }
         else if (!strcmp(argv[i], "--print-label")) printlabel = 1;
         else if (!strcmp(argv[i], "--threads") && i + 1 < argc) threads = atoi(argv[++i]);
         /* PRICING ONLY: score the first N openers and stop.  The result is a
@@ -275,13 +404,13 @@ int main(int argc, char **argv) {
                         "Use the wrapper: bash solver/run-second-word.sh\n");
         return 1;
     }
-    if (min_grays < 0) {
+    if (min_grays < 0 && NGROUP == 0) {
         fprintf(stderr, "--min-grays N is REQUIRED: it is the objective, not a "
                         "knob.\nA >= 3 table and a >= 4 table pick different "
                         "words and describe different strategies.\n");
         return 1;
     }
-    if (min_grays > WORDLEN) {
+    if (min_grays > WORDLEN && NGROUP == 0) {
         fprintf(stderr, "--min-grays %d is impossible: a reply has %d tiles\n",
                 min_grays, WORDLEN);
         return 1;
@@ -335,7 +464,7 @@ int main(int argc, char **argv) {
 #endif
     fprintf(stderr, "threads: %d\n", nth);
 
-    Row *rows = malloc(sizeof(Row) * nopen);
+    Row *rows = malloc(sizeof(Row) * (size_t)nopen * (size_t)NGROUP);
     double t0 = now_s(), last = t0;
     int64_t done = 0;
 
@@ -360,68 +489,77 @@ int main(int argc, char **argv) {
             int g1 = openers[oi];
             const uint8_t *row1 = PAT + (size_t)g1 * NA;
 
-            /* Bucket the QUALIFYING answers by g1 once, into contiguous runs.
-             * Everything below the threshold is dropped here and never seen
-             * again: those are the games the rule does not fire in. */
-            int nb = 0, nq = 0;
-            for (int a = 0; a < NA; a++) {
-                if (!FIRE[row1[a]]) continue;
-                nq++;
-                if (cnt[row1[a]]++ == 0) touch[nb++] = row1[a];
-            }
-            int acc = 0;
-            for (int k = 0; k < nb; k++) {
-                rs[k] = acc; rl[k] = cnt[touch[k]]; acc += rl[k];
-            }
-            for (int k = 0; k < nb; k++) { cnt[touch[k]] = k; fill[k] = rs[k]; }
-            for (int a = 0; a < NA; a++) {
-                if (!FIRE[row1[a]]) continue;
-                ord[fill[cnt[row1[a]]]++] = (uint16_t)a;
-            }
-            for (int k = 0; k < nb; k++) cnt[touch[k]] = 0;
-
-            int32_t best = -1, ties = 0;
-            int64_t best_score = 0;
-            /* Nothing qualifies: there is no case to choose a word for, so
-             * there is nothing to minimise and the row is left empty. */
-            int nloop = nq ? nsec : 0;
-            for (int sj = 0; sj < nloop; sj++) {
-                int g2 = seconds[sj];
-                if (g2 == g1) continue;        /* a repeat cannot split anything */
-                const uint8_t *row2 = PAT + (size_t)g2 * NA;
-                int64_t ssq = 0;
+            /* ONE ARGMIN PER GROUP.  The groups partition the firing replies, so
+             * every answer is bucketed in at most one of them and the total work
+             * is the same as a single group covering all of them -- what changes
+             * is that each group gets its OWN second word, chosen for its own
+             * cases.  A group nothing qualifies for is an empty row, not a
+             * failure: the rule simply declines there. */
+            for (int gi = 0; gi < NGROUP; gi++) {
+                const uint8_t *fire = GFIRE[gi];
+                int nb = 0, nq = 0;
+                for (int a = 0; a < NA; a++) {
+                    if (!fire[row1[a]]) continue;
+                    nq++;
+                    if (cnt[row1[a]]++ == 0) touch[nb++] = row1[a];
+                }
+                int acc = 0;
                 for (int k = 0; k < nb; k++) {
-                    int s = rs[k], e = s + rl[k], nt = 0;
-                    for (int i = s; i < e; i++) {
-                        int p = row2[ord[i]];
-                        if (cnt[p]++ == 0) tin[nt++] = p;
-                    }
-                    for (int i = 0; i < nt; i++) {
-                        int p = tin[i];
-                        int64_t v = cnt[p];
-                        ssq += v * v;
-                        cnt[p] = 0;
-                    }
+                    rs[k] = acc; rl[k] = cnt[touch[k]]; acc += rl[k];
                 }
-                /* Ties are REAL -- the objective is an integer sum over a fixed
-                 * denominator -- so they are COUNTED, and the winner is the
-                 * lowest guess index, the repo's one tie-break.  The pool is
-                 * walked in its own order, which need not be index order, so the
-                 * `<` on index is explicit rather than implied by arrival. */
-                if (best < 0 || ssq < best_score) {
-                    best = g2; best_score = ssq; ties = 1;
-                } else if (ssq == best_score) {
-                    ties++;
-                    if (g2 < best) best = g2;
+                for (int k = 0; k < nb; k++) { cnt[touch[k]] = k; fill[k] = rs[k]; }
+                for (int a = 0; a < NA; a++) {
+                    if (!fire[row1[a]]) continue;
+                    ord[fill[cnt[row1[a]]]++] = (uint16_t)a;
                 }
-            }
+                for (int k = 0; k < nb; k++) cnt[touch[k]] = 0;
 
-            rows[oi].opener   = g1;
-            rows[oi].second   = best;
-            rows[oi].score    = best < 0 ? 0 : best_score;
-            rows[oi].nq       = nq;
-            rows[oi].nbuckets = nb;
-            rows[oi].ties     = ties;
+                int32_t best = -1, ties = 0;
+                int64_t best_score = 0;
+                /* Nothing qualifies: there is no case to choose a word for, so
+                 * there is nothing to minimise and the row is left empty. */
+                int nloop = nq ? nsec : 0;
+                for (int sj = 0; sj < nloop; sj++) {
+                    int g2 = seconds[sj];
+                    if (g2 == g1) continue;    /* a repeat cannot split anything */
+                    const uint8_t *row2 = PAT + (size_t)g2 * NA;
+                    int64_t ssq = 0;
+                    for (int k = 0; k < nb; k++) {
+                        int st = rs[k], e = st + rl[k], nt = 0;
+                        for (int i = st; i < e; i++) {
+                            int p = row2[ord[i]];
+                            if (cnt[p]++ == 0) tin[nt++] = p;
+                        }
+                        for (int i = 0; i < nt; i++) {
+                            int p = tin[i];
+                            int64_t v = cnt[p];
+                            ssq += v * v;
+                            cnt[p] = 0;
+                        }
+                    }
+                    /* Ties are REAL -- the objective is an integer sum over a
+                     * fixed denominator -- so they are COUNTED, and the winner is
+                     * the lowest guess index, the repo's one tie-break.  The pool
+                     * is walked in its own order, which need not be index order,
+                     * so the `<` on index is explicit rather than implied by
+                     * arrival. */
+                    if (best < 0 || ssq < best_score) {
+                        best = g2; best_score = ssq; ties = 1;
+                    } else if (ssq == best_score) {
+                        ties++;
+                        if (g2 < best) best = g2;
+                    }
+                }
+
+                Row *v = &rows[(size_t)oi * NGROUP + gi];
+                v->opener   = g1;
+                v->group    = gi;
+                v->second   = best;
+                v->score    = best < 0 ? 0 : best_score;
+                v->nq       = nq;
+                v->nbuckets = nb;
+                v->ties     = ties;
+            }
 
 #ifdef _OPENMP
 #pragma omp atomic
@@ -465,27 +603,35 @@ int main(int argc, char **argv) {
           "never fires.\n", f);
     fputs("# It is ONE PLY: what is left after two guesses, never what the game "
           "goes on to cost.\n", f);
-    fprintf(f, "# settings min_grays=%d fire=%s openers=%s seconds=%s answers=%d "
-               "second_pool=%d\n", min_grays, firelabel, openlabel, secondnm,
-            NA, nsec);
-    fputs("opener,second,expected,score,qualifying,buckets,ties\n", f);
+    /* `fire` is the condition; `min_grays` rides along ONLY when the one-group
+     * sugar was used, because that is what every table written before groups
+     * existed carries and what a reader falls back to. */
+    fprintf(f, "# settings ");
+    if (min_grays >= 0) fprintf(f, "min_grays=%d ", min_grays);
+    fprintf(f, "fire=%s openers=%s seconds=%s answers=%d second_pool=%d\n",
+            firelabel, openlabel, secondnm, NA, nsec);
+    fputs("opener,fires,second,expected,score,qualifying,buckets,ties\n", f);
     int64_t noq = 0, tied = 0;
     for (int oi = 0; oi < nopen; oi++) {
-        Row *v = &rows[oi];
-        if (v->second < 0) {
-            noq++;
-            fprintf(f, "%s,,,,%d,%d,0\n", GWORD[v->opener], v->nq, v->nbuckets);
-            continue;
+        for (int gi = 0; gi < NGROUP; gi++) {
+            Row *v = &rows[(size_t)oi * NGROUP + gi];
+            if (v->second < 0) {
+                noq++;
+                fprintf(f, "%s,%s,,,,%d,%d,0\n", GWORD[v->opener], GSPEC[gi],
+                        v->nq, v->nbuckets);
+                continue;
+            }
+            if (v->ties > 1) tied++;
+            fprintf(f, "%s,%s,%s,%.6f,%lld,%d,%d,%d\n", GWORD[v->opener],
+                    GSPEC[gi], GWORD[v->second],
+                    (double)v->score / (double)v->nq, (long long)v->score,
+                    v->nq, v->nbuckets, v->ties);
         }
-        if (v->ties > 1) tied++;
-        fprintf(f, "%s,%s,%.6f,%lld,%d,%d,%d\n", GWORD[v->opener],
-                GWORD[v->second], (double)v->score / (double)v->nq,
-                (long long)v->score, v->nq, v->nbuckets, v->ties);
     }
     fclose(f);
-    fprintf(stderr, "%d openers in %.1fs -- %lld with no qualifying answer, "
-            "%lld with a tied second word\n", nopen, now_s() - t0,
-            (long long)noq, (long long)tied);
+    fprintf(stderr, "%d openers x %d group(s) in %.1fs -- %lld rows with no "
+            "qualifying answer, %lld with a tied second word\n", nopen, NGROUP,
+            now_s() - t0, (long long)noq, (long long)tied);
     fprintf(stderr, "wrote %s\n", outpath);
     return 0;
 }
