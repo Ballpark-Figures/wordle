@@ -81,6 +81,8 @@ IT IS NOT INSTANT.  The reference filters its pool word by word in Python, so a
 that to a few seconds by default.
 """
 
+import contextlib
+import io
 import os
 import sys
 from collections import Counter
@@ -92,7 +94,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 from build_patterns import load_patterns  # noqa: E402
 from wordle import ALL_GREEN, load_words, pattern  # noqa: E402
 from secondword import Table, gray_counts  # noqa: E402
-from wordlesim import (WIN_WITHIN, answer_to_guess, draw_answer,  # noqa: E402
+from wordlesim import (WIN_WITHIN, CoupledDraw, answer_to_guess,  # noqa: E402
+                       draw_answer,
                        fixed_opening, make_opening_rule, make_strategy,
                        make_second_rule, second_rule_for,
                        make_tail, play_game)
@@ -101,7 +104,7 @@ from wordle_sweep import PICK_OFFSET, sweep_word  # noqa: E402
 from sweep_shortlist import shortlist  # noqa: E402
 from order_openings import (best_order, best_order_reference,  # noqa: E402
                              order_cost)
-from paired_compare import CoupledDraw, _play, read_sweep_settings  # noqa: E402
+from paired_compare import read_sweep_settings  # noqa: E402
 
 
 def ref_pattern(guess, answer):
@@ -123,7 +126,7 @@ def ref_pattern(guess, answer):
     return code
 
 
-def ref_play(pool, answer, rng, opening=()):
+def refplay_game(pool, answer, rng, opening=()):
     """Replay one game from strings alone.  Returns the words played, in order.
 
     `pool` is the list the strategy draws from -- the 2315 answers for `random`,
@@ -261,7 +264,7 @@ def main(argv):
         answer = answers[a_fast]
         played, replies = play_game(pat, ans2g, a_fast, None, tail, fast_rng)
         words = [guesses[g] for g in played]
-        ref_words, _ = ref_play(answers, answer, ref_rng)
+        ref_words, _ = refplay_game(answers, answer, ref_rng)
         if words != ref_words:
             failures.append("seed %d (%s): fast %s vs reference %s"
                             % (seed, answer, " ".join(words), " ".join(ref_words)))
@@ -304,7 +307,7 @@ def main(argv):
         drawn_outside += answer not in mystery      # the game's own draw, checked
         played, replies = play_game(pat, ans2g, a_fast, grule, gtail, fast_rng)
         words = [guesses[g] for g in played]
-        ref_words, _ = ref_play(guesses, answer, ref_rng)
+        ref_words, _ = refplay_game(guesses, answer, ref_rng)
         if words != ref_words:
             failures.append("random-guess seed %d (%s): fast %s vs reference %s"
                             % (seed, answer, " ".join(words), " ".join(ref_words)))
@@ -353,7 +356,7 @@ def main(argv):
             answer = answers[a_fast]
             played, _ = play_game(pat, ans2g, a_fast, prefix, ptail, fast_rng)
             words = [guesses[g] for g in played]
-            ref_words, _ = ref_play(pool, answer, ref_rng, opening=[opener])
+            ref_words, _ = refplay_game(pool, answer, ref_rng, opening=[opener])
             if words != ref_words:
                 failures.append("prefix/%s seed %d (%s): fast %s vs reference %s"
                                 % (tname, seed, answer, " ".join(words),
@@ -416,7 +419,7 @@ def main(argv):
             for _ in range(sweep_t):
                 a = int(draw_rng.integers(len(answers)))
                 drew.append(answers[a])
-                ref_scores.append(len(ref_play(pool, answers[a], pick_rng,
+                ref_scores.append(len(refplay_game(pool, answers[a], pick_rng,
                                                opening=[w])[0]))
             ref = summarise(ref_scores, WIN_WITHIN)
             if abs(st["mean_guesses"] - ref["mean_guesses"]) > 1e-12 or \
@@ -454,7 +457,7 @@ def main(argv):
             ref_scores = []
             for _ in range(sweep_t):
                 a = int(draw_rng.integers(len(answers)))
-                words, blind = ref_play(pool, answers[a], pick_rng, opening=opening)
+                words, blind = refplay_game(pool, answers[a], pick_rng, opening=opening)
                 ref_scores.append(len(words))
                 blind_hits += blind
                 if words[:len(opening)] != opening and answers[a] not in opening:
@@ -774,7 +777,7 @@ def main(argv):
     crule = make_opening_rule([guesses.index(guesses[0])], tail=ctail, adapt=0)
     bad = 0
     for ai in range(0, len(answers), 331):
-        played, _ = _play(pat, ans2g, ai, crule, ctail,
+        played, _ = play_game(pat, ans2g, ai, crule, ctail,
                           np.random.default_rng([7, ai]))
         words = [guesses[g] for g in played]
         if words[-1] != answers[ai] or consistent_prefix(words, answers[ai]) is not None:
@@ -791,7 +794,7 @@ def main(argv):
         ai = draw_answer(len(answers), ar)
         sc = []
         for r in rules:
-            sc.append(len(_play(pat, ans2g, ai, r, ctail,
+            sc.append(len(play_game(pat, ans2g, ai, r, ctail,
                                 np.random.default_rng([21, i]))[0]))
         sa.append(sc[0]); sb.append(sc[1]); sd_.append(sc[0] - sc[1])
     if abs(np.mean(sd_) - (np.mean(sa) - np.mean(sb))) > 1e-12:
@@ -804,6 +807,154 @@ def main(argv):
           "spread %.3f against %.3f unpaired"
           % (len(range(0, len(answers), 331)), np.std(sd_, ddof=1),
              np.hypot(np.std(sa, ddof=1), np.std(sb, ddof=1))))
+
+    # --- the race: one process, eliminating as the evidence lands ------------
+    # The statistics are checkmultiwordle's business (both races import them from
+    # race_stats.py, and that gate diffs them against hand-made histories).  What
+    # is checked HERE is everything the wordlesim race adds: that its games are a
+    # function of (seed, game index) alone, that the coin-flip cursor really is
+    # the coupled draw, that a resume and the pairwise switch and the chunk size
+    # change nothing, and that the scores are the scores of the strategy it says
+    # it is racing.
+    import wordle_race as wrace
+
+    # THE GAMES ARE THE SEED AND THE INDEX, AND NOTHING ELSE -- which is what
+    # makes a resume exact and the comparison paired.
+    a1, f1 = wrace.make_games(len(answers), 5, 0, 6, 32)
+    a2, f2 = wrace.make_games(len(answers), 5, 0, 6, 32)
+    a3, f3 = wrace.make_games(len(answers), 5, 3, 6, 64)
+    if not (np.array_equal(a1, a2) and np.array_equal(f1, f2)):
+        failures.append("the race's games are not a function of (seed, index)")
+    if not np.array_equal(a1[3:], a3):
+        failures.append("game 3 differs depending on which chunk asked for it")
+    if not np.array_equal(f1[3:], f3[:, :32]):
+        failures.append("regrowing the coin-flip array did not extend the same "
+                        "stream, so a regrown game is a different game")
+
+    # THE CURSOR IS THE COUPLED DRAW.  A game played against a pre-drawn row must
+    # be the game played against a Generator that produces those same floats --
+    # otherwise the race and the paired comparison are two different samplers
+    # wearing one name.
+    class _RowRng:
+        def __init__(self, row):
+            self.row, self.i = row, 0
+
+        def random(self):
+            self.i += 1
+            return self.row[self.i - 1]
+
+    rrule = make_opening_rule([0], tail=ctail, adapt=0)
+    same = 0
+    for gi in range(12):
+        ans_i, fl_i = wrace.make_games(len(answers), 9, gi, gi + 1, 64)
+        w1 = play_game(pat, ans2g, int(ans_i[0]), rrule, ctail,
+                       wrace.FloatCursor(fl_i[0]))[0]
+        w2 = play_game(pat, ans2g, int(ans_i[0]), rrule, ctail,
+                       _RowRng(list(fl_i[0])))[0]
+        if w1 != w2:
+            failures.append("the float cursor does not reproduce the row it "
+                            "reads")
+            break
+        same += 1
+
+    # AND THE SCORES ARE THE STRATEGY'S.  play_chunk is diffed against playing the
+    # very same games one at a time, so a transposed matrix or a rule handed to
+    # the wrong row would show.
+    rules2 = [make_opening_rule([0], tail=ctail, adapt=0),
+              make_opening_rule([len(guesses) // 2], tail=ctail, adapt=0)]
+    cans, cfl = wrace.make_games(len(answers), 4, 0, 15, 64)
+    sc = wrace.play_chunk(pat, ans2g, rules2, ctail, cans, cfl)
+    for i, r in enumerate(rules2):
+        for j in range(len(cans)):
+            n = len(play_game(pat, ans2g, int(cans[j]), r, ctail,
+                              wrace.FloatCursor(cfl[j]))[0])
+            if sc[i, j] != n:
+                failures.append("play_chunk disagrees with the same game played "
+                                "alone (opener %d, game %d)" % (i, j))
+                break
+    print("the race's games are (seed, index) alone, the coin-flip cursor "
+          "reproduces its row (%d games) and a chunk equals the games played "
+          "one at a time" % same)
+
+    # A RESUME, THE PAIRWISE SWITCH AND THE CHUNK SIZE MUST ALL CHANGE NOTHING.
+    # Run the same small race four ways and diff the standings.
+    rloc = os.path.join("data", "local", "wordlesim")
+    os.makedirs(rloc, exist_ok=True)
+    rfield = os.path.join(rloc, "_checkfield.txt")
+    with open(rfield, "w") as f:
+        f.write("\n".join(guesses[i] for i in range(0, len(guesses), 900)) + "\n")
+
+    def rpaths(tag):
+        o = os.path.join(rloc, "_checkrace_%s.csv" % tag)
+        return (o, o[:-4] + "_eliminations.csv",
+                os.path.join(rloc, "_checkrace_%s.npz" % tag))
+
+    def rwipe(tag):
+        for q in rpaths(tag):
+            if os.path.exists(q):
+                os.remove(q)
+
+    def rrun(tag, max_games, pair_at, chunk):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            wrace.main(["--fallback", "answer", "--words", rfield,
+                        "--max-games", str(max_games), "--pair-at", str(pair_at),
+                        "--chunk", str(chunk), "--report", "1e9", "--seed", "3",
+                        "--sigma", "2", "--out", rpaths(tag)[0]])
+        return buf.getvalue()
+
+    def rbody(tag):
+        return [ln for ln in open(rpaths(tag)[0]) if not ln.startswith("# race_")]
+
+    for tag in ("whole", "split", "switch", "chunky"):
+        rwipe(tag)
+    rsaid = {}
+    rsaid["whole"] = rrun("whole", 800, 0, 5)
+    rrun("split", 400, 0, 5)                      # stop early ...
+    rsaid["split"] = rrun("split", 800, 0, 5)     # ... then resume into it
+    rsaid["switch"] = rrun("switch", 800, 9999, 5)
+    rsaid["chunky"] = rrun("chunky", 800, 0, 97)
+
+    if rbody("split") != rbody("whole"):
+        failures.append("a race resumed from its checkpoint does not equal an "
+                        "uninterrupted one")
+    if "resuming" not in rsaid["split"]:
+        failures.append("the resumed race started over, so that check proved "
+                        "nothing")
+    if rbody("switch") != rbody("whole"):
+        failures.append("switching to pairwise sums changed a race's result")
+    if not ("switched to pairwise" in rsaid["switch"]
+            and "switched to pairwise" not in rsaid["whole"]):
+        failures.append("the pairwise switch did not fire where it was meant to, "
+                        "so that comparison was between two identical paths")
+    if rbody("chunky") != rbody("whole"):
+        failures.append("the chunk size changed a race's result -- it is a "
+                        "checkpoint interval, not a parameter of the answer")
+    relim = open(rpaths("whole")[1]).read().strip().split("\n")
+    if not (len(relim) > 2 and relim[1].startswith("word,")):
+        failures.append("the race eliminated nobody, or did not log them")
+    print("the race: resume, the pairwise switch and the chunk size all change "
+          "nothing (%d openers, %d eliminated and logged)"
+          % (len(open(rfield).read().split()), len(relim) - 2))
+
+    # THE STANDINGS ARE SWEEP-SHAPED, so the cut and the paired round can read a
+    # race exactly as they read a sweep -- that is the whole reason for the
+    # column names and the settings line.
+    rmeta = read_sweep_settings(rpaths("whole")[0])
+    if rmeta["fallback"] != "answer" or rmeta["rank"] != "mean":
+        failures.append("a race's standings do not parse as a sweep's settings")
+    rdata = [r.split(",") for r in rbody("whole")
+             if not r.startswith("#") and not r.startswith("word,")]
+    rrows, _ = shortlist([(c[0], float(c[2]), float(c[3])) for c in rdata
+                          if c[2]], se=5.0)
+    if not rrows:
+        failures.append("the shortlist tool could not cut a race's standings")
+    print("a race's standings parse as a sweep's (%d live rows the cut can read)"
+          % len(rrows))
+
+    for tag in ("whole", "split", "switch", "chunky"):
+        rwipe(tag)
+    os.remove(rfield)
 
     # --- ranking by WIN RATE, the parallel ranking ---------------------------
     # A win rate is a PROPORTION, whose ordinary error is exactly zero at the
