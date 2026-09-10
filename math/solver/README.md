@@ -1037,7 +1037,10 @@ Two rows are known in advance, and the gate uses both as oracles:
 | ≥ 6 (salet) | 7920 × 12972, **3.42117** | salet's tree is depth 5, so no live game is left to spoil |
 
 `k = 1` therefore **refuses `--tree-file`**: the number is opener-independent,
-and taking a tree would file it under an opener's name.
+and taking a tree would file it under an opener's name. **`--all` skips k = 1**
+and says so — computing it means solving all 12972 openers at depth 6, which is
+the full sweep over again for a number already on disk. Ask for it with `-k 1`
+if you want this pipeline validated end to end against those 12972 totals.
 
 **Which tree matters at k ≥ 3.** At k = 2 the states are the opener's own
 partition. Deeper they are the nodes of *one* optimal tree, and an optimal tree

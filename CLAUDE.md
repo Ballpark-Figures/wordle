@@ -1250,6 +1250,12 @@ from `math/`, attached, tee'd log; `--dry-run` resolves and stops.
     8393.9652 over the 12972). So k=1 needs no tree and **REFUSES `--tree-file`**:
     the number is opener-independent, and accepting one would file it under an
     opener's name. Its CSV row records the opener as `-`.
+    - **`--all` DELIBERATELY SKIPS k=1 and says so.** Computing it means solving
+      all 12972 openers at depth 6 — that IS `run-sweep.sh`, which took this
+      machine weeks — for a number already committed in `opener_totals.csv`. `-k 1`
+      still runs it, and doing so is the end-to-end validation of the whole
+      pipeline against 12972 committed totals, which is what `checkkthrandom.py`
+      check F then compares. Do not let `--all` launch it by accident.
   - **k past the tree's own depth reproduces the opener itself.** salet's tree is
     depth 5, so k>=6 leaves no live game to spoil: total = 7920 x 12972, mean
     **3.42117**. Instant, and it exercises the real tree reader.

@@ -36,9 +36,15 @@
 # the tree's depth must reproduce the opener's own total (salet: 7920 / 3.42117),
 # there being no live game left for the random guess to spoil.
 #
-# k=1 TAKES NO OPENER.  With no prefix to play there is nothing opener-specific
-# about it, so its row records the opener as `-`.  --all still writes it into
-# this opener's file, since it is the left-hand end of the same curve.
+# k=1 TAKES NO OPENER, AND --all DELIBERATELY SKIPS IT.  With no prefix to play
+# there is nothing opener-specific about k=1 -- and computing it means solving
+# every one of the 12972 openers at depth 6, which IS the full --sweep and took
+# this machine weeks.  It is already answered by the committed
+# data/shared/optturns/opener_totals.csv (total 8393.9652, mean 3.62590), so
+# --all runs k=2..depth and says so.  `-k 1` still works, and running it is the
+# end-to-end validation of this whole pipeline against 12972 committed totals --
+# which is exactly what tools/checkkthrandom.py check F then compares.  Its row
+# records the opener as `-`.
 #
 # WHICH TREE MATTERS AT k>=3, and the log records the one used.  At k=2 the
 # states are the opener's own partition and nothing else can vary; deeper, they
@@ -114,7 +120,9 @@ LOC=data/local/kthrandom/${OPENER}_d${DEPTH}
 OUT=$OUTDIR/${OPENER}_d${DEPTH}.csv
 LOG=$LOC/run.log
 
-if [ "$ALL" = 1 ]; then KLIST=$(seq 1 "$DEPTH"); else KLIST=$KVAL; fi
+# --all starts at 2, NOT 1 -- see the note at the top.  k=1 is the whole opener
+# sweep over again and is already on disk.
+if [ "$ALL" = 1 ]; then KLIST=$(seq 2 "$DEPTH"); else KLIST=$KVAL; fi
 
 if [ "$DRY" = 1 ]; then
     echo "dry run -- nothing computed, nothing written"
@@ -122,6 +130,8 @@ if [ "$DRY" = 1 ]; then
     echo "  tree     : $TREE ($(shasum "$TREE" | cut -c1-12))"
     echo "  depth    : $DEPTH"
     echo "  k values : $(echo $KLIST | tr '\n' ' ')"
+    [ "$ALL" = 1 ] && echo "             (--all skips k=1: it is the full 12972-opener sweep," \
+                          "already in data/shared/optturns/opener_totals.csv)"
     echo "  csv      : $OUT"
     echo "  log      : $LOG"
     echo "  threads  : $THREADS   tt-bits: $TTBITS"
@@ -144,6 +154,15 @@ WARM=""
 echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] kth-random: opener=$OPENER depth=$DEPTH k=$(echo $KLIST | tr '\n' ' ')" \
     | tee -a "$LOG"
 echo "  tree: $TREE  sha=$(shasum "$TREE" | cut -c1-12)" | tee -a "$LOG"
+
+if [ "$ALL" = 1 ]; then
+    echo "  note: --all skips k=1 -- it is the full 12972-opener sweep and is already" \
+        | tee -a "$LOG"
+    echo "        answered by data/shared/optturns/opener_totals.csv (mean 3.62590)." \
+        | tee -a "$LOG"
+    echo "        Ask for it explicitly with -k 1 if you want it recomputed here." \
+        | tee -a "$LOG"
+fi
 
 for K in $KLIST; do
     # k=1 has no prefix, so the binary REFUSES a tree there rather than filing an
