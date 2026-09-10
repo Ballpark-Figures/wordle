@@ -67,19 +67,14 @@ def scale_for(weights) -> int:
     return scale
 
 
-def export(csv_path: str, stem: str, *, k: int = 1, answers=None) -> dict:
-    """Reconstruct ``csv_path`` and write ``<stem>.txt`` / ``<stem>.weights``."""
-    from freq_search import FrequencySearch, CUSTOM
-
-    s = FrequencySearch.reconstruct(csv_path, k=k,
-                                    answers=CUSTOM if answers is None else answers)
-    pairs = [(w, float(f)) for w, f in zip(s.game.words, s.freq) if f > 0]
-    pairs.sort(key=lambda t: (-t[1], t[0]))
+def _write(pairs, stem: str, provenance: str) -> dict:
+    """Write and GATE one (word, weight) list. The single writer, so a uniform
+    stem and an adversarial one cannot drift apart in format, order or checks."""
     scale = scale_for(f for _, f in pairs)
 
     words_path, wts_path = stem + ".txt", stem + ".weights"
     with open(words_path, "w") as fw, open(wts_path, "w") as fx:
-        fx.write("# weights from %s\n" % os.path.relpath(csv_path))
+        fx.write("# weights from %s\n" % provenance)
         fx.write("# scale %d (every weight x scale is an exact integer)\n" % scale)
         for word, weight in pairs:
             fw.write(word + "\n")
@@ -106,22 +101,69 @@ def export(csv_path: str, stem: str, *, k: int = 1, answers=None) -> dict:
             "total_scaled": int(total * scale), "max": float(back[0][1])}
 
 
+def export(csv_path: str, stem: str, *, k: int = 1, answers=None) -> dict:
+    """Reconstruct ``csv_path`` and write ``<stem>.txt`` / ``<stem>.weights``."""
+    from freq_search import FrequencySearch, CUSTOM
+
+    s = FrequencySearch.reconstruct(csv_path, k=k,
+                                    answers=CUSTOM if answers is None else answers)
+    pairs = [(w, float(f)) for w, f in zip(s.game.words, s.freq) if f > 0]
+    pairs.sort(key=lambda t: (-t[1], t[0]))
+    return _write(pairs, stem, os.path.relpath(csv_path))
+
+
+def uniform(list_path: str, stem: str) -> dict:
+    """A stem with EVERY WEIGHT 1, for the unweighted comparison run.
+
+    WHY THIS BELONGS HERE.  A weight stem is two files that must agree position
+    for position and be weight-descending, and this module is the only place that
+    pairing is made and gated.  Hand-rolling a uniform one somewhere else would be
+    a second, ungated writer of the same contract.
+
+    WHAT THE RESULTING RUN MEANS.  With every weight 1 the weighted objective IS
+    the plain guess count, so `wturns` over this stem computes exactly what
+    `optturns` computes over the same answer list -- same totals, same nodes.
+    That is not a coincidence to note in passing, it is the identity
+    `tools/checkweighted.py` asserts, and it makes this run a free cross-check on
+    the weighted machinery as well as the baseline it is wanted for.
+
+    Ordering is by WORD: every weight is equal, so weight-descending is satisfied
+    by any order and the word sort is what makes the file deterministic.
+    """
+    words = [w.strip() for w in open(list_path, encoding="utf-8") if w.strip()]
+    if not words:
+        raise SystemExit("%s has no words" % list_path)
+    dup = len(words) - len(set(words))
+    if dup:
+        raise SystemExit("%s has %d duplicate word(s); the answer list must be a set"
+                         % (list_path, dup))
+    pairs = [(w, 1.0) for w in sorted(words)]
+    return _write(pairs, stem, "uniform over %s (every weight 1)"
+                  % os.path.relpath(list_path))
+
+
 def main(argv):
-    csv_path = stem = None
+    csv_path = stem = uni = None
     k = 1
     it = iter(argv)
     for a in it:
         if a == "--from":
             csv_path = next(it)
+        elif a == "--uniform":
+            uni = next(it)
         elif a == "--stem":
             stem = next(it)
         elif a in ("-k", "--topk"):
             k = int(next(it))
         else:
-            raise SystemExit("unknown arg %r (--from CSV, --stem PATH, -k K)" % a)
-    if not csv_path or not stem:
-        raise SystemExit("usage: freqweights.py --from <freqsearch csv> --stem <out stem> [-k K]")
-    info = export(csv_path, stem, k=k)
+            raise SystemExit("unknown arg %r (--from CSV | --uniform LIST, "
+                             "--stem PATH, -k K)" % a)
+    if not stem or (csv_path is None) == (uni is None):
+        raise SystemExit(
+            "usage: freqweights.py --from <freqsearch csv> --stem <out stem> [-k K]\n"
+            "   or: freqweights.py --uniform <word list> --stem <out stem>\n"
+            "Exactly one source: a hill-climb's weights, or every weight 1.")
+    info = export(csv_path, stem, k=k) if uni is None else uniform(uni, stem)
     print("wrote %s and %s" % (info["words"], info["weights"]))
     print("  %d words, scale %d, total weight %.6f (scaled %d), max %.6f"
           % (info["n"], info["scale"], info["total"], info["total_scaled"], info["max"]))

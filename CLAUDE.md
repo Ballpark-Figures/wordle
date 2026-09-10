@@ -1114,6 +1114,20 @@ search under a different COST, not a program of its own. `sh build.sh` builds it
   - **`--dry-run` resolves everything and stops before the solver starts**, printing
     the files it WOULD write. Use it for every wrapper change: a partial CSV from a
     "quick check" is indistinguishable from a real result that died.
+  - **THE UNWEIGHTED COMPARISON RUN IS THIS SAME BINARY WITH EVERY WEIGHT 1** —
+    `python3 tools/freqweights.py --uniform data/shared/words/custom.txt --stem
+    data/shared/freqsearch/uniform_custom`, then the ordinary wrapper. **It is NOT a
+    different program and NOT `topk.py`**: with all weights equal the weighted
+    objective IS the plain guess count, so this computes exactly what `optturns`
+    computes over the same answer list — the identity `checkweighted.py` asserts,
+    which makes the baseline a free cross-check on the weighted machinery too.
+    - The uniform stem is the **4282-word `custom.txt`** (user's call, 2026-09-10),
+      i.e. the frequency-cut list BEFORE the adversary zeroed 53 words — so its
+      answer SET differs from `adv_topk1`'s 4229 and the two averages have
+      different denominators. Comparable in the loose sense, not a strict A/B.
+    - `freqweights.py` is still the ONLY place a weight stem is made, and both
+      sources now go through one gated writer — verified by re-exporting
+      `adv_topk1` and diffing it byte-for-byte against the committed stem.
   - **`--weights` takes a STEM, not a file:** `<stem>.txt` (the answer list) and
     `<stem>.weights`, both written together by **`python3 tools/freqweights.py --from
     <freqsearch csv> --stem <stem>`** so their ORDER cannot drift apart. The pattern
