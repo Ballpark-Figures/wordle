@@ -2148,6 +2148,21 @@ the source of truth; `solver/secondword.c` computes the table.
 - **AN EMPTY `second` IS A RESULT.** An opener no answer can give that many greys
   has nothing to choose between; the rule then never fires and the strategy is
   the plain opener.
+- **THE FOLLOW-UP IS ALWAYS `answer` FOR THIS STRATEGY (user's call, 2026-09-10):
+  the random compatible words come from the ANSWER list.** That is a THIRD axis,
+  separate from the two pools above, and it is not defaulted by the code —
+  `--fallback` stays required everywhere, because a wordlesim strategy is a rule
+  plus a follow-up and the filename has to say which. It simply always gets
+  `answer` here, which is also what makes the two variants directly comparable:
+  they then differ only in where the two COMMITTED words came from.
+- **THE TWO VARIANTS ARE `--words` PLUS THE TABLE, NEVER `--fallback`** — the
+  answers-only run is `--words mystery` with `second_mystery_g3.csv`, the
+  all-guesses run is `--words guess` with `second_guess_g3.csv`. **BOTH pools are
+  in the race's stem** (`race_answer_mystery_sig5_s0_g3-mystery`): the opener list
+  from `--words`, the second-word pool from the table's own stamp. The second half
+  was missing at first, and racing the 2315 openers against the 12972-word table —
+  a third experiment again — would have shared a filename, and therefore a
+  CHECKPOINT, with the answers-only run.
 - **The second word is played BLIND and is usually NOT a live candidate** — it
   was chosen to split, not to win. The opener is excluded as its own second word.
 - **Run one opener with `--strategy gray-second --strategy-arg WORD

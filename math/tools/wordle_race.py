@@ -302,7 +302,13 @@ def stem_for(a, list_name, table):
     stem = "race_%s_%s_sig%g_s%d" % (a["fallback"], list_name, a["sigma"],
                                      a["seed"])
     if table:
-        stem += "_g%d" % table.min_grays
+        # THE TABLE'S OWN POOLS GO IN THE NAME, not just the threshold.  The
+        # opener list is already in the stem, but the SECOND-WORD pool is the
+        # other half of the variant -- racing the 2315 openers against the
+        # 12972-word table is a different experiment from racing them against
+        # the answers-only one, and without this they would share a filename,
+        # which means sharing a checkpoint and resuming into each other.
+        stem += "_g%d-%s" % (table.min_grays, table.seconds)
     if a["win_within"] != WIN_WITHIN:
         stem += "_w%d" % a["win_within"]
     return stem
