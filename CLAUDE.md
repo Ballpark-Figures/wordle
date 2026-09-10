@@ -1210,6 +1210,81 @@ search under a different COST, not a program of its own. `sh build.sh` builds it
   depth-6 problem runs a median 58s per opener, p99 7.8h, max 86h. This is 4229
   answers with a weaker bound. **Price one opener before launching the sweep.**
 
+## `--kth-random` — the price of ONE random guess at turn k
+The exact cost of a single blunder in an otherwise perfect game. Guesses 1..k-1
+follow the committed OPTIMAL TREE of an opener (salet); guess k is a word drawn
+UNIFORMLY FROM ALL 12972 LEGAL WORDS; from k+1 the exact search plays optimally
+again. **Run it with `bash solver/run-kth-random.sh --depth 6 -k K` (or `--all`)**
+from `math/`, attached, tee'd log; `--dry-run` resolves and stops.
+- **A RUNTIME MODE OF `optturns`, NOT A NEW BINARY, and that is deliberate.** The
+  objective is optturns' own — minimum total guesses subject to a depth cap — so
+  the search, the TT, the lower bounds and the loader are all identical and a
+  separate file would duplicate the ONE thing that must stay single-sourced.
+  (`greens.c`/`antistall.c`/`eldrowmax.c` are separate because their SEARCH
+  differs; this one's does not.) VERIFIED inert: `solver/validate.sh` still
+  reproduces all five totals with identical node counts (salet 16672, reast 29780).
+- **IT IS EXACT, NOT SAMPLED — that is why it is NOT a `wordlesim` strategy.**
+  Every (answer, random word) pair is enumerated, 2315 x 12972 = **30030180** of
+  them, so the result is an INTEGER total over that grid with no seed and no
+  standard error, and a re-run reproduces the file. The user's call, 2026-09-10.
+- **THE CAP IS COUNTED FROM THE START OF THE GAME** (user's call): the
+  continuation gets `depth - k` further guesses, so the whole game fits in
+  `--depth`. **`--depth` is REQUIRED**, each depth is its own quantity, and
+  **INFEASIBLE IS AN EXPECTED RESULT** in a way it is not for the plain sweep — a
+  random guess spends a turn without necessarily buying anything.
+  - **An infeasible pair has NO OPTIMUM AT ALL, not a large one.** Those pairs are
+    counted, EXCLUDED from the mean, and reported. So `mean` is "optimal expected
+    guesses CONDITIONAL on the game being winnable within `--depth`"; `lb_mean`
+    charges every infeasible pair `depth + 1` and is a SOUND LOWER BOUND on the
+    unconditional mean. When `infeasible_pairs` is 0 they coincide. **Never quote
+    `mean` as the expected guesses while `infeasible_pairs` is non-zero.**
+  - Like every optturns-family total this is an optimum SUBJECT TO a guarantee, so
+    it must never be tabled beside `wordlesim`/`multiwordle`/`foximax` means, which
+    are expected guesses OUTRIGHT.
+- **THE RANDOM WORD IS UNIFORM OVER ALL 12972, consistent or not** (user's call) —
+  that is what "completely random" means here, and it is what makes k=1 the average
+  over every possible starting word.
+- **TWO ROWS ARE KNOWN IN ADVANCE AND ARE THE GATE'S ORACLES.**
+  - **k=1 IS the opener sweep averaged**: with no prefix to play, the total must
+    equal every opener's own committed total summed — mean **3.62590** (mean total
+    8393.9652 over the 12972). So k=1 needs no tree and **REFUSES `--tree-file`**:
+    the number is opener-independent, and accepting one would file it under an
+    opener's name. Its CSV row records the opener as `-`.
+  - **k past the tree's own depth reproduces the opener itself.** salet's tree is
+    depth 5, so k>=6 leaves no live game to spoil: total = 7920 x 12972, mean
+    **3.42117**. Instant, and it exercises the real tree reader.
+- **WHICH TREE MATTERS AT k>=3 — the quantity is tied to ONE optimal tree.** At
+  k=2 the states are the opener's own partition and nothing else can vary. Deeper,
+  they are the nodes of one optimal tree, and **an optimal tree is NOT UNIQUE**. So
+  the tree is an explicit INPUT read from the committed artifact rather than
+  re-derived: a fresh `best_move()` walk consults the TT and can legitimately
+  return a different, equally optimal guess, which would make the answer depend on
+  search history. The wrapper logs the tree path and its sha.
+- **THE TREE READER CHECKS ITSELF, ALWAYS, three ways** — a misread prefix gives a
+  PLAUSIBLE state, never an error. Every line must play the same opener; every line
+  in a group must play the same guess at every ply (i.e. the file is one STRATEGY);
+  and each group must EQUAL the set of answers consistent with its prefix,
+  recomputed by filtering all 2315 through the pattern matrix.
+- **MEASURED SHAPE of salet's tree, which is what prices the whole thing**: states
+  at ply k-1 number 1 / 148 / 1253 / 908 / 81 for k = 1..5, largest 2315 / 221 / 21
+  / 6 / 1, with 2315 / 2315 / 2220 / 989 / 81 answers still live. So **k=2 is the
+  only expensive cell** (289636 distinct residual states of up to 221 candidates at
+  a 4-guess cap); k=4 runs in **0.2 s**, k=5 and k=6 are instant, and k=1 is the
+  full 12972-opener problem. Price a run by its first per-state progress line.
+- Data: `math/data/shared/kthrandom/<opener>_d<D>.csv`, one row per k, resumable
+  (a k already on file is skipped, not appended twice); log under
+  `math/data/local/kthrandom/`. Nothing writes a `tt.bin` — see § `--tt-save`.
+- **`python3 tools/checkkthrandom.py` is the GATE**, and it is MUTATION-TESTED (an
+  infeasible pair still charged its k, a forgotten all-green bucket and an
+  off-by-one in the cap were each caught). It diffs the C against a reference that
+  recomputes every pattern FROM THE STRINGS, re-derives each state by FILTERING
+  rather than grouping, and plays **PER PAIR** where the C sums **PER BUCKET** — two
+  routes to one integer. Plus the real-list k=6 oracle, the seven refusals, four
+  deliberately broken trees, and a **COVERAGE TALLY that FAILS** unless an
+  infeasible pair, an early finish, a random word that WAS the answer and a
+  multi-candidate state all actually occurred. Run it alongside
+  `solver/validate.sh` and `tools/checkpatterns.py`.
+
 ## Multiwordle (k boards at once) — a SIMULATION, not a solver
 k hidden answers, one per board, every guess played on every unsolved board at once.
 **Nothing here searches or optimises** — it MEASURES one named heuristic by Monte

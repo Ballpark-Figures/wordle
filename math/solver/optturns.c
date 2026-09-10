@@ -236,6 +236,14 @@ typedef uint32_t pat_t;
 #else
 #define WGT 0
 #endif
+
+/* MM_MODE: peg feedback, as a compile-time 0/1 so a runtime refusal can name it
+ * in the same expression as HARD/ULT/WGT rather than needing its own #ifdef. */
+#ifdef MASTERMIND
+#define MM_MODE 1
+#else
+#define MM_MODE 0
+#endif
 #if ULT && defined(HARDMODE)
 #error "ULTRA and HARDMODE are incompatible: ultra mode restricts guesses to \
 words consistent with EVERY clue, a strict superset of hard mode's rule.  Build \
@@ -2059,6 +2067,498 @@ static int find_word(char (*list)[WBUF], int n, const char *w) {
     return -1;
 }
 
+/* ======================================================= --kth-random =======
+ *
+ * THE QUESTION.  What does ONE random guess cost, played at turn K of an
+ * otherwise perfect game?  Guesses 1..K-1 follow the committed OPTIMAL TREE in
+ * `--tree-file`; guess K is a word drawn UNIFORMLY FROM ALL NG LEGAL WORDS,
+ * consistent with the replies or not; and from turn K+1 the search plays
+ * optimally again.
+ *
+ * IT IS EXACT, NOT SAMPLED.  Every (answer, random word) pair is enumerated --
+ * NA x NG of them -- so the result is an INTEGER total over that grid and the
+ * mean is that total over the grid size, exactly as every other total here is
+ * an integer over 2315.  There is no seed and no standard error, and a re-run
+ * reproduces the file byte for byte.
+ *
+ * THE CAP IS PART OF THE OBJECTIVE AND IT IS COUNTED FROM THE START OF THE
+ * GAME.  The continuation must resolve every remaining candidate within
+ * `--depth - K` further guesses, so the whole game fits in `--depth`.  A random
+ * guess spends a turn without necessarily buying anything, so INFEASIBLE IS AN
+ * EXPECTED RESULT here in a way it is not for the plain sweep -- and an
+ * infeasible bucket has NO OPTIMUM AT ALL, not merely a large one.  Those pairs
+ * are therefore COUNTED, EXCLUDED from the mean, and reported; the run also
+ * prints the sound LOWER BOUND that charges each of them `--depth + 1`, which
+ * is the least a game that cannot finish inside the cap can cost.  Read `mean`
+ * as "optimal expected guesses CONDITIONAL on the game being winnable within
+ * --depth"; when `infeasible_pairs` is 0 the two coincide and it is simply the
+ * expected guesses.
+ *
+ * WHAT THE ANSWER DEPENDS ON, stated because it is not obvious.  At K = 2 the
+ * level-1 states are the OPENER's own partition, so nothing but the opener
+ * matters.  At K >= 3 they are the nodes of ONE optimal tree, and an optimal
+ * tree is NOT UNIQUE -- ties fall to whichever minimiser the emitting run
+ * happened to keep.  So the quantity is "under the optimal strategy THIS TREE
+ * FILE records", which is why the tree is an explicit input read from the
+ * committed artifact rather than re-derived here: a fresh best_move() walk
+ * consults the transposition table and can legitimately return a different,
+ * equally optimal guess, which would make the number depend on search history.
+ *
+ * K = 1 REFUSES A TREE FILE.  With no prefix to play there is no opener, and
+ * the answer is a property of the word lists alone -- it is the mean over all
+ * NG openers of that opener's own optimal total, i.e. the whole `--sweep` CSV
+ * averaged.  Accepting a tree there would file an opener-independent number
+ * under an opener's name.  (It is also the free whole-program gate: k=1 must
+ * reproduce the committed opener_totals.csv exactly.)
+ */
+
+/* ---- word -> index, so a tree file can be read without an O(n) scan per token */
+typedef struct { int *slot; size_t mask; char (*list)[WBUF]; } WIndex;
+
+static uint64_t w_fnv(const char *s) {
+    uint64_t h = 1469598103934665603ULL;
+    while (*s) { h ^= (unsigned char)*s++; h *= 1099511628211ULL; }
+    return h;
+}
+
+static void windex_build(WIndex *ix, char (*list)[WBUF], int n) {
+    size_t m = 1;
+    while (m < (size_t)n * 2) m <<= 1;
+    ix->slot = malloc(sizeof(int) * m);
+    if (!ix->slot) { fprintf(stderr, "out of memory: word index\n"); exit(1); }
+    ix->mask = m - 1;
+    ix->list = list;
+    for (size_t i = 0; i < m; i++) ix->slot[i] = -1;
+    for (int i = 0; i < n; i++) {
+        size_t j = w_fnv(list[i]) & ix->mask;
+        while (ix->slot[j] >= 0) j = (j + 1) & ix->mask;
+        ix->slot[j] = i;
+    }
+}
+
+static int windex_find(const WIndex *ix, const char *w) {
+    size_t j = w_fnv(w) & ix->mask;
+    while (ix->slot[j] >= 0) {
+        if (!strcmp(ix->list[ix->slot[j]], w)) return ix->slot[j];
+        j = (j + 1) & ix->mask;
+    }
+    return -1;
+}
+
+/* Inverse of pat_str: "bygbb" -> its base-3 code, position 0 the MOST
+ * significant trit.  Returns -1 for anything that is not exactly WORDLEN
+ * characters of b/y/g, so a malformed tree line is REFUSED rather than folded
+ * into bucket 0 -- which would silently merge two different states.
+ *
+ * NOTE the `!s[i]` test comes FIRST: strchr("byg", 0) finds the terminator and
+ * returns a NON-null pointer, so a short string would otherwise read as a run
+ * of `b`s. */
+static int pat_code(const char *s) {
+    int code = 0;
+    for (int i = 0; i < WORDLEN; i++) {
+        const char *p;
+        if (!s[i] || !(p = strchr("byg", s[i]))) return -1;
+        code = code * 3 + (int)(p - "byg");
+    }
+    return s[WORDLEN] ? -1 : code;
+}
+
+/* One answer's line of the tree, cut down to the prefix --kth-random needs. */
+typedef struct {
+    int a;                 /* answer index */
+    int n;                 /* guesses this answer's line spends */
+    int g[MAXD];           /* guess index played at each of the first KPRE plies */
+    int p[MAXD];           /* the pattern code each of those drew */
+} TreeLine;
+
+/* One node of the tree at ply K-1: the candidates still alive when the random
+ * guess is played. */
+typedef struct { uint16_t *S; int n; } KState;
+
+/* Read `file` (gzipped or not) into one TreeLine per answer, keeping the first
+ * `kpre` (guess, pattern) pairs of each.
+ *
+ * The gzip route mirrors write_tree's own `popen("gzip -1 > ...")` rather than
+ * linking zlib for one reader. */
+static int read_tree_lines(const char *file, int kpre, TreeLine *out,
+                           const WIndex *gix, const WIndex *aix) {
+    size_t len = strlen(file);
+    int gz = len > 3 && !strcmp(file + len - 3, ".gz");
+    FILE *f;
+    if (gz) {
+        char cmd[4200];
+        snprintf(cmd, sizeof cmd, "gzip -dc '%s'", file);
+        f = popen(cmd, "r");
+    } else {
+        f = fopen(file, "r");
+    }
+    if (!f) { fprintf(stderr, "cannot read tree file %s\n", file); return -1; }
+
+    char *seen = calloc((size_t)NA, 1);
+    char line[8192];
+    int nl = 0, rc = 0;
+    while (rc == 0 && fgets(line, sizeof line, f)) {
+        char *save = NULL;
+        char *tok = strtok_r(line, " \t\r\n", &save);
+        if (!tok) continue;
+        int a = windex_find(aix, tok);
+        if (a < 0) {
+            fprintf(stderr, "tree line names %s, which is not an answer word\n", tok);
+            rc = -1; break;
+        }
+        if (seen[a]) { fprintf(stderr, "tree file lists %s twice\n", tok); rc = -1; break; }
+        seen[a] = 1;
+        tok = strtok_r(NULL, " \t\r\n", &save);
+        int n = tok ? atoi(tok) : 0;
+        if (n < 1 || n > MAXD - 1) {
+            fprintf(stderr, "tree line for %s claims %d guesses\n", AWORD[a], n);
+            rc = -1; break;
+        }
+        TreeLine *t = &out[nl++];
+        t->a = a; t->n = n;
+        /* the line is g1 p1 g2 p2 ... gN: N guesses and N-1 patterns */
+        for (int ply = 0; ply < n; ply++) {
+            char *gw = strtok_r(NULL, " \t\r\n", &save);
+            char *ps = NULL;
+            if (!gw) { fprintf(stderr, "tree line for %s ends early\n", AWORD[a]); rc = -1; break; }
+            if (ply < n - 1) {
+                ps = strtok_r(NULL, " \t\r\n", &save);
+                if (!ps) { fprintf(stderr, "tree line for %s ends early\n", AWORD[a]); rc = -1; break; }
+            }
+            if (ply >= kpre) continue;          /* past the prefix we need */
+            /* The LAST guess of a line carries no pattern -- it is the answer.
+             * That only happens inside the prefix for a line that finishes early
+             * (n <= kpre), which is never grouped into a state, so a missing
+             * pattern is recorded as -1 rather than refused.  A line still LIVE
+             * at guess K has n >= K, hence a pattern at every ply below kpre. */
+            int g = windex_find(gix, gw);
+            int p = ps ? pat_code(ps) : -1;
+            if (g < 0 || (ps && p < 0)) {
+                fprintf(stderr, "tree line for %s: unreadable guess/pattern '%s %s'\n",
+                        AWORD[a], gw, ps ? ps : "(none)");
+                rc = -1; break;
+            }
+            t->g[ply] = g; t->p[ply] = p;
+        }
+    }
+    if (gz) pclose(f); else fclose(f);
+    free(seen);
+    if (rc) return -1;
+    if (nl != NA) {
+        fprintf(stderr, "tree file covers %d answers, not %d\n", nl, NA);
+        return -1;
+    }
+    return nl;
+}
+
+static int KPRE_CMP = 0;                        /* prefix length cmp_treeline reads */
+
+/* Order lines by their PATTERN prefix, then by answer index so the sort is
+ * total and the grouping deterministic.  Patterns alone identify the node: the
+ * guess at every ply is a function of the path above it, which is what makes a
+ * tree a STRATEGY -- and group_states() ASSERTS that rather than assuming it. */
+static int cmp_treeline(const void *x, const void *y) {
+    const TreeLine *a = x, *b = y;
+    for (int i = 0; i < KPRE_CMP; i++)
+        if (a->p[i] != b->p[i]) return a->p[i] < b->p[i] ? -1 : 1;
+    return (a->a > b->a) - (a->a < b->a);
+}
+
+/* Turn the tree lines into the level-(kpre) states, checking as it goes.
+ *
+ * THREE CHECKS, ALL ALWAYS ON, because this is the one place a misread tree
+ * would produce a plausible wrong number rather than an error:
+ *   1. every line plays the SAME opener, and every line in a group plays the
+ *      same guess at every ply -- i.e. the file is one strategy, not a
+ *      per-answer fabrication;
+ *   2. the group EQUALS the set of answers consistent with its prefix,
+ *      recomputed by filtering all NA answers through the pattern matrix, so
+ *      the state is the CANDIDATE SET and not merely the answers the file
+ *      happened to list together;
+ *   3. every listed member survives that filter. */
+static int group_states(TreeLine *lines, int nl, int kpre, KState **out_states,
+                        int *out_nstate, long long *out_early_score,
+                        int *out_early_count, int *out_live, int *out_opener) {
+    KPRE_CMP = kpre;
+    long long early_score = 0;
+    int early_count = 0, live = 0;
+
+    int opener = lines[0].g[0];
+    for (int i = 1; i < nl; i++)
+        if (lines[i].g[0] != opener) {
+            fprintf(stderr, "tree opens with both %s and %s -- not one strategy\n",
+                    GWORD[opener], GWORD[lines[i].g[0]]);
+            return -1;
+        }
+
+    TreeLine *live_lines = malloc(sizeof(TreeLine) * (size_t)nl);
+    for (int i = 0; i < nl; i++) {
+        if (lines[i].n <= kpre) { early_score += lines[i].n; early_count++; }
+        else live_lines[live++] = lines[i];
+    }
+    qsort(live_lines, (size_t)live, sizeof(TreeLine), cmp_treeline);
+
+    int cap = 64, ns = 0;
+    KState *st = malloc(sizeof(KState) * (size_t)cap);
+    char *mark = malloc((size_t)NA);
+    size_t plen = sizeof(int) * (size_t)kpre;
+    int i = 0;
+    while (i < live) {
+        int j = i + 1;
+        while (j < live && memcmp(live_lines[i].p, live_lines[j].p, plen) == 0) j++;
+
+        for (int t = i + 1; t < j; t++)
+            for (int ply = 0; ply < kpre; ply++)
+                if (live_lines[t].g[ply] != live_lines[i].g[ply]) {
+                    fprintf(stderr, "tree is not a strategy: two answers share the "
+                            "pattern prefix but play %s and %s at ply %d\n",
+                            GWORD[live_lines[i].g[ply]], GWORD[live_lines[t].g[ply]], ply + 1);
+                    return -1;
+                }
+
+        memset(mark, 0, (size_t)NA);
+        int nfilt = 0;
+        for (int a = 0; a < NA; a++) {
+            int ok = 1;
+            for (int ply = 0; ply < kpre && ok; ply++)
+                if (PAT[(size_t)live_lines[i].g[ply] * NA + a] != live_lines[i].p[ply]) ok = 0;
+            if (ok) { mark[a] = 1; nfilt++; }
+        }
+        if (nfilt != j - i) {
+            fprintf(stderr, "state at ply %d holds %d tree lines but %d answers are "
+                    "consistent with its prefix\n", kpre, j - i, nfilt);
+            return -1;
+        }
+        if (ns == cap) { cap *= 2; st = realloc(st, sizeof(KState) * (size_t)cap); }
+        st[ns].n = j - i;
+        st[ns].S = malloc(sizeof(uint16_t) * (size_t)(j - i));
+        for (int t = i; t < j; t++) {
+            if (!mark[live_lines[t].a]) {
+                fprintf(stderr, "tree lists %s in a state its own prefix excludes\n",
+                        AWORD[live_lines[t].a]);
+                return -1;
+            }
+            st[ns].S[t - i] = (uint16_t)live_lines[t].a;
+        }
+        /* solve() hashes a state by XOR, so order cannot change a value -- but
+         * ascending members make the emitted buckets deterministic. */
+        for (int x = 1; x < st[ns].n; x++)
+            for (int y = x; y > 0 && st[ns].S[y] < st[ns].S[y - 1]; y--) {
+                uint16_t tmp = st[ns].S[y];
+                st[ns].S[y] = st[ns].S[y - 1];
+                st[ns].S[y - 1] = tmp;
+            }
+        ns++;
+        i = j;
+    }
+    free(live_lines);
+    free(mark);
+    *out_states = st; *out_nstate = ns;
+    *out_early_score = early_score; *out_early_count = early_count;
+    *out_live = live; *out_opener = opener;
+    return 0;
+}
+
+/* Per-thread partition scratch.  Pattern-indexed and kept ZERO between uses --
+ * the same invariant Ctx->cnt keeps -- so only the patterns actually seen are
+ * ever touched and a 6-candidate state does not pay a memset of NPAT. */
+typedef struct { int *cnt, *start, *fill, *seen; uint16_t *buf; } KScratch;
+
+static int kth_random(const char *treefile, int K, int depth, const char *outpath) {
+    int kpre = K - 1;
+    int dres = depth - K;                       /* guesses left AFTER the random one */
+
+    KState *states = NULL;
+    int nstate = 0, early_count = 0, live = 0, opener = -1;
+    long long early_score = 0;
+
+    if (kpre == 0) {
+        states = malloc(sizeof(KState));
+        states[0].n = NA;
+        states[0].S = malloc(sizeof(uint16_t) * (size_t)NA);
+        for (int a = 0; a < NA; a++) states[0].S[a] = (uint16_t)a;
+        nstate = 1; live = NA;
+    } else {
+        WIndex gix, aix;
+        windex_build(&gix, GWORD, NG);
+        windex_build(&aix, AWORD, NA);
+        TreeLine *lines = malloc(sizeof(TreeLine) * (size_t)NA);
+        if (!lines) { fprintf(stderr, "out of memory: tree lines\n"); return 1; }
+        if (read_tree_lines(treefile, kpre, lines, &gix, &aix) < 0) return 1;
+        if (group_states(lines, NA, kpre, &states, &nstate, &early_score,
+                         &early_count, &live, &opener) < 0) return 1;
+        free(lines); free(gix.slot); free(aix.slot);
+    }
+
+    int maxn = 0;
+    for (int s = 0; s < nstate; s++) if (states[s].n > maxn) maxn = states[s].n;
+    fprintf(stderr, "kth-random: opener %s  k=%d  depth=%d\n",
+            opener >= 0 ? GWORD[opener] : "(none -- k=1 has no prefix)", K, depth);
+    fprintf(stderr, "kth-random: %d states at ply %d; %d answers still live "
+            "(largest state %d), %d finished earlier\n",
+            nstate, kpre, live, maxn, early_count);
+    fprintf(stderr, "kth-random: %d further guesses allowed after the random one\n", dres);
+    fflush(stderr);
+
+    int nth = 1;
+#ifdef _OPENMP
+    nth = omp_get_max_threads();
+#endif
+    Ctx **ctxs = calloc((size_t)nth, sizeof(Ctx *));
+    KScratch *scr = calloc((size_t)nth, sizeof(KScratch));
+    for (int t = 0; t < nth; t++) {
+        ctxs[t] = calloc(1, sizeof(Ctx));
+        scr[t].cnt   = calloc((size_t)NPAT + 1, sizeof(int));
+        scr[t].start = calloc((size_t)NPAT + 1, sizeof(int));
+        scr[t].fill  = calloc((size_t)NPAT + 1, sizeof(int));
+        scr[t].seen  = calloc((size_t)NPAT + 1, sizeof(int));
+        scr[t].buf   = malloc(sizeof(uint16_t) * (size_t)MAXA);
+        if (!ctxs[t] || !scr[t].buf) { fprintf(stderr, "out of memory: thread state\n"); return 1; }
+    }
+
+    long long feas_extra = 0, infeas_pairs = 0;
+    double t0 = now_s();
+    long long done = 0, work = (long long)live * NG;
+    int step = nstate > 200 ? nstate / 100 : 1;
+
+    for (int s = 0; s < nstate; s++) {
+        const uint16_t *S = states[s].S;
+        int n = states[s].n;
+        long long fe = 0, ip = 0;
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic, 32) reduction(+:fe,ip)
+#endif
+        for (int r = 0; r < NG; r++) {
+            int tid = 0;
+#ifdef _OPENMP
+            tid = omp_get_thread_num();
+#endif
+            Ctx *ctx = ctxs[tid];
+            KScratch *k = &scr[tid];
+            const pat_t *row = PAT + (size_t)r * NA;
+            int nseen = 0;
+            for (int i = 0; i < n; i++) {
+                int p = row[S[i]];
+                if (k->cnt[p]++ == 0) k->seen[nseen++] = p;
+            }
+            int acc = 0;
+            for (int t = 0; t < nseen; t++) {
+                int p = k->seen[t];
+                k->start[p] = acc; k->fill[p] = acc; acc += k->cnt[p];
+            }
+            for (int i = 0; i < n; i++) k->buf[k->fill[row[S[i]]]++] = S[i];
+            for (int t = 0; t < nseen; t++) {
+                int p = k->seen[t];
+                int m = k->cnt[p];
+                k->cnt[p] = 0;                  /* restore the zero invariant */
+                if (p == ALL_GREEN) continue;   /* the random word WAS the answer */
+                /* dres == 0 leaves no guess to name anything, so every bucket
+                 * not already won is infeasible.  solve() would answer 1 for a
+                 * singleton at any depth, which is exactly wrong here. */
+                int v = (dres <= 0) ? INF
+                                    : solve(k->buf + k->start[p], m, dres, &CONS_NONE, ctx);
+                if (v >= INF) ip += m; else fe += v;
+            }
+        }
+        feas_extra += fe;
+        infeas_pairs += ip;
+        done += (long long)n * NG;
+
+        if (s % step == 0 || s == nstate - 1) {
+            double el = now_s() - t0;
+            fprintf(stderr, "[%7.1fs] state %d/%d  n=%-4d  %5.1f%% of the answer-work  "
+                    "eta %5.1f min\n", el, s + 1, nstate, n,
+                    100.0 * done / (work ? work : 1),
+                    done ? el / done * (work - done) / 60.0 : 0.0);
+            fflush(stderr);
+        }
+    }
+
+    long long g_nodes = 0;
+    for (int t = 0; t < nth; t++) {
+        g_probe += ctxs[t]->probe; g_hit += ctxs[t]->hit; g_fill += ctxs[t]->fill;
+        g_nodes += ctxs[t]->nodes;
+    }
+
+    /* --- the accounting, stated in full -------------------------------------
+     * A pair (answer a, random word r) scores:
+     *   a finished inside K-1 guesses  -> its own line length (r is never played)
+     *   r IS a's word                  -> K
+     *   otherwise                      -> K + a's depth in the optimal tree of
+     *                                     its bucket under the cap `dres`
+     * and summing that last term over a whole bucket is exactly solve()'s value
+     * for it.  So every live pair pays K, and the feasible ones add their
+     * bucket's total; the all-green bucket adds nothing, the game being over. */
+    long long total_pairs = (long long)NA * NG;
+    long long live_pairs  = (long long)live * NG;
+    long long early_pairs = (long long)early_count * NG;
+    long long feas_pairs  = total_pairs - infeas_pairs;
+    long long feas_total  = early_score * NG
+                          + (long long)K * (live_pairs - infeas_pairs) + feas_extra;
+    /* A pair the cap rules out has NO optimum, so it cannot enter the mean --
+     * but it cannot cost less than depth+1 either, which makes this a SOUND
+     * lower bound on the unconditional mean rather than a guess at one. */
+    long long lb_total = feas_total + (long long)(depth + 1) * infeas_pairs;
+    long long won_at_k = live;                  /* one r per live answer: its own word */
+
+    double mean = feas_pairs ? (double)feas_total / (double)feas_pairs : 0.0;
+    double lb_mean = (double)lb_total / (double)total_pairs;
+    double secs = now_s() - t0;
+
+    printf("k=%d  depth=%d  opener=%s  pairs=%lld\n", K, depth,
+           opener >= 0 ? GWORD[opener] : "-", total_pairs);
+    printf("      total=%lld  mean=%.6f  over %lld feasible pairs\n",
+           feas_total, mean, feas_pairs);
+    if (infeas_pairs)
+        printf("      INFEASIBLE within %d: %lld pairs (%.4f%%) -- so the "
+               "unconditional mean is >= %.6f\n",
+               depth, infeas_pairs, 100.0 * infeas_pairs / total_pairs, lb_mean);
+    else
+        printf("      no infeasible pair, so the mean is unconditional\n");
+    printf("      won at guess %d: %lld pairs;  finished before it: %lld pairs\n",
+           K, won_at_k, early_pairs);
+    printf("      (%.1fs, %lld nodes, TT %.2f%% hit)\n", secs, g_nodes,
+           100.0 * g_hit / (g_probe ? g_probe : 1));
+    fflush(stdout);
+
+    if (outpath) {
+        int fresh = 1;
+        FILE *rf = fopen(outpath, "r");
+        if (rf) { fresh = fgetc(rf) == EOF; fclose(rf); }
+        FILE *out = fopen(outpath, "a");
+        if (!out) { fprintf(stderr, "cannot append to %s\n", outpath); return 1; }
+        if (fresh)
+            fprintf(out, "opener,k,depth,pairs,feasible_pairs,infeasible_pairs,"
+                         "pct_infeasible,total,mean,lb_total,lb_mean,won_at_k,"
+                         "early_pairs,states,seconds\n");
+        fprintf(out, "%s,%d,%d,%lld,%lld,%lld,%.6f,%lld,%.6f,%lld,%.6f,%lld,%lld,%d,%.1f\n",
+                opener >= 0 ? GWORD[opener] : "-", K, depth, total_pairs,
+                feas_pairs, infeas_pairs, 100.0 * infeas_pairs / total_pairs,
+                feas_total, mean, lb_total, lb_mean, won_at_k, early_pairs,
+                nstate, secs);
+        fclose(out);
+    }
+    return 0;
+}
+
+/* Has this (k, depth) already been written?  One invocation computes ONE k, so
+ * a run whose row is already on file has nothing to do -- and recomputing it
+ * would append a duplicate rather than resume. */
+static int kth_already_done(const char *outpath, int K, int depth) {
+    FILE *f = fopen(outpath, "r");
+    if (!f) return 0;
+    char line[512];
+    int found = 0;
+    while (fgets(line, sizeof line, f)) {
+        char w[64];
+        int k, d;
+        if (sscanf(line, "%63[^,],%d,%d,", w, &k, &d) == 3 && k == K && d == depth)
+            { found = 1; break; }
+    }
+    fclose(f);
+    return found;
+}
+
 /* Emit one index of the difficulty-sorted list into the dispatch order, unless
  * it has already been emitted. Out-of-range indices clamp: rounding at deep
  * levels can land on NG. */
@@ -2177,6 +2677,8 @@ int main(int argc, char **argv) {
     const char *datadir = "data";
     const char *openers[64];
     int nopen = 0;
+    int kthk = 0;                       /* --kth-random K: 0 means the mode is off */
+    const char *treefile = NULL;        /* the committed optimal tree it plays first */
     const char *outpath = NULL, *treedir = NULL;
     const char *ttload = NULL, *ttsave = NULL, *guesslist = NULL;
     const char *answerlist = NULL, *patpath = NULL;
@@ -2207,6 +2709,8 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--pair-list") && i + 1 < argc) pairlist = argv[++i];
         else if (!strcmp(argv[i], "--triple-list") && i + 1 < argc) triplelist = argv[++i];
         else if (!strcmp(argv[i], "--pair-adaptive") && i + 1 < argc) PAIR_ADAPT = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--kth-random") && i + 1 < argc) kthk = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--tree-file") && i + 1 < argc) treefile = argv[++i];
         /* kept as the N=1 alias so runs already launched with it keep working */
         else if (!strcmp(argv[i], "--pair-early-finish")) PAIR_ADAPT = 1;
         else if (!strcmp(argv[i], "--optimal-only")) optonly = 1;
@@ -2270,6 +2774,65 @@ int main(int argc, char **argv) {
                 "dispatches {easiest, hardest, median, ...} while --topk means the "
                 "K BEST splitters, so the K examined would not be the top K\n");
         return 1;
+    }
+
+    /* ---------------------------------------------- --kth-random validation
+     *
+     * The mode plays a committed optimal tree, then one uniformly random word,
+     * then optimal play again -- so every one of these refusals is about a flag
+     * that would make one of those three clauses untrue while the output still
+     * called itself the same quantity. */
+    if (kthk > 0) {
+        if (USE_CONS || MM_MODE || WGT) {
+            fprintf(stderr, "--kth-random is normal-mode only: the tree it plays is a "
+                    "normal-mode tree and the continuation is the plain guess count, "
+                    "so hard/ultra/mastermind/weighted would each be a different game "
+                    "wearing this one's name\n");
+            return 1;
+        }
+        if (sweep || nopen || pairlist || triplelist || optonly || PHANTOM) {
+            fprintf(stderr, "--kth-random is its own driver: it cannot be combined with "
+                    "--sweep, --opener, --pair-list, --triple-list, --optimal-only or "
+                    "--phantom-final\n");
+            return 1;
+        }
+        if (TOPK > 0) {
+            fprintf(stderr, "--kth-random cannot be combined with --topk: the whole "
+                    "question is what OPTIMAL play costs after the random guess, and a "
+                    "beam would report an upper bound under an exact-sounding name\n");
+            return 1;
+        }
+        /* THE CAP IS THE OBJECTIVE HERE and it is counted from the START of the
+         * game, so a depth-6 pass and a depth-7 pass are different quantities
+         * and INFEASIBLE is an expected result.  Inheriting a default would make
+         * that choice silently; the wrapper carries one a human reads and passes
+         * it explicitly. */
+        if (!depth_set) {
+            fprintf(stderr, "--kth-random: --depth is required -- the cap is counted "
+                    "from the start of the game and IS part of the objective, so each "
+                    "depth is a different quantity.  Use solver/run-kth-random.sh.\n");
+            return 1;
+        }
+        if (kthk > depth) {
+            fprintf(stderr, "--kth-random %d exceeds --depth %d: the random guess would "
+                    "be played past the cap, so no game could contain it\n", kthk, depth);
+            return 1;
+        }
+        /* k=1 plays NO prefix, so there is no opener and the answer is a
+         * property of the word lists alone.  Taking a tree there would file an
+         * opener-independent number under an opener's name. */
+        if (kthk == 1 && treefile) {
+            fprintf(stderr, "--kth-random 1 plays no guess before the random one, so it "
+                    "has no opener and --tree-file cannot affect it.  Drop the flag: the "
+                    "k=1 answer is the mean of every opener's own optimal total\n");
+            return 1;
+        }
+        if (kthk > 1 && !treefile) {
+            fprintf(stderr, "--kth-random %d needs --tree-file: the first %d guesses ARE "
+                    "the committed optimal tree, and at k>=3 an optimal tree is not "
+                    "unique, so which one is an input and not a detail\n", kthk, kthk - 1);
+            return 1;
+        }
     }
 
 #ifdef MASTERMIND
@@ -2587,6 +3150,21 @@ int main(int argc, char **argv) {
         const char *oname = ORDER_BISECT ? "bisect"
                           : (optonly ? (ORDER_SSQ || TOPK > 0 ? "ssq" : "lb") : "ssq");
         fprintf(stderr, "order: %s\n", oname);
+    }
+
+    if (kthk > 0) {
+        if (!outpath) {
+            fprintf(stderr, "--kth-random needs --out FILE: it computes ONE exact "
+                    "number per k and a run that only printed it saves nothing.  "
+                    "Use solver/run-kth-random.sh.\n");
+            return 1;
+        }
+        if (kth_already_done(outpath, kthk, depth)) {
+            fprintf(stderr, "resume: k=%d depth=%d is already in %s -- nothing to do\n",
+                    kthk, depth, outpath);
+            return 0;
+        }
+        return kth_random(treefile, kthk, depth, outpath);
     }
 
     if (nopen > 0) {

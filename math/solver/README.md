@@ -1000,6 +1000,59 @@ filtered full lists, and replays any emitted trees length-generally (coverage,
 legality, `wordle.pattern` agreement, one next guess per prefix, tree-sum vs
 CSV). Run it alongside `solver/validate.sh` and `tools/checkpatterns.py`.
 
+## One random guess at turn k (`--kth-random`)
+
+What does a single blunder cost in an otherwise perfect game? Guesses 1..k-1
+follow the committed optimal tree of an opener, guess **k is drawn uniformly
+from all 12972 legal words** (consistent with the replies or not), and from
+k+1 the exact search plays optimally again.
+
+```sh
+# from math/
+bash solver/run-kth-random.sh --depth 6 -k 3
+bash solver/run-kth-random.sh --depth 6 --all          # k = 1..6, resumable
+bash solver/run-kth-random.sh --depth 6 -k 2 --opener crane
+bash solver/run-kth-random.sh --depth 6 --all --dry-run
+```
+
+**Exact, not sampled.** Every (answer, random word) pair is enumerated —
+2315 × 12972 = 30,030,180 — so the output is an integer total over that grid.
+No seed, no standard error; a re-run reproduces the file. That is why this is a
+solver mode and not a `wordlesim` strategy.
+
+**The cap is counted from the start of the game**, so the continuation gets
+`depth - k` further guesses and the whole game fits in `--depth`. `--depth` is
+required and each depth is its own quantity. **`INFEASIBLE` is an expected
+result** here — a random guess spends a turn without necessarily buying
+anything — and an infeasible pair has *no optimum at all*, so it is counted,
+excluded from `mean`, and reported. `lb_mean` charges each one `depth + 1` and
+is a sound lower bound on the unconditional mean; when `infeasible_pairs` is 0
+the two coincide.
+
+Two rows are known in advance, and the gate uses both as oracles:
+
+| k | what it must be | why |
+|---|---|---|
+| 1 | the opener sweep averaged — 8393.9652 total, **3.62590** | no prefix is played, so this is every opener's own optimal total |
+| ≥ 6 (salet) | 7920 × 12972, **3.42117** | salet's tree is depth 5, so no live game is left to spoil |
+
+`k = 1` therefore **refuses `--tree-file`**: the number is opener-independent,
+and taking a tree would file it under an opener's name.
+
+**Which tree matters at k ≥ 3.** At k = 2 the states are the opener's own
+partition. Deeper they are the nodes of *one* optimal tree, and an optimal tree
+is not unique — so the tree is an explicit input read from the committed
+artifact rather than re-derived here (a fresh `best_move()` walk consults the
+table and can return a different, equally optimal guess). The wrapper logs the
+tree path and its sha. The reader checks the file three ways on every run: one
+opener throughout, one guess per pattern prefix, and each group equal to the
+answers its prefix leaves consistent.
+
+Cost is dominated by k = 2 (289,636 distinct residual states of up to 221
+candidates at a 4-guess cap); k = 4 runs in 0.2 s and k = 5/6 are instant.
+Data lands in `data/shared/kthrandom/<opener>_d<D>.csv`, one row per k, with
+the log under `data/local/kthrandom/`. Gate: `python3 tools/checkkthrandom.py`.
+
 ## Output format
 
 Each tree line is a complete replay of one game:
