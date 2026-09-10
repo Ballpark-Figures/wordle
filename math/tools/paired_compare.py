@@ -279,7 +279,7 @@ def parse_args(argv):
         if adapt:
             stem += "_adapt%d" % adapt
         if table:
-            stem += "_g%d" % table.min_grays
+            stem += "_%s" % table.fire
         if rank != "mean":
             stem += "_win"
         print(stem)
@@ -334,7 +334,7 @@ def main(argv):
     print("paired compare: %d openings, %d games each, follow-up %s, "
           "%s, seed %d"
           % (n, t, fallback,
-             ("second word at %d+ greys from %s" % (table.min_grays, second_from))
+             ("second word firing on %s from %s" % (table.fire, second_from))
              if table else "pair-adaptive %d" % adapt, seed), flush=True)
     print("  answers AND the follow-up's coin flips are coupled across openings",
           flush=True)
@@ -381,8 +381,8 @@ def main(argv):
     lines.append("paired comparison of %d openings, %d games, follow-up %s, "
                  "%s, seed %d, ranked on %s"
                  % (n, t, fallback,
-                    ("second word at %d+ greys from %s"
-                     % (table.min_grays, os.path.basename(second_from)))
+                    ("second word firing on %s from %s"
+                     % (table.fire, os.path.basename(second_from)))
                     if table else "pair-adaptive %d" % adapt, seed,
                     "WIN RATE" if rank == "win_rate" else "mean guesses"))
     if meta:
@@ -428,9 +428,9 @@ def main(argv):
         # source of the next round: settings, lineage, and which round it is
         f.write("# settings follow_up=%s pair_adaptive=%d win_within=6 "
                 "trials=%d seed=%d words=%d rank=%s second_table=%s "
-                "min_grays=%d\n"
+                "fire=%s\n"
                 % (fallback, adapt, t, seed, n, rank, second_from or "-",
-                   table.min_grays if table else 0))
+                   table.fire if table else "-"))
         f.write("# lineage root=%s pass=%d round=%d source=%s\n"
                 % (meta["root"] if meta else "openings",
                    meta["pass"] if meta else 0, rnd,

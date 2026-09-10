@@ -15,6 +15,13 @@
 # many answers qualify.  math/secondword.py states it exactly and is the source
 # of truth; solver/secondword.c implements it.
 #
+# --fire G,Y ADDS ONE COMPOSITION to the firing condition, on top of the
+# --min-grays threshold.  `--min-grays 3 --fire 0,3` fires on every reply with
+# three or more greys AND on the three-yellow two-grey reply, which is nearly
+# uninformative despite having only two greys.  The condition is a SET of
+# (greens, yellows) compositions; --min-grays is the sugar for "at least N
+# greys", and the canonical NAME of the set is what lands in the filename.
+#
 # --min-grays IS THE OBJECTIVE, not a knob.  A >= 3 table and a >= 4 table pick
 # different words and describe different strategies, so it is in the filename AND
 # in the file's own stamp, and the reader refuses a table whose stamp disagrees
@@ -55,6 +62,7 @@ MATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # back on.  Both are in the output filename.
 VARIANT=guess
 MINGRAYS=3
+FIRE=""
 LIMIT=0
 THREADS=0
 DRY=0
@@ -63,6 +71,7 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --variant)    VARIANT="$2"; shift 2 ;;
         --min-grays)  MINGRAYS="$2"; shift 2 ;;
+        --fire)       FIRE="$FIRE --fire $2"; shift 2 ;;
         --limit)      LIMIT="$2"; shift 2 ;;
         --threads)    THREADS="$2"; shift 2 ;;
         --dry-run)    DRY=1; shift ;;
@@ -99,19 +108,24 @@ BIN=solver/secondword
 
 OUTDIR=data/shared/secondword
 LOC=data/local/secondword
-STEM="second_${VARIANT}_g${MINGRAYS}"
+# ASK THE BINARY WHAT THE FIRING CONDITION IS CALLED rather than re-deriving it
+# in shell: the canonical label drops an --fire the threshold already covers and
+# sorts the rest, so two spellings of one rule cannot make two filenames -- and
+# that canonicalisation has exactly one owner.
+LABEL=$($BIN --min-grays $MINGRAYS$FIRE --print-label) || exit 1
+STEM="second_${VARIANT}_${LABEL}"
 [ "$LIMIT" = 0 ] || STEM="${STEM}_limit${LIMIT}"
 OUT="$OUTDIR/$STEM.csv"
 LOG="$LOC/$STEM.log"
 
-FLAGS="--min-grays $MINGRAYS --openers $POOL --seconds $POOL"
+FLAGS="--min-grays $MINGRAYS$FIRE --openers $POOL --seconds $POOL"
 FLAGS="$FLAGS --openers-name $VARIANT --seconds-name $VARIANT"
 [ "$LIMIT" = 0 ]   || FLAGS="$FLAGS --limit $LIMIT"
 [ "$THREADS" = 0 ] || FLAGS="$FLAGS --threads $THREADS"
 
 echo "second-word table"
 echo "  variant    $VARIANT   (openers and second words both from $POOL)"
-echo "  min grays  $MINGRAYS   -- part of the objective, in the name and the stamp"
+echo "  fires on   $LABEL   -- part of the objective, in the name and the stamp"
 [ "$LIMIT" = 0 ] || echo "  limit      $LIMIT openers: a PRICING prefix, not the table"
 echo "  out        $OUT"
 echo "  log        $LOG"
@@ -128,7 +142,7 @@ guard_output secondword "$OUT" || exit 1
 mkdir -p "$OUTDIR" "$LOC"
 
 # BSD date has no -Is; this form works on both macOS and Linux.
-echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] secondword: variant=$VARIANT min_grays=$MINGRAYS" \
+echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] secondword: variant=$VARIANT fire=$LABEL" \
     | tee -a "$LOG"
 
 $BIN $FLAGS --out "$OUT" 2>&1 | tee -a "$LOG"

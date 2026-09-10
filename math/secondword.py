@@ -98,17 +98,96 @@ def gray_counts(word_len=WORD_LEN):
     return out
 
 
-def qualifying(pat_row, min_grays, grays=None):
-    """Indices of the answers whose reply to this guess shows >= min_grays greys.
+def compositions(word_len=WORD_LEN):
+    """(greens, yellows, greys) for every pattern CODE, as three int8 arrays.
+
+    2 = green, 1 = yellow, 0 = grey (wordle.py), and the three always sum to the
+    word length, so a reply's composition is what a player can read off the board
+    without knowing which positions were which.
+    """
+    n = n_patterns(word_len)
+    g = np.zeros(n, dtype=np.int8)
+    y = np.zeros(n, dtype=np.int8)
+    for code in range(n):
+        c = code
+        for _ in range(word_len):
+            t = c % 3
+            if t == 2:
+                g[code] += 1
+            elif t == 1:
+                y[code] += 1
+            c //= 3
+    return g, y, np.int8(word_len) - g - y
+
+
+def fire_set(min_grays, extra=(), word_len=WORD_LEN):
+    """THE FIRING CONDITION, as a set of (greens, yellows) COMPOSITIONS.
+
+    WHY A SET AND NOT A THRESHOLD (the user's, 2026-09-10).  "At least N greys"
+    was the first shape of this rule and it is still the common case, but it
+    cannot say the thing that turned out to matter: two greys with three YELLOWS
+    is nearly uninformative, while two greys with three GREENS has pinned three
+    positions.  Those two replies do not belong on the same side of the line
+    just because they have the same number of greys.  So the rule is a SET of
+    compositions, and `min_grays` is sugar for "every composition with at least N
+    greys" -- which keeps every earlier table exactly what it was.
+
+    Returns (mask over pattern codes, canonical label).  The LABEL is a function
+    of the SET, not of how it was typed: an `extra` already covered by the
+    threshold is dropped, and the rest are sorted, so two spellings of one rule
+    cannot produce two filenames.
+    """
+    g, y, gr = compositions(word_len)
+    mask = gr >= min_grays
+    keep = []
+    for gg, yy in sorted({(int(a), int(b)) for a, b in extra}):
+        if gg + yy > word_len:
+            raise SystemExit("(%d green, %d yellow) is more than %d tiles"
+                             % (gg, yy, word_len))
+        if word_len - gg - yy >= min_grays:
+            continue                      # already fires; not part of the label
+        keep.append((gg, yy))
+        mask |= (g == gg) & (y == yy)
+    label = "g%d" % min_grays
+    for gg, yy in keep:
+        label += "+%dg%dy" % (gg, yy)
+    return mask, label
+
+
+def parse_fire_label(label, word_len=WORD_LEN):
+    """The inverse of `fire_set`'s label: the mask a table was built under.
+
+    A table records the label, so a reader rebuilds the exact firing condition
+    from it rather than being told a threshold and guessing the rest.
+    """
+    parts = label.split("+")
+    if not parts[0].startswith("g") or not parts[0][1:].isdigit():
+        raise SystemExit("cannot read the firing condition %r: it should start "
+                         "with g<N>" % label)
+    extra = []
+    for p in parts[1:]:
+        head, _, tail = p.partition("g")
+        yy, _, rest = tail.partition("y")
+        if not (head.isdigit() and yy.isdigit() and rest == ""):
+            raise SystemExit("cannot read the firing condition %r at %r"
+                             % (label, p))
+        extra.append((int(head), int(yy)))
+    mask, canon = fire_set(int(parts[0][1:]), extra, word_len)
+    if canon != label:
+        raise SystemExit("the firing condition %r is not canonical (it means "
+                         "%r) -- rebuild the table" % (label, canon))
+    return mask
+
+
+def qualifying(pat_row, mask):
+    """Indices of the answers whose reply to this guess FIRES the rule.
 
     `pat_row` is one row of the pattern matrix: the guess against every answer.
     """
-    if grays is None:
-        grays = gray_counts()
-    return np.flatnonzero(grays[np.asarray(pat_row)] >= min_grays)
+    return np.flatnonzero(np.asarray(mask)[np.asarray(pat_row)])
 
 
-def best_second(pat, opener, min_grays, seconds=None, grays=None):
+def best_second(pat, opener, mask, seconds=None):
     """THE REFERENCE implementation of the objective above, for one opener.
 
     Returns (second, score, nq, nbuckets, ties) with `second` the winning GUESS
@@ -121,11 +200,9 @@ def best_second(pat, opener, min_grays, seconds=None, grays=None):
     appears: it can only reproduce the reply already seen.
     """
     pat = np.asarray(pat)
-    if grays is None:
-        grays = gray_counts()
     if seconds is None:
         seconds = np.arange(pat.shape[0])
-    q = qualifying(pat[opener], min_grays, grays)
+    q = qualifying(pat[opener], mask)
     p1 = pat[opener][q].astype(np.int64)
     nq = int(len(q))
     nbuckets = int(len(np.unique(p1))) if nq else 0
@@ -154,10 +231,10 @@ def best_second(pat, opener, min_grays, seconds=None, grays=None):
 
 COLUMNS = "opener,second,expected,score,qualifying,buckets,ties"
 
-Table = namedtuple("Table", "path min_grays openers seconds answers rows")
+Table = namedtuple("Table", "path min_grays fire openers seconds answers rows")
 
 
-def stamp_line(min_grays, openers, seconds, answers, nsecond):
+def stamp_line(min_grays, fire, openers, seconds, answers, nsecond):
     """The machine-readable line every table carries as its second line.
 
     A FILENAME CANNOT CHECK ITSELF -- the greens scar, where results written
@@ -166,16 +243,21 @@ def stamp_line(min_grays, openers, seconds, answers, nsecond):
     and in this line for a program, and a reader refuses a table whose stamp does
     not match what it asked for.
     """
-    return ("# settings min_grays=%d openers=%s seconds=%s answers=%d "
-            "second_pool=%d\n" % (min_grays, openers, seconds, answers, nsecond))
+    return ("# settings min_grays=%d fire=%s openers=%s seconds=%s answers=%d "
+            "second_pool=%d\n"
+            % (min_grays, fire, openers, seconds, answers, nsecond))
 
 
-def read_table(path, min_grays=None, openers=None, seconds=None):
+def read_table(path, fire=None, openers=None, seconds=None):
     """Read a second-word table, refusing one that is not what was asked for.
 
     Returns a `Table` whose `rows` maps opener word -> second word, with None for
-    an opener that had no qualifying cases.  Any of `min_grays`/`openers`/
-    `seconds` given is CHECKED against the stamp rather than assumed.
+    an opener that had no qualifying cases.  Any of `fire`/`openers`/`seconds`
+    given is CHECKED against the stamp rather than assumed.
+
+    A table written before the firing condition became a SET carries only
+    `min_grays`, which means exactly `g<N>` -- so those tables keep working and
+    keep meaning what they meant.
     """
     if not os.path.exists(path):
         raise SystemExit(
@@ -202,9 +284,11 @@ def read_table(path, min_grays=None, openers=None, seconds=None):
             "or which pools it was built under.\nRefusing it rather than "
             "guessing -- rebuild it with solver/run-second-word.sh." % path)
     got = int(meta["min_grays"])
-    if min_grays is not None and got != min_grays:
-        raise SystemExit("%s was built at min_grays=%d, not %d -- a different "
-                         "strategy under the same name" % (path, got, min_grays))
+    got_fire = meta.get("fire", "g%d" % got)
+    parse_fire_label(got_fire)              # refuse a label we cannot rebuild
+    if fire is not None and got_fire != fire:
+        raise SystemExit("%s fires on %s, not %s -- a different strategy under "
+                         "the same name" % (path, got_fire, fire))
     for name, want in (("openers", openers), ("seconds", seconds)):
         if want is not None and meta.get(name) != want:
             raise SystemExit("%s was built with %s=%s, not %s -- a different "
@@ -212,6 +296,7 @@ def read_table(path, min_grays=None, openers=None, seconds=None):
                              % (path, name, meta.get(name), want))
     if not rows:
         raise SystemExit("%s has no rows" % path)
-    return Table(path=path, min_grays=got, openers=meta.get("openers", "?"),
+    return Table(path=path, min_grays=got, fire=got_fire,
+                 openers=meta.get("openers", "?"),
                  seconds=meta.get("seconds", "?"),
                  answers=int(meta.get("answers", 0)), rows=rows)

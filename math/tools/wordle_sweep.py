@@ -301,16 +301,16 @@ def main(argv):
             # the paragraphs below can break.
             fh.write("# settings follow_up=%s pair_adaptive=%d win_within=%d "
                      "trials=%d seed=%d words=%d rank=%s second_table=%s "
-                     "min_grays=%d\n"
+                     "fire=%s\n"
                      % (fallback, adapt, win_within, t, seed, len(sweep_words),
                         rank, second_from or "-",
-                        table.min_grays if table else 0))
+                        table.fire if table else "-"))
             if table:
                 fh.write("# each opener plays the PREDETERMINED second word from "
-                         "%s whenever its\n# reply shows at least %d greys, and "
-                         "declines to the follow-up otherwise\n"
+                         "%s whenever its\n# reply fires %s, and declines to the "
+                         "follow-up otherwise\n"
                          "# (math/secondword.py; pools openers=%s seconds=%s)\n"
-                         % (second_from, table.min_grays, table.openers,
+                         % (second_from, table.fire, table.openers,
                             table.seconds))
             if table:
                 pass                       # the table's own lines above say it
@@ -340,7 +340,7 @@ def main(argv):
     print("sweep: %d %s x %d trials, follow-up %s, seed %d%s"
           % (len(todo), "openings of %d words" % sizes[0] if sizes[0] > 1 else "words",
              t, fallback, seed,
-             ", second word at %d+ greys from %s" % (table.min_grays, second_from)
+             ", second word firing on %s from %s" % (table.fire, second_from)
              if table else (", pair-adaptive %d" % adapt if adapt else ", blind")))
     if done and not todo:
         # SAY SO PLAINLY.  This used to print "resuming: N words already in ..."

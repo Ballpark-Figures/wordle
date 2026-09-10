@@ -52,7 +52,8 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
-from secondword import Table, best_second, gray_counts, read_table  # noqa: E402
+from secondword import (best_second, fire_set, parse_fire_label,  # noqa: E402
+                        read_table)
 from wordle import load_words, pattern  # noqa: E402
 
 MATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
@@ -75,6 +76,21 @@ EMPTY_GUESSES = EMPTY_ANSWERS + ["pilot", "mimic", "gouty"]
 
 fail = 0
 notes = Counter()
+
+
+def grays_at_least(n):
+    """The plain threshold, as a predicate on the tiles."""
+    return lambda tiles: sum(1 for t in tiles if t == 0) >= n
+
+
+def grays_or_composition(n, greens, yellows):
+    """The threshold, PLUS one (greens, yellows) composition -- `--fire G,Y`."""
+    def fires(tiles):
+        if sum(1 for t in tiles if t == 0) >= n:
+            return True
+        return (sum(1 for t in tiles if t == 2) == greens
+                and sum(1 for t in tiles if t == 1) == yellows)
+    return fires
 
 
 def bad(msg):
@@ -108,15 +124,16 @@ def tiles_from_strings(guess, answer):
     return tuple(tiles)
 
 
-def ref_best_second(guesses, answers, opener, min_grays, seconds):
+def ref_best_second(guesses, answers, opener, fires, seconds):
     """(second, score, nq, nbuckets, ties) by grouping WORDS, not codes.
 
-    `opener` and `seconds` are words; the returned second is a word or None.  The
-    tie-break is the lowest index in `guesses`, which is what the C means by the
-    lowest guess index.
+    `opener` and `seconds` are words; the returned second is a word or None.
+    `fires` is a predicate on the TILE TUPLE, so the firing condition is
+    re-derived from what a player would see rather than from a pattern code.
+    The tie-break is the lowest index in `guesses`, which is what the C means by
+    the lowest guess index.
     """
-    q = [a for a in answers
-         if sum(1 for t in tiles_from_strings(opener, a) if t == 0) >= min_grays]
+    q = [a for a in answers if fires(tiles_from_strings(opener, a))]
     first = {a: tiles_from_strings(opener, a) for a in q}
     nbuckets = len(set(first.values()))
     if not q:
@@ -177,13 +194,13 @@ def read_rows(path):
     return out
 
 
-def compare(rows, guesses, answers, seconds, min_grays, label):
+def compare(rows, guesses, answers, seconds, fires, label, what=""):
     """Diff every row against the from-the-strings reference."""
     for opener, got in sorted(rows.items()):
-        want = ref_best_second(guesses, answers, opener, min_grays, seconds)
+        want = ref_best_second(guesses, answers, opener, fires, seconds)
         if got != want:
-            bad("%s min_grays=%d opener %s: C gave %s, reference %s"
-                % (label, min_grays, opener, got, want))
+            bad("%s %s opener %s: C gave %s, reference %s"
+                % (label, what, opener, got, want))
             return
         if got[0] is None:
             notes["empty"] += 1
@@ -205,7 +222,8 @@ def check_mini():
         if len(rows) != len(MINI_GUESSES):
             bad("expected %d rows, got %d" % (len(MINI_GUESSES), len(rows)))
             return
-        compare(rows, MINI_GUESSES, MINI_ANSWERS, MINI_GUESSES, mg, "mini")
+        compare(rows, MINI_GUESSES, MINI_ANSWERS, MINI_GUESSES,
+                grays_at_least(mg), "mini", "g%d" % mg)
         winners[mg] = {w: r[0] for w, r in rows.items()}
     if not fail:
         print("   ok   %d openers x 5 thresholds match the reference exactly"
@@ -225,8 +243,8 @@ def check_mini():
          "--seconds", rev, "--seconds-name", "reversed"])
     rows = read_rows(out)
     before = notes["tie"]
-    compare(rows, MINI_GUESSES, MINI_ANSWERS, list(reversed(MINI_GUESSES)), 2,
-            "reversed pool")
+    compare(rows, MINI_GUESSES, MINI_ANSWERS, list(reversed(MINI_GUESSES)),
+            grays_at_least(2), "reversed pool", "g2")
     if notes["tie"] > before:
         notes["tie-break"] += 1
         print("   ok   ties break on the lowest guess index, not on arrival")
@@ -253,7 +271,8 @@ def check_mini():
     if sorted(rows) != sorted(MINI_ANSWERS):
         bad("restricted run should have one row per answer word, got %d"
             % len(rows))
-    compare(rows, MINI_GUESSES, MINI_ANSWERS, MINI_ANSWERS, mg, "restricted")
+    compare(rows, MINI_GUESSES, MINI_ANSWERS, MINI_ANSWERS,
+            grays_at_least(mg), "restricted", "g%d" % mg)
     changed = sum(1 for w in rows if rows[w][0] != winners[mg][w])
     if changed:
         notes["pool-moved"] += 1
@@ -262,7 +281,7 @@ def check_mini():
     else:
         bad("restricting the pool changed nothing -- the restriction never bit")
     # and the stamp must say so, or a later reader cannot tell the two apart
-    t = read_table(out, min_grays=mg, openers="mystery", seconds="mystery")
+    t = read_table(out, fire="g%d" % mg, openers="mystery", seconds="mystery")
     if t.answers != len(MINI_ANSWERS):
         bad("stamp records %d answers, not %d" % (t.answers, len(MINI_ANSWERS)))
 
@@ -273,7 +292,8 @@ def check_mini():
     out = os.path.join(tmp2, "empty.csv")
     run(["--data", tmp2, "--min-grays", "5", "--out", out, "--threads", "2"])
     rows = read_rows(out)
-    compare(rows, EMPTY_GUESSES, EMPTY_ANSWERS, EMPTY_GUESSES, 5, "empty")
+    compare(rows, EMPTY_GUESSES, EMPTY_ANSWERS, EMPTY_GUESSES,
+            grays_at_least(5), "empty", "g5")
     blanks = [w for w, r in rows.items() if r[0] is None]
     with_e = [w for w in EMPTY_GUESSES if "e" in w]
     if sorted(blanks) < sorted(with_e) or not set(with_e) <= set(blanks):
@@ -283,7 +303,7 @@ def check_mini():
     else:
         print("   ok   %d openers have no qualifying answer and an empty row"
               % len(blanks))
-    tbl = read_table(out, min_grays=5)
+    tbl = read_table(out, fire="g5")
     if tbl.rows[with_e[0]] is not None:
         bad("the reader should give None for an empty second word")
 
@@ -296,7 +316,7 @@ def check_real(wide):
     answers = load_words("mystery")
     from build_patterns import load_patterns
     pat = np.array(load_patterns())
-    grays = gray_counts()
+    mask, _ = fire_set(3)
 
     # 3a. real openers over the full second-word pool, against the numpy
     # reference -- the aggregation written a second way, at full scale.
@@ -307,7 +327,7 @@ def check_real(wide):
     rows = read_rows(out)
     idx = {w: i for i, w in enumerate(guesses)}
     for opener, got in sorted(rows.items()):
-        g2, score, nq, nb, ties = best_second(pat, idx[opener], 3, grays=grays)
+        g2, score, nq, nb, ties = best_second(pat, idx[opener], mask)
         want = (guesses[g2] if g2 is not None else None, score, nq, nb, ties)
         if got != want:
             bad("real opener %s: C gave %s, numpy reference %s" % (opener, got, want))
@@ -337,7 +357,7 @@ def check_real(wide):
     rows = read_rows(out2)
     for opener in openers:
         got = rows[opener]
-        want = ref_best_second(guesses, answers, opener, 3, pool)
+        want = ref_best_second(guesses, answers, opener, grays_at_least(3), pool)
         if got != want:
             bad("real opener %s over a 400-word pool: C gave %s, strings %s"
                 % (opener, got, want))
@@ -347,6 +367,114 @@ def check_real(wide):
 
 
 # ------------------------------------------------------------------ 5. refusals
+
+def check_fire():
+    """The firing condition as a SET OF COMPOSITIONS, in both implementations.
+
+    The C and math/secondword.py each build the set and its canonical NAME from
+    the same flags, independently.  If they ever disagreed, the table would be
+    filtered one way and named -- and later read back -- the other, which is the
+    one mistake a stamp cannot catch, because the stamp is written by the side
+    that is wrong.
+    """
+    print("6. the firing condition: compositions, and its canonical name")
+    specs = [
+        (3, []),
+        (2, []),
+        (3, [(0, 3)]),
+        (3, [(0, 3), (1, 2)]),
+        (3, [(1, 2), (0, 3)]),          # order must not matter
+        (3, [(0, 3), (0, 3)]),          # nor must a repeat
+        (3, [(0, 0)]),                  # already covered: dropped from the name
+        (4, [(0, 3), (2, 1)]),
+        (5, [(0, 5)]),
+    ]
+    for mg, extra in specs:
+        want_mask, want_label = fire_set(mg, extra)
+        args = ["--min-grays", str(mg)]
+        for g, y in extra:
+            args += ["--fire", "%d,%d" % (g, y)]
+        p = subprocess.run([BINARY] + args + ["--print-label"], cwd=MATH,
+                           capture_output=True, text=True)
+        got = p.stdout.strip()
+        if got != want_label:
+            bad("--min-grays %d %s: the C calls it %r, Python %r"
+                % (mg, extra, got, want_label))
+            continue
+        # and the LABEL must rebuild the same set, or a reader would filter
+        # differently from the run that wrote the table
+        if not np.array_equal(parse_fire_label(got), want_mask):
+            bad("the label %r does not rebuild its own set" % got)
+    print("   ok   %d firing conditions: the C and Python agree on the set and "
+          "its name, and every name rebuilds its set" % len(specs))
+
+    # A NON-CANONICAL LABEL IS REFUSED, not silently normalised: it would name a
+    # file that no rebuild of the rule would ever produce again.
+    for lab in ("g3+0g0y", "3", "g3+xyz", "g3+0g3", ""):
+        try:
+            parse_fire_label(lab)
+            bad("the reader accepted the non-canonical label %r" % lab)
+        except SystemExit:
+            pass
+    print("   ok   non-canonical and malformed labels are refused")
+
+    # AND A REAL RUN UNDER --fire, against the strings.  This is the check that
+    # the extra composition reaches the FILTER and not only the name.
+    tmp = tempfile.mkdtemp(prefix="checksw-fire-")
+    make_data(tmp, MINI_GUESSES, MINI_ANSWERS)
+    plain = os.path.join(tmp, "g3.csv")
+    fired = os.path.join(tmp, "g3fire.csv")
+    run(["--data", tmp, "--min-grays", "3", "--out", plain, "--threads", "2"])
+    run(["--data", tmp, "--min-grays", "3", "--fire", "0,3", "--out", fired,
+         "--threads", "2"])
+    rows = read_rows(fired)
+    compare(rows, MINI_GUESSES, MINI_ANSWERS, MINI_GUESSES,
+            grays_or_composition(3, 0, 3), "fire", "g3+0g3y")
+    before, after = read_rows(plain), rows
+    grew = [w for w in after if after[w][2] > before[w][2]]
+    if not grew:
+        bad("--fire 0,3 qualified no extra answer anywhere, so the composition "
+            "never reached the filter")
+    else:
+        notes["fire-grew"] += 1
+        print("   ok   the extra composition qualifies more answers (%d of %d "
+              "openers)" % (len(grew), len(after)))
+
+    # AND IT MUST BE ABLE TO CHANGE THE ANSWER, not only the count -- otherwise
+    # nothing here shows the set reaches the ARGMIN rather than just the filter.
+    # This case is CONSTRUCTED, because the natural one cannot show it: measured,
+    # `--min-grays 3 --fire 0,3` grows the qualifying set of every real opener
+    # and moves the chosen word for none of them, the added bucket being a small
+    # part of a set of ~2200.  A high threshold plus a common composition makes
+    # the addition the larger part, and then it moves.
+    small = os.path.join(tmp, "g5.csv")
+    smallfire = os.path.join(tmp, "g5fire.csv")
+    run(["--data", tmp, "--min-grays", "5", "--out", small, "--threads", "2"])
+    run(["--data", tmp, "--min-grays", "5", "--fire", "0,2", "--out", smallfire,
+         "--threads", "2"])
+    compare(read_rows(smallfire), MINI_GUESSES, MINI_ANSWERS, MINI_GUESSES,
+            grays_or_composition(5, 0, 2), "fire", "g5+0g2y")
+    moved = [w for w, r in read_rows(smallfire).items()
+             if r[0] != read_rows(small)[w][0]]
+    if moved:
+        notes["fire-moved"] += 1
+        print("   ok   and a composition CAN change the chosen word (%d openers "
+              "under the constructed g5+0g2y case)" % len(moved))
+    else:
+        bad("no added composition changed any opener's second word, so nothing "
+            "shows the set reaching the argmin rather than only the filter")
+    # the stamp must carry the condition, and the reader must hold it to it
+    t = read_table(fired, fire="g3+0g3y")
+    if t.min_grays != 3:
+        bad("the stamp lost the threshold")
+    try:
+        read_table(fired, fire="g3")
+        bad("the reader accepted a g3 request against a g3+0g3y table")
+    except SystemExit:
+        pass
+    print("   ok   the stamp records the condition and the reader holds a table "
+          "to it")
+
 
 def check_refusals():
     print("5. refusals, and the table reader")
@@ -379,8 +507,8 @@ def check_refusals():
             if not line.startswith("# settings"):
                 o.write(line)
     reader_cases.append(("a stampless table", lambda: read_table(stampless)))
-    reader_cases.append(("the wrong threshold",
-                         lambda: read_table(good, min_grays=4)))
+    reader_cases.append(("the wrong firing condition",
+                         lambda: read_table(good, fire="g4")))
     reader_cases.append(("the wrong pool",
                          lambda: read_table(good, seconds="mystery")))
     reader_cases.append(("a missing file",
@@ -406,6 +534,7 @@ def main(argv):
                          % BINARY)
     check_mini()
     check_real(wide)
+    check_fire()
     check_refusals()
 
     print("\ncoverage")
@@ -416,6 +545,8 @@ def main(argv):
         "pool-moved": "a pool restriction that changed the winner",
         "filtered": "an opener whose threshold excluded some answers",
         "tie-break": "a tie broken against the pool's own order",
+        "fire-grew": "an added composition qualifying more answers",
+        "fire-moved": "an added composition changing a chosen second word",
     }
     for key, what in need.items():
         if notes[key]:

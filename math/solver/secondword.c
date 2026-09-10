@@ -1,14 +1,15 @@
 /* secondword -- the best PREDETERMINED second word for every opener.
  *
  * THE QUANTITY, and math/secondword.py states it as the source of truth.  For an
- * opener g1, take the answers whose reply to g1 shows at least --min-grays GREY
- * tiles, group them by that reply, and for each candidate second word g2 score
+ * opener g1, take the answers whose reply to g1 FIRES THE RULE -- a set of
+ * (greens, yellows) compositions, of which --min-grays N is the sugar for "at
+ * least N greys" -- group them by that reply, and for each candidate g2 score
  *
  *     score(g1, g2) = sum over JOINT (reply to g1, reply to g2) buckets of n^2
  *     expected      = score / (number of qualifying answers)
  *
  * which is the expected number of ANSWERS still consistent after both words,
- * conditional on the opener having shown that many greys, the answer uniform
+ * conditional on the opener's reply having fired the rule, the answer uniform
  * over the answer list.  ANSWER-WEIGHTED: a reply 300 answers produce counts 300
  * times against one that 2 produce.  Emit the argmin, ties on the LOWEST GUESS
  * INDEX, and record how many words attained it.
@@ -63,6 +64,10 @@ static int      NG, NA;
 static uint8_t *PAT;                 /* NG * NA, row-major */
 static char   (*GWORD)[WBUF];
 static int8_t   GRAYS[NPAT];         /* grey-tile count of every pattern code */
+static int8_t   GREENS[NPAT], YELLOWS[NPAT];
+static uint8_t  FIRE[NPAT];          /* does this reply fire the rule? */
+#define MAXEXTRA 32
+static int      EXG[MAXEXTRA], EXY[MAXEXTRA], NEXTRA;
 
 static double now_s(void) {
     struct timespec ts;
@@ -75,9 +80,56 @@ static double now_s(void) {
  * count, so nothing here depends on the encoding's orientation. */
 static void build_grays(void) {
     for (int code = 0; code < NPAT; code++) {
-        int c = code, n = 0;
-        for (int i = 0; i < WORDLEN; i++) { if (c % 3 == 0) n++; c /= 3; }
+        int c = code, n = 0, g = 0, y = 0;
+        for (int i = 0; i < WORDLEN; i++) {
+            int t = c % 3;
+            if (t == 0) n++; else if (t == 2) g++; else y++;
+            c /= 3;
+        }
         GRAYS[code] = (int8_t)n;
+        GREENS[code] = (int8_t)g;
+        YELLOWS[code] = (int8_t)y;
+    }
+}
+
+/* ---- THE FIRING CONDITION, as a SET OF COMPOSITIONS ----------------------
+ * "At least N greys" was the first shape of this rule and is still the common
+ * case, but it cannot express the thing that matters: two greys with three
+ * YELLOWS is nearly uninformative, while two greys with three GREENS has pinned
+ * three positions, and those two replies do not belong on the same side of the
+ * line just because they have the same grey count.  So the condition is a set of
+ * (greens, yellows) compositions, and --min-grays is sugar for "every
+ * composition with at least N greys".  math/secondword.py states it and computes
+ * the same set in Python; tools/checksecondword.py diffs the two, label included.
+ *
+ * THE LABEL IS A FUNCTION OF THE SET, NOT OF HOW IT WAS TYPED: an --fire already
+ * covered by the threshold is dropped and the rest are sorted, so two spellings
+ * of one rule cannot produce two filenames -- and therefore cannot produce two
+ * tables that a reader would have to tell apart by hand. */
+static void build_fire(int min_grays, char *label, size_t lsz) {
+    for (int i = 1; i < NEXTRA; i++)             /* insertion sort, tiny */
+        for (int j = i; j > 0 && (EXG[j - 1] > EXG[j]
+                 || (EXG[j - 1] == EXG[j] && EXY[j - 1] > EXY[j])); j--) {
+            int t = EXG[j]; EXG[j] = EXG[j - 1]; EXG[j - 1] = t;
+            t = EXY[j]; EXY[j] = EXY[j - 1]; EXY[j - 1] = t;
+        }
+    for (int code = 0; code < NPAT; code++)
+        FIRE[code] = GRAYS[code] >= min_grays;
+    int n = snprintf(label, lsz, "g%d", min_grays);
+    int prev_g = -1, prev_y = -1;
+    for (int e = 0; e < NEXTRA; e++) {
+        int g = EXG[e], y = EXY[e];
+        if (g + y > WORDLEN) {
+            fprintf(stderr, "(%d green, %d yellow) is more than %d tiles\n",
+                    g, y, WORDLEN);
+            exit(1);
+        }
+        if (WORDLEN - g - y >= min_grays) continue;   /* already fires */
+        if (g == prev_g && y == prev_y) continue;     /* a repeat is one entry */
+        prev_g = g; prev_y = y;
+        for (int code = 0; code < NPAT; code++)
+            if (GREENS[code] == g && YELLOWS[code] == y) FIRE[code] = 1;
+        n += snprintf(label + n, lsz - (size_t)n, "+%dg%dy", g, y);
     }
 }
 
@@ -175,7 +227,7 @@ int main(int argc, char **argv) {
      * pool should refuse it rather than assume.  The wrapper always passes both
      * explicitly. */
     const char *opennm = "all", *secondnm = "all";
-    int min_grays = -1, threads = 0, limit = 0;
+    int min_grays = -1, threads = 0, limit = 0, printlabel = 0;
 
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--out") && i + 1 < argc) outpath = argv[++i];
@@ -192,6 +244,23 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--openers-name") && i + 1 < argc) opennm = argv[++i];
         else if (!strcmp(argv[i], "--seconds-name") && i + 1 < argc) secondnm = argv[++i];
         else if (!strcmp(argv[i], "--min-grays") && i + 1 < argc) min_grays = atoi(argv[++i]);
+        /* --fire G,Y adds one COMPOSITION to the firing condition, on top of the
+         * --min-grays threshold: `--min-grays 3 --fire 0,3` fires on everything
+         * with three or more greys AND on the three-yellow two-grey reply. */
+        else if (!strcmp(argv[i], "--fire") && i + 1 < argc) {
+            if (NEXTRA >= MAXEXTRA) {
+                fprintf(stderr, "at most %d --fire compositions\n", MAXEXTRA);
+                return 1;
+            }
+            if (sscanf(argv[++i], "%d,%d", &EXG[NEXTRA], &EXY[NEXTRA]) != 2) {
+                fprintf(stderr, "--fire takes GREENS,YELLOWS, e.g. --fire 0,3\n");
+                return 1;
+            }
+            NEXTRA++;
+        }
+        /* Resolve the firing condition and print its canonical name, so the
+         * wrapper can name the file without re-deriving the rule in shell. */
+        else if (!strcmp(argv[i], "--print-label")) printlabel = 1;
         else if (!strcmp(argv[i], "--threads") && i + 1 < argc) threads = atoi(argv[++i]);
         /* PRICING ONLY: score the first N openers and stop.  The result is a
          * PREFIX of the table, never the table, so the stamp's opener pool is
@@ -200,7 +269,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--limit") && i + 1 < argc) limit = atoi(argv[++i]);
         else { fprintf(stderr, "unknown arg: %s\n", argv[i]); return 1; }
     }
-    if (!outpath) {
+    if (!outpath && !printlabel) {
         fprintf(stderr, "secondword needs --out FILE -- a run that prints its "
                         "answer and saves NOTHING is a run lost.\n"
                         "Use the wrapper: bash solver/run-second-word.sh\n");
@@ -217,6 +286,10 @@ int main(int argc, char **argv) {
                 min_grays, WORDLEN);
         return 1;
     }
+    char firelabel[128];
+    build_grays();
+    build_fire(min_grays, firelabel, sizeof firelabel);
+    if (printlabel) { printf("%s\n", firelabel); return 0; }
 
     char path[1024];
     GWORD = malloc(sizeof(char[WBUF]) * 20000);
@@ -228,7 +301,6 @@ int main(int argc, char **argv) {
     PAT = load_npy(path, &r, &c);
     NA = c;
     if (r != NG) { fprintf(stderr, "pattern rows %d != guesses %d\n", r, NG); return 1; }
-    build_grays();
     fprintf(stderr, "loaded %d guesses x %d answers\n", NG, NA);
 
     int nopen = 0, nsec = 0;
@@ -252,8 +324,8 @@ int main(int argc, char **argv) {
     } else {
         snprintf(openlabel, sizeof openlabel, "%s", opennm);
     }
-    fprintf(stderr, "openers: %d (%s)   second words: %d (%s)   min_grays: %d\n",
-            nopen, openlabel, nsec, secondnm, min_grays);
+    fprintf(stderr, "openers: %d (%s)   second words: %d (%s)   fires on: %s\n",
+            nopen, openlabel, nsec, secondnm, firelabel);
 
 #ifdef _OPENMP
     if (threads > 0) omp_set_num_threads(threads);
@@ -293,7 +365,7 @@ int main(int argc, char **argv) {
              * again: those are the games the rule does not fire in. */
             int nb = 0, nq = 0;
             for (int a = 0; a < NA; a++) {
-                if (GRAYS[row1[a]] < min_grays) continue;
+                if (!FIRE[row1[a]]) continue;
                 nq++;
                 if (cnt[row1[a]]++ == 0) touch[nb++] = row1[a];
             }
@@ -303,7 +375,7 @@ int main(int argc, char **argv) {
             }
             for (int k = 0; k < nb; k++) { cnt[touch[k]] = k; fill[k] = rs[k]; }
             for (int a = 0; a < NA; a++) {
-                if (GRAYS[row1[a]] < min_grays) continue;
+                if (!FIRE[row1[a]]) continue;
                 ord[fill[cnt[row1[a]]]++] = (uint16_t)a;
             }
             for (int k = 0; k < nb; k++) cnt[touch[k]] = 0;
@@ -388,13 +460,14 @@ int main(int argc, char **argv) {
     fputs("# expected = score / qualifying, and score is an INTEGER sum of "
           "squared joint-bucket sizes,\n# so ties are real ties: `ties` counts "
           "the words attaining the minimum, and the winner\n# among them is the "
-          "lowest guess index.  An empty `second` means no answer gave this\n"
-          "# opener that many greys, so there is nothing to choose and the rule "
+          "lowest guess index.  An empty `second` means no answer gives this\n"
+          "# opener a firing reply, so there is nothing to choose and the rule "
           "never fires.\n", f);
     fputs("# It is ONE PLY: what is left after two guesses, never what the game "
           "goes on to cost.\n", f);
-    fprintf(f, "# settings min_grays=%d openers=%s seconds=%s answers=%d "
-               "second_pool=%d\n", min_grays, openlabel, secondnm, NA, nsec);
+    fprintf(f, "# settings min_grays=%d fire=%s openers=%s seconds=%s answers=%d "
+               "second_pool=%d\n", min_grays, firelabel, openlabel, secondnm,
+            NA, nsec);
     fputs("opener,second,expected,score,qualifying,buckets,ties\n", f);
     int64_t noq = 0, tied = 0;
     for (int oi = 0; oi < nopen; oi++) {

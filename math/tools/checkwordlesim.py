@@ -93,7 +93,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 from build_patterns import load_patterns  # noqa: E402
 from wordle import ALL_GREEN, load_words, pattern  # noqa: E402
-from secondword import Table, gray_counts  # noqa: E402
+from secondword import Table, fire_set, gray_counts  # noqa: E402
 from wordlesim import (WIN_WITHIN, CoupledDraw, answer_to_guess,  # noqa: E402
                        draw_answer,
                        fixed_opening, make_opening_rule, make_strategy,
@@ -158,13 +158,13 @@ def refplay_game(pool, answer, rng, opening=()):
             raise AssertionError("reference eliminated the answer %s" % answer)
 
 
-def ref_play_second(pool, answer, rng, opener, second, min_grays):
+def ref_play_second(pool, answer, rng, opener, second, fires):
     """Replay a gray-second game from strings alone.  Returns the words played.
 
-    The greys are counted off the TILES this file derives itself, never off a
-    pattern code and never off secondword.gray_counts -- so a mistake in the
-    encoding, in the count, or in the threshold's direction cannot be shared with
-    the thing being checked.
+    `fires` is a predicate on the TILES this file derives itself, never on a
+    pattern code and never on secondword's mask -- so a mistake in the encoding,
+    in the composition, or in the condition's direction cannot be shared with the
+    thing being checked.
     """
     cands = list(pool)
     played = []
@@ -173,8 +173,7 @@ def ref_play_second(pool, answer, rng, opener, second, min_grays):
         if not played:
             g = opener
         elif len(played) == 1 and second is not None and fired is None:
-            tiles = ref_tiles(opener, answer)
-            fired = sum(1 for t in tiles if t == 0) >= min_grays
+            fired = fires(ref_tiles(opener, answer))
             g = second if fired else cands[int(rng.integers(len(cands)))]
         else:
             g = cands[int(rng.integers(len(cands)))]
@@ -1034,11 +1033,13 @@ def main(argv):
     # down in this gate -- the table it builds is synthetic, in memory, and owes
     # nothing to any committed file.
     gs_opener_g, gs_second_g, GS_MIN = 0, 1, 3
+    GS_MASK, GS_LABEL = fire_set(GS_MIN)
+    gs_fires = lambda tiles: sum(1 for t in tiles if t == 0) >= GS_MIN
     gs_opener, gs_second = guesses[gs_opener_g], guesses[gs_second_g]
     gs_fired = gs_declined = 0
     for tname, pool in (("answer", answers), ("guess", guesses)):
         gtail = make_tail(tname, guesses, answers, ans2g)
-        rule = make_second_rule(gs_opener_g, gs_second_g, GS_MIN)
+        rule = make_second_rule(gs_opener_g, gs_second_g, GS_MASK)
         for seed in range(min(games, 80 if tname == "answer" else guess_games)):
             fast_rng = np.random.default_rng(7000 + seed)
             ref_rng = np.random.default_rng(7000 + seed)
@@ -1048,7 +1049,7 @@ def main(argv):
             played, _ = play_game(pat, ans2g, a_fast, rule, gtail, fast_rng)
             words = [guesses[g] for g in played]
             ref_words, fired = ref_play_second(pool, answer, ref_rng, gs_opener,
-                                               gs_second, GS_MIN)
+                                               gs_second, gs_fires)
             if words != ref_words:
                 failures.append("gray-second/%s seed %d (%s): fast %s vs "
                                 "reference %s" % (tname, seed, answer,
@@ -1089,7 +1090,7 @@ def main(argv):
                         "the threshold was not exercised at its edge" % GS_MIN)
     else:
         btail = make_tail("answer", guesses, answers, ans2g)
-        rule = make_second_rule(gs_opener_g, gs_second_g, GS_MIN)
+        rule = make_second_rule(gs_opener_g, gs_second_g, GS_MASK)
         for n, a_idx in sorted(boundary.items()):
             # the tiles are recounted from the STRINGS, so the case really is the
             # one it claims to be
@@ -1108,10 +1109,41 @@ def main(argv):
         print("the threshold fires at exactly %d greys and not at %d "
               "(constructed, both checked from the strings)" % (GS_MIN, GS_MIN - 1))
 
+    # AND A COMPOSITION, WHICH IS THE POINT OF THE SET: with (0 green, 3 yellow)
+    # added, a 2-grey reply fires iff it has no greens.  Both sides of THAT are
+    # constructed too, because random play meets them rarely and the whole rule
+    # turns on telling them apart.
+    cmask, clabel = fire_set(GS_MIN, [(0, 3)])
+    crule = make_second_rule(gs_opener_g, gs_second_g, cmask)
+    ctail2 = make_tail("answer", guesses, answers, ans2g)
+    want = {(0, 3): True, (1, 2): False, (2, 1): False, (3, 0): False}
+    seen = {}
+    for a_idx in range(len(answers)):
+        tiles = ref_tiles(gs_opener, answers[a_idx])
+        comp = (sum(1 for t in tiles if t == 2), sum(1 for t in tiles if t == 1))
+        if sum(1 for t in tiles if t == 0) != 2 or comp in seen:
+            continue
+        seen[comp] = a_idx
+    for comp, should in want.items():
+        if comp not in seen:
+            continue
+        played, _ = play_game(pat, ans2g, seen[comp], crule, ctail2,
+                              np.random.default_rng(11))
+        fired = len(played) > 1 and guesses[played[1]] == gs_second
+        if fired != should:
+            failures.append("%s: a %d-green %d-yellow 2-grey reply %s the rule"
+                            % (clabel, comp[0], comp[1],
+                               "fired" if fired else "did not fire"))
+    if len(seen) < 2:
+        failures.append("fewer than two 2-grey compositions occurred against "
+                        "this opener, so the composition rule was not exercised")
+    print("%s: of the 2-grey replies, only the all-yellow one fires (%d "
+          "compositions constructed from the strings)" % (clabel, len(seen)))
+
     # AN EMPTY TABLE ROW MAKES IT THE PLAIN OPENER.  An opener no answer can give
     # that many greys has nothing to choose, and the rule must then never speak
     # after turn one rather than play something arbitrary.
-    empty_rule = make_second_rule(gs_opener_g, None, GS_MIN)
+    empty_rule = make_second_rule(gs_opener_g, None, GS_MASK)
     etail = make_tail("answer", guesses, answers, ans2g)
     plain = make_opening_rule([gs_opener_g], tail=etail, adapt=0)
     for seed in range(20):
@@ -1128,8 +1160,8 @@ def main(argv):
 
     # THE TABLE PATH, AND WHAT IT REFUSES.  second_rule_for is what the sweep and
     # the paired comparison both call, so it is checked rather than the class.
-    tbl = Table(path="(synthetic)", min_grays=GS_MIN, openers="guess",
-                seconds="guess", answers=len(answers),
+    tbl = Table(path="(synthetic)", min_grays=GS_MIN, fire=GS_LABEL,
+                openers="guess", seconds="guess", answers=len(answers),
                 rows={gs_opener: gs_second, guesses[2]: None})
     r = second_rule_for([gs_opener_g], tbl, guesses)
     if r(turn=0, alive=None, played=[], replies=[], rng=None) != gs_opener_g:
@@ -1143,17 +1175,22 @@ def main(argv):
         except SystemExit:
             gs_refusals += 1
     try:
-        make_second_rule(gs_opener_g, gs_opener_g, GS_MIN)
+        make_second_rule(gs_opener_g, gs_opener_g, GS_MASK)
         failures.append("the rule accepted a second word equal to the opener")
     except ValueError:
         gs_refusals += 1
-    try:
-        make_second_rule(gs_opener_g, gs_second_g, 0)
-        failures.append("the rule accepted a threshold of 0 greys")
-    except ValueError:
-        gs_refusals += 1
+    for label, cond in (("a condition that never fires",
+                         np.zeros(len(GS_MASK), dtype=bool)),
+                        ("a condition that always fires",
+                         np.ones(len(GS_MASK), dtype=bool))):
+        try:
+            make_second_rule(gs_opener_g, gs_second_g, cond)
+            failures.append("the rule accepted %s" % label)
+        except ValueError:
+            gs_refusals += 1
     print("gray-second refusals: %d (a two-word opening, an opener the table has "
-          "no row for, a repeat of the opener, a 0-grey threshold)" % gs_refusals)
+          "no row for, a repeat of the opener, and conditions that never or "
+          "always fire)" % gs_refusals)
 
     # THE SWEEP RUNS THE SAME RULE.  sweep_word's make_rule hook is the only way
     # the strategy reaches a sweep, so it is diffed against the rule built here --
@@ -1167,7 +1204,7 @@ def main(argv):
     direct = []
     draw_rng = np.random.default_rng(11)
     pick_rng = np.random.default_rng(11 + PICK_OFFSET)
-    direct_rule = make_second_rule(gs_opener_g, gs_second_g, GS_MIN)
+    direct_rule = make_second_rule(gs_opener_g, gs_second_g, GS_MASK)
     for _ in range(40):
         a_idx = draw_answer(len(answers), draw_rng)
         pl, _ = play_game(pat, ans2g, a_idx, direct_rule, etail, pick_rng)

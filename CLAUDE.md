@@ -2129,6 +2129,32 @@ the source of truth; `solver/secondword.c` computes the table.
   after two guesses, never what the game goes on to take; only the simulation the
   table feeds says that. And the sim's own mean is expected guesses **outright**
   — never table it beside an `optturns`-family total.
+- **THE FIRING CONDITION IS A SET OF (greens, yellows) COMPOSITIONS, and
+  `--min-grays N` is SUGAR for "at least N greys"** (user's call, 2026-09-10).
+  A threshold on the grey count alone cannot say the thing that turned out to
+  matter: two greys with three YELLOWS is nearly uninformative, while two greys
+  with three GREENS has pinned three positions, and those do not belong on the
+  same side of the line. `--fire G,Y` adds one composition, so the
+  three-yellow rule is `--min-grays 3 --fire 0,3`.
+  - **THE LABEL IS A FUNCTION OF THE SET, NOT OF HOW IT WAS TYPED** — an
+    `--fire` the threshold already covers is dropped and the rest are sorted, so
+    two spellings of one rule cannot make two filenames (`g3+0g3y`). The label
+    is in the table's stamp, in its filename and in every downstream stem, and
+    the RULE rebuilds its mask from that label rather than being told a
+    threshold. A non-canonical label is REFUSED, not normalised.
+  - **The C and `secondword.py` build the set and the label INDEPENDENTLY**, and
+    `checksecondword.py` diffs both over a range of specs — that is the one
+    mistake a stamp cannot catch, since the stamp is written by whichever side is
+    wrong.
+  - **A table written before this carries only `min_grays`, which means exactly
+    `g<N>`**, so `second_guess_g3.csv` and the rest keep working and keep meaning
+    what they meant.
+  - **MEASURED: adding `0,3` to the `g3` rule grows the qualifying set of EVERY
+    real opener and changes the chosen second word for NONE of them** (24 openers
+    checked). The added bucket is a small part of ~2200, so this variant differs
+    from plain `g3` almost entirely in WHEN it fires, not in WHAT it plays. The
+    gate's winner-moves case is therefore CONSTRUCTED (`g5+0g2y` on the mini
+    problem), since the natural one cannot demonstrate it.
 - **`--min-grays` IS THE OBJECTIVE, not a knob**, and so are the two pools. Each
   combination is a different strategy: all three are in the filename AND in the
   table's own `# settings` stamp, and every reader refuses a table whose stamp

@@ -308,7 +308,7 @@ def stem_for(a, list_name, table):
         # 12972-word table is a different experiment from racing them against
         # the answers-only one, and without this they would share a filename,
         # which means sharing a checkpoint and resuming into each other.
-        stem += "_g%d-%s" % (table.min_grays, table.seconds)
+        stem += "_%s-%s" % (table.fire, table.seconds)
     if a["win_within"] != WIN_WITHIN:
         stem += "_w%d" % a["win_within"]
     return stem
@@ -376,8 +376,8 @@ def main(argv):
     print("race: %d openers of %d word(s) from %s, follow-up %s"
           % (len(field), sizes.copy().pop(), list_name, a["fallback"]))
     if table:
-        print("  each opener plays its own second word from %s at %d+ greys"
-              % (a["second_from"], table.min_grays))
+        print("  each opener plays its own second word from %s, firing on %s"
+              % (a["second_from"], table.fire))
     else:
         print("  each opener is played blind, then the follow-up takes over")
     print("  cut %.4g PAIRED sigma behind the leader; blocks of %d then x%g; "
@@ -445,16 +445,16 @@ def write_standings(out, stem, a, names, status, elim_at, live, mean, ose, md,
                 "guesses or fewer\n" % a["win_within"])
         if table:
             f.write("# each opener plays the predetermined second word from %s "
-                    "whenever its\n# reply shows at least %d greys "
-                    "(math/secondword.py; pools openers=%s seconds=%s)\n"
-                    % (a["second_from"], table.min_grays, table.openers,
+                    "whenever its\n# reply fires %s (math/secondword.py; pools "
+                    "openers=%s seconds=%s)\n"
+                    % (a["second_from"], table.fire, table.openers,
                        table.seconds))
         f.write("# settings follow_up=%s pair_adaptive=0 win_within=%d "
                 "trials=%d seed=%d words=%d rank=mean second_table=%s "
-                "min_grays=%d\n"
+                "fire=%s\n"
                 % (a["fallback"], a["win_within"], n_games, a["seed"],
                    len(names), a["second_from"] or "-",
-                   table.min_grays if table else 0))
+                   table.fire if table else "-"))
         f.write("# lineage root=%s pass=1 source=(race)\n" % list_name)
         f.write(COLUMNS + "\n")
         for k in order:
