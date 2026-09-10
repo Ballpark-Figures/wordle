@@ -163,27 +163,6 @@ COLUMNS = ["lang", "guesses", "answers", "alphabet_size", "accents",
            "opener", "total_guesses", "expected_guesses", "seconds"]
 
 
-def print_header(k: int, length: int, answers_only: bool) -> None:
-    """The ONE screen header, shared by the language sweep and a named pair.
-
-    Both are the same measurement, so they get the same header and the same
-    columns; only the row label differs. Printing a bespoke line for one of them
-    would make two identical results look like two different quantities.
-    """
-    guess_set = "answers only" if answers_only else "full guess list"
-    print(f"top-{k} beam, length {length}, {guess_set}, "
-          "average guesses OUTRIGHT (no depth cap)")
-    print(f"{'lang':<6}{'opener':>10}{'avg guesses':>14}"
-          f"{'answers':>9}{'guesses':>9}{'secs':>8}")
-
-
-def show(row: dict, note: str = "") -> None:
-    """One result row, in the shared column layout."""
-    print(f"{row['lang']:<6}{row['opener']:>10}{row['expected_guesses']:>14}"
-          f"{row['answers']:>9}{row['guesses']:>9}{row['seconds']:>8}{note}",
-          flush=True)
-
-
 def write_meta(path: str, k: int, length: int, langs: list[str],
                answers_only: bool = False, lists: tuple | None = None) -> None:
     """`lists` = (answers_path, guesses_path) for an explicitly named pair.
@@ -279,15 +258,16 @@ def main(argv: list[str]) -> None:
             label = os.path.basename(ans_path)
             if label.endswith(".txt"):
                 label = label[:-4]
-        print_header(k, length, answers_only)
         row = solve_pair(label, answers, guesses, k)
-        show(row)
+        print(f"topk {k}: {row['answers']} words, {row['guesses']} legal guesses; "
+              f"opens with {row['opener']}, "
+              f"avg = {row['expected_guesses']}", flush=True)
         with open(out, "w", encoding="utf-8") as fh:
             fh.write(",".join(COLUMNS) + "\n")
             fh.write(",".join(str(row[c]) for c in COLUMNS) + "\n")
         write_meta(out + ".meta", k, length, [label], answers_only,
                    lists=(ans_path, None if answers_only else gue_path))
-        print(f"\nwrote {out}")
+        print(f"wrote {out}", flush=True)
         return
 
     if langs is None:
@@ -307,7 +287,15 @@ def main(argv: list[str]) -> None:
         with open(out, "w", encoding="utf-8") as fh:
             fh.write(",".join(COLUMNS) + "\n")
 
-    print_header(k, length, answers_only)
+    def show(row: dict, note: str = "") -> None:
+        print(f"{row['lang']:<6}{row['opener']:>10}{row['expected_guesses']:>14}"
+              f"{row['answers']:>9}{row['guesses']:>9}{row['seconds']:>8}{note}")
+
+    guess_set = "answers only" if answers_only else "full guess list"
+    print(f"top-{k} beam, length {length}, {guess_set}, "
+          "average guesses OUTRIGHT (no depth cap)")
+    print(f"{'lang':<6}{'opener':>10}{'avg guesses':>14}"
+          f"{'answers':>9}{'guesses':>9}{'secs':>8}")
     for lg in langs:
         # A resumed language still prints, so the table on screen is the whole
         # run rather than only the part this invocation happened to compute.
