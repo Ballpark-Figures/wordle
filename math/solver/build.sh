@@ -64,6 +64,14 @@ if [ $# -eq 0 ]; then
   # score for every unordered pair of guesses. Separate program because it shares
   # nothing with the solver but the .npy loader.
   gcc $BASE $OMP -o pairsplit pairsplit.c
+  # secondword picks the best PREDETERMINED second word for every opener -- the
+  # word minimising the expected answers left, over the replies showing at least
+  # --min-grays greys.  Separate program because it is pairsplit's inner loop
+  # under a different QUESTION: the answers are filtered by the opener's reply
+  # before they are bucketed, the walk is over ORDERED (g1, g2), and the result
+  # is one argmin per opener rather than a global ranking -- so it shares the
+  # .npy loader and the run-histogram trick and nothing else.
+  gcc $BASE $OMP -o secondword secondword.c
   # strturns is the W -> S cell: the same objective over ALL 26**5 strings as
   # answers. Separate program because it shares no data structure with the
   # solver -- no pattern matrix and no candidate list, since neither survives
@@ -99,7 +107,7 @@ if [ $# -eq 0 ]; then
   # per-guess delta table nor either of antistall's two bounds survives the change
   # -- it shares the loader, the table and the arena and none of the search.
   gcc $BASE $OMP -o eldrowmax eldrowmax.c
-  echo "built ./optturns, ./hardturns, ./mmturns, ./ultraturns, ./pairsplit, ./strturns, ./strguess, ./greens, ./antistall, ./antiexpect and ./eldrowmax  (5 letters)"
+  echo "built ./optturns, ./hardturns, ./mmturns, ./ultraturns, ./pairsplit, ./secondword, ./strturns, ./strguess, ./greens, ./antistall, ./antiexpect and ./eldrowmax  (5 letters)"
   exit 0
 fi
 
