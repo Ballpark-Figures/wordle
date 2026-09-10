@@ -22,6 +22,7 @@ jedi==0.20.0
 jupyter_client==8.9.1
 jupyter_core==5.9.1
 kiwisolver==1.5.0
+llvmlite==0.49.0 ; python_version < "3.14"
 manim==0.20.1
 ManimPango==0.6.1
 mapbox_earcut==2.0.0
@@ -33,6 +34,7 @@ moderngl==5.12.0
 moderngl-window==3.1.1
 nest-asyncio2==1.7.2
 networkx==3.6.1
+numba==0.67.0 ; python_version < "3.14"
 numpy==2.5.1
 packaging==26.3
 pandas==3.0.5

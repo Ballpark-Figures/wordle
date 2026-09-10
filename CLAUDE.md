@@ -1002,6 +1002,23 @@ subject to a guarantee. Do not put the two in one table.
   12972 guesses is **~0.9 s** (uniform weights; it gets cheaper as the adversary zeroes
   words). A phase loop is ~2 evaluations per knob, so ~9 min/loop at 281 knobs. Larger K
   is exponential in depth and has no transposition table yet.
+- **NUMBA IS A REAL DEPENDENCY OF THIS CELL, AND ITS ABSENCE IS SILENT.** `topk.py`
+  wraps the import in `try/except` and `TopKGame` sets `use_numba = use_numba and
+  _HAVE_NUMBA`, so without numba every solve quietly runs `_ref_solve` — the pure-numpy
+  REFERENCE path, which exists to be the differential ORACLE, not the fast one. Nothing
+  warns. **MEASURED 2026-09-10**: a k=1 uniform evaluation over 4282 x 12972 took ~35 s
+  on the reference path against the ~0.9 s documented with numba, and the `ca` language
+  solve took 21.7 s. It also silently disables the sharpest check in
+  `tools/checktopk.py`, which reports `FAIL numba available` and cannot diff the kernel
+  against the reference at all.
+  - **It is now pinned in the repo `requirements.lock` as `numba==0.67.0 ;
+    python_version < "3.14"`** (plus `llvmlite==0.49.0` under the same marker). numpy
+    2.5.1 already satisfies numba's `numpy<2.6`, so nothing was downgraded.
+  - **THE MARKER IS NOT COSMETIC: there is NO stable numba wheel for Python 3.14**, which
+    is what both Macs run — the only cp314 wheel is `0.63.0b1`, a beta pip will not take
+    without `--pre`. So an unmarked pin would BREAK the Mac venv builds, and with the
+    marker the Macs simply have no numba and silently get the reference path. **A slow
+    `topk`/`lang_solve`/`freq_search` run on a Mac is this, not the problem.**
 - **The gates: `python3 math/tools/checktopk.py` and `math/tools/checkfreqsearch.py`.**
   The first diffs the numba kernel against a pure-numpy reference implementing the
   identical rules (k=1/2/3, exact agreement), checks the pattern slice against
