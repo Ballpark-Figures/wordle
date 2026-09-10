@@ -54,9 +54,19 @@
 #                  mystery words); that is the point, it is what a player without
 #                  the curated answer list can do.
 #
-# A future strategy that DOES have a rule takes --fallback to say which of the two
-# fills in the rest; the flag is required there, and refused for these two, whose
-# names already say it.
+# A strategy that DOES have a rule takes --fallback to say which of the two fills
+# in the rest; the flag is required there, and refused for the two above, whose
+# names already say it.  Those with rules today:
+#
+#   opener         one fixed word, then the follow-up.  --strategy-arg WORD
+#   opening        several words played BLIND in order, then the follow-up
+#   gray-second    an opener, then a word committed to IN ADVANCE for that opener
+#                  -- but only when the opener's reply shows enough GREY tiles;
+#                  otherwise the follow-up takes over there too.  Two arguments:
+#                  --strategy-arg WORD --strategy-arg TABLE.csv, the table built
+#                  by solver/run-second-word.sh (math/secondword.py states what
+#                  it minimises).  Sweep it with run-wordle-sweep.sh
+#                  --second-from TABLE.csv.
 #
 # USE THIS RATHER THAN CALLING tools/wordle_sim.py DIRECTLY.  It sets --out so the
 # games outlive the terminal, names the file after every parameter that defines
@@ -145,8 +155,21 @@ echo "strategy $STRATEGY${SARGS:+ $SARGS}, follow-up $RESOLVED"
 
 OUTDIR=data/shared/wordlesim
 LOC=data/local/wordlesim
-# strategy args join the name with '-', so a plain run keeps a clean stem
-STEM="$(echo "$STRATEGY $SARGS $FALLBACK" | sed 's/  *$//' | tr ' ' '-')_t${T}_s${SEED}"
+# strategy args join the name with '-', so a plain run keeps a clean stem.
+# AN ARGUMENT THAT IS A PATH CONTRIBUTES ITS BASENAME, and that is not cosmetic:
+# a strategy taking a file (gray-second's second-word table) put the whole path
+# in the stem, and since the path is absolute the "filename" then contained
+# slashes -- so the run silently created a directory tree under data/shared/
+# wordlesim/ and wrote the CSV at the bottom of it.  Which table it was still
+# has to show, hence the basename rather than dropping it.
+STEMARGS=""
+for a in $SARGS; do
+    case "$a" in
+        */*) a=$(basename "$a"); a="${a%.csv}" ;;
+    esac
+    STEMARGS="$STEMARGS $a"
+done
+STEM="$(echo "$STRATEGY$STEMARGS $FALLBACK" | sed 's/  *$//' | tr ' ' '-')_t${T}_s${SEED}"
 [ "$WIN" = 6 ] || STEM="${STEM}_w${WIN}"
 OUT="$OUTDIR/$STEM.csv"
 mkdir -p "$OUTDIR" "$LOC"

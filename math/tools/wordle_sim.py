@@ -103,7 +103,12 @@ def parse_args(argv):
         # wrapper calls this BEFORE it creates a log or a CSV, so a strategy that
         # will be refused is refused before it leaves anything behind -- and the
         # refusal still comes from the registry, the one place that owns it.
-        return strategy, fallback, sargs, 0, seed, win_within, "--resolve", progress
+        # NB `adapt` rides along: main unpacks ONE shape, so a return that
+        # skipped it made --resolve die with a ValueError -- and every run
+        # goes through --resolve first, so the wrapper was refusing every
+        # strategy until this was put back.
+        return (strategy, fallback, adapt, sargs, 0, seed, win_within,
+                "--resolve", progress)
     if t is None or t < 1:
         raise SystemExit("-t (number of trials) is required and must be >= 1")
     if win_within < 1:
