@@ -113,19 +113,16 @@ def build_patterns(guesses: list[str], answers: list[str],
     return P
 
 
-def solve_pair(label: str, answers: list[str], guesses: list[str], k: int,
-               meta: dict | None = None) -> dict:
-    """One (answers, guesses) pair through the top-K guesser, weights UNIFORM.
-
-    THE ONE PLACE the objective is evaluated. `solve_language` reads a language
-    directory and calls this; `--answers/--guesses` names a pair directly and
-    calls the same. Two entry points, one computation -- so an explicitly named
-    list cannot drift from a discovered one.
-
-    Uniform weighting IS `topk.py`'s default (`_coerce(None)` returns all-ones),
-    so this is the weighted evaluation with every weight 1, not a separate mode.
-    """
-    meta = meta or {}
+def solve_language(lg: str, root: str, length: int, k: int,
+                   answers_only: bool = False) -> dict:
+    d = os.path.join(root, lg, f"len{length}")
+    answers = read_words(os.path.join(d, "mystery.txt"))
+    # answers_only: guesses ARE the answer list, the language analogue of
+    # --guess-list mystery.txt in the English answers-only sweep. Every answer is
+    # trivially a legal guess, so TopKGame's playability guard is satisfied, and
+    # the alphabet (below) covers every letter in play since guesses == answers.
+    guesses = answers if answers_only else read_words(os.path.join(d, "guess.txt"))
+    meta = read_meta(os.path.join(d, "wordlists.meta"))
     alphabet = sorted({c for w in guesses for c in w})
 
     t0 = time.time()
@@ -134,7 +131,7 @@ def solve_pair(label: str, answers: list[str], guesses: list[str], k: int,
     total = game.total_cost()
     opener = game.trace(answers[0])[0][0]
     return {
-        "lang": label,
+        "lang": lg,
         "guesses": len(guesses),
         "answers": len(answers),
         "alphabet_size": len(alphabet),
@@ -146,42 +143,17 @@ def solve_pair(label: str, answers: list[str], guesses: list[str], k: int,
     }
 
 
-def solve_language(lg: str, root: str, length: int, k: int,
-                   answers_only: bool = False) -> dict:
-    d = os.path.join(root, lg, f"len{length}")
-    answers = read_words(os.path.join(d, "mystery.txt"))
-    # answers_only: guesses ARE the answer list, the language analogue of
-    # --guess-list mystery.txt in the English answers-only sweep. Every answer is
-    # trivially a legal guess, so TopKGame's playability guard is satisfied, and
-    # the alphabet covers every letter in play since guesses == answers.
-    guesses = answers if answers_only else read_words(os.path.join(d, "guess.txt"))
-    return solve_pair(lg, answers, guesses, k,
-                      read_meta(os.path.join(d, "wordlists.meta")))
-
-
 COLUMNS = ["lang", "guesses", "answers", "alphabet_size", "accents",
            "opener", "total_guesses", "expected_guesses", "seconds"]
 
 
 def write_meta(path: str, k: int, length: int, langs: list[str],
-               answers_only: bool = False, lists: tuple | None = None) -> None:
-    """`lists` = (answers_path, guesses_path) for an explicitly named pair.
-
-    A named pair is NOT a language result, and the meta must not claim it is --
-    it did not come from build_lang_wordlists.py and there is no language to
-    compare it across. The rest of the file is identical, because the objective
-    and the strategy are identical.
-    """
+               answers_only: bool = False) -> None:
     with open(path, "w", encoding="utf-8") as fh:
-        fh.write("kind=%s\n" % ("topk-solve" if lists else "lang-topk-solve"))
+        fh.write("kind=lang-topk-solve\n")
         fh.write(f"k={k}\n")
         fh.write(f"length={length}\n")
-        if lists:
-            fh.write(f"label={langs[0]}\n")
-            fh.write(f"answers_list={os.path.relpath(lists[0])}\n")
-            fh.write(f"guesses_list={os.path.relpath(lists[1]) if lists[1] else 'same-as-answers'}\n")
-        else:
-            fh.write(f"languages={len(langs)}\n")
+        fh.write(f"languages={len(langs)}\n")
         fh.write("objective=expected-guesses-outright\n")
         fh.write("depth_cap=none\n")
         fh.write("strategy=topk-beam-ranked-by-expected-candidates-alive\n")
@@ -192,8 +164,7 @@ def write_meta(path: str, k: int, length: int, langs: list[str],
         # always a possible answer. A DIFFERENT strategy from the full run.
         fh.write(f"answers_only={1 if answers_only else 0}\n")
         fh.write(f"guess_set={'answers' if answers_only else 'full'}\n")
-        if not lists:
-            fh.write("wordlists=build_lang_wordlists.py\n")
+        fh.write("wordlists=build_lang_wordlists.py\n")
         fh.write("comparable_with_optturns=0\n")
 
 
@@ -201,17 +172,10 @@ def main(argv: list[str]) -> None:
     k, length, root, out = 1, ONLY_LENGTH, LANG_WORDS, None
     langs = None
     answers_only = False
-    ans_path = gue_path = label = None
     it = iter(argv)
     for a in it:
         if a in ("-k", "--topk"):
             k = int(next(it))
-        elif a == "--answers":
-            ans_path = next(it)
-        elif a == "--guesses":
-            gue_path = next(it)
-        elif a == "--label":
-            label = next(it)
         elif a == "--length":
             length = int(next(it))
         elif a == "--langs":
@@ -224,8 +188,8 @@ def main(argv: list[str]) -> None:
             answers_only = True
         else:
             raise SystemExit(
-                f"unknown arg {a!r} (-k/--length/--langs/--words/--out/"
-                "--answers-only/--answers/--guesses/--label)")
+                f"unknown arg {a!r} "
+                "(-k/--length/--langs/--words/--out/--answers-only)")
 
     if out is None:
         raise SystemExit(
@@ -238,37 +202,6 @@ def main(argv: list[str]) -> None:
             f"--length {length}: this driver is {ONLY_LENGTH}-letter only. topk.py's "
             "numba kernels bake in ALL_GREEN=242, so another length would exclude "
             "the wrong winning bin and return a wrong number silently.")
-
-    # ---- an explicitly named pair, instead of discovering language dirs ----
-    # The English baseline goes through HERE rather than through a second tool:
-    # same driver, same objective, same columns, same CSV.
-    if ans_path is not None:
-        if langs is not None:
-            raise SystemExit("--answers names ONE list pair; --langs discovers "
-                             "several. Pick one.")
-        if gue_path is None and not answers_only:
-            raise SystemExit(
-                "--guesses PATH is required with --answers (or --answers-only to "
-                "make the answer list its own guess set).\n"
-                "The guess set is part of the question -- a 12972-word guesser and "
-                "a 4282-word one are different strategies, so it is never defaulted.")
-        answers = read_words(ans_path)
-        guesses = answers if answers_only else read_words(gue_path)
-        if label is None:
-            label = os.path.basename(ans_path)
-            if label.endswith(".txt"):
-                label = label[:-4]
-        row = solve_pair(label, answers, guesses, k)
-        print(f"topk {k}: {row['answers']} words, {row['guesses']} legal guesses; "
-              f"opens with {row['opener']}, "
-              f"avg = {row['expected_guesses']}", flush=True)
-        with open(out, "w", encoding="utf-8") as fh:
-            fh.write(",".join(COLUMNS) + "\n")
-            fh.write(",".join(str(row[c]) for c in COLUMNS) + "\n")
-        write_meta(out + ".meta", k, length, [label], answers_only,
-                   lists=(ans_path, None if answers_only else gue_path))
-        print(f"wrote {out}", flush=True)
-        return
 
     if langs is None:
         langs = discover(root, length)
