@@ -1168,7 +1168,7 @@ def main(argv):
     # THE TABLE PATH, AND WHAT IT REFUSES.  second_rule_for is what the sweep and
     # the paired comparison both call, so it is checked rather than the class.
     tbl = Table(path="(synthetic)", min_grays=GS_MIN, fire=GS_LABEL,
-                groups=[(GS_LABEL, GS_MASK)], openers="guess", seconds="guess",
+                groups=[GS_LABEL], openers="guess", seconds="guess",
                 answers=len(answers),
                 rows={gs_opener: {GS_LABEL: gs_second},
                       guesses[2]: {GS_LABEL: None}})

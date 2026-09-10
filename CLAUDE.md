@@ -2146,6 +2146,26 @@ the source of truth; `solver/secondword.c` computes the table.
     `g3` covers), terms within a group are sorted, and the groups are sorted by
     their CANONICAL spec — so one rule cannot have two names, and therefore
     cannot have two tables a reader must tell apart by hand.
+  - **A GROUP MAY KEY ON THE GREYED VOWELS, and that bucket depends on the
+    OPENER as well as the reply** (user's call, 2026-09-10). `v<N>` is "exactly N
+    of the greys sit on a vowel", counted by POSITION, and it is joined to other
+    atoms with `_` (AND) inside a term, terms being unioned with `+`: `e3_v1` is
+    "exactly three greys and exactly one greyed vowel". `--by-grays 3
+    --split-vowels` is the sugar for the full cross product, 15 groups.
+    - **Y IS ALWAYS A VOWEL** (`aeiouy`) — not a flag and not a default, this
+      video's convention, stamped into every table as `vowels=`. NB
+      `tools/vowels.py` still defaults to `aeiou` with `aeiouy` as an argument;
+      it predates this and was left alone.
+    - **THE MASKS ARE THEREFORE PER OPENER**, and so is the disjointness check:
+      the same all-grey reply is a different bucket for a one-vowel opener than
+      for a four-vowel one. A condition with no `v` atom is opener-independent
+      and is checked once, up front, by both implementations.
+    - Combinations an opener cannot produce (`v2` against a one-vowel word) are
+      empty rows that never fire — a result, not a gap.
+    - **The label is long and deliberately not abbreviated**:
+      `e3_v0.e3_v1.…e5_v5` is 118 characters, which the filenames carry. A
+      shorthand would have to canonicalise back to the same partition or one rule
+      would have two names.
   - **MEASURED: 500 openers x 3 groups in 1.6 s**, so a full partition table is
     about the same minute as a single-group one — every answer falls in exactly
     one group, so the total work barely moves.

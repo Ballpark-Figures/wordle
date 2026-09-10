@@ -530,15 +530,18 @@ if [ -n "$SECONDFROM" ]; then
     [ -f "$SECONDFROM" ] || { echo "no such second-word table: $SECONDFROM" >&2
                               echo "  Build one: bash solver/run-second-word.sh" >&2
                               exit 1; }
-    MINGRAYS=$(sed -n 's/^# settings .*min_grays=\([0-9]*\).*/\1/p' "$SECONDFROM" | head -1)
-    [ -n "$MINGRAYS" ] || { echo "$SECONDFROM carries no '# settings' stamp, so it" >&2
-                            echo "  cannot say which threshold it was built at." >&2
-                            exit 1; }
+    # THE CONDITION'S OWN NAME, not a threshold: a table whose groups key on
+    # anything but the grey count carries no min_grays at all.
+    MINGRAYS=$(sed -n 's/^# settings .*fire=\([^ ]*\).*/\1/p' "$SECONDFROM" | head -1)
+    [ -n "$MINGRAYS" ] || MINGRAYS=g$(sed -n 's/^# settings .*min_grays=\([0-9]*\).*/\1/p' "$SECONDFROM" | head -1)
+    [ "$MINGRAYS" != "g" ] || { echo "$SECONDFROM carries no '# settings' stamp, so it" >&2
+                                echo "  cannot say which condition it was built under." >&2
+                                exit 1; }
 fi
 STEM="sweep_${FALLBACK}_${ROOT}_p${PASSNO}_t${T}_s${SEED}"
 # The threshold is the objective, so it is in the name -- and a cascade under a
 # table is a different experiment from a blind one off the same root and pass.
-[ -z "$SECONDFROM" ] || STEM="${STEM}_g${MINGRAYS}"
+[ -z "$SECONDFROM" ] || STEM="${STEM}_${MINGRAYS}"
 # N is part of the objective, so it is in the name; 0 keeps the blind stem every
 # earlier sweep already used.
 [ "$ADAPT" = 0 ] || STEM="${STEM}_adapt${ADAPT}"
@@ -569,7 +572,7 @@ if [ "$DRYRUN" = 1 ]; then
     echo "  words   $WORDS"
     echo "  lineage root $ROOT, pass $PASSNO"
     echo "  trials  $T   seed $SEED   follow-up $FALLBACK   pair-adaptive $ADAPT   rank $RANK"
-    [ -z "$SECONDFROM" ] || echo "  second  $SECONDFROM (fires at $MINGRAYS+ greys)"
+    [ -z "$SECONDFROM" ] || echo "  second  $SECONDFROM (fires on $MINGRAYS)"
     echo "  progress every $PROGRESS opening(s)"
     exit 0
 fi

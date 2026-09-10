@@ -52,7 +52,8 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
-from secondword import (best_second, fire_groups, fire_set,  # noqa: E402
+from secondword import (VOWELS, best_second, fire_groups,  # noqa: E402
+                        fire_set, gray_vowels, group_mask,
                         parse_fire_label, read_table, word_by_code)
 from wordle import load_words, pattern  # noqa: E402
 
@@ -413,8 +414,8 @@ def check_fire():
         # and the LABEL must rebuild the same set, or a reader would filter
         # differently from the run that wrote the table
         rebuilt = np.zeros_like(want_mask)
-        for _, gm in parse_fire_label(got):
-            rebuilt |= gm
+        for spec in parse_fire_label(got):
+            rebuilt |= group_mask(spec, None)[0]
         if not np.array_equal(rebuilt, want_mask):
             bad("the label %r does not rebuild its own set" % got)
     print("   ok   %d firing conditions: the C and Python agree on the set and "
@@ -426,13 +427,16 @@ def check_fire():
     # rule would have two names and the tables would not be interchangeable.
     partitions = [
         (["e5", "e4", "e3"], "e3.e4.e5"),
+        (["e3_v1", "e3_v0"], "e3_v0.e3_v1"),     # a vowel partition
+        (["v1_e3", "v0_e3"], "e3_v0.e3_v1"),     # atoms sort within a term
+        (["e5_v5", "e5_v0"], "e5_v0.e5_v5"),
         (["e3", "e5", "e4"], "e3.e4.e5"),        # order must not matter
         (["0g3y+g3", "e1"], "e1.g3+0g3y"),       # nor must term order
         (["e5", "e4"], "e4.e5"),
         (["g4", "e3"], "e3.g4"),
     ]
     for specs_in, want in partitions:
-        groups, label = fire_groups(specs_in)
+        specs_out, label = fire_groups(specs_in)
         if label != want:
             bad("python calls %s %r, expected %r" % (specs_in, label, want))
             continue
@@ -443,8 +447,7 @@ def check_fire():
                            capture_output=True, text=True)
         if p.stdout.strip() != want:
             bad("the C calls %s %r, python %r" % (specs_in, p.stdout.strip(), want))
-        rebuilt = parse_fire_label(want)
-        if [k for k, _ in rebuilt] != [k for k, _ in groups]:
+        if parse_fire_label(want) != specs_out:
             bad("the label %r does not rebuild its own groups" % want)
     print("   ok   %d partitions: the C and Python agree on the groups and the "
           "name, whatever the order or spelling" % len(partitions))
@@ -553,6 +556,62 @@ def check_fire():
             break
     print("   ok   the groups partition the firing replies exactly")
 
+    # THE VOWEL PARTITION, where the bucket depends on the OPENER'S LETTERS.
+    # This is the one key that is not a function of the reply alone, so it is
+    # checked against a from-the-strings count of greyed vowels -- position by
+    # position, so a doubled vowel grey twice counts twice.
+    def gv_fires(opener, greys, vows):
+        def fires(tiles):
+            if sum(1 for t in tiles if t == 0) != greys:
+                return False
+            n = sum(1 for i, t in enumerate(tiles)
+                    if t == 0 and opener[i] in VOWELS)
+            return n == vows
+        return fires
+
+    vspecs = ["e%d_v%d" % (k, j) for k in (3, 4, 5) for j in range(k + 1)]
+    vout = os.path.join(tmp, "vowels.csv")
+    args = []
+    for sp in vspecs:
+        args += ["--group", sp]
+    run(["--data", tmp, "--out", vout, "--threads", "2"] + args)
+    covered = {}
+    for spec in vspecs:
+        k, j = int(spec[1]), int(spec[4])
+        rws = read_rows(vout, spec)
+        for opener, got in sorted(rws.items()):
+            want = ref_best_second(MINI_GUESSES, MINI_ANSWERS, opener,
+                                   gv_fires(opener, k, j), MINI_GUESSES)
+            if got != want:
+                bad("vowel partition %s opener %s: C gave %s, strings %s"
+                    % (spec, opener, got, want))
+                break
+            covered.setdefault(opener, 0)
+            covered[opener] += got[2]
+    # the vowel groups must partition the SAME replies e3.e4.e5 does, opener by
+    # opener -- if they did not, the two conditions would not be comparable
+    for opener, tot in covered.items():
+        want = sum(1 for a in MINI_ANSWERS
+                   if sum(1 for t in tiles_from_strings(opener, a) if t == 0) >= 3)
+        if tot != want:
+            bad("%s: the vowel groups cover %d answers, e3.e4.e5 covers %d"
+                % (opener, tot, want))
+            break
+    # and the split must actually depend on the OPENER: two openers with
+    # different vowel counts must bucket the same reply differently, or nothing
+    # here distinguishes this from a composition key
+    seen_v = set()
+    for opener in MINI_GUESSES:
+        gv = gray_vowels(opener)
+        seen_v.add(tuple(sorted(set(gv[gr] for gr in range(243)))))
+    if len(seen_v) < 2:
+        bad("every mini opener greys the same number of vowels, so the "
+            "opener-dependent key was not exercised")
+    else:
+        notes["vowel-partition"] += 1
+        print("   ok   the vowel partition matches the strings, covers exactly "
+              "what e3.e4.e5 covers, and depends on the opener")
+
     # the stamp must carry the condition, and the reader must hold it to it
     t = read_table(fired, fire="g3+0g3y")
     if t.min_grays != 3:
@@ -638,6 +697,7 @@ def main(argv):
         "fire-grew": "an added composition qualifying more answers",
         "fire-moved": "an added composition changing a chosen second word",
         "partition-differs": "a partition choosing different words per group",
+        "vowel-partition": "a partition keyed on the opener's greyed vowels",
     }
     for key, what in need.items():
         if notes[key]:

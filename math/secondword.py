@@ -74,6 +74,13 @@ import numpy as np
 
 from wordle import WORD_LEN, n_patterns
 
+# Y IS ALWAYS A VOWEL HERE (the user's call, 2026-09-10).  Not a flag and not a
+# default: it is this video's convention, so there is one vowel set and every
+# table stamps it, which is what makes a later change visible rather than silent.
+# NB tools/vowels.py still defaults to `aeiou` with `aeiouy` as an argument --
+# that tool predates this and has not been changed.
+VOWELS = "aeiouy"
+
 # The pools that have a name rather than a path.  Both are word lists `wordle.
 # load_words` already knows; anything else is given as a path and recorded by
 # its basename, so a table always states what it was built over.
@@ -121,7 +128,37 @@ def compositions(word_len=WORD_LEN):
     return g, y, np.int8(word_len) - g - y
 
 
-def group_mask(spec, word_len=WORD_LEN):
+def tile_at(code, pos, word_len=WORD_LEN):
+    """The tile at POSITION `pos` of a pattern code.
+
+    wordle.py encodes position 0 as the MOST significant trit, so this is not the
+    repeated `% 3` a count can get away with -- a greyed-VOWEL count has to know
+    which position it is looking at.
+    """
+    return (code // 3 ** (word_len - 1 - pos)) % 3
+
+
+def gray_vowels(word, word_len=WORD_LEN):
+    """For every pattern code, how many GREY tiles sit on a vowel of `word`.
+
+    Counted by POSITION, so a doubled vowel grey in two places counts twice, and
+    a vowel green in one place and grey in another counts once -- which is what
+    the board shows.  This is the one bucket key that depends on the OPENER as
+    well as the reply, which is why a group's mask is built per opener.
+    """
+    n = n_patterns(word_len)
+    out = np.zeros(n, dtype=np.int8)
+    isv = [ch in VOWELS for ch in word]
+    for code in range(n):
+        c = 0
+        for pos in range(word_len):
+            if isv[pos] and tile_at(code, pos, word_len) == 0:
+                c += 1
+        out[code] = c
+    return out
+
+
+def group_mask(spec, opener=None, word_len=WORD_LEN):
     """The compositions one GROUP covers: (mask over pattern codes, canonical spec).
 
     A group spec is one or more TERMS joined by `+`:
@@ -139,89 +176,145 @@ def group_mask(spec, word_len=WORD_LEN):
     have to tell apart by hand.  Terms are sorted, so order cannot do the same.
     """
     g, y, gr = compositions(word_len)
+    gv = None if opener is None else gray_vowels(opener, word_len)
     terms = {}
     for term in spec.split("+"):
-        if re.fullmatch(r"g\d+", term):
-            m = gr >= int(term[1:])
-            key = (0, int(term[1:]))
-        elif re.fullmatch(r"e\d+", term):
-            m = gr == int(term[1:])
-            key = (1, int(term[1:]))
-        elif re.fullmatch(r"\d+g\d+y", term):
-            gg, yy = (int(x) for x in re.findall(r"\d+", term))
-            if gg + yy > word_len:
-                raise SystemExit("(%d green, %d yellow) is more than %d tiles"
-                                 % (gg, yy, word_len))
-            m = (g == gg) & (y == yy)
-            key = (2, gg * (word_len + 1) + yy)
-        else:
-            raise SystemExit("cannot read the group %r: a term is g<N>, e<N> or "
-                             "<G>g<Y>y, joined by +" % spec)
-        if not m.any():
-            raise SystemExit("the term %r in %r covers no reply at all"
-                             % (term, spec))
-        if term in terms:
+        # A TERM is a CONJUNCTION of atoms joined by `_`, and terms are UNIONED
+        # by `+`.  So `e3_v1` is "exactly three greys AND exactly one greyed
+        # vowel", which is the bucket a per-vowel rule wants.
+        m = np.ones(len(g), dtype=bool)
+        key, atoms = None, term.split("_")
+        for atom in atoms:
+            if re.fullmatch(r"g\d+", atom):
+                m &= gr >= int(atom[1:])
+                k = (0, int(atom[1:]))
+            elif re.fullmatch(r"e\d+", atom):
+                m &= gr == int(atom[1:])
+                k = (1, int(atom[1:]))
+            elif re.fullmatch(r"v\d+", atom):
+                if gv is None:
+                    raise SystemExit(
+                        "the term %r counts GREYED VOWELS, which depends on the "
+                        "opener's letters -- this group can only be built for a "
+                        "named opener" % term)
+                m &= gv == int(atom[1:])
+                k = (3, int(atom[1:]))
+            elif re.fullmatch(r"\d+g\d+y", atom):
+                gg, yy = (int(x) for x in re.findall(r"\d+", atom))
+                if gg + yy > word_len:
+                    raise SystemExit("(%d green, %d yellow) is more than %d tiles"
+                                     % (gg, yy, word_len))
+                m &= (g == gg) & (y == yy)
+                k = (2, gg * (word_len + 1) + yy)
+            else:
+                raise SystemExit("cannot read the group %r: an atom is g<N>, "
+                                 "e<N>, v<N> or <G>g<Y>y, joined by _ within a "
+                                 "term and by + between terms" % spec)
+            key = k if key is None else key
+        if len(atoms) != len(set(atoms)):
+            raise SystemExit("the term %r repeats an atom" % term)
+        canon_term = "_".join(sorted(atoms, key=_atom_key))
+        if canon_term in terms:
             raise SystemExit("the group %r repeats the term %r" % (spec, term))
-        terms[term] = (key, m)
+        terms[canon_term] = (key, m)
     mask = np.zeros(len(g), dtype=bool)
     for _, m in terms.values():
         mask |= m
+    if not mask.any() and opener is not None:
+        # For a NAMED opener an empty group is a real answer -- `v2` against a
+        # one-vowel word cannot happen -- so it is allowed here and simply never
+        # fires.  Only a group that is empty for EVERY opener is a mistake, and
+        # that is caught when the specs are validated without one.
+        pass
     for term, (_, m) in terms.items():
         rest = np.zeros(len(g), dtype=bool)
         for other, (_, om) in terms.items():
             if other != term:
                 rest |= om
-        if (m & ~rest).sum() == 0:
+        if len(terms) > 1 and (m & ~rest).sum() == 0:
             raise SystemExit("the term %r adds nothing to the group %r -- one "
                              "rule would have two names" % (term, spec))
     canon = "+".join(sorted(terms, key=lambda t: terms[t][0]))
     return mask, canon
 
 
+def _atom_key(atom):
+    """Sort key for the atoms inside one term, so `v1_e3` and `e3_v1` are one name."""
+    order = {"g": 0, "e": 1, "v": 3}
+    if atom[0] in order and atom[1:].isdigit():
+        return (order[atom[0]], int(atom[1:]))
+    return (2, atom)
+
+
 def fire_groups(specs, word_len=WORD_LEN):
     """THE FIRING CONDITION: an ordered list of DISJOINT groups, each of which
     gets its OWN predetermined second word.
 
-    WHY GROUPS AND NOT ONE SET (the user's, 2026-09-10).  This started as "at
-    least N greys, play this word", became "at least N greys OR this composition"
-    when it turned out two greys with three YELLOWS is nothing like two greys with
-    three GREENS, and is now the general form: the reply's bucket SELECTS the
-    word.  A separate word for five, four and three greys is `e5 e4 e3`; the old
-    single-word rules are the one-group case and still mean exactly what they
-    meant.
+    WHY GROUPS (the user's, 2026-09-10, in four steps).  This started as "at
+    least N greys, play this word"; became "at least N greys OR this composition"
+    when two greys with three YELLOWS turned out to be nothing like two greys
+    with three GREENS; then "a word per grey count"; and now the bucket may key
+    on the greyed VOWELS as well.  The reply's bucket selects the word, and the
+    old single-word rules are the one-group case, unchanged.
 
-    THE GROUPS MUST BE DISJOINT, and that is not a nicety: a reply in two groups
-    would have two predetermined words and no rule for choosing between them.
-    Everything in no group DECLINES to the follow-up.
+    Returns (canonical specs, canonical label).  MASKS ARE NOT BUILT HERE,
+    because a `v<N>` atom counts greyed vowels and so depends on the OPENER's
+    letters -- `group_masks` does that per opener.  What is checked here is the
+    syntax, the canonical form, and (where the specs do not mention vowels) that
+    the groups are disjoint and do not cover every reply.
 
-    Returns (list of (spec, mask), canonical label).  The label is a function of
-    the PARTITION, not of how it was typed -- the specs are sorted -- so two
-    spellings of one rule cannot make two filenames.
+    THE LABEL IS A FUNCTION OF THE PARTITION, not of how it was typed: atoms sort
+    within a term, terms within a group, and groups within the label.
     """
     if not specs:
         raise SystemExit("a firing condition needs at least one --group")
-    seen = {}
+    probe = "aeiou"[:word_len] if word_len <= 5 else "a" * word_len
+    canon = []
     for raw in specs:
-        m, spec = group_mask(raw, word_len)
-        for other, om in seen.items():
+        _, spec = group_mask(raw, probe, word_len)     # syntax + canonical form
+        if spec not in canon:
+            canon.append(spec)
+    canon.sort()
+    if not any("v" in c for c in canon):
+        # No vowel atom: the masks are the same for every opener, so the
+        # structural checks can be made once, here, rather than per opener.
+        masks = [group_mask(c, None, word_len)[0] for c in canon]
+        for i in range(len(canon)):
+            for j in range(i):
+                if (masks[i] & masks[j]).any():
+                    raise SystemExit(
+                        "the groups %r and %r overlap: a reply in both would "
+                        "have two predetermined words and no rule for choosing"
+                        % (canon[j], canon[i]))
+        covered = np.zeros(n_patterns(word_len), dtype=bool)
+        for m in masks:
+            covered |= m
+        if covered.all():
+            raise SystemExit(
+                "this condition fires on EVERY reply, which is a blind two-word "
+                "opening rather than a rule that chooses when to commit -- the "
+                "`opening` strategy already is that")
+    return canon, ".".join(canon)
+
+
+def group_masks(specs, opener, word_len=WORD_LEN):
+    """The groups' masks FOR ONE OPENER, checked disjoint for that opener.
+
+    A `v<N>` group means different replies for different openers, so this is the
+    only place a mask exists -- and the only place the disjointness of such a
+    partition can be established.
+    """
+    out = []
+    for spec in specs:
+        m, canon = group_mask(spec, opener, word_len)
+        for other, om in out:
             if (m & om).any():
                 raise SystemExit(
-                    "the groups %r and %r overlap: a reply in both would have "
-                    "two predetermined words and no rule for choosing" 
-                    % (other, spec))
-        if spec in seen:
-            continue
-        seen[spec] = m
-    order = sorted(seen)
-    covered = np.zeros(n_patterns(word_len), dtype=bool)
-    for k in order:
-        covered |= seen[k]
-    if covered.all():
-        raise SystemExit(
-            "this condition fires on EVERY reply, which is a blind two-word "
-            "opening rather than a rule that chooses when to commit -- the "
-            "`opening` strategy already is that")
-    return [(k, seen[k]) for k in order], ".".join(order)
+                    "against the opener %r the groups %r and %r overlap: a reply "
+                    "in both would have two predetermined words and no rule for "
+                    "choosing" % (opener, other, canon))
+        out.append((canon, m))
+    return out
 
 
 def fire_set(min_grays, extra=(), word_len=WORD_LEN):
@@ -237,7 +330,7 @@ def fire_set(min_grays, extra=(), word_len=WORD_LEN):
         if word_len - gg - yy >= min_grays:
             continue                      # already fires; not part of the label
         spec += "+%dg%dy" % (gg, yy)
-    return group_mask(spec, word_len)
+    return group_mask(spec, None, word_len)
 
 
 def parse_fire_label(label, word_len=WORD_LEN):
@@ -248,17 +341,17 @@ def parse_fire_label(label, word_len=WORD_LEN):
     the same (groups, label) shape `fire_groups` does, and REFUSES a label that
     is not canonical -- it would name a file no rebuild of the rule would produce.
     """
-    groups, canon = fire_groups(label.split("."), word_len)
+    specs, canon = fire_groups(label.split("."), word_len)
     if canon != label:
         raise SystemExit("the firing condition %r is not canonical (it means "
                          "%r) -- rebuild the table" % (label, canon))
-    return groups
+    return specs
 
 
-def fire_mask(label, word_len=WORD_LEN):
-    """Every code that fires, across all groups -- when only "does it fire" matters."""
+def fire_mask(label, opener, word_len=WORD_LEN):
+    """Every code that fires against one opener -- when only "does it fire" matters."""
     m = np.zeros(n_patterns(word_len), dtype=bool)
-    for _, gm in parse_fire_label(label, word_len):
+    for _, gm in group_masks(parse_fire_label(label, word_len), opener, word_len):
         m |= gm
     return m
 
@@ -381,7 +474,7 @@ def read_table(path, fire=None, openers=None, seconds=None):
     # A table written before the condition became a partition carries only the
     # threshold, which means exactly the one group `g<N>`.
     got_fire = meta.get("fire", "g%s" % got)
-    groups = parse_fire_label(got_fire)     # refuse a label we cannot rebuild
+    specs = parse_fire_label(got_fire)      # refuse a label we cannot rebuild
     if fire is not None and got_fire != fire:
         raise SystemExit("%s fires on %s, not %s -- a different strategy under "
                          "the same name" % (path, got_fire, fire))
@@ -394,17 +487,17 @@ def read_table(path, fire=None, openers=None, seconds=None):
         raise SystemExit("%s has no rows" % path)
     # A one-group table written before the `fires` column keys its row on None;
     # name it, so every reader downstream sees one shape.
-    if len(groups) == 1:
-        only = groups[0][0]
+    if len(specs) == 1:
+        only = specs[0]
         for w in rows:
             if None in rows[w]:
                 rows[w] = {only: rows[w][None]}
-    missing = [w for w in rows if sorted(rows[w]) != sorted(k for k, _ in groups)]
+    missing = [w for w in rows if sorted(rows[w]) != sorted(specs)]
     if missing:
         raise SystemExit("%s has no row for every group of %s (e.g. %s) -- it "
                          "was not built under this condition"
                          % (path, got_fire, missing[0]))
-    return Table(path=path, min_grays=got, fire=got_fire, groups=groups,
+    return Table(path=path, min_grays=got, fire=got_fire, groups=specs,
                  openers=meta.get("openers", "?"),
                  seconds=meta.get("seconds", "?"),
                  answers=int(meta.get("answers", 0)), rows=rows)
@@ -419,7 +512,7 @@ def word_by_code(table, opener, guesses, word_len=WORD_LEN):
     as an unlisted reply does.
     """
     out = np.full(n_patterns(word_len), -1, dtype=np.int32)
-    for spec, mask in table.groups:
+    for spec, mask in group_masks(table.groups, opener, word_len):
         second = table.rows[opener][spec]
         if second is None:
             continue

@@ -65,9 +65,21 @@ static uint8_t *PAT;                 /* NG * NA, row-major */
 static char   (*GWORD)[WBUF];
 static int8_t   GRAYS[NPAT];         /* grey-tile count of every pattern code */
 static int8_t   GREENS[NPAT], YELLOWS[NPAT];
+/* Y IS ALWAYS A VOWEL HERE (the user's call, 2026-09-10): one vowel set, not a
+ * flag, stamped into every table so a later change is visible. */
+#define VOWELS "aeiouy"
+
+/* An ATOM is one condition on a reply; a TERM is a CONJUNCTION of atoms (joined
+ * by `_`); a GROUP is a UNION of terms (joined by `+`).  So `e3_v1` is "exactly
+ * three greys AND exactly one greyed vowel".  Atom kinds: 0 g>=N, 1 e==N,
+ * 2 composition (a greens, b yellows), 3 v==N greyed vowels. */
+typedef struct { int kind, a, b; char text[16]; } Atom;
+typedef struct { int natom; Atom at[6]; int key; char text[48]; } Term;
+typedef struct { int nterm; Term t[8]; char text[64]; } Group;
+
 #define MAXGROUP 32
-static uint8_t  GFIRE[MAXGROUP][NPAT];   /* which replies each GROUP covers */
-static char     GSPEC[MAXGROUP][64];     /* its canonical spec */
+static Group    GRP[MAXGROUP];           /* the parsed groups, in label order */
+static char     GSPEC[MAXGROUP][64];     /* each one's canonical spec */
 static int      NGROUP;
 #define MAXEXTRA 32
 static int      EXG[MAXEXTRA], EXY[MAXEXTRA], NEXTRA;
@@ -81,6 +93,35 @@ static double now_s(void) {
 /* A pattern is base 3 with 0 = grey (math/wordle.py), so the grey count is the
  * number of zero trits.  Which end is most significant does not matter to a
  * count, so nothing here depends on the encoding's orientation. */
+/* Which POSITIONS of each guess word hold a vowel.  A greyed-vowel count is by
+ * position, so a doubled vowel grey twice counts twice -- which is what the
+ * board shows. */
+static uint8_t *VPOS;                /* NG * WORDLEN */
+
+static void build_vpos(void) {
+    VPOS = malloc((size_t)NG * WORDLEN);
+    for (int g = 0; g < NG; g++)
+        for (int i = 0; i < WORDLEN; i++)
+            VPOS[(size_t)g * WORDLEN + i] =
+                strchr(VOWELS, GWORD[g][i]) != NULL;
+}
+
+/* For one opener, how many GREY tiles sit on a vowel, per pattern code.
+ * wordle.py puts position 0 in the MOST significant trit, so this cannot use the
+ * repeated %% 3 a count gets away with. */
+static void build_gvow(int opener, int8_t *out) {
+    const uint8_t *vp = VPOS + (size_t)opener * WORDLEN;
+    int pw[WORDLEN];
+    pw[WORDLEN - 1] = 1;
+    for (int i = WORDLEN - 2; i >= 0; i--) pw[i] = pw[i + 1] * 3;
+    for (int code = 0; code < NPAT; code++) {
+        int n = 0;
+        for (int i = 0; i < WORDLEN; i++)
+            if (vp[i] && (code / pw[i]) % 3 == 0) n++;
+        out[code] = (int8_t)n;
+    }
+}
+
 static void build_grays(void) {
     for (int code = 0; code < NPAT; code++) {
         int c = code, n = 0, g = 0, y = 0;
@@ -113,82 +154,110 @@ static void build_grays(void) {
  * A FUNCTION OF THE PARTITION, not of how it was typed: the specs are sorted,
  * so two spellings of one rule cannot make two filenames -- and therefore cannot
  * make two tables a reader would have to tell apart by hand. */
-typedef struct { int kind, key; char text[24]; uint8_t m[NPAT]; } Term;
 
-static int cmp_term(const void *a, const void *b) {
-    const Term *x = a, *y = b;
-    if (x->kind != y->kind) return x->kind - y->kind;
-    return x->key - y->key;
+static int cmp_spec(const void *a, const void *b) {
+    return strcmp((const char *)a, (const char *)b);
 }
 
-/* Parse a group spec into its mask AND its canonical text.  A REDUNDANT TERM IS
- * REFUSED rather than quietly dropped -- `g3+0g0y` covers exactly what `g3`
- * covers, and one rule with two names is one rule with two tables.  Terms are
- * sorted, so order cannot do the same. */
-static int parse_group(const char *spec, uint8_t *out, char *canon, size_t csz) {
-    Term t[16];
-    int nt = 0;
+static int atom_key(const Atom *a) {
+    static const int order[4] = {0, 1, 2, 3};
+    return order[a->kind] * 1000 + a->a * 10 + a->b;
+}
+
+static int cmp_atom(const void *x, const void *y) {
+    return atom_key((const Atom *)x) - atom_key((const Atom *)y);
+}
+
+static int cmp_term(const void *x, const void *y) {
+    const Term *a = x, *b = y;
+    return a->key - b->key;
+}
+
+static int parse_atom(const char *text, Atom *out) {
+    size_t len = strlen(text);
+    int n, g, y;
+    snprintf(out->text, sizeof out->text, "%s", text);
+    if (text[0] == 'g' && len > 1 && strspn(text + 1, "0123456789") == len - 1) {
+        out->kind = 0; out->a = atoi(text + 1); out->b = 0; return 1;
+    }
+    if (text[0] == 'e' && len > 1 && strspn(text + 1, "0123456789") == len - 1) {
+        out->kind = 1; out->a = atoi(text + 1); out->b = 0; return 1;
+    }
+    if (text[0] == 'v' && len > 1 && strspn(text + 1, "0123456789") == len - 1) {
+        out->kind = 3; out->a = atoi(text + 1); out->b = 0; return 1;
+    }
+    if (sscanf(text, "%dg%dy", &g, &y) == 2 && g + y <= WORDLEN) {
+        out->kind = 2; out->a = g; out->b = y; return 1;
+    }
+    (void)n;
+    return 0;
+}
+
+/* Parse a group spec into its TERMS and its canonical text.  Atoms sort within a
+ * term and terms within a group, so `v1_e3` and `e3_v1` are one name; a repeated
+ * atom or term is refused.  No mask is built here: a v<N> atom counts greyed
+ * VOWELS and so depends on the opener's letters. */
+static int parse_group(const char *spec, Group *out) {
+    out->nterm = 0;
     const char *p = spec;
     while (*p) {
         const char *end = strchr(p, '+');
         size_t len = end ? (size_t)(end - p) : strlen(p);
-        if (len == 0 || len >= sizeof t[0].text || nt >= 16) return 0;
-        Term *v = &t[nt];
-        memcpy(v->text, p, len); v->text[len] = 0;
-        for (int c = 0; c < NPAT; c++) v->m[c] = 0;
-        int n, g, y;
-        if (v->text[0] == 'g' && strspn(v->text + 1, "0123456789") == len - 1
-                && len > 1) {
-            n = atoi(v->text + 1); v->kind = 0; v->key = n;
-            for (int c = 0; c < NPAT; c++) if (GRAYS[c] >= n) v->m[c] = 1;
-        } else if (v->text[0] == 'e' && strspn(v->text + 1, "0123456789") == len - 1
-                   && len > 1) {
-            n = atoi(v->text + 1); v->kind = 1; v->key = n;
-            for (int c = 0; c < NPAT; c++) if (GRAYS[c] == n) v->m[c] = 1;
-        } else if (sscanf(v->text, "%dg%dy", &g, &y) == 2) {
-            if (g + y > WORDLEN) return 0;
-            v->kind = 2; v->key = g * (WORDLEN + 1) + y;
-            for (int c = 0; c < NPAT; c++)
-                if (GREENS[c] == g && YELLOWS[c] == y) v->m[c] = 1;
-        } else {
-            return 0;
+        if (len == 0 || len >= sizeof out->t[0].text || out->nterm >= 8) return 0;
+        char text[48];
+        memcpy(text, p, len); text[len] = 0;
+        Term *t = &out->t[out->nterm];
+        t->natom = 0;
+        char *save = NULL, *tok = strtok_r(text, "_", &save);
+        while (tok) {
+            if (t->natom >= 6) return 0;
+            if (!parse_atom(tok, &t->at[t->natom])) return 0;
+            for (int i = 0; i < t->natom; i++)
+                if (!strcmp(t->at[i].text, t->at[t->natom].text)) return 0;
+            t->natom++;
+            tok = strtok_r(NULL, "_", &save);
         }
-        int any = 0;
-        for (int c = 0; c < NPAT; c++) any |= v->m[c];
-        if (!any) return 0;                    /* a term covering no reply */
-        for (int i = 0; i < nt; i++)
-            if (!strcmp(t[i].text, v->text)) return 0;   /* a repeated term */
-        nt++;
+        if (!t->natom) return 0;
+        qsort(t->at, (size_t)t->natom, sizeof t->at[0], cmp_atom);
+        size_t n = 0;
+        for (int i = 0; i < t->natom; i++)
+            n += (size_t)snprintf(t->text + n, sizeof t->text - n, "%s%s",
+                                  i ? "_" : "", t->at[i].text);
+        t->key = atom_key(&t->at[0]);
+        for (int i = 0; i < out->nterm; i++)
+            if (!strcmp(out->t[i].text, t->text)) return 0;   /* repeated term */
+        out->nterm++;
         p = end ? end + 1 : p + len;
     }
-    if (!nt) return 0;
-    for (int i = 0; i < nt; i++) {             /* no term may be redundant */
-        int adds = 0;
-        for (int c = 0; c < NPAT && !adds; c++) {
-            if (!t[i].m[c]) continue;
-            int covered = 0;
-            for (int j = 0; j < nt && !covered; j++)
-                if (j != i && t[j].m[c]) covered = 1;
-            if (!covered) adds = 1;
-        }
-        if (!adds) {
-            fprintf(stderr, "the term '%s' adds nothing to the group '%s' -- one "
-                    "rule would have two names\n", t[i].text, spec);
-            exit(1);
-        }
-    }
-    qsort(t, (size_t)nt, sizeof t[0], cmp_term);
-    for (int c = 0; c < NPAT; c++) out[c] = 0;
+    if (!out->nterm) return 0;
+    qsort(out->t, (size_t)out->nterm, sizeof out->t[0], cmp_term);
     size_t n = 0;
-    for (int i = 0; i < nt; i++) {
-        for (int c = 0; c < NPAT; c++) out[c] |= t[i].m[c];
-        n += (size_t)snprintf(canon + n, csz - n, "%s%s", i ? "+" : "", t[i].text);
-    }
+    for (int i = 0; i < out->nterm; i++)
+        n += (size_t)snprintf(out->text + n, sizeof out->text - n, "%s%s",
+                              i ? "+" : "", out->t[i].text);
     return 1;
 }
 
-static int cmp_spec(const void *a, const void *b) {
-    return strcmp((const char *)a, (const char *)b);
+/* One group's mask FOR ONE OPENER.  `gvow` is that opener's greyed-vowel count
+ * per code; the rest of the atoms are opener-independent. */
+static void group_mask_for(const Group *g, const int8_t *gvow, uint8_t *out) {
+    for (int c = 0; c < NPAT; c++) {
+        int hit = 0;
+        for (int ti = 0; ti < g->nterm && !hit; ti++) {
+            int all = 1;
+            for (int ai = 0; ai < g->t[ti].natom && all; ai++) {
+                const Atom *a = &g->t[ti].at[ai];
+                switch (a->kind) {
+                case 0: all = GRAYS[c] >= a->a; break;
+                case 1: all = GRAYS[c] == a->a; break;
+                case 2: all = GREENS[c] == a->a && YELLOWS[c] == a->b; break;
+                default: all = gvow[c] == a->a; break;
+                }
+            }
+            hit = all;
+        }
+        out[c] = (uint8_t)hit;
+    }
 }
 
 /* Resolve the groups given on the command line -- plus the --min-grays/--fire
@@ -222,35 +291,63 @@ static void build_fire(int min_grays, char *label, size_t lsz) {
      * order the groups differently from Python, which sorts what the specs MEAN
      * -- and the label is what names the file. */
     for (int i = 0; i < NGROUP; i++) {
-        char canon[64];
-        if (!parse_group(GSPEC[i], GFIRE[i], canon, sizeof canon)) {
-            fprintf(stderr, "cannot read the group '%s', or it covers no reply: "
-                    "a term is g<N>, e<N> or <G>g<Y>y, joined by +\n", GSPEC[i]);
+        if (!parse_group(GSPEC[i], &GRP[i])) {
+            fprintf(stderr, "cannot read the group '%s': an atom is g<N>, e<N>, "
+                    "v<N> or <G>g<Y>y, joined by _ within a term and by + "
+                    "between terms\n", GSPEC[i]);
             exit(1);
         }
-        snprintf(GSPEC[i], sizeof GSPEC[0], "%s", canon);
+        snprintf(GSPEC[i], sizeof GSPEC[0], "%s", GRP[i].text);
     }
     qsort(GSPEC, (size_t)NGROUP, sizeof GSPEC[0], cmp_spec);
     int kept = 0;
     for (int i = 0; i < NGROUP; i++) {
         if (i && !strcmp(GSPEC[i], GSPEC[kept - 1])) continue;   /* a repeat */
         if (kept != i) snprintf(GSPEC[kept], sizeof GSPEC[0], "%s", GSPEC[i]);
-        char canon[64];
-        parse_group(GSPEC[kept], GFIRE[kept], canon, sizeof canon);
-        for (int j = 0; j < kept; j++)
-            for (int c = 0; c < NPAT; c++)
-                if (GFIRE[j][c] && GFIRE[kept][c]) {
-                    fprintf(stderr, "the groups '%s' and '%s' overlap: a reply in "
-                            "both would have two predetermined words and no rule "
-                            "for choosing\n", GSPEC[j], GSPEC[kept]);
-                    exit(1);
-                }
+        parse_group(GSPEC[kept], &GRP[kept]);
         kept++;
     }
     NGROUP = kept;
     size_t n = 0;
     for (int i = 0; i < NGROUP; i++)
         n += (size_t)snprintf(label + n, lsz - n, "%s%s", i ? "." : "", GSPEC[i]);
+
+    /* WITHOUT A VOWEL ATOM the masks are the same for every opener, so the
+     * structural checks can be made HERE -- before anything is loaded -- rather
+     * than in the opener loop.  With one they cannot: a v<N> group means
+     * different replies for different openers, and disjointness is then a fact
+     * about the opener.  Python splits it the same way, so both refuse the same
+     * conditions at the same moment. */
+    int has_v = 0;
+    for (int i = 0; i < NGROUP && !has_v; i++)
+        for (int t = 0; t < GRP[i].nterm && !has_v; t++)
+            for (int a = 0; a < GRP[i].t[t].natom && !has_v; a++)
+                if (GRP[i].t[t].at[a].kind == 3) has_v = 1;
+    if (!has_v) {
+        int8_t zero[NPAT];
+        uint8_t m[MAXGROUP][NPAT], covered[NPAT];
+        for (int c = 0; c < NPAT; c++) { zero[c] = 0; covered[c] = 0; }
+        for (int i = 0; i < NGROUP; i++) {
+            group_mask_for(&GRP[i], zero, m[i]);
+            for (int j = 0; j < i; j++)
+                for (int c = 0; c < NPAT; c++)
+                    if (m[i][c] && m[j][c]) {
+                        fprintf(stderr, "the groups '%s' and '%s' overlap: a reply "
+                                "in both would have two predetermined words and no "
+                                "rule for choosing\n", GSPEC[j], GSPEC[i]);
+                        exit(1);
+                    }
+            for (int c = 0; c < NPAT; c++) covered[c] |= m[i][c];
+        }
+        int all = 1;
+        for (int c = 0; c < NPAT; c++) all &= covered[c];
+        if (all) {
+            fprintf(stderr, "this condition fires on EVERY reply, which is a "
+                    "blind two-word opening rather than a rule that chooses when "
+                    "to commit\n");
+            exit(1);
+        }
+    }
 }
 
 static int load_words(const char *path, char (*out)[WBUF]) {
@@ -424,6 +521,7 @@ int main(int argc, char **argv) {
     GWORD = malloc(sizeof(char[WBUF]) * 20000);
     snprintf(path, sizeof path, "%s/shared/words/guess.txt", datadir);
     NG = load_words(path, GWORD);
+    build_vpos();                        /* which positions of each word are vowels */
     if (patpath) snprintf(path, sizeof path, "%s", patpath);
     else         snprintf(path, sizeof path, "%s/local/patterns/patterns.npy", datadir);
     int r, c;
@@ -479,6 +577,8 @@ int main(int argc, char **argv) {
         int      *rs    = malloc(sizeof(int) * (NPAT + 1));
         int      *rl    = malloc(sizeof(int) * (NPAT + 1));
         int      *fill  = malloc(sizeof(int) * (NPAT + 1));
+        int8_t   *gvow  = malloc(NPAT);                    /* per OPENER */
+        uint8_t  *gmask = malloc((size_t)NPAT * MAXGROUP); /* per opener x group */
 
         /* Every opener costs the same -- nq x nsec, and nq varies only mildly --
          * so a static split is fine; dynamic is kept for the tail. */
@@ -489,6 +589,27 @@ int main(int argc, char **argv) {
             int g1 = openers[oi];
             const uint8_t *row1 = PAT + (size_t)g1 * NA;
 
+            /* THE MASKS ARE BUILT PER OPENER, because a v<N> group counts GREYED
+             * VOWELS and so depends on this word's letters -- the same all-grey
+             * reply is a different bucket for a one-vowel opener than for a
+             * four-vowel one.  Cheap: 243 codes per group.  Disjointness is
+             * checked HERE for the same reason, since for a vowel partition it
+             * is a fact about the opener and not about the specs alone. */
+            build_gvow(g1, gvow);
+            for (int gi = 0; gi < NGROUP; gi++) {
+                group_mask_for(&GRP[gi], gvow, gmask + (size_t)gi * NPAT);
+                for (int gj = 0; gj < gi; gj++)
+                    for (int c = 0; c < NPAT; c++)
+                        if (gmask[(size_t)gi * NPAT + c]
+                                && gmask[(size_t)gj * NPAT + c]) {
+                            fprintf(stderr, "against the opener %s the groups "
+                                    "'%s' and '%s' overlap: a reply in both would "
+                                    "have two predetermined words and no rule for "
+                                    "choosing\n", GWORD[g1], GSPEC[gj], GSPEC[gi]);
+                            exit(1);
+                        }
+            }
+
             /* ONE ARGMIN PER GROUP.  The groups partition the firing replies, so
              * every answer is bucketed in at most one of them and the total work
              * is the same as a single group covering all of them -- what changes
@@ -496,7 +617,7 @@ int main(int argc, char **argv) {
              * cases.  A group nothing qualifies for is an empty row, not a
              * failure: the rule simply declines there. */
             for (int gi = 0; gi < NGROUP; gi++) {
-                const uint8_t *fire = GFIRE[gi];
+                const uint8_t *fire = gmask + (size_t)gi * NPAT;
                 int nb = 0, nq = 0;
                 for (int a = 0; a < NA; a++) {
                     if (!fire[row1[a]]) continue;
@@ -585,7 +706,8 @@ int main(int argc, char **argv) {
                 }
             }
         }
-        free(cnt); free(touch); free(tin); free(ord); free(rs); free(rl); free(fill);
+        free(cnt); free(touch); free(tin); free(ord); free(rs); free(rl);
+        free(fill); free(gvow); free(gmask);
     }
 
     FILE *f = fopen(outpath, "w");
@@ -608,8 +730,9 @@ int main(int argc, char **argv) {
      * existed carries and what a reader falls back to. */
     fprintf(f, "# settings ");
     if (min_grays >= 0) fprintf(f, "min_grays=%d ", min_grays);
-    fprintf(f, "fire=%s openers=%s seconds=%s answers=%d second_pool=%d\n",
-            firelabel, openlabel, secondnm, NA, nsec);
+    fprintf(f, "fire=%s vowels=%s openers=%s seconds=%s answers=%d "
+               "second_pool=%d\n", firelabel, VOWELS, openlabel, secondnm, NA,
+            nsec);
     fputs("opener,fires,second,expected,score,qualifying,buckets,ties\n", f);
     int64_t noq = 0, tied = 0;
     for (int oi = 0; oi < nopen; oi++) {

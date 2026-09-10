@@ -17,6 +17,13 @@
 # many answers qualify.  math/secondword.py states it exactly and is the source
 # of truth; solver/secondword.c implements it.
 #
+# --split-vowels CROSSES each --by-grays group with the number of GREYED VOWELS,
+# so `--by-grays 3 --split-vowels` gives a different second word for every
+# (grey count, greyed-vowel count) pair from three greys up.  Y IS ALWAYS A VOWEL
+# here (the user's call, 2026-09-10) -- one vowel set, stamped into every table.
+# A greyed vowel is counted by POSITION, so this bucket depends on the OPENER's
+# letters as well as the reply, and the groups are built per opener.
+#
 # --group SPEC IS THE GENERAL FORM: one bucket of replies with its OWN second
 # word, repeated for a partition.  A spec is terms joined by `+`: g<N> (greys >=
 # N), e<N> (greys == N exactly), <G>g<Y>y (that composition).  So a separate word
@@ -79,6 +86,7 @@ FIRE=""
 # `staff`, on macOS).  It fails silently and looks like a quoting bug.
 GSPECS=""
 BYGRAYS=""
+SPLITV=0
 GIVEN=0
 LIMIT=0
 THREADS=0
@@ -91,6 +99,7 @@ while [ $# -gt 0 ]; do
         --fire)       FIRE="$FIRE --fire $2"; shift 2 ;;
         --group)      GSPECS="$GSPECS --group $2"; GIVEN=1; shift 2 ;;
         --by-grays)   BYGRAYS="$2"; GIVEN=1; shift 2 ;;
+        --split-vowels) SPLITV=1; shift ;;
         --limit)      LIMIT="$2"; shift 2 ;;
         --threads)    THREADS="$2"; shift 2 ;;
         --dry-run)    DRY=1; shift ;;
@@ -112,9 +121,26 @@ if [ -n "$BYGRAYS" ]; then
     esac
     n=5
     while [ "$n" -ge "$BYGRAYS" ]; do
-        GSPECS="$GSPECS --group e$n"
+        if [ "$SPLITV" = 1 ]; then
+            # ... and split each grey count by how many of those greys sit on a
+            # VOWEL.  A reply cannot have more greyed vowels than greys, so the
+            # cross product stops at n; combinations an opener cannot produce --
+            # v2 against a one-vowel word -- are simply empty rows that never
+            # fire.
+            v=0
+            while [ "$v" -le "$n" ]; do
+                GSPECS="$GSPECS --group e${n}_v${v}"
+                v=$((v + 1))
+            done
+        else
+            GSPECS="$GSPECS --group e$n"
+        fi
         n=$((n - 1))
     done
+fi
+if [ "$SPLITV" = 1 ] && [ -z "$BYGRAYS" ]; then
+    echo "--split-vowels splits the --by-grays groups; pass --by-grays N too" >&2
+    exit 1
 fi
 if [ "$GIVEN" = 0 ]; then
     case "$MINGRAYS" in
