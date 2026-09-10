@@ -1128,6 +1128,20 @@ search under a different COST, not a program of its own. `sh build.sh` builds it
   - **NO TREES FROM THE SWEEP** — `--optimal-only` never calls `write_tree`, so the
     winner's tree needs a follow-up `--opener <winner>` run at the SAME depth and
     weights. The wrapper's header carries the command.
+- **A RESUMED `--optimal-only` RUN REBUILDS ITS TIE LIST FROM THE CSV** (fixed
+  2026-09-10). It did not, and the failure was invisible in the worst way: a resume
+  seeds the incumbent off disk, cuts every remaining opener against it, searches
+  nothing — and then printed **`0 openers attain it`** for the very value the same
+  line reported as best. The number was right and the LIST was a lie. MEASURED on a
+  resumed `wturns -k 100`: 76 cut, 0 searched, best 49036860, 0 attaining. Same scar
+  `greens.c` already carried; this path did not. The rebuild uses the in-run
+  precedence (**shallower depth wins outright, then lower total**), or the restored
+  ties could be those of a row the live search would not have led with. **Still NOT
+  done: a resumed run does not adopt a shallower depth as its new cap** — inert
+  wherever `--depth` is pinned, which is every `--optimal-only` sweep today.
+  Gated by `tools/checkorder.py` (a resumed run must report the same tie list as a
+  fresh one), and that check is MUTATION-TESTED — zeroing the rebuild reproduces the
+  `0 openers` symptom exactly.
 - **`python3 tools/checkweighted.py` is the GATE**, and its strongest check is free:
   **with every weight 1 the objective IS the guess count, so `wturns` must reproduce
   `optturns`** — measured, same totals AND same node counts (salet 16672, reast 29780),

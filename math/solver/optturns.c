@@ -3027,34 +3027,69 @@ int main(int argc, char **argv) {
                     nord, nolb);
         }
 
-        /* Resume: an existing CSV both seeds the incumbent and marks work done.
-         * Seeding matters more than skipping -- a good bound from the previous
-         * run prunes immediately instead of rediscovering it. */
+        /* Resume: an existing CSV seeds the incumbent, REBUILDS THE TIE LIST and
+         * marks work done.  Seeding matters most -- a good bound from the previous
+         * run prunes immediately instead of rediscovering it.
+         *
+         * THE TIE LIST HAS TO BE REBUILT, or a resumed run reports only the ties
+         * found SINCE RESTARTING.  In the common case that is none at all: every
+         * opener is cut against an incumbent that came off disk, so the run ends
+         * printing "0 openers attain it" for the very value it is reporting as
+         * best.  The number is right and the list is a lie, which is worse than
+         * either being wrong.  `greens.c` carries this scar already; this path did
+         * not.  MEASURED on a resumed wturns k=100 run: 76 cut, 0 searched, best
+         * 49036860, "0 openers attain it".
+         *
+         * The comparison MUST be the in-run one -- shallower depth wins outright,
+         * then lower total -- or the rebuilt list could be the ties of a row the
+         * live search would not have accepted as leader.  Older CSVs predate the
+         * depth column; those rows are read at the run's own --depth.
+         *
+         * NOT changed here: a resumed run does NOT adopt a shallower depth as its
+         * new cap the way the live search does.  That interacts with the
+         * first-opener escalation below and is a separate question; it is inert
+         * wherever --depth is pinned, which is every --optimal-only sweep today. */
         int incumbent = INF;
+        int best_depth = MAXD;
         char *done = calloc(NG, 1);
         int ndone = 0;
+        /* NG, not nord: the file may hold more rows than this run will visit
+         * (a --topk run resumed with a different K), and a tie list that
+         * overflows its buffer is a far worse failure than a big allocation. */
+        int *best = malloc(sizeof(int) * NG);
+        int nbest = 0;
         FILE *rf = outpath ? fopen(outpath, "r") : NULL;
         if (rf) {
             char line[256];
             while (fgets(line, sizeof line, rf)) {
-                char w[64]; int t;
-                if (sscanf(line, "%63[^,],%d", w, &t) != 2) continue;
+                char w[64]; int t, d;
+                int nf = sscanf(line, "%63[^,],%d,%*[^,],%d", w, &t, &d);
+                if (nf < 2) continue;
                 int g = find_word(GWORD, NG, w);
                 if (g >= 0 && !done[g]) { done[g] = 1; ndone++; }
-                if (t > 0 && t < incumbent) incumbent = t;
+                if (t <= 0) continue;                  /* an INFEASIBLE row */
+                if (nf < 3) d = depth;                 /* CSV without the column */
+                if (d < best_depth || (d == best_depth && t < incumbent)) {
+                    best_depth = d; incumbent = t; nbest = 0;
+                    if (g >= 0) best[nbest++] = g;
+                } else if (d == best_depth && t == incumbent && g >= 0) {
+                    best[nbest++] = g;
+                }
             }
             fclose(rf);
-            if (ndone) fprintf(stderr, "resume: %d searched, incumbent %d\n", ndone, incumbent);
+            if (ndone)
+                fprintf(stderr, "resume: %d searched, incumbent %d at depth %d, "
+                        "%d opener%s tied\n", ndone, incumbent, best_depth,
+                        nbest, nbest == 1 ? "" : "s");
         }
         FILE *out = outpath ? fopen(outpath, "a") : NULL;
         if (outpath && !out) { fprintf(stderr, "cannot append to %s\n", outpath); return 1; }
         if (out && ndone == 0) fprintf(out, "word,total,expected,depth,seconds\n");
 
-        int *best = malloc(sizeof(int) * nord);
         /* seen  = reached the critical section (searched + cut + infeasible)
          * lbskip = discarded by the root LB without any search, never reaches it
          * so processed = seen + lbskip, and the two must not be conflated. */
-        int nbest = 0, searched = 0, cut = 0, infeas = 0, seen = 0, lbskip = 0;
+        int searched = 0, cut = 0, infeas = 0, seen = 0, lbskip = 0;
         double t0 = now_s(), last_report = t0;
 
         if (TOPK > 0)

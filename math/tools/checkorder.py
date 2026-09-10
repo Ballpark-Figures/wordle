@@ -208,7 +208,55 @@ def main():
         ok("--optimal-only names the same winner under both orders (%s total=%s)"
            % winners["ssq"])
 
-    # ---- 7. the refusals ---------------------------------------------------
+    # ---- 7. RESUME reports the same answer as a fresh run -------------------
+    # A resumed --optimal-only run seeds its incumbent from the CSV and then cuts
+    # every remaining opener against it -- so nothing is searched, and the tie
+    # list used to come out EMPTY: "0 openers attain it", printed for the very
+    # value the same line reports as best.  The number was right and the list was
+    # a lie.  The invariant is simply that resuming changes nothing it reports.
+    fresh_out = os.path.join(tmp, "resume.csv")
+    rows, err = run(tmp, fresh_out, ["--sweep", "--optimal-only", "--order", "ssq"])
+    if rows is None:
+        return finish()
+
+    def attain(text):
+        """(count, words) off the `N opener(s) attain it: a b c` line."""
+        for line in text.splitlines():
+            if "attain it" in line:
+                head, _, tail = line.partition(":")
+                return int(head.split()[0]), sorted(tail.split())
+        return None, None
+
+    p1 = subprocess.run([BINARY, "--data", tmp, "--threads", "1", "--tt-bits", "20",
+                         "--depth", DEPTH, "--out", fresh_out, "--sweep",
+                         "--optimal-only", "--order", "ssq"],
+                        capture_output=True, text=True)
+    n1, w1 = attain(p1.stdout)
+    # p1 above already IS the resumed run (the file exists from the call before
+    # it), so re-read the fresh numbers from a clean copy of the same work.
+    fresh2 = os.path.join(tmp, "resume_fresh.csv")
+    p0 = subprocess.run([BINARY, "--data", tmp, "--threads", "1", "--tt-bits", "20",
+                         "--depth", DEPTH, "--out", fresh2, "--sweep",
+                         "--optimal-only", "--order", "ssq"],
+                        capture_output=True, text=True)
+    n0, w0 = attain(p0.stdout)
+
+    if n0 is None or n1 is None:
+        bad("could not find the `attain it` line in the run output")
+    elif n0 == 0:
+        bad("COVERAGE: even the FRESH run reported 0 openers attaining, so the "
+            "resume comparison proves nothing")
+    elif "resume:" not in p1.stderr:
+        bad("COVERAGE: the second run did not actually resume, so this checked "
+            "two fresh runs against each other")
+    elif (n1, w1) != (n0, w0):
+        bad("a RESUMED run reports a different tie list from a fresh one:\n"
+            "  fresh   %d: %s\n  resumed %d: %s" % (n0, w0, n1, w1))
+    else:
+        ok("a resumed run reports the same %d-opener tie list as a fresh one (%s)"
+           % (n0, " ".join(w0)))
+
+    # ---- 8. the refusals ---------------------------------------------------
     p = subprocess.run([BINARY, "--data", tmp, "--sweep", "--optimal-only",
                         "--order", "bisect", "--topk", "5", "--depth", DEPTH,
                         "--out", os.path.join(tmp, "never.csv")],
