@@ -54,33 +54,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 from build_patterns import load_patterns  # noqa: E402
 from wordle import ALL_GREEN, load_words  # noqa: E402
 from secondword import read_table  # noqa: E402
-from wordlesim import (answer_to_guess, make_opening_rule, second_rule_for,  # noqa: E402
-                       make_tail, draw_answer)
-
-
-class CoupledDraw:
-    """A follow-up whose draws are one float each, so openings stay in lockstep.
-
-    Wraps the ordinary follow-up: same live set, same uniform distribution over
-    it, but the index is taken from `rng.random()` rather than `rng.integers`,
-    which consumes a FIXED amount of the stream whatever the set size.
-    """
-
-    def __init__(self, tail):
-        self.tail = tail
-
-    def live_count(self, alive, played, replies):
-        return self.tail.live_count(alive, played, replies)
-
-    def __call__(self, turn, alive, played, replies, rng):
-        if hasattr(self.tail, "_refresh"):
-            live = self.tail._refresh(played, replies)
-            idx = np.flatnonzero(live)
-            pick = idx[min(int(rng.random() * len(idx)), len(idx) - 1)]
-            return int(pick)
-        idx = np.flatnonzero(alive)
-        pick = idx[min(int(rng.random() * len(idx)), len(idx) - 1)]
-        return int(self.tail.ans2g[pick])
+from wordlesim import (CoupledDraw, answer_to_guess,  # noqa: E402
+                       make_opening_rule, second_rule_for, make_tail,
+                       draw_answer, play_game)
 
 
 def next_t(t):
@@ -370,7 +346,7 @@ def main(argv):
         for k, rule in enumerate(rules):
             # the SAME stream for every opening in this game: that is the coupling
             rng = np.random.default_rng([seed, g])
-            played, _ = _play(pat, ans2g, a, rule, tail, rng)
+            played, _ = play_game(pat, ans2g, a, rule, tail, rng)
             # THE SCORE IS WHATEVER IS BEING RANKED.  Under win_rate it is the
             # 0/1 indicator, so the paired difference is a per-game win/lose
             # difference -- which never has the proportion's zero-error problem,
@@ -479,26 +455,6 @@ def main(argv):
                        dse[k, lead],
                        abs(dmean[k, lead]) / dse[k, lead] if dse[k, lead] > 0 else 0.0))
     print("wrote %s" % out)
-
-
-def _play(pat, ans2g, answer_idx, rule, tail, rng):
-    """play_game, with the coupled follow-up.  Kept here so wordlesim is untouched."""
-    alive = np.ones(pat.shape[1], dtype=bool)
-    played, replies = [], []
-    while True:
-        g = rule(turn=len(played), alive=alive, played=played, replies=replies,
-                 rng=rng)
-        if g is None:
-            g = tail(turn=len(played), alive=alive, played=played,
-                     replies=replies, rng=rng)
-        g = int(g)
-        row = pat[g]
-        fb = int(row[answer_idx])
-        played.append(g)
-        replies.append(fb)
-        if fb == ALL_GREEN:
-            return played, replies
-        alive &= row == fb
 
 
 if __name__ == "__main__":

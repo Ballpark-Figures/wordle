@@ -180,6 +180,41 @@ class RandomGuess:
         return int(idx[int(rng.integers(len(idx)))])
 
 
+class CoupledDraw:
+    """A follow-up whose draws are ONE FLOAT each, so entries stay in lockstep.
+
+    Wraps either ordinary follow-up: same live set, same uniform distribution over
+    it, but the index comes from `rng.random()` rather than `rng.integers`.  That
+    is not a style choice -- `integers` uses rejection sampling and consumes a
+    VARIABLE number of bits, so two entries whose live sets differ in size fall
+    out of step after the first differing draw and the coupling silently decays.
+    One float per decision holds them turn for turn.
+
+    IT IS WHAT MAKES A PAIRED COMPARISON PAIRED, and it is a DIFFERENT SAMPLER
+    from the sweeps': a coupled run will not match a sweep cell at the same seed.
+    Same quantity, different sample, deliberately.
+
+    `rng` need only provide `.random()`, so a race can hand it a cursor over a
+    pre-drawn row of floats instead of a Generator.
+    """
+
+    def __init__(self, tail):
+        self.tail = tail
+
+    def live_count(self, alive, played, replies):
+        return self.tail.live_count(alive, played, replies)
+
+    def __call__(self, turn, alive, played, replies, rng):
+        if hasattr(self.tail, "_refresh"):
+            live = self.tail._refresh(played, replies)
+            idx = np.flatnonzero(live)
+            pick = idx[min(int(rng.random() * len(idx)), len(idx) - 1)]
+            return int(pick)
+        idx = np.flatnonzero(alive)
+        pick = idx[min(int(rng.random() * len(idx)), len(idx) - 1)]
+        return int(self.tail.ans2g[pick])
+
+
 def _tail_answer(guesses, answers, ans2g):
     return RandomAnswer(ans2g)
 
