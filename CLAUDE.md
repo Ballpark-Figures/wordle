@@ -1030,7 +1030,7 @@ subject to a guarantee. Do not put the two in one table.
     **3.978171252747317** and `wturns --topk 1` on those weights reports
     **3.97817**; at k=10 uniform, `wturns` gives **3.623073** against
     `freq_search`'s own `start avg = 3.6231`.
-  - **MEASURED SPEEDUP at k=10: ~370 s per evaluation to 22.4 s** (~16x). `topk.py`
+  - **MEASURED SPEEDUP at k=10: ~370 s per evaluation to 12.0 s** (~31x). `topk.py`
     has no transposition table and runs on ONE core (CPU/wall measured 1.0);
     `wturns` has a table (92% hit rates observed) and 18 threads.
   - **THE PER-EVALUATION OVERHEAD IS CONSTANT IN K** — one sort of the live words
@@ -1038,10 +1038,17 @@ subject to a guarantee. Do not put the two in one table.
     12972 x 4229. Noise beside a k>=2 evaluation, MORE than a k=1 evaluation
     (0.9 s) — which is exactly why `topk` stays the default and this is for the
     beam. Do not switch the default.
-  - **THE CAP IS THE ONE REAL DIFFERENCE.** `topk.py` has NO depth cap; `wturns`
-    always has one. If it binds, an opener `topk.py` would have used comes back
-    INFEASIBLE and the solver picks another — a different objective under the same
-    name. So **a binding cap RAISES**, it is never averaged over or skipped.
+  - **THE CAP IS THE ONE REAL DIFFERENCE, and `--depth 6` is enough.**
+    **FEASIBILITY DOES NOT DEPEND ON THE WEIGHTS** (user's correction, 2026-09-10):
+    whether a strategy resolving every answer within D exists is a fact about the
+    ANSWER SET and the GUESS SET; weights change what a line COSTS, never whether
+    one exists, and zeroing a word only shrinks the answer set. So the cap needs no
+    slack for the hill-climb to move weights around — and a looser cap is **not
+    free**, it weakens the lower bound and prunes less: MEASURED at k=10, depth 6
+    takes **12.0 s** against depth 9's **15.9 s**, for the identical 3.623073.
+    A binding cap still **RAISES** — under `--topk` that may be the BEAM failing to
+    find a line rather than none existing, but either way `topk.py` would have
+    returned a number and this would not, so the two have parted company.
   - **`python3 math/tools/checkwturnsobjective.py` is the GATE**: it diffs the two
     EXACTLY, on integer totals, never on the CSV's 5-decimal `expected` (a
     hill-climb compares improvements far finer than 1e-5, so five decimals is not

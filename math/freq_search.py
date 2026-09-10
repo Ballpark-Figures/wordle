@@ -305,7 +305,7 @@ class FrequencySearch:
 
 def main(argv: list[str]) -> None:
     k, answers, log_path, max_loops = 1, CUSTOM, None, None
-    objective, depth, threads, tt_bits = "topk", 9, 18, 24
+    objective, depth, threads, tt_bits = "topk", 6, 18, 24
     it = iter(argv)
     for a in it:
         if a in ("-k", "--topk"):
@@ -346,6 +346,12 @@ def main(argv: list[str]) -> None:
     # It is NOT the default, and should not become one silently: `wturns` always
     # has a depth cap where topk.py has none, so it can only stand in while that
     # cap is slack.  A binding cap RAISES rather than returning a number.
+    #
+    # --depth 6 is enough: FEASIBILITY DOES NOT DEPEND ON THE WEIGHTS.  Whether a
+    # strategy resolving every answer within D exists is a property of the two
+    # word lists; weights change what a line costs, not whether one exists, and
+    # zeroing words only shrinks the answer set.  A looser cap would just weaken
+    # the lower bound and prune less.
     game = None
     if objective == "wturns":
         from wturns_objective import WturnsGame

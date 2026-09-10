@@ -25,6 +25,11 @@
 #
 # THE CAP.  topk.py has no depth cap and wturns always does, so --depth must stay
 # slack; a binding cap RAISES rather than quietly answering a different question.
+# --depth 6 is enough and is the default: FEASIBILITY DOES NOT DEPEND ON THE
+# WEIGHTS.  Whether a strategy resolving every answer within D exists is a fact
+# about the two word lists; the weights change what a line COSTS, not whether one
+# exists, and zeroing a word only shrinks the answer set.  A looser cap is not
+# free either -- it weakens the lower bound and prunes less.
 #
 # WHAT THIS COMPUTES, precisely:
 #
@@ -57,7 +62,7 @@ TOPK=1
 ANSWERS=""
 MAXLOOPS=""
 OBJECTIVE="topk"        # default a human reads, forwarded explicitly below
-DEPTH=9
+DEPTH=6
 THREADS=18
 TTBITS=24
 

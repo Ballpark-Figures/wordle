@@ -25,10 +25,19 @@ to 5 decimals; a hill-climb comparing improvements finer than 1e-5 would be blin
 to them, and would silently stop climbing.  `total` is exact in scaled integer
 units and `total_scaled` is its denominator.
 
-THE CAP MUST NOT BIND.  `topk.py` has NO depth cap; `wturns` always has one.  If
-the cap bound, an opener `topk.py` would have used comes back INFEASIBLE and the
-solver picks a different one -- a different objective under the same name.  So
-any INFEASIBLE row RAISES rather than being averaged over or skipped.
+THE CAP MUST NOT BIND, AND DEPTH 6 IS ENOUGH.  FEASIBILITY IS A PROPERTY OF THE
+LISTS, NOT OF THE WEIGHTS: whether a strategy exists that resolves every answer
+within D depends on the answer set and the guess set only -- weights change what
+a line COSTS, never whether one exists.  Dropping zero-weight words only shrinks
+the answer set, which is strictly easier.  So the cap does not need slack for the
+hill-climb to move the weights around, and a LOOSER cap is not free: it weakens
+the lower bound and prunes less.  Default 6.
+
+An INFEASIBLE row still RAISES.  Under `--topk K` that does NOT mean no line
+exists -- the beam ranks by split quality and can simply fail to find one -- but
+either way `topk.py`, which has no cap at all, would have returned a number here
+and this would not, so the two objectives have parted company and a raise is the
+only honest answer.
 
 PER-EVALUATION COST is one sort of the live words plus one column permutation of
 the pattern matrix, MEASURED at ~1.35 s for 12972 x 4229.  That is a CONSTANT,
@@ -69,7 +78,7 @@ class WturnsGame:
                  guesses: str | list[str] | None = None,
                  patterns: np.ndarray | None = None,
                  data: str | None = None, k: int = 1,
-                 depth: int = 9, threads: int = 18, tt_bits: int = 24,
+                 depth: int = 6, threads: int = 18, tt_bits: int = 24,
                  workdir: str | None = None):
         """`guesses`/`patterns`/`data` mirror TopKGame's own escape hatch, which
         exists so a caller whose words are not in the committed square matrix can
@@ -177,8 +186,11 @@ class WturnsGame:
             # The cap bound. topk.py has no cap, so the two objectives have parted
             # company and the number would be wrong under a right-looking name.
             raise RuntimeError(
-                "--depth %d BOUND on %d opener(s) (e.g. %s): topk.py has no depth "
-                "cap, so this is no longer the same objective. Raise depth."
+                "--depth %d left %d opener(s) unresolved (e.g. %s). topk.py has no "
+                "cap and would have returned a number here, so the two objectives "
+                "have parted company. Under --topk this may be the BEAM failing to "
+                "find a line rather than none existing -- feasibility itself does "
+                "not depend on the weights. Raise --depth."
                 % (self.depth, len(infeasible), ", ".join(infeasible[:5])))
         if best is None:
             raise RuntimeError("wturns wrote no result row to %s" % out)
