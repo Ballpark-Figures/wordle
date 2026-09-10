@@ -39,6 +39,25 @@
 #
 # USE THIS RATHER THAN CALLING tools/lang_solve.py DIRECTLY.  It sets --out,
 # names the file after the K and accent mode that define the run, and tees a log.
+#
+# ------------------------------------------------- ONE EXPLICITLY NAMED LIST
+#
+#     bash solver/run-lang-solve.sh --answers data/shared/words/custom.txt \
+#         --guesses data/shared/words/guess.txt
+#
+# --answers/--guesses solve ONE named pair instead of discovering language dirs,
+# through the SAME driver and the same columns.  That is what produces the
+# ENGLISH baseline: the top-K guesser over the 4282-word frequency-cut candidate
+# list with every weight 1 -- uniform weighting being topk.py's own default, not
+# a separate mode -- which is the number an adversarial expected_guesses from
+# data/shared/freqsearch/topk<K>.csv is quoted against.
+#
+# THE GUESS SET IS PART OF THE QUESTION and is never defaulted: --guesses is
+# required alongside --answers, or --answers-only to make the answer list its own
+# guess set.  A 12972-word guesser and a 4282-word one are different strategies.
+#
+# Named runs land under data/shared/topk/ rather than data/shared/lang/, since
+# they are not language results.
 
 set -u
 
@@ -47,12 +66,20 @@ MATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 K=1
 LANGS=""
 ACCENTS="ascii"
+ANSWERS=""
+GUESSES=""
+LABEL=""
+ANSONLY=0
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        -k|--topk)  K="$2";       shift 2 ;;
-        --langs)    LANGS="$2";   shift 2 ;;
-        --accents)  ACCENTS="$2"; shift 2 ;;
+        -k|--topk)      K="$2";       shift 2 ;;
+        --langs)        LANGS="$2";   shift 2 ;;
+        --accents)      ACCENTS="$2"; shift 2 ;;
+        --answers)      ANSWERS="$2"; shift 2 ;;
+        --guesses)      GUESSES="$2"; shift 2 ;;
+        --label)        LABEL="$2";   shift 2 ;;
+        --answers-only) ANSONLY=1;    shift 1 ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
     esac
 done
@@ -64,6 +91,35 @@ cd "$MATH" || exit 1
 
 PY=../.venv/bin/python
 [ -x "$PY" ] || { echo "no venv python at $PY" >&2; exit 1; }
+
+# ---- one explicitly named list pair -------------------------------------
+if [ -n "$ANSWERS" ]; then
+    [ -f "$ANSWERS" ] || { echo "missing $ANSWERS" >&2; exit 1; }
+    if [ "$ANSONLY" -eq 0 ]; then
+        [ -n "$GUESSES" ] || { echo "--guesses PATH is required with --answers (or --answers-only)." >&2
+                               echo "  The guess set is part of the question, so it is never defaulted." >&2
+                               exit 1; }
+        [ -f "$GUESSES" ] || { echo "missing $GUESSES" >&2; exit 1; }
+    fi
+    if [ -z "$LABEL" ]; then
+        LABEL=$(basename "$ANSWERS"); LABEL=${LABEL%.txt}
+    fi
+    OUTDIR=data/shared/topk
+    LOC=data/local/topk
+    SUF=""; [ "$ANSONLY" -eq 1 ] && SUF="_answers-only"
+    STEM="topk${K}_${LABEL}${SUF}"
+    OUT="$OUTDIR/$STEM.csv"
+    mkdir -p "$OUTDIR" "$LOC"
+    . "$MATH/solver/_guard.sh"
+    guard_output lang_solve.py "$OUT" || exit 1
+    FLAGS="-k $K --answers $ANSWERS --label $LABEL --out $OUT"
+    [ "$ANSONLY" -eq 1 ] && FLAGS="$FLAGS --answers-only" \
+                         || FLAGS="$FLAGS --guesses $GUESSES"
+    echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] topk solve $STEM (weights uniform)" \
+        | tee -a "$LOC/$STEM.log"
+    "$PY" -u tools/lang_solve.py $FLAGS 2>&1 | tee -a "$LOC/$STEM.log"
+    exit $?
+fi
 
 WORDS=data/shared/words/lang/$ACCENTS
 OUTDIR=data/shared/lang
