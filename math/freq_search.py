@@ -305,6 +305,7 @@ class FrequencySearch:
 
 def main(argv: list[str]) -> None:
     k, answers, log_path, max_loops = 1, CUSTOM, None, None
+    objective, depth, threads, tt_bits = "topk", 9, 18, 24
     it = iter(argv)
     for a in it:
         if a in ("-k", "--topk"):
@@ -317,14 +318,44 @@ def main(argv: list[str]) -> None:
             max_loops = int(next(it))
         elif a == "--no-out":
             log_path = ""
+        elif a == "--objective":
+            objective = next(it)
+        elif a == "--depth":
+            depth = int(next(it))
+        elif a == "--threads":
+            threads = int(next(it))
+        elif a == "--tt-bits":
+            tt_bits = int(next(it))
         else:
             raise SystemExit(f"unknown arg {a!r} "
-                             f"(-k/--topk, --answers, --out, --no-out, --max-loops)")
+                             f"(-k/--topk, --answers, --out, --no-out, --max-loops, "
+                             f"--objective topk|wturns, --depth, --threads, --tt-bits)")
     if log_path is None:
         raise SystemExit(
             "refusing to run without --out: a run that saves nothing is a run lost.\n"
             "Use solver/run-freq-search.sh, or pass --no-out deliberately.")
-    s = FrequencySearch(k=k, answers=answers)
+    if objective not in ("topk", "wturns"):
+        raise SystemExit("--objective must be topk or wturns")
+
+    # TWO IMPLEMENTATIONS OF ONE OBJECTIVE.  `topk` is topk.py's numba kernels,
+    # single-threaded with no transposition table; `wturns` is the C solver under
+    # --topk K, whose ranking rule IS topk.py's, with a table and OpenMP.  They
+    # are required to agree EXACTLY -- tools/checkwturnsobjective.py diffs them on
+    # integer totals -- so this is a speed choice, not a modelling one.
+    #
+    # It is NOT the default, and should not become one silently: `wturns` always
+    # has a depth cap where topk.py has none, so it can only stand in while that
+    # cap is slack.  A binding cap RAISES rather than returning a number.
+    game = None
+    if objective == "wturns":
+        from wturns_objective import WturnsGame
+        game = WturnsGame(answers=answers, k=k, depth=depth,
+                          threads=threads, tt_bits=tt_bits)
+        print(f"objective: wturns --topk {k} --depth {depth} "
+              f"(threads {threads}, tt-bits {tt_bits}); "
+              f"a binding cap raises rather than returning a wrong number",
+              flush=True)
+    s = FrequencySearch(k=k, answers=answers, game=game)
     s.run(log_path=log_path or None, max_loops=max_loops)
 
 

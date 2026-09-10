@@ -1019,6 +1019,36 @@ subject to a guarantee. Do not put the two in one table.
     without `--pre`. So an unmarked pin would BREAK the Mac venv builds, and with the
     marker the Macs simply have no numba and silently get the reference path. **A slow
     `topk`/`lang_solve`/`freq_search` run on a Mac is this, not the problem.**
+- **THE OBJECTIVE HAS TWO IMPLEMENTATIONS, AND `--objective wturns` PICKS THE
+  FAST ONE** (added 2026-09-10). The guesser exists twice: `topk.py`'s numba
+  kernels (`--objective topk`, the DEFAULT), and **`solver/wturns --topk K`**,
+  whose ranking rule IS `topk.py`'s — ascending `sum over LOSING bins of (bin size
+  x bin weight)`, ties on the lowest guess index. At K=1 neither minimises
+  anything; both play the top-ranked guess. **They are the same guesser, not two
+  approximations of one.**
+  - **VERIFIED ON THE REAL PROBLEM, twice.** The k=1 hill-climb ends at
+    **3.978171252747317** and `wturns --topk 1` on those weights reports
+    **3.97817**; at k=10 uniform, `wturns` gives **3.623073** against
+    `freq_search`'s own `start avg = 3.6231`.
+  - **MEASURED SPEEDUP at k=10: ~370 s per evaluation to 22.4 s** (~16x). `topk.py`
+    has no transposition table and runs on ONE core (CPU/wall measured 1.0);
+    `wturns` has a table (92% hit rates observed) and 18 threads.
+  - **THE PER-EVALUATION OVERHEAD IS CONSTANT IN K** — one sort of the live words
+    plus one column permutation of the pattern matrix, **measured 1.35 s** for
+    12972 x 4229. Noise beside a k>=2 evaluation, MORE than a k=1 evaluation
+    (0.9 s) — which is exactly why `topk` stays the default and this is for the
+    beam. Do not switch the default.
+  - **THE CAP IS THE ONE REAL DIFFERENCE.** `topk.py` has NO depth cap; `wturns`
+    always has one. If it binds, an opener `topk.py` would have used comes back
+    INFEASIBLE and the solver picks another — a different objective under the same
+    name. So **a binding cap RAISES**, it is never averaged over or skipped.
+  - **`python3 math/tools/checkwturnsobjective.py` is the GATE**: it diffs the two
+    EXACTLY, on integer totals, never on the CSV's 5-decimal `expected` (a
+    hill-climb compares improvements far finer than 1e-5, so five decimals is not
+    agreement). **The problem is SIZED so the beam bites** — `checkweighted.py`'s
+    24x16 problem is solved optimally by the greedy, so every K gives the same
+    number there and a pass would have been k=1 four times over; at 60 answers x
+    600 guesses K genuinely moves the answer, and coverage FAILS if it did not.
 - **The gates: `python3 math/tools/checktopk.py` and `math/tools/checkfreqsearch.py`.**
   The first diffs the numba kernel against a pure-numpy reference implementing the
   identical rules (k=1/2/3, exact agreement), checks the pattern slice against

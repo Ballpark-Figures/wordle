@@ -121,19 +121,24 @@ def ordered_answers(weights):
     return [w for w, _ in pairs], [x for _, x in pairs]
 
 
-def make_mini_data(tmp, answers):
+def make_mini_data(tmp, answers, guesses=None):
     """A complete miniature `--data` directory, so wturns reads a small problem
     by its NORMAL path -- no special flags, so the code under test is the code
-    that runs for real."""
+    that runs for real.
+
+    `guesses` defaults to MINI_GUESSES; checkwturnsobjective.py passes a larger
+    list, because a problem this small is solved optimally by the greedy and so
+    cannot exercise a beam at all."""
+    guesses = MINI_GUESSES if guesses is None else guesses
     words = os.path.join(tmp, "shared", "words")
     pats = os.path.join(tmp, "local", "patterns")
     os.makedirs(words, exist_ok=True)
     os.makedirs(pats, exist_ok=True)
     with open(os.path.join(words, "guess.txt"), "w") as f:
-        f.write("\n".join(MINI_GUESSES) + "\n")
+        f.write("\n".join(guesses) + "\n")
     with open(os.path.join(words, "mystery.txt"), "w") as f:
         f.write("\n".join(answers) + "\n")
-    mat = np.array([[pattern(g, a) for a in answers] for g in MINI_GUESSES],
+    mat = np.array([[pattern(g, a) for a in answers] for g in guesses],
                    dtype=np.uint8)
     np.save(os.path.join(pats, "patterns.npy"), mat)
 
