@@ -696,13 +696,19 @@ def check_race(guesses, mystery):
     def body(tag):
         return [ln for ln in open(paths(tag)[0]) if not ln.startswith("# race_")]
 
-    for tag in ("whole", "split", "switch"):
+    for tag in ("whole", "split", "switch", "pairsplit"):
         wipe(tag)
     said = {}
     said["whole"] = run("whole", 800, 0)
     run("split", 400, 0)                       # stop early ...
     said["split"] = run("split", 800, 0)       # ... then resume into the same file
     said["switch"] = run("switch", 800, 9999)
+    # AND A RESUME FROM THE PAIRWISE PHASE, which is a different checkpoint
+    # payload entirely -- sums rather than a history -- and is the state a long
+    # race spends nearly all of its life in.  The resume above never reaches it,
+    # because it runs with the switch disabled.
+    run("pairsplit", 400, 9999)
+    said["pairsplit"] = run("pairsplit", 800, 9999)
 
     check("a race resumed from its checkpoint equals an uninterrupted one",
           body("split") == body("whole"),
@@ -717,12 +723,24 @@ def check_race(guesses, mystery):
     check("the pairwise switch fired in the switch run and not in the other",
           "switched to pairwise" in said["switch"]
           and "switched to pairwise" not in said["whole"])
+    check("a race resumed from the PAIRWISE phase equals an uninterrupted one",
+          body("pairsplit") == body("switch"),
+          "resumed at %s" % ("yes" if "resuming" in said["pairsplit"] else
+                             "NO -- it started over, so this proves nothing"))
+    # The SECOND leg must not re-announce the switch: it loaded a checkpoint that
+    # was already past it.  So the signature of a genuine pairwise resume is
+    # "resuming" without "switched", plus a checkpoint that really holds sums.
+    check("that resume really was from the pairwise phase",
+          "resuming" in said["pairsplit"]
+          and "switched to pairwise" not in said["pairsplit"]
+          and bool(np.load(paths("pairsplit")[2],
+                           allow_pickle=False)["paired"]))
     elim = open(paths("whole")[1]).read().strip().split("\n")
     check("the race eliminated openings and logged every one of them",
           len(elim) > 2 and elim[1].startswith("opening,"),
           "%d rows in the eliminations log" % (len(elim) - 2))
 
-    for tag in ("whole", "split", "switch"):
+    for tag in ("whole", "split", "switch", "pairsplit"):
         wipe(tag)
     os.remove(field)
 

@@ -16,12 +16,12 @@ standard errors behind the leader is dropped THE MOMENT that becomes true, and
 the survivors just keep playing on a doubling schedule.  Halt it whenever you
 like; it checkpoints continuously and resumes where it stopped.
 
-It is `tools/multiwordle_race.py` for the single-board game, and the two share
-`tools/race_stats.py` -- the paired difference, both standard errors, the block
-schedule and the cut itself, which are the one thing two races must not define
-twice.  The LOOP is separate on purpose: multiwordle's has to amortise a
-per-opening setup table and this one has no setup at all, so it plays games in
-the outer loop unconditionally and needs no calibration.
+IT IS THE SAME RACE AS `tools/multiwordle_race.py`, not a second one.  The whole
+driver -- the block schedule, the chunking, the two phases, the checkpoint, the
+cut, the elimination lines and the status line -- is `race_stats.run`, shared with
+it.  What lives in THIS file is only what is genuinely single-board: how a game is
+played, and how the standings are written.  Everything else has one definition, so
+a fix to the race is a fix to both races.
 
 PAIRED FROM THE FIRST GAME, which is the reason it can cut this early.  Every
 opener plays the IDENTICAL games -- the same answer from the same per-game seed,
@@ -72,9 +72,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from build_patterns import load_patterns                        # noqa: E402
 from opening_list import read_openings                          # noqa: E402
-from race_stats import (accumulate_pairwise, block_targets,     # noqa: E402
-                        eliminate, history_paired, history_sums, own_error,
-                        paired_error, pairwise_from_history)
+import race_stats as rs                                          # noqa: E402
 from secondword import read_table                               # noqa: E402
 from wordle import load_words                                   # noqa: E402
 from wordlesim import (WIN_WITHIN, CoupledDraw, answer_to_guess,  # noqa: E402
@@ -89,19 +87,10 @@ ELIM_COLUMNS = "word,trials,mean,diff_vs_leader,paired_stderr,sigma,leader"
 # shift another opener's answers.  Same constant, same reason, as the sweeps.
 PICK_OFFSET = 1 << 20
 
-# How long a game chunk should take.  Only a target: the chunk decides how often
-# the race checkpoints and reports, and NOTHING else -- the games are seeded by
-# index, so two runs with different chunk sizes play the identical games.
-CHUNK_SECONDS = 2.0
-
 # Coin flips drawn per game to start with.  A game needs one per follow-up draw,
 # so this is generous; a game that exhausts it regrows the array and replays,
 # and `Generator.random(n)` is prefix-consistent so the replay is the same game.
 FLIPS = 64
-
-
-class OutOfFlips(Exception):
-    """A game wanted more coin flips than the row held."""
 
 
 class FloatCursor:
@@ -122,7 +111,7 @@ class FloatCursor:
 
     def random(self):
         if self.i >= len(self.row):
-            raise OutOfFlips
+            raise rs.Regrow
         v = self.row[self.i]
         self.i += 1
         return v
@@ -227,13 +216,59 @@ def make_games(na, seed, g0, g1, nf):
     return ans, fl
 
 
+class Player:
+    """How a single-board game is played -- the race driver's adapter.
+
+    It holds no race state: the driver owns the field, the blocks and the
+    checkpoint, and calls in here for a chunk of scores.  `wins` is carried in
+    the checkpoint by the driver's `extra` and accumulated here, because the win
+    rate is REPORTED per opener even though nothing cuts on it.
+    """
+
+    def __init__(self, pat, ans2g, rules, tail, na, win_within, wins, chunk):
+        self.pat = pat
+        self.ans2g = ans2g
+        self.rules = rules
+        self.tail = tail
+        self.na = na
+        self.win_within = win_within
+        self.wins = wins
+        self.chunk = chunk
+        self.nf = FLIPS
+
+    def make_games(self, seed, g0, g1):
+        return make_games(self.na, seed, g0, g1, self.nf)
+
+    def play(self, ids, games):
+        return play_chunk(self.pat, self.ans2g, [self.rules[i] for i in ids],
+                          self.tail, games[0], games[1])
+
+    def regrow(self):
+        self.nf *= 2
+        print("  (coin-flip array regrown to %d)" % self.nf)
+
+    def record(self, ids, sc, g0, g1):
+        self.wins[ids] += (sc <= self.win_within).sum(axis=1)
+
+    def chunk_size(self, ids, n_games, target, seed):
+        """None: use the driver's measured default.
+
+        There is no per-opener setup to amortise here -- no table to rebuild, no
+        JIT to warm -- so nothing in this game has an opinion about how many
+        games a chunk should hold, and the driver's "about two seconds" is
+        exactly right.  That is the one place multiwordle's race genuinely
+        differs, and it is why the driver asks rather than assumes.
+        """
+        return self.chunk or None
+
+
 def play_chunk(pat, ans2g, rules, tail, ans, fl):
     """Scores for every live opener over one chunk of games: (openers, games).
 
     Games are the OUTER loop, so a halt always leaves the field LEVEL -- every
     live opener has played exactly the same games, which is the state you can
-    rank and cut.  Raises OutOfFlips if any game wanted more coin flips than the
-    row held; the caller regrows and replays.
+    rank and cut.  Raises race_stats.Regrow if any game wanted more coin flips
+    than the row held; the driver regrows and replays.
     """
     m, n = len(rules), len(ans)
     sc = np.empty((m, n), dtype=np.int16)
@@ -356,207 +391,21 @@ def main(argv):
     tail = CoupledDraw(make_tail(a["fallback"], guesses, answers, ans2g))
     rules = build_rules(field, guesses, table, tail)
 
-    live = np.arange(len(field))
-    n_games = 0                # games every live opener has completed
-    hist = np.zeros((len(field), 0), dtype=np.int16)
-    paired = None              # (sum_d, sumsq_d, tot, sq) once switched
-    status = ["live"] * len(field)
-    elim_at = np.zeros(len(field), dtype=np.int64)
     wins = np.zeros(len(field), dtype=np.int64)
-    nf = FLIPS
+    player = Player(pat, ans2g, rules, tail, na, a["win_within"], wins,
+                    a["chunk"])
+    extra = {"wins": wins}
 
-    if ck_path and os.path.exists(ck_path):
-        z = np.load(ck_path, allow_pickle=False)
-        if int(z["field"]) != len(field):
-            raise SystemExit(
-                "%s was written for a field of %d openers, not %d -- a "
-                "checkpoint from a different race must never be resumed into "
-                "this one" % (ck_path, int(z["field"]), len(field)))
-        live = z["live"]
-        n_games = int(z["n_games"])
-        status = [s.decode() for s in z["status"]]
-        elim_at = z["elim_at"]
-        wins = z["wins"]
-        if bool(z["paired"]):
-            paired = (z["sum_d"], z["sumsq_d"], z["tot"], z["sq"])
-        else:
-            hist = z["hist"]
-        if hist.shape[1] > n_games:
-            hist = hist[:, :n_games].copy()
-        print("\nresuming: %d live, every one level at %d games"
-              % (len(live), n_games))
-
-    os.makedirs(os.path.join("data", "local", "wordlesim"), exist_ok=True)
-    if out:
-        os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
-        if not os.path.exists(elim_path):
-            with open(elim_path, "w") as f:
-                f.write("# %s -- one row per opener as it leaves the race\n"
-                        % stem)
-                f.write(ELIM_COLUMNS + "\n")
-
-    last_ck = [0.0]
-
-    def checkpoint(force=False):
-        """Save the race state.  Cheap to call: it writes at most every
-        --checkpoint seconds, because the history grows with the game count.  The
-        state is consistent at EVERY chunk boundary (all live openers level at
-        n_games), so a skipped write costs at most that many seconds of games,
-        never correctness."""
-        if not ck_path:
-            return
-        if not force and time.time() - last_ck[0] < a["checkpoint"]:
-            return
-        last_ck[0] = time.time()
-        kw = dict(field=len(field), live=live, n_games=n_games, elim_at=elim_at,
-                  status=np.array([s.encode() for s in status]), wins=wins,
-                  paired=paired is not None)
-        if paired is None:
-            kw["hist"] = hist
-        else:
-            kw.update(sum_d=paired[0], sumsq_d=paired[1], tot=paired[2],
-                      sq=paired[3])
-        # atomic: a checkpoint half-written by a Ctrl-C would lose the whole race
-        np.savez(ck_path + ".tmp", **kw)
-        os.replace(ck_path + ".tmp.npz", ck_path)
-
-    last_report = time.time()
-    per_game = [0.0]           # measured seconds per game per opener
-    t0 = time.time()
-    for target in block_targets(a["block"], a["growth"], a["max_games"]):
-        if len(live) <= 1:
-            break
-        if target <= n_games:
-            continue
-        if paired is None and hist.shape[1] < target:
-            grown = np.zeros((len(live), target), dtype=np.int16)
-            grown[:, :hist.shape[1]] = hist
-            hist = grown
-
-        while n_games < target:
-            # THE CHUNK IS A CHECKPOINT INTERVAL, NOT A PARAMETER OF THE RESULT.
-            # Games are seeded by index, so any chunking plays the same games in
-            # the same order; this only decides how often the race saves and
-            # reports.  Sized from the measured cost of the last one, because a
-            # field of 12972 and a field of 3 want very different numbers.
-            if a["chunk"]:
-                step = a["chunk"]
-            elif per_game[0] > 0:
-                step = max(1, int(CHUNK_SECONDS
-                                  / (per_game[0] * max(1, len(live)))))
-            else:
-                step = max(1, min(8, target - n_games))
-            hi = min(target, n_games + step)
-            c0 = time.time()
-            ans, fl = make_games(na, a["seed"], n_games, hi, nf)
-            while True:
-                try:
-                    sc = play_chunk(pat, ans2g, [rules[i] for i in live], tail,
-                                    ans, fl)
-                    break
-                except OutOfFlips:
-                    nf *= 2
-                    print("  (coin-flip array regrown to %d)" % nf)
-                    ans, fl = make_games(na, a["seed"], n_games, hi, nf)
-            dt = time.time() - c0
-            per_game[0] = dt / max(1, (hi - n_games) * len(live))
-            wins[live] += (sc <= a["win_within"]).sum(axis=1)
-            if paired is None:
-                hist[:, n_games:hi] = sc
-            else:
-                paired = accumulate_pairwise(paired, sc)
-            # n_games advances WITH the scores, in both phases, so a resume never
-            # replays a chunk and never leaves the field ragged
-            n_games = hi
-            checkpoint()
-            if time.time() - last_report > a["report"]:
-                print("  %d/%d games of this block, %d openers each (%.0f "
-                      "games/s)" % (n_games, target, len(live),
-                                    1.0 / max(per_game[0], 1e-12)))
-                last_report = time.time()
-
-        # --- the cut, on the paired difference against the leader
-        if paired is None:
-            tot, sq = history_sums(hist, n_games)
-            lead = int(np.argmin(tot))
-            tot, sq, sum_d_l, sumsq_d_l = history_paired(hist, n_games, lead)
-        else:
-            sum_d, sumsq_d, tot, sq = paired
-            lead = int(np.argmin(tot))
-            sum_d_l, sumsq_d_l = sum_d[:, lead], sumsq_d[:, lead]
-        md, se = paired_error(sum_d_l, sumsq_d_l, n_games)
-        mean, ose = own_error(tot, sq, n_games)
-
-        drop = eliminate(md, se, a["sigma"], lead)
-        keep = ~drop
-        rows = []
-        for pos in np.flatnonzero(drop):
-            c = int(live[pos])
-            status[c] = "out"
-            elim_at[c] = n_games
-            sig = md[pos] / se[pos] if se[pos] > 0 else float("inf")
-            rows.append((c, "%s,%d,%.6f,%.6f,%.6f,%.3f,%s"
-                         % (names[c], n_games, mean[pos], md[pos], se[pos],
-                            sig, names[int(live[lead])])))
-        if rows and elim_path:
-            with open(elim_path, "a") as f:
-                f.write("\n".join(r[1] for r in rows) + "\n")
-        if len(rows) <= 40:
-            for pos in np.flatnonzero(drop):
-                c = int(live[pos])
-                sig = md[pos] / se[pos] if se[pos] > 0 else float("inf")
-                print("  OUT  %-14s %9.4f   %+.4f +/- %.4f  (%.1f sigma behind "
-                      "%s)" % (names[c], mean[pos], md[pos], se[pos], sig,
-                               names[int(live[lead])]))
-        elif rows:
-            print("  OUT  %d openers (logged to %s)"
-                  % (len(rows), os.path.basename(elim_path)))
-        if rows and is_answer[[c for c, _ in rows]].any() \
-                and not is_answer[live[keep]].any():
-            last = min((c for c, _ in rows if is_answer[c]),
-                       key=lambda c: mean[int(np.flatnonzero(live == c)[0])])
-            print("  ^^ %s was the LAST answer-word opener, out at %d games"
-                  % (names[last], n_games))
-
-        mean, ose, md, se = mean[keep], ose[keep], md[keep], se[keep]
-        live = live[keep]
-        lead = int(np.argmin(mean))
-        if paired is None:
-            hist = hist[keep]
-        else:
-            paired = tuple(x[np.ix_(keep, keep)] if x.ndim == 2 else x[keep]
-                           for x in paired)
-
-        order = np.argsort(mean, kind="stable")
-        gap = sig2 = float("nan")
-        if len(order) > 1:
-            j = int(order[1])
-            gap = mean[j] - mean[int(order[0])]
-            sig2 = md[j] / se[j] if se[j] > 0 else float("inf")
-        best_ans = [int(live[p]) for p in order if is_answer[int(live[p])]]
-        print("%9d games  %6d live  leader %-14s %.4f (own se %.4f)  "
-              "2nd is %.4f = %.1f paired sigma back  |  %s  [%.0fs]"
-              % (n_games, len(live), names[int(live[lead])], mean[lead],
-                 ose[lead], gap, sig2,
-                 ("best answer opener %s" % names[best_ans[0]]) if best_ans
-                 else "NO answer openers left", time.time() - t0))
-
-        if paired is None:
-            mem = len(live) * n_games * 8 / 1e9
-            if len(live) <= a["pair_at"] or mem > a["max_mem"]:
-                paired = pairwise_from_history(hist, n_games)
-                hist = np.zeros((0, 0), dtype=np.int16)
-                print("  (switched to pairwise sums over %d openers -- memory "
-                      "is now independent of the game count)" % len(live))
-        checkpoint(force=True)
+    def writer(status, elim_at, live, mean, ose, md, se, n_games, lead):
         write_standings(out, stem, a, names, status, elim_at, live, mean, ose,
-                        md, se, wins, is_answer, n_games, lead, list_name, table)
-        if len(live) <= 1:
-            break
+                        md, se, extra["wins"], is_answer, n_games, lead,
+                        list_name, table)
 
-    print("\n%d openers still live at %d games:" % (len(live), n_games))
-    for c in live[:20]:
-        print("   %s" % names[int(c)])
+    rs.run({k: a[k] for k in ("sigma", "block", "growth", "max_games",
+                              "pair_at", "max_mem", "report", "checkpoint",
+                              "chunk", "seed")},
+           player, names, is_answer, writer, elim_path, ck_path, ELIM_COLUMNS,
+           noun="opener", extra=extra, stem=stem)
 
 
 def write_standings(out, stem, a, names, status, elim_at, live, mean, ose, md,

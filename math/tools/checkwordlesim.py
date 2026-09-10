@@ -906,7 +906,7 @@ def main(argv):
     def rbody(tag):
         return [ln for ln in open(rpaths(tag)[0]) if not ln.startswith("# race_")]
 
-    for tag in ("whole", "split", "switch", "chunky"):
+    for tag in ("whole", "split", "switch", "chunky", "pairsplit"):
         rwipe(tag)
     rsaid = {}
     rsaid["whole"] = rrun("whole", 800, 0, 5)
@@ -914,6 +914,13 @@ def main(argv):
     rsaid["split"] = rrun("split", 800, 0, 5)     # ... then resume into it
     rsaid["switch"] = rrun("switch", 800, 9999, 5)
     rsaid["chunky"] = rrun("chunky", 800, 0, 97)
+    # AND A RESUME FROM THE PAIRWISE PHASE, a different checkpoint payload
+    # entirely -- sums rather than a history -- and the state a long race spends
+    # nearly all of its life in.  The resume above never reaches it, because it
+    # runs with the switch disabled.  This is the case that caught the extras
+    # being rebound instead of filled in place.
+    rrun("pairsplit", 400, 9999, 5)
+    rsaid["pairsplit"] = rrun("pairsplit", 800, 9999, 5)
 
     if rbody("split") != rbody("whole"):
         failures.append("a race resumed from its checkpoint does not equal an "
@@ -927,14 +934,23 @@ def main(argv):
             and "switched to pairwise" not in rsaid["whole"]):
         failures.append("the pairwise switch did not fire where it was meant to, "
                         "so that comparison was between two identical paths")
+    if rbody("pairsplit") != rbody("switch"):
+        failures.append("a race resumed from the PAIRWISE phase does not equal "
+                        "an uninterrupted one")
+    if not ("resuming" in rsaid["pairsplit"]
+            and "switched to pairwise" not in rsaid["pairsplit"]
+            and bool(np.load(rpaths("pairsplit")[2],
+                             allow_pickle=False)["paired"])):
+        failures.append("that resume was not from the pairwise phase, so it "
+                        "proved nothing about the sums")
     if rbody("chunky") != rbody("whole"):
         failures.append("the chunk size changed a race's result -- it is a "
                         "checkpoint interval, not a parameter of the answer")
     relim = open(rpaths("whole")[1]).read().strip().split("\n")
     if not (len(relim) > 2 and relim[1].startswith("word,")):
         failures.append("the race eliminated nobody, or did not log them")
-    print("the race: resume, the pairwise switch and the chunk size all change "
-          "nothing (%d openers, %d eliminated and logged)"
+    print("the race: a resume in EITHER phase, the pairwise switch and the "
+          "chunk size all change nothing (%d openers, %d eliminated and logged)"
           % (len(open(rfield).read().split()), len(relim) - 2))
 
     # THE STANDINGS ARE SWEEP-SHAPED, so the cut and the paired round can read a
@@ -952,7 +968,7 @@ def main(argv):
     print("a race's standings parse as a sweep's (%d live rows the cut can read)"
           % len(rrows))
 
-    for tag in ("whole", "split", "switch", "chunky"):
+    for tag in ("whole", "split", "switch", "chunky", "pairsplit"):
         rwipe(tag)
     os.remove(rfield)
 
