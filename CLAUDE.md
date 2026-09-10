@@ -2045,6 +2045,85 @@ differences instead.
   `mean(A-B)` equals `mean(A)-mean(B)` exactly, and pairing must actually reduce
   the spread.
 
+### `gray-second` — a PREDETERMINED second word, played only on enough greys
+A `wordlesim` strategy, and a table that feeds it (the user's, 2026-09-10): play
+an opener; if its reply shows **at least N grey tiles**, play a word committed to
+IN ADVANCE for that opener; otherwise, and from the third guess on, the follow-up
+plays a random compatible word. `math/secondword.py` states the objective and IS
+the source of truth; `solver/secondword.c` computes the table.
+- **THE OBJECTIVE, EXACTLY.** For an opener `g1`, take the answers whose reply to
+  it shows `>= min_grays` greys, group them by that reply, and for each candidate
+  `g2` score `sum over JOINT (reply to g1, reply to g2) buckets of n^2`; the
+  reported `expected` is that over the number of qualifying answers. It is
+  **`pairsplit`'s ssq restricted to the qualifying rows**, so exact and integral,
+  and **ANSWER-WEIGHTED** (user's call): a reply 300 answers produce counts 300
+  times against one that 2 produce. **The count is over the 2315 ANSWERS**, not
+  the 12972 — so the table optimises for a player who knows the curated list even
+  when the run's follow-up is `guess`, which is a deliberate mismatch, not a slip.
+- **IT IS ONE PLY, so never quote `expected` as a cost.** It says what is left
+  after two guesses, never what the game goes on to take; only the simulation the
+  table feeds says that. And the sim's own mean is expected guesses **outright**
+  — never table it beside an `optturns`-family total.
+- **`--min-grays` IS THE OBJECTIVE, not a knob**, and so are the two pools. Each
+  combination is a different strategy: all three are in the filename AND in the
+  table's own `# settings` stamp, and every reader refuses a table whose stamp
+  disagrees with what it asked for (a filename cannot check itself — the greens
+  scar). **TWO VARIANTS** (user's call, 2026-09-10), and their numbers must never
+  share a table, the second being a strictly smaller strategy space:
+  `--variant guess` (openers and second words both the 12972) and
+  `--variant mystery` (both the 2315), swept with `--words guess` / `--words
+  mystery` respectively.
+- **Build it with `bash solver/run-second-word.sh [--variant V] [--min-grays N]`**
+  (from `math/`), attached, tee'd log, `--dry-run`. Exact and deterministic — no
+  sampling, no seed — so a re-run reproduces the file byte for byte. **MEASURED
+  2026-09-10: 500 openers in 2.2 s on 18 threads, so the full 12972 is ~1 minute**
+  and the `mystery` variant a few seconds. `--limit N` prices it and writes a
+  PREFIX under its own name, with the stamp's opener pool RENAMED so nothing can
+  read a priced run as the table.
+- **AN EMPTY `second` IS A RESULT.** An opener no answer can give that many greys
+  has nothing to choose between; the rule then never fires and the strategy is
+  the plain opener.
+- **The second word is played BLIND and is usually NOT a live candidate** — it
+  was chosen to split, not to win. The opener is excluded as its own second word.
+- **Run one opener with `--strategy gray-second --strategy-arg WORD
+  --strategy-arg TABLE.csv`**; sweep with **`bash solver/run-wordle-sweep.sh
+  --fallback answer|guess --second-from TABLE.csv -t 100`**, which is the ordinary
+  cascade with this rule swapped in for the blind opening. It is **REFUSED
+  alongside `--pair-adaptive`** (two rules for the same turn), refuses a
+  multi-word entry, and **checks up front that the table has a row for every
+  opener being swept** — which is what stops one variant's table being swept over
+  the other's word list. The threshold lands in the stem as `_g<N>`, in the
+  `# settings` line as `second_table=`/`min_grays=`, and **is INHERITED by every
+  later pass and by `run-wordle-paired.sh`** — the § cascade scar, which is why a
+  pass given a DIFFERENT table than its source is refused outright.
+- **A STAGE-1 SWEEP'S LINEAGE ROOT IS NOW ITS WORD LIST** (fixed 2026-09-10). It
+  was empty, so `--words guess` and `--words mystery` produced the SAME stem —
+  `sweep_answer__p1_t100_s0.csv` — and the second would have resumed from the
+  first, silently mixing two word lists into one file. Nothing committed carries
+  the empty form: every single-word sweep on disk predates the lineage scheme.
+- **`tools/wordle_sim.py --resolve` was BROKEN and is fixed** (same day): its
+  early return dropped `adapt` after that flag was added, so it raised a
+  ValueError — and the wrapper resolves every strategy through it before doing
+  anything, so `run-wordle-sim.sh` was refusing **every** run.
+- **`python3 tools/checksecondword.py` is the GATE** (~10 s), and it is
+  MUTATION-TESTED (an off-by-one in the threshold and a dropped tie-break were
+  each caught): the whole mini `--data` problem at every threshold against a
+  reference that recomputes replies FROM THE STRINGS by the multiset rule and
+  groups by the TILE TUPLE, so it never touches the encoding, the matrix or the
+  run-histogram trick; the restricted pools, with the assertion that restricting
+  actually CHANGED a row; real openers against the numpy reference over all 12972
+  second words, and against the string reference over a 400-word pool; a
+  CONSTRUCTED empty case (every answer carries an `e`, so five greys is
+  impossible); and the refusals, including the reader's. **A REVERSED pool file is
+  what pins the tie-break** — in index order "first found" and "lowest guess
+  index" are the same word, so nothing else can tell a real tie-break from an
+  accident of arrival. **Coverage is asserted**: it FAILS unless a tie, an empty
+  row, a threshold that moved the winner and a pool restriction that moved it all
+  occurred. `checkwordlesim.py` covers the RULE — both branches of the threshold
+  constructed at exactly N and N-1 greys, an empty row reproducing the plain
+  opener, and the sweep's `make_rule` hook actually running this rule rather than
+  falling back to the blind opening.
+
 - **`python3 tools/checkwordlesim.py` is the GATE**: it replays the same seeds
   through an independent implementation that keeps candidates as LISTS OF WORDS and
   recomputes every reply from the STRINGS by the **multiset rule** (a different
