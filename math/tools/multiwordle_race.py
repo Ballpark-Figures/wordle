@@ -63,6 +63,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import multiwordle as mw                                        # noqa: E402
 import multiwordle_fast as mf                                   # noqa: E402
 from build_patterns import load_patterns                        # noqa: E402
+from race_stats import (accumulate_pairwise, block_targets,     # noqa: E402
+                        eliminate, history_paired, history_sums, own_error,
+                        paired_error, pairwise_from_history)
 from opening_list import read_openings                          # noqa: E402
 from wordle import load_words                                   # noqa: E402
 
@@ -282,81 +285,17 @@ class Player:
 # times the stored size at exactly the moment the race is widest; chunking keeps
 # the working set to a few megabytes however long the race runs.
 
-def _col_chunk(m):
-    return max(1, (1 << 22) // max(1, m))
-
-
-def history_sums(hist, n):
-    """Per-opening sum and sum of squares of the scores."""
-    m = hist.shape[0]
-    tot = np.zeros(m)
-    sq = np.zeros(m)
-    step = _col_chunk(m)
-    for i in range(0, n, step):
-        s = hist[:, i:min(n, i + step)].astype(np.float64)
-        tot += s.sum(axis=1)
-        sq += (s * s).sum(axis=1)
-    return tot, sq
-
-
-def history_paired(hist, n, lead):
-    """sum(d) and sum(d^2) against one opening, d_i = score_it - score_lead.
-
-    Expanded as sum(a^2) - 2 sum(a b) + sum(b^2) rather than materialising the
-    difference, so the leader can move every block without the memory moving too.
-    """
-    m = hist.shape[0]
-    tot, sq = history_sums(hist, n)
-    cross = np.zeros(m)
-    step = _col_chunk(m)
-    for i in range(0, n, step):
-        s = hist[:, i:min(n, i + step)].astype(np.float64)
-        cross += s @ s[lead]
-    return tot, sq, tot - tot[lead], sq - 2.0 * cross + sq[lead]
-
-
-def paired_error(sum_d, sumsq_d, n):
-    """Mean and standard error of the per-game difference against the leader.
-
-    Zero variance is a real answer, not a degenerate one: two openings that scored
-    identically in EVERY game have a difference of exactly 0 with no spread, and an
-    opening strictly worse in every game is eliminated on the mean alone.  This is
-    also where the win-rate ceiling problem of a proportion cannot arise -- the
-    difference of two guess COUNTS has no ceiling to be pinned against.
-    """
-    md = sum_d / n
-    if n < 2:
-        return md, np.zeros_like(md)
-    var = (sumsq_d - n * md * md) / (n - 1)
-    np.clip(var, 0.0, None, out=var)
-    return md, np.sqrt(var / n)
-
-
-def own_error(tot, sq, n):
-    """Each opening's OWN standard error -- reported, never used for the cut.
-
-    It is the conservative unpaired number the old cascade cut on, so keeping it
-    in every row makes the gain from pairing visible rather than asserted.
-    """
-    mean = tot / n
-    if n < 2:
-        return mean, np.zeros_like(mean)
-    var = (sq - n * mean * mean) / (n - 1)
-    np.clip(var, 0.0, None, out=var)
-    return mean, np.sqrt(var / n)
-
-
 # --- the race --------------------------------------------------------------
-
-def block_targets(block, growth, max_games):
-    """100, 200, 400, ... -- each block multiplies the total game count."""
-    n = block
-    while True:
-        if max_games is not None and n >= max_games:
-            yield max_games
-            return
-        yield n
-        n = max(n + 1, int(round(n * growth)))
+#
+# THE ESTIMATOR AND THE CUT LIVE IN tools/race_stats.py, shared with the
+# wordlesim race, because they are the one thing that must not differ between two
+# races: the paired difference, both standard errors, the block schedule and what
+# "sigma behind" means.  The LOOP below stays here -- it has to amortise minavg's
+# per-opening turn-2 table, which the wordlesim race has no equivalent of, so one
+# loop serving both would be the shared-helper failure rather than reuse.
+#
+# The names are imported into this module, so `multiwordle_race.paired_error` is
+# still the same function it always was and every caller is unchanged.
 
 
 def game_chunk(m):
@@ -556,15 +495,7 @@ def main(argv):
             if paired is None:
                 hist[:, n_games:hi] = sc
             else:
-                sum_d, sumsq_d, tot, sq = paired
-                f = sc.astype(np.float64)
-                rs = f.sum(axis=1)
-                rq = (f * f).sum(axis=1)
-                tot += rs
-                sq += rq
-                sum_d += rs[:, None] - rs[None, :]
-                sumsq_d += rq[:, None] + rq[None, :] - 2.0 * (f @ f.T)
-                paired = (sum_d, sumsq_d, tot, sq)
+                paired = accumulate_pairwise(paired, sc)
             # n_games advances WITH the scores, in both phases, so a resume never
             # replays a chunk and never leaves the field ragged
             n_games = hi
@@ -586,8 +517,7 @@ def main(argv):
         md, se = paired_error(sum_d_l, sumsq_d_l, n_games)
         mean, ose = own_error(tot, sq, n_games)
 
-        drop = md - a["sigma"] * se > 0
-        drop[lead] = False
+        drop = eliminate(md, se, a["sigma"], lead)
         keep = ~drop
         rows = []
         for pos in np.flatnonzero(drop):
@@ -637,11 +567,7 @@ def main(argv):
         if paired is None:
             mem = len(live) * n_games * 8 / 1e9
             if len(live) <= a["pair_at"] or mem > a["max_mem"]:
-                tot, sq = history_sums(hist, n_games)
-                s = hist[:, :n_games].astype(np.float64)
-                sum_d = tot[:, None] - tot[None, :]
-                sumsq_d = sq[:, None] + sq[None, :] - 2.0 * (s @ s.T)
-                paired = (sum_d, sumsq_d, tot, sq)
+                paired = pairwise_from_history(hist, n_games)
                 hist = np.zeros((0, 0), dtype=np.int16)
                 print("  (switched to pairwise sums over %d openings -- memory "
                       "is now independent of the game count)" % len(live))
