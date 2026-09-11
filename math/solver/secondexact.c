@@ -73,7 +73,18 @@ static int      NG, NA;
 static uint8_t *PAT;                 /* NG * NA, row-major */
 static char   (*GWORD)[WBUF];
 static int8_t   GRAYS[NPAT], GREENS[NPAT], YELLOWS[NPAT];
-static uint8_t  FIRE[NPAT];          /* does this reply fire the rule? */
+/* THE GROUPS ARE INDEPENDENT, and that is what makes the per-grey-count version
+ * no harder than the single-word one: they PARTITION the firing replies, so the
+ * strategy's total is
+ *     decline + sum over groups of (that group's cost with its own word)
+ * and each group's best word can be found on its own.  There is no joint search
+ * over k words -- k separate argmins, and since every answer still falls in
+ * exactly one group the total scanning work barely moves. */
+#define MAXGRP 8
+static uint8_t  GFIRE[MAXGRP][NPAT]; /* which replies each group covers */
+static char     GNAME[MAXGRP][8];
+static int      NGRP = 1;
+static uint8_t  FIRE[NPAT];          /* any group at all: the union */
 static int32_t *ANS2G;               /* answer index -> guess index */
 
 static double now_s(void) {
@@ -292,11 +303,12 @@ static void build_tiles(void) {
 /* ------------------------------------------------------- one opener ------- */
 
 typedef struct {
-    int32_t opener, second;
-    double  decline;      /* exact total over the replies that do NOT fire */
-    double  fired;        /* exact total over the replies that DO, best word */
-    double  bound;        /* a sound lower bound on decline + fired */
-    int32_t nq, scanned, cut;
+    int32_t opener;
+    int32_t second[MAXGRP];       /* one word per group */
+    double  fired[MAXGRP];        /* and that group's exact total */
+    int32_t nq[MAXGRP], scanned[MAXGRP], cut[MAXGRP];
+    double  decline;              /* exact total over the replies that do NOT fire */
+    double  bound;                /* a sound lower bound on the whole total */
     int     done;
 } Row;
 
@@ -406,7 +418,8 @@ static int cmp_cand(const void *a, const void *b) {
  * computation, not a detail.
  */
 static double opener_bound(Memo *m, int og, uint16_t *q, uint16_t *out,
-                           int *rstart, int *rlen, int *nbp, int *nqp) {
+                           int *rstart, int *rlen, int *nbp, int *nqp,
+                           double *gbound) {
     const uint8_t *row = PAT + (size_t)og * NA;
     int *cnt = m->cnt, *touch = m->touch;
     double tot = 0.0;
@@ -424,36 +437,42 @@ static double opener_bound(Memo *m, int og, uint16_t *q, uint16_t *out,
         cnt[touch[k]] = 0;
     }
 
-    /* the FIRING answers, grouped by the opener's reply -- kept, because the
-     * caller needs exactly this layout if the opener survives */
-    int nb = 0, nq = 0;
-    for (int a = 0; a < NA; a++) {
-        if (!FIRE[row[a]]) continue;
-        nq++;
-        if (cnt[row[a]]++ == 0) touch[nb++] = row[a];
+    /* each GROUP separately: its answers, grouped by the opener's reply, then
+     * the cheapest possible second word for it.  The groups are independent, so
+     * their bounds simply add. */
+    for (int g = 0; g < NGRP; g++) {
+        const uint8_t *fire = GFIRE[g];
+        int nb = 0, nq = 0;
+        for (int a = 0; a < NA; a++) {
+            if (!fire[row[a]]) continue;
+            nq++;
+            if (cnt[row[a]]++ == 0) touch[nb++] = row[a];
+        }
+        int acc = 0;
+        for (int k = 0; k < nb; k++) {
+            int p = touch[k];
+            rlen[g * NPAT + k] = cnt[p];
+            rstart[g * NPAT + k] = acc;
+            cnt[p] = acc;
+            acc += rlen[g * NPAT + k];
+        }
+        for (int a = 0; a < NA; a++)
+            if (fire[row[a]]) q[g * NA + cnt[row[a]]++] = (uint16_t)a;
+        for (int k = 0; k < nb; k++) cnt[touch[k]] = 0;
+        nbp[g] = nb;
+        nqp[g] = nq;
+        if (!nq) { gbound[g] = 0.0; continue; }
+        double best = HUGE_VAL;
+        for (int w = 0; w < NG; w++) {
+            if (w == og) continue;
+            double v = fired_total(m, q + g * NA, nq, rstart + g * NPAT,
+                                   rlen + g * NPAT, nb, w, 1, out, 1);
+            if (v < best) best = v;
+        }
+        gbound[g] = best;
+        tot += best;
     }
-    int acc = 0;
-    for (int k = 0; k < nb; k++) {
-        int p = touch[k];
-        rlen[k] = cnt[p];
-        rstart[k] = acc;
-        cnt[p] = acc;
-        acc += rlen[k];
-    }
-    for (int a = 0; a < NA; a++)
-        if (FIRE[row[a]]) q[cnt[row[a]]++] = (uint16_t)a;
-    for (int k = 0; k < nb; k++) cnt[touch[k]] = 0;
-    *nbp = nb;
-    *nqp = nq;
-    if (!nq) return tot;
-
-    double best = HUGE_VAL;
-    for (int w = 0; w < NG; w++) {
-        if (w == og) continue;
-        double v = fired_total(m, q, nq, rstart, rlen, nb, w, 1, out, 1);
-        if (v < best) best = v;
-    }
-    return tot + best;
+    return tot;
 }
 
 /* Evaluate ONE opener exactly: the best second word, and the strategy's total.
@@ -461,83 +480,70 @@ static double opener_bound(Memo *m, int og, uint16_t *q, uint16_t *out,
  * a second word whose BOUND is not below it cannot win and is skipped.  Pass
  * HUGE_VAL to evaluate every word. */
 static void solve_opener(Memo *m, int og, Row *r, double incumbent, int no_prune,
-                         uint16_t *q, uint16_t *out, int *rstart, int *rlen) {
+                         uint16_t *q, uint16_t *out, int *rstart, int *rlen,
+                         int *nbs, int *nqs, const double *gbound) {
     memo_clear(m);
-    const uint8_t *row = PAT + (size_t)og * NA;
-
-    /* the firing answers, grouped by their reply to the opener */
-    int *cnt0 = m->cnt, *touch0 = m->touch;      /* level 0 is this grouping */
-    int nb = 0, nq = 0;
-    for (int a = 0; a < NA; a++) {
-        if (!FIRE[row[a]]) continue;
-        nq++;
-        if (cnt0[row[a]]++ == 0) touch0[nb++] = row[a];
-    }
-    int acc = 0;
-    for (int k = 0; k < nb; k++) {
-        int p = touch0[k];
-        rlen[k] = cnt0[p];
-        rstart[k] = acc;
-        cnt0[p] = acc;
-        acc += rlen[k];
-    }
-    for (int a = 0; a < NA; a++)
-        if (FIRE[row[a]]) q[cnt0[row[a]]++] = (uint16_t)a;
-    for (int k = 0; k < nb; k++) cnt0[touch0[k]] = 0;
-
     r->opener = og;
-    r->nq = nq;
     r->decline = decline_total(m, og, out, 0);
-    r->second = -1;
-    r->fired = 0.0;
-    r->scanned = 0;
-    r->cut = 0;
-    if (!nq) {                                /* nothing ever fires */
-        r->done = 1;
-        return;
-    }
-
-    /* Bound every second word first, then walk them ASCENDING: the cheapest
-     * possible one goes first, so the incumbent is strong early and the cut
-     * bites hardest.  The bound pass has no recursion at all. */
-    Cand *cand = malloc(sizeof(Cand) * NG);
-    for (int w = 0; w < NG; w++) {
-        cand[w].w = w;
-        cand[w].key = (w == og) ? HUGE_VAL      /* a repeat cannot split anything */
-                     : fired_total(m, q, nq, rstart, rlen, nb, w, 1, out, 0);
-    }
-    qsort(cand, (size_t)NG, sizeof(Cand), cmp_cand);
-
-    /* EVERYTHING HERE IS A TOTAL over all NA answers -- the incumbent, the
-     * running best and the bound alike.  Comparing a bound that includes the
-     * decline branch against a best that did not was a units mismatch that cut
-     * every candidate after the first and still printed a plausible answer. */
-    double best = HUGE_VAL;
-    for (int i = 0; i < NG; i++) {
-        if (cand[i].key == HUGE_VAL) break;
-        /* THE CUT, and it is what makes this a proof: the list is ascending in a
-         * SOUND lower bound, so the first candidate whose bound is not below the
-         * best total proves every one after it is worse too.  Strict `<` keeps
-         * ties, as everywhere else here. */
-        double ceiling = best < incumbent ? best : incumbent;
-        if (!no_prune && !(r->decline + cand[i].key < ceiling)) {
-            r->cut = NG - i;
-            break;
-        }
-        double v = r->decline
-                 + fired_total(m, q, nq, rstart, rlen, nb, cand[i].w, 0, out, 0);
-        r->scanned++;
-        if (v < best) { best = v; r->second = cand[i].w; }
-    }
-    r->fired = best - r->decline;
     r->done = 1;
+
+    Cand *cand = malloc(sizeof(Cand) * NG);
+    for (int g = 0; g < NGRP; g++) {
+        r->second[g] = -1;
+        r->fired[g] = 0.0;
+        r->scanned[g] = r->cut[g] = 0;
+        r->nq[g] = nqs[g];
+        int nq = nqs[g], nb = nbs[g];
+        if (!nq) continue;
+        const uint16_t *qq = q + g * NA;
+        const int *rs = rstart + g * NPAT, *rl = rlen + g * NPAT;
+
+        for (int w = 0; w < NG; w++) {
+            cand[w].w = w;
+            cand[w].key = (w == og) ? HUGE_VAL
+                        : fired_total(m, qq, nq, rs, rl, nb, w, 1, out, 1);
+        }
+        qsort(cand, (size_t)NG, sizeof(Cand), cmp_cand);
+
+        /* TWO CUTS, and the second is what makes this affordable.  The groups
+         * are independent, so a word whose bound is not below the best found
+         * HERE cannot be this group's word -- that is the single-word cut,
+         * applied k times.  But it is weak when a group's words are all close:
+         * measured on `spilt`, the e5 group scanned every one of the 12971.
+         *
+         * The INCUMBENT cuts far harder, and it is still sound: whatever this
+         * group ends up costing, the others cost at least their own bounds (or
+         * exactly their best, once solved), so
+         *     decline + this word's bound + the others' floor
+         * is a lower bound on the WHOLE strategy with this word in this group.
+         * If that is not below the incumbent, this word cannot be part of a
+         * winning opener at all. */
+        double floor_other = 0.0;
+        for (int h = 0; h < NGRP; h++)
+            if (h != g) floor_other += (h < g) ? r->fired[h] : gbound[h];
+        double best = HUGE_VAL;
+        for (int i = 0; i < NG; i++) {
+            if (cand[i].key == HUGE_VAL) break;
+            if (!no_prune && !(cand[i].key < best)
+                    && !(r->decline + floor_other + cand[i].key < incumbent)) {
+                r->cut[g] = NG - i;
+                break;
+            }
+            double v = fired_total(m, qq, nq, rs, rl, nb, cand[i].w, 0, out, 1);
+            r->scanned[g]++;
+            if (v < best) { best = v; r->second[g] = cand[i].w; }
+        }
+        r->fired[g] = best;
+    }
     free(cand);
+    (void)incumbent;
 }
 
 int main(int argc, char **argv) {
     const char *datadir = "data", *outpath = NULL, *patpath = NULL;
     const char *one = NULL, *openpath = NULL;
-    int min_grays = 3, threads = 0, limit = 0, no_prune = 0, memo_bits = 19;
+    int min_grays = 3, by_grays = 0, threads = 0, limit = 0, no_prune = 0,
+        memo_bits = 19;
     double report = 10.0;
 
     for (int i = 1; i < argc; i++) {
@@ -545,6 +551,9 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--data") && i + 1 < argc) datadir = argv[++i];
         else if (!strcmp(argv[i], "--patterns") && i + 1 < argc) patpath = argv[++i];
         else if (!strcmp(argv[i], "--min-grays") && i + 1 < argc) min_grays = atoi(argv[++i]);
+        /* --by-grays N: a SEPARATE word for each grey count from 5 down to N,
+         * which is secondword's e5.e4....eN partition. */
+        else if (!strcmp(argv[i], "--by-grays") && i + 1 < argc) by_grays = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--opener") && i + 1 < argc) one = argv[++i];
         else if (!strcmp(argv[i], "--openers") && i + 1 < argc) openpath = argv[++i];
         else if (!strcmp(argv[i], "--threads") && i + 1 < argc) threads = atoi(argv[++i]);
@@ -565,6 +574,10 @@ int main(int argc, char **argv) {
     }
     if (min_grays < 1 || min_grays > WORDLEN) {
         fprintf(stderr, "--min-grays must be 1..%d\n", WORDLEN);
+        return 1;
+    }
+    if (by_grays && (by_grays < 1 || by_grays > WORDLEN)) {
+        fprintf(stderr, "--by-grays must be 1..%d\n", WORDLEN);
         return 1;
     }
 
@@ -596,9 +609,33 @@ int main(int argc, char **argv) {
         }
     }
     build_tiles();
-    for (int p = 0; p < NPAT; p++) FIRE[p] = GRAYS[p] >= min_grays;
-    fprintf(stderr, "loaded %d guesses x %d answers; firing at %d+ greys\n",
-            NG, NA, min_grays);
+    /* ONE GROUP, or one per grey count.  --by-grays N is the partition
+     * e5 . e4 . ... . eN, the same condition secondword names that way, so a
+     * table from either side means the same thing. */
+    char label[64];
+    if (by_grays) {
+        NGRP = 0;
+        for (int k = WORDLEN; k >= by_grays; k--) {
+            snprintf(GNAME[NGRP], sizeof GNAME[0], "e%d", k);
+            for (int p = 0; p < NPAT; p++) GFIRE[NGRP][p] = GRAYS[p] == k;
+            NGRP++;
+        }
+        size_t n = 0;
+        for (int g = NGRP - 1; g >= 0; g--)
+            n += (size_t)snprintf(label + n, sizeof label - n, "%s%s",
+                                  g == NGRP - 1 ? "" : ".", GNAME[g]);
+    } else {
+        NGRP = 1;
+        snprintf(GNAME[0], sizeof GNAME[0], "g%d", min_grays);
+        for (int p = 0; p < NPAT; p++) GFIRE[0][p] = GRAYS[p] >= min_grays;
+        snprintf(label, sizeof label, "g%d", min_grays);
+    }
+    for (int p = 0; p < NPAT; p++) {
+        FIRE[p] = 0;
+        for (int g = 0; g < NGRP; g++) FIRE[p] |= GFIRE[g][p];
+    }
+    fprintf(stderr, "loaded %d guesses x %d answers; firing on %s (%d group%s)\n",
+            NG, NA, label, NGRP, NGRP == 1 ? "" : "s");
 
     int *openers = malloc(sizeof(int) * NG), nopen = 0;
     if (one) {
@@ -645,10 +682,12 @@ int main(int argc, char **argv) {
     {
         Memo m;
         memo_init(&m, (size_t)memo_bits);
-        uint16_t *q = malloc(sizeof(uint16_t) * NA);
+        uint16_t *q = malloc(sizeof(uint16_t) * (size_t)NA * MAXGRP);
         uint16_t *out = malloc(sizeof(uint16_t) * NA);
-        int *rstart = malloc(sizeof(int) * NPAT), *rlen = malloc(sizeof(int) * NPAT);
-        int nb, nq;
+        int *rstart = malloc(sizeof(int) * NPAT * MAXGRP);
+        int *rlen = malloc(sizeof(int) * NPAT * MAXGRP);
+        int nb[MAXGRP], nq[MAXGRP];
+        double gb[MAXGRP];
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic, 8)
 #endif
@@ -657,10 +696,9 @@ int main(int argc, char **argv) {
             /* -1, NOT the calloc'd 0: a cut opener never reaches solve_opener,
              * and index 0 is a perfectly good word, so the zero read back as a
              * real choice and printed as one. */
-            rows[oi].second = -1;
+            for (int g = 0; g < MAXGRP; g++) rows[oi].second[g] = -1;
             rows[oi].bound = opener_bound(&m, openers[oi], q, out, rstart, rlen,
-                                          &nb, &nq);
-            rows[oi].nq = nq;
+                                          nb, nq, gb);
         }
         free(q); free(out); free(rstart); free(rlen);
         free(m.e); free(m.buf); free(m.cnt); free(m.touch); free(m.start); free(m.len);
@@ -691,9 +729,12 @@ int main(int argc, char **argv) {
     {
         Memo m;
         memo_init(&m, (size_t)memo_bits);
-        uint16_t *q = malloc(sizeof(uint16_t) * NA);
+        uint16_t *q = malloc(sizeof(uint16_t) * (size_t)NA * MAXGRP);
         uint16_t *out = malloc(sizeof(uint16_t) * NA);
-        int *rstart = malloc(sizeof(int) * NPAT), *rlen = malloc(sizeof(int) * NPAT);
+        int *rstart = malloc(sizeof(int) * NPAT * MAXGRP);
+        int *rlen = malloc(sizeof(int) * NPAT * MAXGRP);
+        int nbs[MAXGRP], nqs[MAXGRP];
+        double gbs[MAXGRP];
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic, 1)
 #endif
@@ -712,19 +753,31 @@ int main(int argc, char **argv) {
                 cut_openers++;
                 continue;
             }
-            solve_opener(&m, rr->opener, rr, inc, no_prune, q, out, rstart, rlen);
+            /* the layout again -- cheap, and it keeps phase 2 independent of
+             * whatever phase 1 left in the shared buffers */
+            opener_bound(&m, rr->opener, q, out, rstart, rlen, nbs, nqs, gbs);
+            solve_opener(&m, rr->opener, rr, inc, no_prune, q, out, rstart, rlen,
+                         nbs, nqs, gbs);
 #ifdef _OPENMP
 #pragma omp critical (progress)
 #endif
             {
                 done++;
-                double v = rr->decline + rr->fired;
-                if (rr->second >= 0 && v < incumbent) {
+                double v = rr->decline;
+                int any = 0;
+                for (int g = 0; g < NGRP; g++) {
+                    v += rr->fired[g];
+                    any |= rr->second[g] >= 0;
+                }
+                if (any && v < incumbent) {
                     incumbent = v;
                     best_i = oi;
-                    fprintf(stderr, "[%6.0fs] %s %s  %.6f  NEW BEST\n",
-                            now_s() - t0, GWORD[rr->opener], GWORD[rr->second],
-                            v / NA);
+                    fprintf(stderr, "[%6.0fs] %s", now_s() - t0,
+                            GWORD[rr->opener]);
+                    for (int g = NGRP - 1; g >= 0; g--)
+                        fprintf(stderr, " %s", rr->second[g] >= 0
+                                ? GWORD[rr->second[g]] : "-");
+                    fprintf(stderr, "  %.6f  NEW BEST\n", v / NA);
                     fflush(stderr);
                 }
                 if (now_s() - last >= report) {
@@ -750,25 +803,45 @@ int main(int argc, char **argv) {
                "recursion).\n", min_grays);
     fprintf(f, "# expected is over all %d answers; decline/fired split it by "
                "whether the rule fired.\n", NA);
-    fprintf(f, "# settings min_grays=%d openers=%d follow_up=answer\n",
-            min_grays, nopen);
-    fprintf(f, "opener,second,expected,total,decline,fired,qualifying,scanned,cut\n");
+    fprintf(f, "# settings fire=%s openers=%d follow_up=answer\n", label, nopen);
+    fprintf(f, "opener,fires,second,expected,total,decline,fired,qualifying,"
+               "scanned,cut\n");
     for (int oi = 0; oi < nopen; oi++) {
         Row *v = &rows[oi];
-        double tot = v->decline + v->fired;
-        if (v->second < 0)
-            fprintf(f, "%s,,,,,,%d,%d,%s\n", GWORD[v->opener], v->nq,
-                    v->scanned, v->done ? "none" : "cut");
-        else
-            fprintf(f, "%s,%s,%.6f,%.4f,%.4f,%.4f,%d,%d,%d\n", GWORD[v->opener],
-                    GWORD[v->second], tot / NA, tot, v->decline, v->fired,
-                    v->nq, v->scanned, v->cut);
+        double tot = v->decline;
+        int any = 0;
+        for (int g = 0; g < NGRP; g++) {
+            tot += v->fired[g];
+            any |= v->second[g] >= 0;
+        }
+        for (int g = NGRP - 1; g >= 0; g--) {
+            if (!v->done) {
+                fprintf(f, "%s,%s,,,,,,%d,0,cut\n", GWORD[v->opener], GNAME[g],
+                        v->nq[g]);
+                continue;
+            }
+            if (v->second[g] < 0) {
+                fprintf(f, "%s,%s,,,,,,%d,%d,none\n", GWORD[v->opener], GNAME[g],
+                        v->nq[g], v->scanned[g]);
+                continue;
+            }
+            /* `expected` and `total` are the WHOLE strategy's, repeated on every
+             * group's row: the groups are independent but the value is not one
+             * of them, it is their sum plus the decline branch. */
+            fprintf(f, "%s,%s,%s,%.6f,%.4f,%.4f,%.4f,%d,%d,%d\n",
+                    GWORD[v->opener], GNAME[g], GWORD[v->second[g]],
+                    any ? tot / NA : 0.0, any ? tot : 0.0, v->decline,
+                    v->fired[g], v->nq[g], v->scanned[g], v->cut[g]);
+        }
     }
     fclose(f);
-    if (best_i >= 0)
-        fprintf(stderr, "\nbest: %s then %s -- %.6f expected guesses (exact)\n",
-                GWORD[rows[best_i].opener], GWORD[rows[best_i].second],
-                incumbent / NA);
+    if (best_i >= 0) {
+        fprintf(stderr, "\nbest: %s then", GWORD[rows[best_i].opener]);
+        for (int g = NGRP - 1; g >= 0; g--)
+            fprintf(stderr, " %s (%s)", rows[best_i].second[g] >= 0
+                    ? GWORD[rows[best_i].second[g]] : "-", GNAME[g]);
+        fprintf(stderr, " -- %.6f expected guesses (exact)\n", incumbent / NA);
+    }
     fprintf(stderr, "%d openers: %lld evaluated exactly, %d cut by the bound, "
             "in %.1fs\nwrote %s\n", nopen, done, cut_openers, now_s() - t0,
             outpath);

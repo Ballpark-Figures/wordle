@@ -98,14 +98,21 @@ def run(args, expect_fail=False):
     return p
 
 
-def read_rows(path):
-    out = {}
+def read_rows(path, group=None):
+    """One group's rows: {opener: [second, expected, total, decline, fired, nq,
+    scanned, cut]}.  `group` names which; None takes the only one there is."""
+    out, seen = {}, set()
     with open(path) as f:
         for line in f:
             if line.startswith("#") or line.startswith("opener,"):
                 continue
             c = line.rstrip("\n").split(",")
-            out[c[0]] = c[1:]
+            seen.add(c[1])
+            if group is not None and c[1] != group:
+                continue
+            out[c[0]] = c[2:]
+    if group is None and len(seen) > 1:
+        raise AssertionError("%s has %d groups; name one" % (path, len(seen)))
     return out
 
 
@@ -220,6 +227,83 @@ def check_prune():
         print("   ok   the within-opener cut actually fired")
 
 
+def check_by_grays():
+    """6. THE PARTITION VERSION: a word per grey count.
+
+    The groups are independent, so the C finds k separate argmins -- and the
+    check is that its total is what the enumeration says for exactly those k
+    words, and that it is never WORSE than the single-word optimum, which is the
+    same strategy with the groups forced to agree.
+    """
+    print("6. a word per grey count")
+    tmp = tempfile.mkdtemp(prefix="checkse-by-")
+    make_data(tmp, MINI_GUESSES, MINI_ANSWERS)
+    one = os.path.join(tmp, "one.csv")
+    many = os.path.join(tmp, "many.csv")
+    run(["--data", tmp, "--min-grays", "3", "--threads", "1", "--no-prune",
+         "--out", one])
+    run(["--data", tmp, "--by-grays", "3", "--threads", "1", "--no-prune",
+         "--out", many])
+    r1 = read_rows(one, "g3")
+    groups = ["e5", "e4", "e3"]
+    rk = {g: read_rows(many, g) for g in groups}
+    checked = better = 0
+    for opener in sorted(r1):
+        if not r1[opener][0]:
+            continue
+        words = {g: rk[g][opener][0] for g in groups}
+        if not all(words.values()):
+            continue
+        want = ref_total_groups(opener, words)
+        got = float(rk["e3"][opener][2])
+        if abs(float(want) - got) > 1e-9:
+            bad("%s with %s: the C totals %.6f, the enumeration %.6f"
+                % (opener, words, got, float(want)))
+            break
+        # a partition can never be worse: forcing every group to the same word is
+        # one of the choices it is free to make
+        if got > float(r1[opener][2]) + 1e-9:
+            bad("%s: the per-grey-count total %.6f is worse than the single "
+                "word's %.6f" % (opener, got, float(r1[opener][2])))
+            break
+        if got < float(r1[opener][2]) - 1e-9:
+            better += 1
+        checked += 1
+    if checked < 5:
+        bad("only %d openers were compared in the partition check" % checked)
+    elif not better:
+        bad("a word per grey count never beat one word anywhere, so nothing "
+            "here distinguishes the two")
+    else:
+        print("   ok   %d openers match the enumeration, and %d are strictly "
+              "better than one shared word" % (checked, better))
+
+
+def ref_total_groups(opener, words):
+    """The strategy's total when the grey COUNT selects the word."""
+    tot = Fraction(0)
+    decline, fired = {}, {}
+    for a in MINI_ANSWERS:
+        t = tiles(opener, a)
+        n = sum(1 for x in t if x == 0)
+        (fired if n >= 3 else decline).setdefault(t, []).append(a)
+    for t, grp in decline.items():
+        tot += len(grp)
+        if any(x != 2 for x in t):
+            tot += ref_T(grp)
+    for t, grp in fired.items():
+        second = words["e%d" % sum(1 for x in t if x == 0)]
+        tot += 2 * len(grp)
+        parts = {}
+        for a in grp:
+            parts.setdefault(tiles(second, a), []).append(a)
+        for p, sub in parts.items():
+            if all(x == 2 for x in p):
+                continue
+            tot += ref_T(sub)
+    return tot
+
+
 def check_bound():
     print("3. the bound is sound")
     rng = np.random.default_rng(11)
@@ -294,6 +378,7 @@ def main(argv):
     check_recursion()
     check_prune()
     check_bound()
+    check_by_grays()
     check_real()
     check_refusals()
     print()

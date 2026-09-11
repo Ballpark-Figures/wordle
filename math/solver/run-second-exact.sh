@@ -3,7 +3,15 @@
 #
 #     bash solver/run-second-exact.sh --opener spilt       # one opener, seconds
 #     bash solver/run-second-exact.sh                      # ALL openers: a PROOF
+#     bash solver/run-second-exact.sh --by-grays 3        # a word PER grey count
 #     bash solver/run-second-exact.sh --limit 200 --dry-run
+#
+# --by-grays N gives a SEPARATE second word to each grey count from 5 down to N
+# -- secondword's e5.e4....eN partition, evaluated exactly.  THE GROUPS ARE
+# INDEPENDENT: they partition the firing replies, so the strategy's total is the
+# decline branch plus a sum over groups, and each group's best word is found on
+# its own.  k separate argmins, not a joint search over k words, and since every
+# answer still lands in exactly one group the scanning work barely moves.
 #
 # WHAT IT COMPUTES.  Play an opener; if the reply shows at least --min-grays
 # greys play one word committed to in advance; otherwise, and from the third
@@ -41,6 +49,7 @@ MATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OPENER=""
 OPENERS=""
 MINGRAYS=3
+BYGRAYS=""
 LIMIT=""
 THREADS=""
 MEMOBITS=""
@@ -53,6 +62,7 @@ while [ $# -gt 0 ]; do
         --opener)     OPENER="$2";   shift 2 ;;
         --openers)    OPENERS="$2";  shift 2 ;;
         --min-grays)  MINGRAYS="$2"; shift 2 ;;
+        --by-grays)   BYGRAYS="$2";  shift 2 ;;
         --limit)      LIMIT="$2";    shift 2 ;;
         --threads)    THREADS="$2";  shift 2 ;;
         --memo-bits)  MEMOBITS="$2"; shift 2 ;;
@@ -83,14 +93,29 @@ BIN=solver/secondexact
 
 OUTDIR=data/shared/secondexact
 LOC=data/local/secondexact
-STEM="exact_g${MINGRAYS}"
+if [ -n "$BYGRAYS" ]; then
+    case "$BYGRAYS" in
+        ''|*[!0-9]*) echo "--by-grays must be a number of grey tiles" >&2; exit 1 ;;
+    esac
+    LABEL=""
+    n="$BYGRAYS"
+    while [ "$n" -le 5 ]; do
+        LABEL="${LABEL:+$LABEL.}e$n"
+        n=$((n + 1))
+    done
+else
+    LABEL="g${MINGRAYS}"
+fi
+STEM="exact_${LABEL}"
 [ -z "$OPENER" ]  || STEM="${STEM}_${OPENER}"
 [ -z "$OPENERS" ] || STEM="${STEM}_$(basename "$OPENERS" .txt)"
 [ -z "$LIMIT" ]   || STEM="${STEM}_limit${LIMIT}"
 [ "$NOPRUNE" = 0 ] || STEM="${STEM}_noprune"
 OUT="$OUTDIR/$STEM.csv"
 
-FLAGS="--min-grays $MINGRAYS --report $REPORT"
+FLAGS="--report $REPORT"
+[ -n "$BYGRAYS" ] && FLAGS="$FLAGS --by-grays $BYGRAYS" \
+                  || FLAGS="$FLAGS --min-grays $MINGRAYS"
 [ -z "$OPENER" ]   || FLAGS="$FLAGS --opener $OPENER"
 [ -z "$OPENERS" ]  || FLAGS="$FLAGS --openers $OPENERS"
 [ -z "$LIMIT" ]    || FLAGS="$FLAGS --limit $LIMIT"
@@ -99,7 +124,7 @@ FLAGS="--min-grays $MINGRAYS --report $REPORT"
 [ "$NOPRUNE" = 0 ] || FLAGS="$FLAGS --no-prune"
 
 echo "exact second word"
-echo "  fires at   $MINGRAYS+ greys"
+echo "  fires on   $LABEL$([ -n "$BYGRAYS" ] && echo "  (a SEPARATE word per group)")"
 echo "  openers    ${OPENER:-${OPENERS:-all 12972}}${LIMIT:+ (first $LIMIT)}"
 echo "  follow-up  answer (a uniformly random consistent answer)"
 [ "$NOPRUNE" = 0 ] || echo "  NO PRUNING: every second word evaluated (the gate's check)"

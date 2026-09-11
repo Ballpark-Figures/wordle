@@ -2091,6 +2091,26 @@ is the proven optimum over all 12972 x 12972 (opener, second word) pairs.
   subsets, growing to fit them is gigabytes per thread, and clearing when full
   thrashes (measured: seconds became minutes). A false hit needs a collision in
   both hashes AND the same set size.
+- **`--by-grays N` GIVES EACH GREY COUNT ITS OWN WORD** — secondword's
+  `e5.e4....eN` partition, evaluated exactly. **THE GROUPS ARE INDEPENDENT**:
+  they partition the firing replies, so the total is the decline branch plus a
+  SUM over groups, and each group's best word is found on its own — k separate
+  argmins, not a joint search over k words, and since every answer still lands in
+  exactly one group the scanning work barely moves.
+  - **The per-group cut is weak on its own** (measured: `spilt`'s `e5` group
+    scanned all 12971 words), because a group's words are all close together. The
+    INCUMBENT cuts across groups instead and is still sound: whatever this group
+    costs, the others cost at least their own bounds, so `decline + this word's
+    bound + the others' floor` bounds the whole strategy.
+  - **MEASURED: ~18 CPU-seconds per opener**, so a full run is around three hours
+    on 18 threads — and that is the worst case, from a probe whose incumbent was
+    weak. Watch the `evaluated / cut` line.
+- **THE g3 RESULT (2026-09-10): `clint` then `parse`, 3.666937 exact**, over all
+  12972 openers with 11324 evaluated and 1648 cut, in 653 s. **`spilt` is only
+  4th** (3.671133) — it won the RACE because that race used the one-ply table's
+  second words, and under exactly-optimal ones the ranking moves. That is the
+  reason to prove rather than screen. NB `parse`+`clint` is also the best adaptive
+  PAIR in `data/shared/PAIRS.md`, reached from a completely different direction.
 - Data under `math/data/shared/secondexact/`, log under `data/local/secondexact/`.
 - **`python3 tools/checksecondexact.py` is the GATE**: the recursion against a
   brute-force enumeration in exact RATIONALS over all 24 mini openers, the pruned
