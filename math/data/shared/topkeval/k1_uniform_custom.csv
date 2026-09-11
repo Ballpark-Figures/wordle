@@ -1,0 +1,4 @@
+# topk_eval: expected guesses OUTRIGHT, no depth cap -- not comparable with any optturns-family total
+# settings k=1 weighting=uniform answers=data/shared/words/custom.txt numba=1
+k,weighting,answers,listed,live,guesses,opener,expected_guesses,weighted_total,total_weight,seconds
+1,uniform,data/shared/words/custom.txt,4282,4282,12972,lares,3.678888369921,15753.000000000000,4282.000000000000,70.2

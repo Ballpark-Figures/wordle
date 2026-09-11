@@ -1,0 +1,15 @@
+kind=topk-solve
+k=2
+length=5
+label=custom
+answers_list=data/shared/words/custom.txt
+guesses_list=data/shared/words/guess.txt
+objective=expected-guesses-outright
+depth_cap=none
+strategy=topk-beam-ranked-by-expected-candidates-alive
+root_restricted_by_k=1
+optimum=0
+weights=uniform
+answers_only=0
+guess_set=full
+comparable_with_optturns=0
