@@ -1,0 +1,6 @@
+opener,k,depth,pool,pct_infeasible,mean,lb_mean,won_at_k,early_answers,states,pairs,feasible_pairs,infeasible_pairs,total,lb_total,seconds
+salet,2,6,compatible,0.000000,3.667708,3.667708,2315,0,148,,,,,,6.1
+salet,3,6,compatible,0.000000,3.487115,3.487115,2220,95,1253,,,,,,0.4
+salet,4,6,compatible,0.000000,3.422462,3.422462,989,1326,908,,,,,,0.2
+salet,5,6,compatible,0.000000,3.421166,3.421166,81,2234,81,,,,,,0.0
+salet,6,6,compatible,0.000000,3.421166,3.421166,0,2315,0,,,,,,0.0
