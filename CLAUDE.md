@@ -2048,6 +2048,55 @@ differences instead.
   `mean(A-B)` equals `mean(A)-mean(B)` exactly, and pairing must actually reduce
   the spread.
 
+### `run-second-exact.sh` — the EXACT best second word, and a PROOF of it
+The one-ply table picks a second word by "fewest answers remaining", which is a
+PROXY. This computes what the choice really costs and finds the true argmin:
+**`bash solver/run-second-exact.sh [--opener W]`** (from `math/`), attached,
+tee'd log, `--dry-run`. With no `--opener` it walks every opener and the result
+is the proven optimum over all 12972 x 12972 (opener, second word) pairs.
+- **THE RANDOM TAIL IS SUMMED EXACTLY, not simulated.** Its cost depends only on
+  the live candidate SET, and a uniform random guess sends the answer into a part
+  that never contains that guess — so the recursion terminates:
+  `T(S) = |S| + (1/|S|) * sum over g of sum over parts P != {g} of T(P)`,
+  memoised on the set. **VERIFIED against a brute-force playout** and, at full
+  scale, against the committed race: `spilt`+`crane` is exactly **3.671133**
+  where the Monte Carlo measured 3.670342 +/- 0.000649 — 1.2 sigma.
+- **WHY EXACT RATHER THAN SIMULATED, measured**: separating 12972 second words
+  means resolving ~0.005 guesses at a per-game sd near 0.9, so ~290000 games EACH
+  — 3.8 billion for ONE opener, hours, and still an error bar. The recursion does
+  it in **0.6 s**.
+- **THE BOUND IS WHAT MAKES IT A PROOF.** `T(S) >= 2|S| - 1` by induction (a
+  guess splits `S` minus itself into at most `|S|-1` parts), so summing over a
+  second word's buckets needs only their SIZES — no recursion. MEASURED on
+  `spilt`: **11008 of 12972 second words discarded outright**, a 16x saving, and
+  `--no-prune` confirms the pruned and unpruned answers are identical.
+- **BOUND FIRST, WALK ASCENDING** — and skipping that was a real mistake. In list
+  order the first openers are `aahed`, `aalii`, … , each scanning thousands of
+  second words before any incumbent exists to cut them: **`aahed` alone took 80 s
+  against `spilt`'s 0.6**. Bounded first and walked ascending, a good incumbent
+  exists before the bad openers are reached. **The visit order is a computation.**
+- **MEASURED: bounding all 12972 openers takes ~55 s**; a full run is tens of
+  minutes, and the `evaluated / cut` line is the real cost to watch.
+- **IT IS TIED TO THE `answer` FOLLOW-UP** — the tail draws from consistent
+  ANSWERS, so a state is a subset of the 2315. The `guess` follow-up is a
+  different and much larger recursion.
+- **TWO SCARS IN THE C, both found by the gate and ASan.** The recursion's
+  scratch must be indexed BY DEPTH: it partitions a set while walking the parts
+  of its caller's partition, so one shared counter array is clobbered by the very
+  call reading it — a heap overflow, not a subtly wrong answer. And `Row` is
+  `calloc`'d, so a CUT opener's `second` read back as index 0, a perfectly good
+  word, and printed as a real choice.
+- **The memo is a REPLACING cache keyed on a 128-bit fingerprint**, not a table
+  that must hold everything: a bad opener has an enormous number of distinct
+  subsets, growing to fit them is gigabytes per thread, and clearing when full
+  thrashes (measured: seconds became minutes). A false hit needs a collision in
+  both hashes AND the same set size.
+- Data under `math/data/shared/secondexact/`, log under `data/local/secondexact/`.
+- **`python3 tools/checksecondexact.py` is the GATE**: the recursion against a
+  brute-force enumeration in exact RATIONALS over all 24 mini openers, the pruned
+  walk against `--no-prune`, the bound's soundness on random sets, the
+  decline/fired split adding up, and the real-lists value against the race.
+
 ### `run-second-loss.sh` — where the EV loss goes, by the opener's grey count
 The gap between a second-word strategy and OPTIMAL play, decomposed. Every answer
 is played `-n` times under the strategy and compared with what that answer costs

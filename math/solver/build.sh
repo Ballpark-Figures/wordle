@@ -72,6 +72,12 @@ if [ $# -eq 0 ]; then
   # is one argmin per opener rather than a global ranking -- so it shares the
   # .npy loader and the run-histogram trick and nothing else.
   gcc $BASE $OMP -o secondword secondword.c
+  # secondexact is the EXACT best predetermined second word: the same strategy
+  # secondword picks a word for by a one-ply proxy, evaluated for what it really
+  # costs.  Separate program because the objective is a RANDOMISED strategy's
+  # expected guesses -- summed exactly by a recursion over candidate SETS -- which
+  # shares no search with anything else here.
+  gcc $BASE $OMP -o secondexact secondexact.c
   # strturns is the W -> S cell: the same objective over ALL 26**5 strings as
   # answers. Separate program because it shares no data structure with the
   # solver -- no pattern matrix and no candidate list, since neither survives
@@ -107,7 +113,7 @@ if [ $# -eq 0 ]; then
   # per-guess delta table nor either of antistall's two bounds survives the change
   # -- it shares the loader, the table and the arena and none of the search.
   gcc $BASE $OMP -o eldrowmax eldrowmax.c
-  echo "built ./optturns, ./hardturns, ./mmturns, ./ultraturns, ./pairsplit, ./secondword, ./strturns, ./strguess, ./greens, ./antistall, ./antiexpect and ./eldrowmax  (5 letters)"
+  echo "built ./optturns, ./hardturns, ./mmturns, ./ultraturns, ./pairsplit, ./secondword, ./secondexact, ./strturns, ./strguess, ./greens, ./antistall, ./antiexpect and ./eldrowmax  (5 letters)"
   exit 0
 fi
 

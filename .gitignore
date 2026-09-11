@@ -40,6 +40,7 @@ math/solver/optturns[0-9]
 math/solver/optturns[0-9][0-9]
 math/solver/pairsplit
 math/solver/secondword
+math/solver/secondexact
 math/solver/antistall
 math/solver/antiexpect
 math/solver/cover
