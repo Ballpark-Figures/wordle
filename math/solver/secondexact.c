@@ -101,13 +101,7 @@ static double now_s(void) {
  * clear is a memset of the whole table.  Replacement keeps the recently used
  * sets, which are the ones that recur, and bounds the memory exactly.
  *
- * THE KEY IS STORED INLINE AND COMPARED, so a hash collision cannot return
- * another set's value.  That caps what is cacheable at KEYMAX answers; bigger
- * sets are computed without the cache, which costs little because they are rare
- * and their PARTS -- where the reuse actually is -- are small.  A lost entry is
- * only a recomputation: T is a pure function of its set.
- */
-/* THE KEY IS A 128-BIT FINGERPRINT of the set, not the set itself.  Storing the
+ * THE KEY IS A 128-BIT FINGERPRINT of the set, not the set itself.  Storing the
  * answer indices inline caps what is cacheable at a couple of dozen, and that is
  * exactly wrong: a BAD opener leaves buckets of hundreds, whose recursion is the
  * expensive part and explodes without a cache -- measured, capping the key at 20
@@ -673,7 +667,7 @@ int main(int argc, char **argv) {
     double t0 = now_s(), last = t0;
     long long done = 0;
     double incumbent = HUGE_VAL;
-    int best_i = -1, cut_openers = 0;
+    int best_i = -1, cut_openers = 0, bounded = 0;
 
     /* PHASE 1: a cheap sound lower bound for every opener, with no recursion. */
 #ifdef _OPENMP
@@ -699,6 +693,24 @@ int main(int argc, char **argv) {
             for (int g = 0; g < MAXGRP; g++) rows[oi].second[g] = -1;
             rows[oi].bound = opener_bound(&m, openers[oi], q, out, rstart, rlen,
                                           nb, nq, gb);
+            /* PHASE 1 NARRATES.  It is a minute of work on the full list, and
+             * silence reads as a hang -- the same reason every other phase in
+             * this repo prints. */
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
+            bounded++;
+            if ((bounded & 255) == 0) {
+#ifdef _OPENMP
+#pragma omp critical (progress)
+#endif
+                if (now_s() - last >= report) {
+                    last = now_s();
+                    fprintf(stderr, "  bounding %d/%d openers  (%.0fs)\n",
+                            bounded, nopen, now_s() - t0);
+                    fflush(stderr);
+                }
+            }
         }
         free(q); free(out); free(rstart); free(rlen);
         free(m.e); free(m.buf); free(m.cnt); free(m.touch); free(m.start); free(m.len);
@@ -782,8 +794,14 @@ int main(int argc, char **argv) {
                 }
                 if (now_s() - last >= report) {
                     last = now_s();
+                    /* PROGRESS IS evaluated + cut, both SHARED and both only
+                     * rising.  It used to print this thread's loop index, which
+                     * under schedule(dynamic) is wherever the reporting thread
+                     * happened to be -- so it jumped 1446, 1451, 735, 5050 and
+                     * meant nothing. */
                     fprintf(stderr, "  %d/%d openers  %d evaluated, %d cut  "
-                            "best %.6f  (%.0fs)\n", k + 1, nopen, (int)done,
+                            "best %.6f  (%.0fs)\n",
+                            (int)done + cut_openers, nopen, (int)done,
                             cut_openers, incumbent / NA, now_s() - t0);
                     fflush(stderr);
                 }
