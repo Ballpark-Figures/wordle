@@ -2048,6 +2048,37 @@ differences instead.
   `mean(A-B)` equals `mean(A)-mean(B)` exactly, and pairing must actually reduce
   the spread.
 
+### `run-second-loss.sh` — where the EV loss goes, by the opener's grey count
+The gap between a second-word strategy and OPTIMAL play, decomposed. Every answer
+is played `-n` times under the strategy and compared with what that answer costs
+under the committed optimal TREE for the SAME opener; answers are grouped by how
+many greys the opener's reply shows, and each group's share of the whole gap is
+reported. **`bash solver/run-second-loss.sh --opener W [--second-from TABLE]`**
+(from `math/`); omitting the table measures the plain opener, which is how you
+price what the second word buys.
+- **"OPTIMAL" IS THE SAME OPENER, NOT THE BEST ONE**, and that is what makes it a
+  decomposition: each bucket's gap is about how the strategy plays THAT bucket
+  with the opener held fixed. The opener's own cost is a separate number
+  (`spilt` 3.48121 against `salet`'s 3.42117) and belongs to no bucket.
+- **IT IS THE CAPPED OPTIMUM** — minimum guesses subject to solving every answer
+  within six, which is what `optturns` computed and what the trees are — while
+  the strategy is UNCAPPED. A capped optimum is >= the unconstrained one, so
+  **every gap reported is a LOWER BOUND on the loss against true optimal play**.
+- **THE ESTIMATOR IS STRATIFIED: every answer is played the same number of
+  times**, so the answer weights are EXACT (1/2315 each) and the reported
+  standard error is the strategy's coin flips ALONE. The spread between answers
+  is the thing being decomposed, not noise in it — which is why this is per
+  answer rather than a uniform draw, whose bucket shares would carry sampling
+  noise of their own.
+- **THE GATE IS BUILT IN and always runs**: the tree's per-answer costs must sum
+  to the total the committed CSV records for that opener, it must cover every
+  answer exactly once and open with that word, the grey counts are recomputed
+  FROM THE STRINGS, and the bucket contributions must sum to the overall gap.
+  Mutation-tested (a wrong share denominator and a single altered tree cost were
+  each caught). It exits nonzero rather than reporting.
+- **MEASURED: 46,300 games in 0.36 s**, so `-n 1000` (2.3M games) is under 20 s.
+- Data under `math/data/shared/secondloss/`, log under `data/local/secondloss/`.
+
 ### The opener RACE (`run-wordle-race.sh`) — the cascade as ONE process
 The `wordlesim` analogue of the multiwordle race, and the way to find a good
 opener now. **`bash solver/run-wordle-race.sh --fallback answer|guess
