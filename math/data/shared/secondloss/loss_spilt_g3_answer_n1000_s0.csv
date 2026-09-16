@@ -1,14 +1,15 @@
-# EV loss vs optimal for the opener spilt, by the opener's grey count
+# EV loss vs optimal for the opener spilt, by grey count, split into word-choice and followup loss
 # strategy: second word from data/shared/secondword/second_guess_g3.csv firing on g3, follow-up answer
-# 1000 games per answer x 2315 answers, seed 0; the answer weights are EXACT
-# optimal is the CAPPED optimum for the SAME opener (total 8059, 3.48121 per answer): minimum
-# guesses subject to solving every answer within six.  The strategy is UNCAPPED, so every
-# gap here is a LOWER BOUND on the loss against unconstrained optimal play.
-# strategy 3.670496 +/- 0.000377, gap 0.189286; the contributions sum to it
-grays,answers,share,opt_mean,sim_mean,sim_stderr,gap,contribution,pct_of_gap,fires
-0,2,0.000864,1.500000,1.500000,0.000000,0.000000,0.000000,0.0000,0.000000
-1,16,0.006911,2.062500,2.061438,0.001398,-0.001062,-0.000007,-0.0039,0.000000
-2,179,0.077322,2.787709,2.971201,0.001589,0.183492,0.014188,7.4955,0.000000
-3,684,0.295464,3.244152,3.490630,0.000591,0.246478,0.072825,38.4737,1.000000
-4,947,0.409071,3.596621,3.747738,0.000576,0.151117,0.061818,32.6583,1.000000
-5,487,0.210367,3.899384,4.091727,0.000961,0.192343,0.040463,21.3764,1.000000
+# 1000 games per answer x 2315 answers, seed 0; answer weights are EXACT
+# A = capped optimum for the SAME opener (total 8059, 3.48121/ans), min guesses within six.  B = our forced 2nd word then the SAME
+# capped-optimal continuation.  C = the uncapped strategy.  A <= B <= C, so word-choice loss B-A and followup loss C-B
+# are each LOWER BOUNDS on the loss against unconstrained optimal play.
+# gap 0.189286 = word-choice loss 0.078186 (B-A) + followup loss 0.111101 (C-B)
+# gate: forcing each reply's own optimal 2nd move reproduces A per bucket, validating the residual solver
+grays,answers,share,opt_mean,optword_mean,sim_mean,sim_stderr,gap,word_gap,followup_gap,contribution,word_contrib,followup_contrib,pct_of_gap,fires
+0,2,0.000864,1.500000,1.500000,1.500000,0.000000,0.000000,0.000000,0.000000,0.000000,0.000000,0.000000,0.0000,0.000000
+1,16,0.006911,2.062500,2.062500,2.061438,0.001398,-0.001062,0.000000,-0.001062,-0.000007,0.000000,-0.000007,-0.0039,0.000000
+2,179,0.077322,2.787709,2.787709,2.971201,0.001589,0.183492,0.000000,0.183492,0.014188,0.000000,0.014188,7.4955,0.000000
+3,684,0.295464,3.244152,3.445906,3.490630,0.000591,0.246478,0.201754,0.044724,0.072825,0.059611,0.013214,38.4737,1.000000
+4,947,0.409071,3.596621,3.642027,3.747738,0.000576,0.151117,0.045407,0.105711,0.061818,0.018575,0.043243,32.6583,1.000000
+5,487,0.210367,3.899384,3.899384,4.091727,0.000961,0.192343,0.000000,0.192343,0.040463,0.000000,0.040463,21.3764,1.000000
