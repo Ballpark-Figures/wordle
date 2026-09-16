@@ -24,6 +24,17 @@
 # A greyed vowel is counted by POSITION, so this bucket depends on the OPENER's
 # letters as well as the reply, and the groups are built per opener.
 #
+# --split-matched-vowels CROSSES each --by-grays group with the number of MATCHED
+# (green or yellow) vowels instead -- "how many vowels we matched versus how many
+# consonants" (the consonants matched are (5 - greys) minus the vowels matched).
+# So `--by-grays 3 --split-matched-vowels` gives a different second word for every
+# (grey count, matched-vowel count) pair, splitting the 3- and 4-grey cases and
+# leaving the all-grey reply (no matched tiles) as ONE group `e5`.  The atom is
+# `mv<N>`; y is a vowel here too, stamped into the table.  Like `v<N>` it depends
+# on the opener's letters, so the groups are built per opener.  It is a DIFFERENT
+# partition from --split-vowels (the two cannot be combined) -- and for a fixed
+# opener the two are complementary (matched = the opener's vowels minus greyed).
+#
 # --group SPEC IS THE GENERAL FORM: one bucket of replies with its OWN second
 # word, repeated for a partition.  A spec is terms joined by `+`: g<N> (greys >=
 # N), e<N> (greys == N exactly), <G>g<Y>y (that composition).  So a separate word
@@ -87,6 +98,7 @@ FIRE=""
 GSPECS=""
 BYGRAYS=""
 SPLITV=0
+SPLITMV=0
 GIVEN=0
 LIMIT=0
 THREADS=0
@@ -100,6 +112,7 @@ while [ $# -gt 0 ]; do
         --group)      GSPECS="$GSPECS --group $2"; GIVEN=1; shift 2 ;;
         --by-grays)   BYGRAYS="$2"; GIVEN=1; shift 2 ;;
         --split-vowels) SPLITV=1; shift ;;
+        --split-matched-vowels) SPLITMV=1; shift ;;
         --limit)      LIMIT="$2"; shift 2 ;;
         --threads)    THREADS="$2"; shift 2 ;;
         --dry-run)    DRY=1; shift ;;
@@ -132,14 +145,40 @@ if [ -n "$BYGRAYS" ]; then
                 GSPECS="$GSPECS --group e${n}_v${v}"
                 v=$((v + 1))
             done
+        elif [ "$SPLITMV" = 1 ]; then
+            # ... and split each grey count by how many of the MATCHED (green or
+            # yellow) tiles sit on a vowel -- "vowels matched vs consonants
+            # matched".  A grey count of n leaves 5-n matched tiles, so mv runs
+            # 0..5-n; the all-grey reply (n=5) has no matched tiles and stays ONE
+            # group `e5`.  Empty combinations (mv2 for a one-vowel opener) never
+            # fire.  y is a vowel (secondword.VOWELS), stamped into the table.
+            matched=$((5 - n))
+            if [ "$matched" -le 0 ]; then
+                GSPECS="$GSPECS --group e$n"
+            else
+                mv=0
+                while [ "$mv" -le "$matched" ]; do
+                    GSPECS="$GSPECS --group e${n}_mv${mv}"
+                    mv=$((mv + 1))
+                done
+            fi
         else
             GSPECS="$GSPECS --group e$n"
         fi
         n=$((n - 1))
     done
 fi
+if [ "$SPLITV" = 1 ] && [ "$SPLITMV" = 1 ]; then
+    echo "--split-vowels and --split-matched-vowels are two different partitions;"\
+         "pick one" >&2
+    exit 1
+fi
 if [ "$SPLITV" = 1 ] && [ -z "$BYGRAYS" ]; then
     echo "--split-vowels splits the --by-grays groups; pass --by-grays N too" >&2
+    exit 1
+fi
+if [ "$SPLITMV" = 1 ] && [ -z "$BYGRAYS" ]; then
+    echo "--split-matched-vowels splits the --by-grays groups; pass --by-grays N too" >&2
     exit 1
 fi
 if [ "$GIVEN" = 0 ]; then

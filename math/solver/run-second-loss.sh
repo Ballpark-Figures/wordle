@@ -12,6 +12,14 @@
 # and each group's share of the whole gap is reported.  The contributions sum to
 # the gap, so it is a decomposition rather than a set of separate numbers.
 #
+# Within each grey bucket the gap is split further into WHY it is there:
+#   word-choice loss = B - A   (our forced 2nd word vs the optimal one, both
+#                               played optimally afterward)
+#   followup loss    = C - B   (our random followup vs optimal, given our word)
+# where A is the optimal tree, B is our 2nd word then OPTIMAL continuation (an
+# exact small solve, capped at 6 like A), and C is the simulated strategy.  A gate
+# forces each reply's own optimal 2nd move and checks that B reproduces A exactly.
+#
 # "OPTIMAL" MEANS TWO THINGS HERE AND BOTH ARE LOAD-BEARING:
 #
 #   * THE SAME OPENER, not the best one.  That is the only comparison that
@@ -49,6 +57,7 @@ N=100
 SEED=0
 PROGRESS=""
 DRYRUN=0
+SPLITMV=0
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -58,6 +67,7 @@ while [ $# -gt 0 ]; do
         -n|--games)    N="$2";          shift 2 ;;
         --seed)        SEED="$2";       shift 2 ;;
         --progress)    PROGRESS="$2";   shift 2 ;;
+        --split-matched-vowels) SPLITMV=1; shift ;;
         --dry-run)     DRYRUN=1;        shift ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
     esac
@@ -87,7 +97,10 @@ fi
 
 OUTDIR=data/shared/secondloss
 LOC=data/local/secondloss
-STEM="loss_${OPENER}_${LABEL}_${FALLBACK}_n${N}_s${SEED}"
+# The matched-vowel split is a different report, so it gets its own filename.
+MVTAG=""
+[ "$SPLITMV" = 0 ] || MVTAG="_mv"
+STEM="loss_${OPENER}_${LABEL}_${FALLBACK}_n${N}_s${SEED}${MVTAG}"
 OUT="$OUTDIR/$STEM.csv"
 
 echo "EV-loss breakdown"
@@ -95,6 +108,7 @@ echo "  opener     $OPENER"
 echo "  strategy   ${SECONDFROM:-(none: the plain opener)}  (fires on $LABEL)"
 echo "  follow-up  $FALLBACK"
 echo "  games      $N per answer x 2315 answers, seed $SEED"
+[ "$SPLITMV" = 0 ] || echo "  report     3- and 4-grey split by matched vowels"
 echo "  out        $OUT"
 
 if [ "$DRYRUN" = 1 ]; then
@@ -114,5 +128,6 @@ echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] second-loss $STEM" | tee -a "$LOC/$STEM.l
 FLAGS="--opener $OPENER --fallback $FALLBACK --n $N --seed $SEED --out $OUT"
 [ -z "$SECONDFROM" ] || FLAGS="$FLAGS --second-from $SECONDFROM"
 [ -z "$PROGRESS" ]   || FLAGS="$FLAGS --progress $PROGRESS"
+[ "$SPLITMV" = 0 ]   || FLAGS="$FLAGS --split-matched-vowels"
 
 "$PY" -u tools/secondloss.py $FLAGS 2>&1 | tee -a "$LOC/$STEM.log"
