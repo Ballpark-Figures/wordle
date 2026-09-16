@@ -59,32 +59,34 @@
 #include <ctype.h>
 #include <time.h>
 #include <math.h>
+#include "groups.h"
 #ifdef _OPENMP
 #include <omp.h>
 #endif
 
-#define NPAT  243
-#define WBUF  8
-#define WORDLEN 5
 #define ALL_GREEN (NPAT - 1)
 #define MAXDEPTH 64
 
 static int      NG, NA;
 static uint8_t *PAT;                 /* NG * NA, row-major */
 static char   (*GWORD)[WBUF];
-static int8_t   GRAYS[NPAT], GREENS[NPAT], YELLOWS[NPAT];
-/* THE GROUPS ARE INDEPENDENT, and that is what makes the per-grey-count version
- * no harder than the single-word one: they PARTITION the firing replies, so the
+/* THE GROUPS ARE INDEPENDENT, and that is what makes a per-bucket version no
+ * harder than the single-word one: they PARTITION the firing replies, so the
  * strategy's total is
  *     decline + sum over groups of (that group's cost with its own word)
  * and each group's best word can be found on its own.  There is no joint search
  * over k words -- k separate argmins, and since every answer still falls in
- * exactly one group the total scanning work barely moves. */
-#define MAXGRP 8
-static uint8_t  GFIRE[MAXGRP][NPAT]; /* which replies each group covers */
-static char     GNAME[MAXGRP][8];
-static int      NGRP = 1;
+ * exactly one group the total scanning work barely moves.
+ *
+ * WHICH REPLIES A GROUP COVERS IS groups.c's ANSWER, not this file's.  The same
+ * unit defines it for `secondword`, so a table one writes is a table the other
+ * reads and they cannot drift on what `e3_mv1` means.  The vowel atoms make a
+ * mask depend on the OPENER, so the masks are rebuilt per opener where they are
+ * used rather than once at startup. */
+#define MAXGRP MAXGROUP
+static uint8_t  GFIRE[MAXGRP][NPAT]; /* the CURRENT opener's group masks */
 static uint8_t  FIRE[NPAT];          /* any group at all: the union */
+static int      OPENER_DEP;          /* do the masks depend on the opener? */
 static int32_t *ANS2G;               /* answer index -> guess index */
 
 static double now_s(void) {
@@ -282,17 +284,6 @@ static uint8_t *load_npy(const char *path, int *rows, int *cols) {
     return d;
 }
 
-static void build_tiles(void) {
-    for (int c = 0; c < NPAT; c++) {
-        int x = c, gr = 0, gn = 0, y = 0;
-        for (int i = 0; i < WORDLEN; i++) {
-            int t = x % 3;
-            if (t == 0) gr++; else if (t == 2) gn++; else y++;
-            x /= 3;
-        }
-        GRAYS[c] = (int8_t)gr; GREENS[c] = (int8_t)gn; YELLOWS[c] = (int8_t)y;
-    }
-}
 
 /* ------------------------------------------------------- one opener ------- */
 
@@ -356,7 +347,28 @@ static double fired_total(Memo *m, const uint16_t *q, int nq, const int *rstart,
  * the random tail straight away.  Independent of the second word, so it is
  * computed once per opener -- and it is what makes one opener comparable with
  * another rather than only one second word with another. */
-static double decline_total(Memo *m, int og, uint16_t *out, int depth) {
+/* THE MASKS THIS OPENER FIRES ON.  A condition of grey counts alone has the same
+ * masks for every opener and they were built once at startup; a v<N> or mv<N>
+ * atom makes them depend on the opener's letters, so they are rebuilt here --
+ * into the CALLER'S buffers, because the walk is threaded and a shared mask
+ * would be another thread's opener half the time. */
+static void masks_for(int og, uint8_t (*gf)[NPAT], uint8_t *fu,
+                      int8_t *gvow, int8_t *mvow) {
+    if (!OPENER_DEP) {
+        memcpy(gf, GFIRE, (size_t)NGROUP * NPAT);
+        memcpy(fu, FIRE, NPAT);
+        return;
+    }
+    groups_vowel_counts(og, gvow, mvow);
+    for (int p = 0; p < NPAT; p++) fu[p] = 0;
+    for (int g = 0; g < NGROUP; g++) {
+        groups_mask_for(&GRP[g], gvow, mvow, gf[g]);
+        for (int p = 0; p < NPAT; p++) fu[p] |= gf[g][p];
+    }
+}
+
+static double decline_total(Memo *m, int og, uint16_t *out, int depth,
+                            const uint8_t *fu) {
     const uint8_t *row = PAT + (size_t)og * NA;
     int *cnt = m->cnt + (size_t)depth * NPAT;
     int *touch = m->touch + (size_t)depth * NPAT;
@@ -364,7 +376,7 @@ static double decline_total(Memo *m, int og, uint16_t *out, int depth) {
     int *plen = m->len + (size_t)depth * NPAT;
     int nt = 0;
     for (int a = 0; a < NA; a++) {
-        if (FIRE[row[a]]) continue;
+        if (fu[row[a]]) continue;
         int p = row[a];
         if (cnt[p]++ == 0) touch[nt++] = p;
     }
@@ -377,7 +389,7 @@ static double decline_total(Memo *m, int og, uint16_t *out, int depth) {
         acc += plen[k];
     }
     for (int a = 0; a < NA; a++)
-        if (!FIRE[row[a]]) out[cnt[row[a]]++] = (uint16_t)a;
+        if (!fu[row[a]]) out[cnt[row[a]]++] = (uint16_t)a;
     double tot = 0.0;
     for (int k = 0; k < nt; k++) {
         tot += plen[k];                          /* the opener itself */
@@ -413,7 +425,8 @@ static int cmp_cand(const void *a, const void *b) {
  */
 static double opener_bound(Memo *m, int og, uint16_t *q, uint16_t *out,
                            int *rstart, int *rlen, int *nbp, int *nqp,
-                           double *gbound) {
+                           double *gbound, const uint8_t (*gf)[NPAT],
+                           const uint8_t *fu) {
     const uint8_t *row = PAT + (size_t)og * NA;
     int *cnt = m->cnt, *touch = m->touch;
     double tot = 0.0;
@@ -421,7 +434,7 @@ static double opener_bound(Memo *m, int og, uint16_t *q, uint16_t *out,
     /* the DECLINE branch, bounded */
     int nt = 0;
     for (int a = 0; a < NA; a++) {
-        if (FIRE[row[a]]) continue;
+        if (fu[row[a]]) continue;
         if (cnt[row[a]]++ == 0) touch[nt++] = row[a];
     }
     for (int k = 0; k < nt; k++) {
@@ -434,8 +447,8 @@ static double opener_bound(Memo *m, int og, uint16_t *q, uint16_t *out,
     /* each GROUP separately: its answers, grouped by the opener's reply, then
      * the cheapest possible second word for it.  The groups are independent, so
      * their bounds simply add. */
-    for (int g = 0; g < NGRP; g++) {
-        const uint8_t *fire = GFIRE[g];
+    for (int g = 0; g < NGROUP; g++) {
+        const uint8_t *fire = gf[g];
         int nb = 0, nq = 0;
         for (int a = 0; a < NA; a++) {
             if (!fire[row[a]]) continue;
@@ -475,14 +488,15 @@ static double opener_bound(Memo *m, int og, uint16_t *q, uint16_t *out,
  * HUGE_VAL to evaluate every word. */
 static void solve_opener(Memo *m, int og, Row *r, double incumbent, int no_prune,
                          uint16_t *q, uint16_t *out, int *rstart, int *rlen,
-                         int *nbs, int *nqs, const double *gbound) {
+                         int *nbs, int *nqs, const double *gbound,
+                         const uint8_t *fu) {
     memo_clear(m);
     r->opener = og;
-    r->decline = decline_total(m, og, out, 0);
+    r->decline = decline_total(m, og, out, 0, fu);
     r->done = 1;
 
     Cand *cand = malloc(sizeof(Cand) * NG);
-    for (int g = 0; g < NGRP; g++) {
+    for (int g = 0; g < NGROUP; g++) {
         r->second[g] = -1;
         r->fired[g] = 0.0;
         r->scanned[g] = r->cut[g] = 0;
@@ -513,7 +527,7 @@ static void solve_opener(Memo *m, int og, Row *r, double incumbent, int no_prune
          * If that is not below the incumbent, this word cannot be part of a
          * winning opener at all. */
         double floor_other = 0.0;
-        for (int h = 0; h < NGRP; h++)
+        for (int h = 0; h < NGROUP; h++)
             if (h != g) floor_other += (h < g) ? r->fired[h] : gbound[h];
         double best = HUGE_VAL;
         for (int i = 0; i < NG; i++) {
@@ -537,7 +551,7 @@ int main(int argc, char **argv) {
     const char *datadir = "data", *outpath = NULL, *patpath = NULL;
     const char *one = NULL, *openpath = NULL;
     int min_grays = 3, by_grays = 0, threads = 0, limit = 0, no_prune = 0,
-        memo_bits = 19;
+        memo_bits = 19, split_v = 0, split_mv = 0, print_label = 0;
     double report = 10.0;
 
     for (int i = 1; i < argc; i++) {
@@ -548,6 +562,15 @@ int main(int argc, char **argv) {
         /* --by-grays N: a SEPARATE word for each grey count from 5 down to N,
          * which is secondword's e5.e4....eN partition. */
         else if (!strcmp(argv[i], "--by-grays") && i + 1 < argc) by_grays = atoi(argv[++i]);
+        /* --group SPEC: any partition groups.c can express, including the vowel
+         * atoms -- the same flag, the same grammar and the same canonical name
+         * secondword uses, because it is the same code. */
+        else if (!strcmp(argv[i], "--group") && i + 1 < argc) groups_add(argv[++i]);
+        /* --split-vowels / --split-matched-vowels: the cross product of the
+         * --by-grays groups with the greyed or matched vowel count, written out
+         * here so the flag means the same thing in both solvers. */
+        else if (!strcmp(argv[i], "--split-vowels")) split_v = 1;
+        else if (!strcmp(argv[i], "--split-matched-vowels")) split_mv = 1;
         else if (!strcmp(argv[i], "--opener") && i + 1 < argc) one = argv[++i];
         else if (!strcmp(argv[i], "--openers") && i + 1 < argc) openpath = argv[++i];
         else if (!strcmp(argv[i], "--threads") && i + 1 < argc) threads = atoi(argv[++i]);
@@ -558,9 +581,14 @@ int main(int argc, char **argv) {
          * as the pruned walk.  That equality is the gate's sharpest check, so the
          * flag exists for it rather than for production. */
         else if (!strcmp(argv[i], "--no-prune")) no_prune = 1;
+        /* --print-label resolves the firing condition, prints its CANONICAL name
+         * and stops.  The wrapper needs that name for the filename, and groups.c
+         * is the one place that knows it -- deriving it in shell would be a
+         * second implementation of the rule the two solvers share. */
+        else if (!strcmp(argv[i], "--print-label")) print_label = 1;
         else { fprintf(stderr, "unknown arg: %s\n", argv[i]); return 1; }
     }
-    if (!outpath) {
+    if (!outpath && !print_label) {
         fprintf(stderr, "secondexact needs --out FILE -- a run that prints its "
                         "answer and saves NOTHING is a run lost.\n"
                         "Use the wrapper: bash solver/run-second-exact.sh\n");
@@ -573,6 +601,26 @@ int main(int argc, char **argv) {
     if (by_grays && (by_grays < 1 || by_grays > WORDLEN)) {
         fprintf(stderr, "--by-grays must be 1..%d\n", WORDLEN);
         return 1;
+    }
+    if (split_v && split_mv) {
+        fprintf(stderr, "--split-vowels and --split-matched-vowels are two "
+                        "different partitions; pick one\n");
+        return 1;
+    }
+    if ((split_v || split_mv) && !by_grays) {
+        fprintf(stderr, "--split-%svowels splits the --by-grays groups; pass "
+                        "--by-grays N too\n", split_mv ? "matched-" : "");
+        return 1;
+    }
+    if (print_label) {
+        /* the tiles are all groups_resolve needs (a vowel atom defers its
+         * checks to the opener loop), so this answers without loading a thing */
+        char lab[512];
+        groups_build_tiles();
+        if (by_grays) groups_add_by_grays(by_grays, split_v, split_mv);
+        groups_resolve(min_grays, lab, sizeof lab);
+        printf("%s\n", lab);
+        return 0;
     }
 
     char path[1024];
@@ -602,34 +650,29 @@ int main(int argc, char **argv) {
             return 1;
         }
     }
-    build_tiles();
-    /* ONE GROUP, or one per grey count.  --by-grays N is the partition
-     * e5 . e4 . ... . eN, the same condition secondword names that way, so a
-     * table from either side means the same thing. */
-    char label[64];
-    if (by_grays) {
-        NGRP = 0;
-        for (int k = WORDLEN; k >= by_grays; k--) {
-            snprintf(GNAME[NGRP], sizeof GNAME[0], "e%d", k);
-            for (int p = 0; p < NPAT; p++) GFIRE[NGRP][p] = GRAYS[p] == k;
-            NGRP++;
+    groups_build_tiles();
+    groups_build_vpos(GWORD, NG);
+    /* ONE GROUP, or one per grey count, or anything groups.c can express -- the
+     * --group spec is passed straight through, so `--group e3_mv1` means here
+     * exactly what it means to secondword. */
+    char label[512];
+    if (by_grays) groups_add_by_grays(by_grays, split_v, split_mv);
+    groups_resolve(min_grays, label, sizeof label);
+    OPENER_DEP = groups_opener_dependent();
+    if (!OPENER_DEP) {
+        /* opener-independent: one set of masks serves every opener */
+        int8_t zero[NPAT];
+        for (int p = 0; p < NPAT; p++) zero[p] = 0;
+        for (int g = 0; g < NGROUP; g++)
+            groups_mask_for(&GRP[g], zero, zero, GFIRE[g]);
+        for (int p = 0; p < NPAT; p++) {
+            FIRE[p] = 0;
+            for (int g = 0; g < NGROUP; g++) FIRE[p] |= GFIRE[g][p];
         }
-        size_t n = 0;
-        for (int g = NGRP - 1; g >= 0; g--)
-            n += (size_t)snprintf(label + n, sizeof label - n, "%s%s",
-                                  g == NGRP - 1 ? "" : ".", GNAME[g]);
-    } else {
-        NGRP = 1;
-        snprintf(GNAME[0], sizeof GNAME[0], "g%d", min_grays);
-        for (int p = 0; p < NPAT; p++) GFIRE[0][p] = GRAYS[p] >= min_grays;
-        snprintf(label, sizeof label, "g%d", min_grays);
     }
-    for (int p = 0; p < NPAT; p++) {
-        FIRE[p] = 0;
-        for (int g = 0; g < NGRP; g++) FIRE[p] |= GFIRE[g][p];
-    }
-    fprintf(stderr, "loaded %d guesses x %d answers; firing on %s (%d group%s)\n",
-            NG, NA, label, NGRP, NGRP == 1 ? "" : "s");
+    fprintf(stderr, "loaded %d guesses x %d answers; firing on %s (%d group%s%s)\n",
+            NG, NA, label, NGROUP, NGROUP == 1 ? "" : "s",
+            OPENER_DEP ? ", per opener" : "");
 
     int *openers = malloc(sizeof(int) * NG), nopen = 0;
     if (one) {
@@ -680,8 +723,15 @@ int main(int argc, char **argv) {
         uint16_t *out = malloc(sizeof(uint16_t) * NA);
         int *rstart = malloc(sizeof(int) * NPAT * MAXGRP);
         int *rlen = malloc(sizeof(int) * NPAT * MAXGRP);
-        int nb[MAXGRP], nq[MAXGRP];
-        double gb[MAXGRP];
+        int nb[MAXGROUP], nq[MAXGROUP];
+        double gb[MAXGROUP];
+        /* the opener's own masks: shared when the condition is grey counts
+         * alone, rebuilt per opener when a vowel atom makes them depend on the
+         * word's letters.  Per THREAD, because the walk is threaded and a shared
+         * mask would be another thread's opener half the time. */
+        uint8_t (*gf)[NPAT] = malloc(sizeof(uint8_t) * MAXGROUP * NPAT);
+        uint8_t *fu = malloc(NPAT);
+        int8_t *gvow = malloc(NPAT), *mvow = malloc(NPAT);
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic, 8)
 #endif
@@ -691,8 +741,9 @@ int main(int argc, char **argv) {
              * and index 0 is a perfectly good word, so the zero read back as a
              * real choice and printed as one. */
             for (int g = 0; g < MAXGRP; g++) rows[oi].second[g] = -1;
+            masks_for(openers[oi], gf, fu, gvow, mvow);
             rows[oi].bound = opener_bound(&m, openers[oi], q, out, rstart, rlen,
-                                          nb, nq, gb);
+                                          nb, nq, gb, gf, fu);
             /* PHASE 1 NARRATES.  It is a minute of work on the full list, and
              * silence reads as a hang -- the same reason every other phase in
              * this repo prints. */
@@ -713,6 +764,7 @@ int main(int argc, char **argv) {
             }
         }
         free(q); free(out); free(rstart); free(rlen);
+        free(gf); free(fu); free(gvow); free(mvow);
         free(m.e); free(m.buf); free(m.cnt); free(m.touch); free(m.start); free(m.len);
     }
     int *order = malloc(sizeof(int) * nopen);
@@ -745,8 +797,15 @@ int main(int argc, char **argv) {
         uint16_t *out = malloc(sizeof(uint16_t) * NA);
         int *rstart = malloc(sizeof(int) * NPAT * MAXGRP);
         int *rlen = malloc(sizeof(int) * NPAT * MAXGRP);
-        int nbs[MAXGRP], nqs[MAXGRP];
-        double gbs[MAXGRP];
+        int nbs[MAXGROUP], nqs[MAXGROUP];
+        double gbs[MAXGROUP];
+        /* the opener's own masks: shared when the condition is grey counts
+         * alone, rebuilt per opener when a vowel atom makes them depend on the
+         * word's letters.  Per THREAD, because the walk is threaded and a shared
+         * mask would be another thread's opener half the time. */
+        uint8_t (*gf)[NPAT] = malloc(sizeof(uint8_t) * MAXGROUP * NPAT);
+        uint8_t *fu = malloc(NPAT);
+        int8_t *gvow = malloc(NPAT), *mvow = malloc(NPAT);
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic, 1)
 #endif
@@ -767,9 +826,11 @@ int main(int argc, char **argv) {
             }
             /* the layout again -- cheap, and it keeps phase 2 independent of
              * whatever phase 1 left in the shared buffers */
-            opener_bound(&m, rr->opener, q, out, rstart, rlen, nbs, nqs, gbs);
+            masks_for(rr->opener, gf, fu, gvow, mvow);
+            opener_bound(&m, rr->opener, q, out, rstart, rlen, nbs, nqs, gbs,
+                         gf, fu);
             solve_opener(&m, rr->opener, rr, inc, no_prune, q, out, rstart, rlen,
-                         nbs, nqs, gbs);
+                         nbs, nqs, gbs, fu);
 #ifdef _OPENMP
 #pragma omp critical (progress)
 #endif
@@ -777,7 +838,7 @@ int main(int argc, char **argv) {
                 done++;
                 double v = rr->decline;
                 int any = 0;
-                for (int g = 0; g < NGRP; g++) {
+                for (int g = 0; g < NGROUP; g++) {
                     v += rr->fired[g];
                     any |= rr->second[g] >= 0;
                 }
@@ -786,7 +847,7 @@ int main(int argc, char **argv) {
                     best_i = oi;
                     fprintf(stderr, "[%6.0fs] %s", now_s() - t0,
                             GWORD[rr->opener]);
-                    for (int g = NGRP - 1; g >= 0; g--)
+                    for (int g = NGROUP - 1; g >= 0; g--)
                         fprintf(stderr, " %s", rr->second[g] >= 0
                                 ? GWORD[rr->second[g]] : "-");
                     fprintf(stderr, "  %.6f  NEW BEST\n", v / NA);
@@ -808,6 +869,7 @@ int main(int argc, char **argv) {
             }
         }
         free(q); free(out); free(rstart); free(rlen);
+        free(gf); free(fu); free(gvow); free(mvow);
         free(m.e); free(m.buf); free(m.cnt); free(m.touch); free(m.start); free(m.len);
     }
 
@@ -828,18 +890,18 @@ int main(int argc, char **argv) {
         Row *v = &rows[oi];
         double tot = v->decline;
         int any = 0;
-        for (int g = 0; g < NGRP; g++) {
+        for (int g = 0; g < NGROUP; g++) {
             tot += v->fired[g];
             any |= v->second[g] >= 0;
         }
-        for (int g = NGRP - 1; g >= 0; g--) {
+        for (int g = NGROUP - 1; g >= 0; g--) {
             if (!v->done) {
-                fprintf(f, "%s,%s,,,,,,%d,0,cut\n", GWORD[v->opener], GNAME[g],
+                fprintf(f, "%s,%s,,,,,,%d,0,cut\n", GWORD[v->opener], GSPEC[g],
                         v->nq[g]);
                 continue;
             }
             if (v->second[g] < 0) {
-                fprintf(f, "%s,%s,,,,,,%d,%d,none\n", GWORD[v->opener], GNAME[g],
+                fprintf(f, "%s,%s,,,,,,%d,%d,none\n", GWORD[v->opener], GSPEC[g],
                         v->nq[g], v->scanned[g]);
                 continue;
             }
@@ -847,7 +909,7 @@ int main(int argc, char **argv) {
              * group's row: the groups are independent but the value is not one
              * of them, it is their sum plus the decline branch. */
             fprintf(f, "%s,%s,%s,%.6f,%.4f,%.4f,%.4f,%d,%d,%d\n",
-                    GWORD[v->opener], GNAME[g], GWORD[v->second[g]],
+                    GWORD[v->opener], GSPEC[g], GWORD[v->second[g]],
                     any ? tot / NA : 0.0, any ? tot : 0.0, v->decline,
                     v->fired[g], v->nq[g], v->scanned[g], v->cut[g]);
         }
@@ -855,9 +917,9 @@ int main(int argc, char **argv) {
     fclose(f);
     if (best_i >= 0) {
         fprintf(stderr, "\nbest: %s then", GWORD[rows[best_i].opener]);
-        for (int g = NGRP - 1; g >= 0; g--)
+        for (int g = NGROUP - 1; g >= 0; g--)
             fprintf(stderr, " %s (%s)", rows[best_i].second[g] >= 0
-                    ? GWORD[rows[best_i].second[g]] : "-", GNAME[g]);
+                    ? GWORD[rows[best_i].second[g]] : "-", GSPEC[g]);
         fprintf(stderr, " -- %.6f expected guesses (exact)\n", incumbent / NA);
     }
     fprintf(stderr, "%d openers: %lld evaluated exactly, %d cut by the bound, "

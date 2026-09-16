@@ -36,6 +36,7 @@ from wordle import load_words, pattern  # noqa: E402
 
 MATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 BINARY = os.path.join(MATH, "solver", "secondexact")
+WORD_LEN = 5
 
 MINI_GUESSES = [
     "crane", "slate", "trace", "adieu", "audio", "roast", "stern", "pilot",
@@ -279,8 +280,27 @@ def check_by_grays():
               "better than one shared word" % (checked, better))
 
 
-def ref_total_groups(opener, words):
-    """The strategy's total when the grey COUNT selects the word."""
+def by_grays_label(opener, t):
+    """The grey COUNT names the group."""
+    return "e%d" % sum(1 for x in t if x == 0)
+
+
+def matched_vowel_label(opener, t):
+    """The grey count AND how many of the OPENER's vowel positions came back
+    non-grey.  Derived here from the STRINGS -- `y` is a vowel, counted by
+    POSITION -- so it shares nothing with the C's tile tables.  A reply with 5
+    greys matched nothing, so `e5_mv0` would be the whole of `e5`: groups.c
+    writes the shorter name and this must agree, or the label it asks for will
+    not be in the table."""
+    n = sum(1 for x in t if x == 0)
+    if n == WORD_LEN:
+        return "e%d" % n
+    mv = sum(1 for ch, x in zip(opener, t) if ch in "aeiouy" and x != 0)
+    return "e%d_mv%d" % (n, mv)
+
+
+def ref_total_groups(opener, words, label=by_grays_label):
+    """The strategy's total when `label` selects which committed word to play."""
     tot = Fraction(0)
     decline, fired = {}, {}
     for a in MINI_ANSWERS:
@@ -292,7 +312,12 @@ def ref_total_groups(opener, words):
         if any(x != 2 for x in t):
             tot += ref_T(grp)
     for t, grp in fired.items():
-        second = words["e%d" % sum(1 for x in t if x == 0)]
+        key = label(opener, t)
+        if key not in words or not words[key]:
+            bad("%s: a reply lands in group %s, where the C committed to no "
+                "word at all" % (opener, key))
+            return None
+        second = words[key]
         tot += 2 * len(grp)
         parts = {}
         for a in grp:
@@ -302,6 +327,82 @@ def ref_total_groups(opener, words):
                 continue
             tot += ref_T(sub)
     return tot
+
+
+def check_vowel_groups():
+    """7. A VOWEL PARTITION: the group depends on the OPENER, not just the reply.
+
+    `--split-matched-vowels` crosses the grey counts with how many of the
+    opener's own vowels came back matched, so two openers seeing the SAME reply
+    can be in different groups -- the masks are rebuilt per opener and this is
+    the only check that exercises that path.  Same discipline as check 6: the
+    enumeration is told which words the C committed to and must reproduce its
+    total, and the finer partition can never be worse than the coarser one it
+    refines.
+    """
+    print("7. a word per (grey count, matched vowels)")
+    tmp = tempfile.mkdtemp(prefix="checkse-mv-")
+    make_data(tmp, MINI_GUESSES, MINI_ANSWERS)
+    coarse = os.path.join(tmp, "coarse.csv")
+    fine = os.path.join(tmp, "fine.csv")
+    run(["--data", tmp, "--by-grays", "3", "--threads", "1", "--no-prune",
+         "--out", coarse])
+    run(["--data", tmp, "--by-grays", "3", "--split-matched-vowels",
+         "--threads", "1", "--no-prune", "--out", fine])
+    # THE GROUP NAMES COME FROM THE BINARY, not from a list typed here: groups.c
+    # owns the canonical form, and a gate that spelled them itself would pass
+    # while the two solvers disagreed about what to call the same partition.
+    label = run(["--by-grays", "3", "--split-matched-vowels",
+                 "--print-label"]).stdout.strip()
+    groups = label.split(".")
+    if matched_vowel_label("aeiou", (0, 0, 0, 0, 0)) != "e5" or "e5" not in groups:
+        bad("the matched-vowel partition did not collapse e5: %s" % label)
+        return
+    rk = {g: read_rows(fine, g) for g in groups}
+    rc = {g: read_rows(coarse, g) for g in ("e5", "e4", "e3")}
+    checked = better = split = 0
+    for opener in sorted(rk["e3"] if "e3" in rk else rk[groups[0]]):
+        words = {g: rk[g][opener][0] for g in groups}
+        if not any(words.values()):
+            continue                      # nothing qualifies for this opener
+        want = ref_total_groups(opener, words, matched_vowel_label)
+        if want is None:
+            return
+        # an EMPTY group writes a row with no numbers (status `none`), so the
+        # total is read off whichever group actually received answers
+        got = next(float(rk[g][opener][2]) for g in groups if rk[g][opener][2])
+        if abs(float(want) - got) > 1e-9:
+            bad("%s with %s: the C totals %.6f, the enumeration %.6f"
+                % (opener, words, got, float(want)))
+            return
+        # refining a partition can never hurt: giving every mv group the coarse
+        # group's own word is one of the choices the finer search is free to make
+        coarse_tot = next(float(rc[g][opener][2])
+                          for g in ("e3", "e4", "e5") if rc[g][opener][2])
+        if got > coarse_tot + 1e-9:
+            bad("%s: splitting on matched vowels totals %.6f, worse than the "
+                "grey count alone at %.6f" % (opener, got, coarse_tot))
+            return
+        if got < coarse_tot - 1e-9:
+            better += 1
+        # did the split actually CHOOSE differently anywhere?
+        for n in (3, 4):
+            picked = {words[g] for g in groups
+                      if g.startswith("e%d_" % n) and words[g]}
+            if len(picked) > 1:
+                split = 1
+        checked += 1
+    if checked < 5:
+        bad("only %d openers were compared in the vowel-partition check" % checked)
+    elif not better:
+        bad("the matched-vowel split never beat the grey count alone, so "
+            "nothing here distinguishes the two")
+    elif not split:
+        bad("no opener ever played two different words within one grey count, "
+            "so the vowel half of the key was never exercised")
+    else:
+        print("   ok   %d openers match the enumeration, %d strictly better "
+              "than the grey count alone" % (checked, better))
 
 
 def check_bound():
@@ -379,6 +480,7 @@ def main(argv):
     check_prune()
     check_bound()
     check_by_grays()
+    check_vowel_groups()
     check_real()
     check_refusals()
     print()

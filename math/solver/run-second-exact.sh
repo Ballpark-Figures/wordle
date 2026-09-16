@@ -50,6 +50,9 @@ OPENER=""
 OPENERS=""
 MINGRAYS=3
 BYGRAYS=""
+SPLITV=0
+SPLITMV=0
+GSPECS=""
 LIMIT=""
 THREADS=""
 MEMOBITS=""
@@ -63,6 +66,9 @@ while [ $# -gt 0 ]; do
         --openers)    OPENERS="$2";  shift 2 ;;
         --min-grays)  MINGRAYS="$2"; shift 2 ;;
         --by-grays)   BYGRAYS="$2";  shift 2 ;;
+        --split-vowels)         SPLITV=1;  shift ;;
+        --split-matched-vowels) SPLITMV=1; shift ;;
+        --group)      GSPECS="$GSPECS --group $2"; shift 2 ;;
         --limit)      LIMIT="$2";    shift 2 ;;
         --threads)    THREADS="$2";  shift 2 ;;
         --memo-bits)  MEMOBITS="$2"; shift 2 ;;
@@ -93,19 +99,26 @@ BIN=solver/secondexact
 
 OUTDIR=data/shared/secondexact
 LOC=data/local/secondexact
-if [ -n "$BYGRAYS" ]; then
-    case "$BYGRAYS" in
-        ''|*[!0-9]*) echo "--by-grays must be a number of grey tiles" >&2; exit 1 ;;
-    esac
-    LABEL=""
-    n="$BYGRAYS"
-    while [ "$n" -le 5 ]; do
-        LABEL="${LABEL:+$LABEL.}e$n"
-        n=$((n + 1))
-    done
-else
-    LABEL="g${MINGRAYS}"
-fi
+
+# THE FIRING CONDITION, and nothing else -- these are the flags that decide both
+# what the run computes and what it is called.
+# EVERY condition flag is forwarded, INCLUDING a --split-* with nothing to
+# split: the binary refuses that combination, and swallowing it here would
+# quietly run the plain --min-grays condition under a flag asking for another.
+COND=""
+[ -z "$BYGRAYS" ]  || COND="$COND --by-grays $BYGRAYS"
+[ "$SPLITV" = 0 ]  || COND="$COND --split-vowels"
+[ "$SPLITMV" = 0 ] || COND="$COND --split-matched-vowels"
+COND="$COND$GSPECS"
+# --min-grays is the SUGAR for "no groups named", so it applies only then.
+[ -n "$COND" ] || COND=" --min-grays $MINGRAYS"
+
+# ASK THE BINARY WHAT THE CONDITION IS CALLED.  groups.c canonicalises a spec --
+# it sorts the groups, drops repeats, and collapses a vacuous split (e5_mv0 IS
+# e5) -- so the name cannot be derived here without writing that rule a second
+# time, in a second language.  It also means an impossible combination is
+# refused NOW, before a log or a CSV exists.
+LABEL=$($BIN $COND --print-label) || exit 1
 STEM="exact_${LABEL}"
 [ -z "$OPENER" ]  || STEM="${STEM}_${OPENER}"
 [ -z "$OPENERS" ] || STEM="${STEM}_$(basename "$OPENERS" .txt)"
@@ -113,9 +126,7 @@ STEM="exact_${LABEL}"
 [ "$NOPRUNE" = 0 ] || STEM="${STEM}_noprune"
 OUT="$OUTDIR/$STEM.csv"
 
-FLAGS="--report $REPORT"
-[ -n "$BYGRAYS" ] && FLAGS="$FLAGS --by-grays $BYGRAYS" \
-                  || FLAGS="$FLAGS --min-grays $MINGRAYS"
+FLAGS="--report $REPORT$COND"
 [ -z "$OPENER" ]   || FLAGS="$FLAGS --opener $OPENER"
 [ -z "$OPENERS" ]  || FLAGS="$FLAGS --openers $OPENERS"
 [ -z "$LIMIT" ]    || FLAGS="$FLAGS --limit $LIMIT"
@@ -124,7 +135,8 @@ FLAGS="--report $REPORT"
 [ "$NOPRUNE" = 0 ] || FLAGS="$FLAGS --no-prune"
 
 echo "exact second word"
-echo "  fires on   $LABEL$([ -n "$BYGRAYS" ] && echo "  (a SEPARATE word per group)")"
+NGRP=$(echo "$LABEL" | tr '.' '\n' | wc -l | tr -d ' ')
+echo "  fires on   $LABEL$([ "$NGRP" -gt 1 ] && echo "  ($NGRP groups, a SEPARATE word for each)")"
 echo "  openers    ${OPENER:-${OPENERS:-all 12972}}${LIMIT:+ (first $LIMIT)}"
 echo "  follow-up  answer (a uniformly random consistent answer)"
 [ "$NOPRUNE" = 0 ] || echo "  NO PRUNING: every second word evaluated (the gate's check)"

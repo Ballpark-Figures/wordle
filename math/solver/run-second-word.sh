@@ -126,61 +126,12 @@ case "$VARIANT" in
     *) echo "--variant must be 'guess' (the 12972) or 'mystery' (the 2315)" >&2
        exit 1 ;;
 esac
-# --by-grays N is the sugar for "a SEPARATE word for each grey count from 5 down
-# to N", which is the same partition written out as --group e5 --group e4 ...
-if [ -n "$BYGRAYS" ]; then
-    case "$BYGRAYS" in
-        ''|*[!0-9]*) echo "--by-grays must be a number of grey tiles" >&2; exit 1 ;;
-    esac
-    n=5
-    while [ "$n" -ge "$BYGRAYS" ]; do
-        if [ "$SPLITV" = 1 ]; then
-            # ... and split each grey count by how many of those greys sit on a
-            # VOWEL.  A reply cannot have more greyed vowels than greys, so the
-            # cross product stops at n; combinations an opener cannot produce --
-            # v2 against a one-vowel word -- are simply empty rows that never
-            # fire.
-            v=0
-            while [ "$v" -le "$n" ]; do
-                GSPECS="$GSPECS --group e${n}_v${v}"
-                v=$((v + 1))
-            done
-        elif [ "$SPLITMV" = 1 ]; then
-            # ... and split each grey count by how many of the MATCHED (green or
-            # yellow) tiles sit on a vowel -- "vowels matched vs consonants
-            # matched".  A grey count of n leaves 5-n matched tiles, so mv runs
-            # 0..5-n; the all-grey reply (n=5) has no matched tiles and stays ONE
-            # group `e5`.  Empty combinations (mv2 for a one-vowel opener) never
-            # fire.  y is a vowel (secondword.VOWELS), stamped into the table.
-            matched=$((5 - n))
-            if [ "$matched" -le 0 ]; then
-                GSPECS="$GSPECS --group e$n"
-            else
-                mv=0
-                while [ "$mv" -le "$matched" ]; do
-                    GSPECS="$GSPECS --group e${n}_mv${mv}"
-                    mv=$((mv + 1))
-                done
-            fi
-        else
-            GSPECS="$GSPECS --group e$n"
-        fi
-        n=$((n - 1))
-    done
-fi
-if [ "$SPLITV" = 1 ] && [ "$SPLITMV" = 1 ]; then
-    echo "--split-vowels and --split-matched-vowels are two different partitions;"\
-         "pick one" >&2
-    exit 1
-fi
-if [ "$SPLITV" = 1 ] && [ -z "$BYGRAYS" ]; then
-    echo "--split-vowels splits the --by-grays groups; pass --by-grays N too" >&2
-    exit 1
-fi
-if [ "$SPLITMV" = 1 ] && [ -z "$BYGRAYS" ]; then
-    echo "--split-matched-vowels splits the --by-grays groups; pass --by-grays N too" >&2
-    exit 1
-fi
+# THE CROSS PRODUCTS ARE THE BINARY'S, not this script's.  The two splits have
+# DIFFERENT bounds -- greyed vowels run 0..n, matched vowels 0..5-n, and the
+# all-grey reply has no matched tiles so it stays one group -- and that rule used
+# to be written out here in shell as well as in the solver.  Two copies of it
+# means one canonical label from secondword and a different one from secondexact
+# for the same strategy.  Now both just forward the flags.
 if [ "$GIVEN" = 0 ]; then
     case "$MINGRAYS" in
         ''|*[!0-9]*) echo "--min-grays must be a number of grey tiles (0-5)" >&2
@@ -196,6 +147,9 @@ else
         "--group partition, put the composition in the group's own spec" >&2
         exit 1; }
     SPEC="$GSPECS"
+    [ -z "$BYGRAYS" ] || SPEC="$SPEC --by-grays $BYGRAYS"
+    [ "$SPLITV" = 0 ]  || SPEC="$SPEC --split-vowels"
+    [ "$SPLITMV" = 0 ] || SPEC="$SPEC --split-matched-vowels"
 fi
 case "$LIMIT" in
     ''|*[!0-9]*) echo "--limit must be a number of openers" >&2; exit 1 ;;

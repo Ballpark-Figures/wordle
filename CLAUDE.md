@@ -2111,11 +2111,48 @@ is the proven optimum over all 12972 x 12972 (opener, second word) pairs.
   second words, and under exactly-optimal ones the ranking moves. That is the
   reason to prove rather than screen. NB `parse`+`clint` is also the best adaptive
   PAIR in `data/shared/PAIRS.md`, reached from a completely different direction.
+- **IT TAKES EVERY PARTITION `secondword` DOES, because the two share ONE unit:
+  `solver/groups.h`/`groups.c`.** The firing-condition grammar, the canonical
+  label and the per-opener masks are compiled into BOTH binaries, so `--group`,
+  `--by-grays N`, `--split-vowels` and `--split-matched-vowels` mean the same
+  thing to each, and a table written by one is a table the other reads. The vowel
+  atoms arrived here as a CONSEQUENCE of that extraction, not as a second
+  implementation — which is the only reason `secondexact` can answer the
+  vowel-partition question exactly instead of racing it.
+  - **VERIFIED byte-identical across the extraction** on `g3`, `e3.e4.e5` and the
+    greyed-vowel partition; the one deliberate change is the matched-vowel table
+    dropping `e5_mv0` in favour of `e5` (a reply with 5 greys matched nothing, so
+    the two name the same set), which took its rows from 900 to 360 with 297
+    common non-empty rows and 0 disagreements.
+  - **A VOWEL ATOM MAKES THE MASKS OPENER-DEPENDENT**, so they are rebuilt per
+    opener, per thread — `groups_opener_dependent()` decides, and without one the
+    single shared mask is used exactly as before.
+  - **The WRAPPER asks the BINARY what the condition is called** (`--print-label`,
+    which resolves the groups and stops without loading anything). groups.c sorts
+    the groups, drops repeats and collapses a vacuous split, so a stem derived in
+    shell would be that rule written a second time in a second language — the
+    same reasoning behind `paired_compare.py --print-stem`. It also means an
+    impossible combination is refused before a log or a CSV exists.
+- **THE MATCHED-VOWEL RESULT (2026-09-16): `slant` scores 3.643368**, against
+  3.650558 for the grey count alone and 3.666937 for one shared word — measured
+  on one opener in 5.7 s, which is the whole point of the extraction.
 - Data under `math/data/shared/secondexact/`, log under `data/local/secondexact/`.
+  **The LABEL is the filename**, so `exact_e3_mv0.e3_mv1.e3_mv2.e4_mv0.e4_mv1.e5`
+  is one partition's file and cannot be confused with another's.
 - **`python3 tools/checksecondexact.py` is the GATE**: the recursion against a
   brute-force enumeration in exact RATIONALS over all 24 mini openers, the pruned
   walk against `--no-prune`, the bound's soundness on random sets, the
   decline/fired split adding up, and the real-lists value against the race.
+  - **Checks 6 and 7 are the PARTITION checks, and 7 is the only one that
+    exercises the per-opener masks.** The enumeration is told which words the C
+    committed to and must reproduce its total; the reference derives the
+    matched-vowel key FROM THE STRINGS (y a vowel, counted by position) and takes
+    the group NAMES from `--print-label` rather than spelling them itself.
+    **Coverage is asserted**: it FAILS unless the finer partition actually beat
+    the coarser one somewhere and unless some opener actually played two
+    different words within one grey count. MUTATION-TESTED — counting greyed
+    vowels instead of matched ones, dropping `y` from the vowels, and swapping
+    the two counts inside `groups.c` were each caught.
 
 ### `run-second-loss.sh` — where the EV loss goes, by the opener's grey count
 The gap between a second-word strategy and OPTIMAL play, decomposed. Every answer
@@ -2286,6 +2323,12 @@ the source of truth; `solver/secondword.c` computes the table.
     `checksecondword.py` diffs both over a range of specs — that is the one
     mistake a stamp cannot catch, since the stamp is written by whichever side is
     wrong.
+  - **THE C SIDE OF IT IS `solver/groups.h`/`groups.c`, and `secondexact`
+    COMPILES THE SAME FILE** — one grammar, one canonical label, one set of
+    per-opener masks for both solvers, so extending the condition extends both at
+    once and neither can drift. `groups_add_by_grays()` owns the `--by-grays`
+    cross product (including the `e5_mv0` collapse), so the wrappers generate no
+    specs of their own. See § `run-second-exact.sh`.
   - **A table written before this carries only `min_grays`, which means exactly
     `g<N>`**, so `second_guess_g3.csv` and the rest keep working and keep meaning
     what they meant.
