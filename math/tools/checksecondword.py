@@ -53,7 +53,7 @@ import numpy as np
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
 from secondword import (VOWELS, best_second, fire_groups,  # noqa: E402
-                        fire_set, gray_vowels, group_mask,
+                        fire_set, gray_vowels, group_mask, matched_vowels,
                         parse_fire_label, read_table, word_by_code)
 from wordle import load_words, pattern  # noqa: E402
 
@@ -612,6 +612,81 @@ def check_fire():
         print("   ok   the vowel partition matches the strings, covers exactly "
               "what e3.e4.e5 covers, and depends on the opener")
 
+    # THE MATCHED-VOWEL PARTITION, the complement key: how many of the MATCHED
+    # (green or yellow) tiles sit on a vowel of the opener -- "vowels matched vs
+    # consonants matched".  Checked the same way, against a from-the-strings count,
+    # because it too depends on the opener's letters, not the reply alone.
+    def mv_fires(opener, greys, mvows):
+        def fires(tiles):
+            if sum(1 for t in tiles if t == 0) != greys:
+                return False
+            n = sum(1 for i, t in enumerate(tiles)
+                    if t != 0 and opener[i] in VOWELS)
+            return n == mvows
+        return fires
+
+    mvspecs = ["e%d_mv%d" % (k, j) for k in (3, 4, 5)
+               for j in range(0, 5 - k + 1)]
+    mvout = os.path.join(tmp, "matched.csv")
+    args = []
+    for sp in mvspecs:
+        args += ["--group", sp]
+    run(["--data", tmp, "--out", mvout, "--threads", "2"] + args)
+    mcovered = {}
+    for spec in mvspecs:
+        k = int(spec[1])
+        j = int(spec[spec.index("mv") + 2:])
+        rws = read_rows(mvout, spec)
+        for opener, got in sorted(rws.items()):
+            want = ref_best_second(MINI_GUESSES, MINI_ANSWERS, opener,
+                                   mv_fires(opener, k, j), MINI_GUESSES)
+            if got != want:
+                bad("matched-vowel partition %s opener %s: C gave %s, strings %s"
+                    % (spec, opener, got, want))
+                break
+            mcovered.setdefault(opener, 0)
+            mcovered[opener] += got[2]
+    for opener, tot in mcovered.items():
+        want = sum(1 for a in MINI_ANSWERS
+                   if sum(1 for t in tiles_from_strings(opener, a) if t == 0) >= 3)
+        if tot != want:
+            bad("%s: the matched-vowel groups cover %d answers, e3.e4.e5 covers %d"
+                % (opener, tot, want))
+            break
+    seen_mv = set()
+    for opener in MINI_GUESSES:
+        mv = matched_vowels(opener)
+        seen_mv.add(tuple(sorted(set(int(mv[gr]) for gr in range(243)))))
+    if len(seen_mv) < 2:
+        bad("every mini opener matches the same number of vowels, so the "
+            "matched-vowel key was not exercised")
+    else:
+        notes["matched-vowel-partition"] += 1
+        print("   ok   the matched-vowel partition matches the strings, covers "
+              "exactly what e3.e4.e5 covers, and depends on the opener")
+
+    # A matched-vowel group and its complementary greyed-vowel group must pick the
+    # SAME word for a fixed opener -- they are the same set of replies relabelled,
+    # so this pins the equivalence the docs claim rather than asserting it.
+    for opener in MINI_GUESSES:
+        nv = int(max(matched_vowels(opener)[gr] + gray_vowels(opener)[gr]
+                     for gr in range(243)))     # the opener's vowel count
+        mvj = 1
+        gvj = nv - mvj
+        if gvj < 0:
+            continue
+        a_mv = ref_best_second(MINI_GUESSES, MINI_ANSWERS, opener,
+                               mv_fires(opener, 3, mvj), MINI_GUESSES)
+        a_gv = ref_best_second(MINI_GUESSES, MINI_ANSWERS, opener,
+                               gv_fires(opener, 3, gvj), MINI_GUESSES)
+        if a_mv != a_gv:
+            bad("%s: matched-vowel(3,%d) and greyed-vowel(3,%d) disagree though "
+                "they are the same replies: %s vs %s"
+                % (opener, mvj, gvj, a_mv, a_gv))
+            break
+    notes["matched-vs-greyed"] += 1
+    print("   ok   matched-vowel and complementary greyed-vowel groups agree")
+
     # the stamp must carry the condition, and the reader must hold it to it
     t = read_table(fired, fire="g3+0g3y")
     if t.min_grays != 3:
@@ -698,6 +773,8 @@ def main(argv):
         "fire-moved": "an added composition changing a chosen second word",
         "partition-differs": "a partition choosing different words per group",
         "vowel-partition": "a partition keyed on the opener's greyed vowels",
+        "matched-vowel-partition": "a partition keyed on the opener's matched vowels",
+        "matched-vs-greyed": "matched and complementary greyed groups agree",
     }
     for key, what in need.items():
         if notes[key]:

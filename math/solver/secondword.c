@@ -72,7 +72,8 @@ static int8_t   GREENS[NPAT], YELLOWS[NPAT];
 /* An ATOM is one condition on a reply; a TERM is a CONJUNCTION of atoms (joined
  * by `_`); a GROUP is a UNION of terms (joined by `+`).  So `e3_v1` is "exactly
  * three greys AND exactly one greyed vowel".  Atom kinds: 0 g>=N, 1 e==N,
- * 2 composition (a greens, b yellows), 3 v==N greyed vowels. */
+ * 2 composition (a greens, b yellows), 3 v==N greyed vowels, 4 mv==N MATCHED
+ * (green/yellow) vowels.  Y is always a vowel (see VOWELS). */
 typedef struct { int kind, a, b; char text[16]; } Atom;
 typedef struct { int natom; Atom at[6]; int key; char text[48]; } Term;
 typedef struct { int nterm; Term t[8]; char text[64]; } Group;
@@ -122,6 +123,23 @@ static void build_gvow(int opener, int8_t *out) {
     }
 }
 
+/* For one opener, how many MATCHED tiles (green or yellow, i.e. NON-grey) sit on
+ * a vowel of the opener, per pattern code -- the vowels the guess got RIGHT (in
+ * the answer), which is the complement of build_gvow over this opener's vowel
+ * positions.  Counted by POSITION, y a vowel, so it depends on the opener too. */
+static void build_mvow(int opener, int8_t *out) {
+    const uint8_t *vp = VPOS + (size_t)opener * WORDLEN;
+    int pw[WORDLEN];
+    pw[WORDLEN - 1] = 1;
+    for (int i = WORDLEN - 2; i >= 0; i--) pw[i] = pw[i + 1] * 3;
+    for (int code = 0; code < NPAT; code++) {
+        int n = 0;
+        for (int i = 0; i < WORDLEN; i++)
+            if (vp[i] && (code / pw[i]) % 3 != 0) n++;
+        out[code] = (int8_t)n;
+    }
+}
+
 static void build_grays(void) {
     for (int code = 0; code < NPAT; code++) {
         int c = code, n = 0, g = 0, y = 0;
@@ -160,7 +178,7 @@ static int cmp_spec(const void *a, const void *b) {
 }
 
 static int atom_key(const Atom *a) {
-    static const int order[4] = {0, 1, 2, 3};
+    static const int order[5] = {0, 1, 2, 3, 4};
     return order[a->kind] * 1000 + a->a * 10 + a->b;
 }
 
@@ -182,6 +200,10 @@ static int parse_atom(const char *text, Atom *out) {
     }
     if (text[0] == 'e' && len > 1 && strspn(text + 1, "0123456789") == len - 1) {
         out->kind = 1; out->a = atoi(text + 1); out->b = 0; return 1;
+    }
+    if (text[0] == 'm' && text[1] == 'v' && len > 2
+            && strspn(text + 2, "0123456789") == len - 2) {
+        out->kind = 4; out->a = atoi(text + 2); out->b = 0; return 1;
     }
     if (text[0] == 'v' && len > 1 && strspn(text + 1, "0123456789") == len - 1) {
         out->kind = 3; out->a = atoi(text + 1); out->b = 0; return 1;
@@ -240,7 +262,8 @@ static int parse_group(const char *spec, Group *out) {
 
 /* One group's mask FOR ONE OPENER.  `gvow` is that opener's greyed-vowel count
  * per code; the rest of the atoms are opener-independent. */
-static void group_mask_for(const Group *g, const int8_t *gvow, uint8_t *out) {
+static void group_mask_for(const Group *g, const int8_t *gvow,
+                           const int8_t *mvow, uint8_t *out) {
     for (int c = 0; c < NPAT; c++) {
         int hit = 0;
         for (int ti = 0; ti < g->nterm && !hit; ti++) {
@@ -251,7 +274,8 @@ static void group_mask_for(const Group *g, const int8_t *gvow, uint8_t *out) {
                 case 0: all = GRAYS[c] >= a->a; break;
                 case 1: all = GRAYS[c] == a->a; break;
                 case 2: all = GREENS[c] == a->a && YELLOWS[c] == a->b; break;
-                default: all = gvow[c] == a->a; break;
+                case 3: all = gvow[c] == a->a; break;
+                default: all = mvow[c] == a->a; break;   /* kind 4: matched vowels */
                 }
             }
             hit = all;
@@ -293,7 +317,7 @@ static void build_fire(int min_grays, char *label, size_t lsz) {
     for (int i = 0; i < NGROUP; i++) {
         if (!parse_group(GSPEC[i], &GRP[i])) {
             fprintf(stderr, "cannot read the group '%s': an atom is g<N>, e<N>, "
-                    "v<N> or <G>g<Y>y, joined by _ within a term and by + "
+                    "v<N>, mv<N> or <G>g<Y>y, joined by _ within a term and by + "
                     "between terms\n", GSPEC[i]);
             exit(1);
         }
@@ -303,7 +327,9 @@ static void build_fire(int min_grays, char *label, size_t lsz) {
     int kept = 0;
     for (int i = 0; i < NGROUP; i++) {
         if (i && !strcmp(GSPEC[i], GSPEC[kept - 1])) continue;   /* a repeat */
-        if (kept != i) snprintf(GSPEC[kept], sizeof GSPEC[0], "%s", GSPEC[i]);
+        /* compact in place; a same-size buffer copy is memmove, not a %s
+         * snprintf -- which gcc flags as a -Wformat-truncation false positive */
+        if (kept != i) memmove(GSPEC[kept], GSPEC[i], sizeof GSPEC[0]);
         parse_group(GSPEC[kept], &GRP[kept]);
         kept++;
     }
@@ -322,13 +348,14 @@ static void build_fire(int min_grays, char *label, size_t lsz) {
     for (int i = 0; i < NGROUP && !has_v; i++)
         for (int t = 0; t < GRP[i].nterm && !has_v; t++)
             for (int a = 0; a < GRP[i].t[t].natom && !has_v; a++)
-                if (GRP[i].t[t].at[a].kind == 3) has_v = 1;
+                if (GRP[i].t[t].at[a].kind == 3 || GRP[i].t[t].at[a].kind == 4)
+                    has_v = 1;                 /* greyed OR matched vowels: per opener */
     if (!has_v) {
         int8_t zero[NPAT];
         uint8_t m[MAXGROUP][NPAT], covered[NPAT];
         for (int c = 0; c < NPAT; c++) { zero[c] = 0; covered[c] = 0; }
         for (int i = 0; i < NGROUP; i++) {
-            group_mask_for(&GRP[i], zero, m[i]);
+            group_mask_for(&GRP[i], zero, zero, m[i]);
             for (int j = 0; j < i; j++)
                 for (int c = 0; c < NPAT; c++)
                     if (m[i][c] && m[j][c]) {
@@ -577,7 +604,8 @@ int main(int argc, char **argv) {
         int      *rs    = malloc(sizeof(int) * (NPAT + 1));
         int      *rl    = malloc(sizeof(int) * (NPAT + 1));
         int      *fill  = malloc(sizeof(int) * (NPAT + 1));
-        int8_t   *gvow  = malloc(NPAT);                    /* per OPENER */
+        int8_t   *gvow  = malloc(NPAT);                    /* greyed vowels, per OPENER */
+        int8_t   *mvow  = malloc(NPAT);                    /* matched vowels, per OPENER */
         uint8_t  *gmask = malloc((size_t)NPAT * MAXGROUP); /* per opener x group */
 
         /* Every opener costs the same -- nq x nsec, and nq varies only mildly --
@@ -596,8 +624,9 @@ int main(int argc, char **argv) {
              * checked HERE for the same reason, since for a vowel partition it
              * is a fact about the opener and not about the specs alone. */
             build_gvow(g1, gvow);
+            build_mvow(g1, mvow);
             for (int gi = 0; gi < NGROUP; gi++) {
-                group_mask_for(&GRP[gi], gvow, gmask + (size_t)gi * NPAT);
+                group_mask_for(&GRP[gi], gvow, mvow, gmask + (size_t)gi * NPAT);
                 for (int gj = 0; gj < gi; gj++)
                     for (int c = 0; c < NPAT; c++)
                         if (gmask[(size_t)gi * NPAT + c]
@@ -707,7 +736,7 @@ int main(int argc, char **argv) {
             }
         }
         free(cnt); free(touch); free(tin); free(ord); free(rs); free(rl);
-        free(fill); free(gvow); free(gmask);
+        free(fill); free(gvow); free(mvow); free(gmask);
     }
 
     FILE *f = fopen(outpath, "w");
