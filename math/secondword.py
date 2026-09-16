@@ -158,6 +158,25 @@ def gray_vowels(word, word_len=WORD_LEN):
     return out
 
 
+def matched_vowels(word, word_len=WORD_LEN):
+    """For every pattern code, how many MATCHED tiles (green or yellow, i.e. NON-
+    grey) sit on a vowel of `word` -- the vowels the guess got RIGHT (present in
+    the answer).  The complement of `gray_vowels` over the word's vowel positions,
+    counted by POSITION with y a vowel, so it depends on the OPENER as well as the
+    reply.  This is what "vowels matched" / "consonants matched" split a bucket by.
+    """
+    n = n_patterns(word_len)
+    out = np.zeros(n, dtype=np.int8)
+    isv = [ch in VOWELS for ch in word]
+    for code in range(n):
+        c = 0
+        for pos in range(word_len):
+            if isv[pos] and tile_at(code, pos, word_len) != 0:
+                c += 1
+        out[code] = c
+    return out
+
+
 def group_mask(spec, opener=None, word_len=WORD_LEN):
     """The compositions one GROUP covers: (mask over pattern codes, canonical spec).
 
@@ -165,7 +184,12 @@ def group_mask(spec, opener=None, word_len=WORD_LEN):
 
         g<N>        greys >= N          (the original threshold)
         e<N>        greys == N exactly  (what a per-grey-count rule wants)
+        v<N>        exactly N GREYED vowels   (vowels the guess got wrong)
+        mv<N>       exactly N MATCHED vowels  (green/yellow vowels; y is a vowel)
         <G>g<Y>y    exactly that composition, e.g. 0g3y
+
+    `v<N>` and `mv<N>` both depend on the OPENER's letters (which positions are
+    vowels), so a group using either can only be built for a named opener.
 
     So `g3` is everything with three or more greys, `e5` is the all-grey reply
     alone, and `g3+0g3y` is the threshold plus the three-yellow two-grey reply.
@@ -177,6 +201,7 @@ def group_mask(spec, opener=None, word_len=WORD_LEN):
     """
     g, y, gr = compositions(word_len)
     gv = None if opener is None else gray_vowels(opener, word_len)
+    mv = None if opener is None else matched_vowels(opener, word_len)
     terms = {}
     for term in spec.split("+"):
         # A TERM is a CONJUNCTION of atoms joined by `_`, and terms are UNIONED
@@ -191,6 +216,14 @@ def group_mask(spec, opener=None, word_len=WORD_LEN):
             elif re.fullmatch(r"e\d+", atom):
                 m &= gr == int(atom[1:])
                 k = (1, int(atom[1:]))
+            elif re.fullmatch(r"mv\d+", atom):
+                if mv is None:
+                    raise SystemExit(
+                        "the term %r counts MATCHED VOWELS, which depends on the "
+                        "opener's letters -- this group can only be built for a "
+                        "named opener" % term)
+                m &= mv == int(atom[2:])
+                k = (4, int(atom[2:]))
             elif re.fullmatch(r"v\d+", atom):
                 if gv is None:
                     raise SystemExit(
@@ -208,8 +241,8 @@ def group_mask(spec, opener=None, word_len=WORD_LEN):
                 k = (2, gg * (word_len + 1) + yy)
             else:
                 raise SystemExit("cannot read the group %r: an atom is g<N>, "
-                                 "e<N>, v<N> or <G>g<Y>y, joined by _ within a "
-                                 "term and by + between terms" % spec)
+                                 "e<N>, v<N>, mv<N> or <G>g<Y>y, joined by _ "
+                                 "within a term and by + between terms" % spec)
             key = k if key is None else key
         if len(atoms) != len(set(atoms)):
             raise SystemExit("the term %r repeats an atom" % term)
@@ -240,6 +273,8 @@ def group_mask(spec, opener=None, word_len=WORD_LEN):
 
 def _atom_key(atom):
     """Sort key for the atoms inside one term, so `v1_e3` and `e3_v1` are one name."""
+    if atom.startswith("mv") and atom[2:].isdigit():
+        return (4, int(atom[2:]))            # matched vowels sort last
     order = {"g": 0, "e": 1, "v": 3}
     if atom[0] in order and atom[1:].isdigit():
         return (order[atom[0]], int(atom[1:]))
