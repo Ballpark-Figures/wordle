@@ -2210,14 +2210,26 @@ is the proven optimum over all 12972 x 12972 (opener, second word) pairs.
     `18k^2`. **`shared` is NOT BUILT YET and the flag says so.**
   - **IT REQUIRES `--topk`** -- choosing a third word for every candidate second
     word is a nested search and only the beam makes it affordable.
-  - **MEASURED 2026-09-16, and the answer is NEGATIVE**: on the real lists a
-    forced third word is WORSE than the random tail it replaces, by a roughly
-    constant margin at every beam width tried -- k=5 3.751380 against 3.708983,
-    k=20 3.720679 against 3.686815, k=50 3.699032 against 3.663450. The same
-    shape as firing a second word on two greys. **The third word is FORCED where
-    it fires**, so the three-level family does not contain the two-level
-    strategy and can be worse; letting a case DECLINE would fix that by
-    construction and is the obvious next experiment.
+  - **`--third-decline` IS WHAT MAKES IT WORTH ANYTHING, and the difference is
+    large.** A case may play NO committed word when the random tail is cheaper.
+    FORCED, a third word is consistently WORSE than the tail it replaces;
+    declining, it is consistently better. MEASURED on the real lists:
+
+        k      two-level   forced third   third + decline
+        5      3.708983    3.751380       3.704926
+        20     3.686815    3.720679       3.683734
+        50     3.663450    3.699032       3.659041
+        100    3.652788    3.690977       3.647341
+
+    At k=100 only **288 of 982** cases keep a word -- 71% decline -- and all 100
+    openers are strictly better than two-level, none worse. The forced version
+    is the same shape as firing a second word on two greys: where you still know
+    almost nothing, a predetermined word cannot beat a random compatible answer.
+  - **DECLINING GIVES A FREE ORACLE and the gate asserts it PER OPENER**: the
+    three-level family then CONTAINS the two-level one (decline everywhere and
+    you have it back), so no opener may come out worse. **Known coverage gap**:
+    on the mini problem every committed word is declined, so a SURVIVING third
+    word is never exercised there -- that case wants constructing.
   - Third words get their own CSV rows, `fires` = `<group>|m<matched count>`
     with `third` in the status column.
 - **IT RESUMES, and the CSV is the checkpoint.** Each opener's rows are appended

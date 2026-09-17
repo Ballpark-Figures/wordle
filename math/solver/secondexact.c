@@ -522,7 +522,8 @@ static int cmp_cand_ssq(const void *a, const void *b) {
 static double choose_third(Memo *m, const uint16_t *jbuf, const int *jstart,
                            const int *jlen, const int *idx, int nidx,
                            int og, int g2, int topk, Cand *cand,
-                           uint16_t *out, int depth, int *best) {
+                           uint16_t *out, int depth, int *best,
+                           int allow_decline) {
     int *cnt = m->cnt + (size_t)depth * NPAT;
     int *touch = m->touch + (size_t)depth * NPAT;
     for (int w = 0; w < NG; w++) {
@@ -556,6 +557,17 @@ static double choose_third(Memo *m, const uint16_t *jbuf, const int *jstart,
             v += third_total(m, jbuf + jstart[idx[j]], jlen[idx[j]],
                              cand[i].w, out, depth + 1);
         if (v < bestv) { bestv = v; *best = cand[i].w; }
+    }
+    /* DECLINING is playing no committed word at all and letting the random tail
+     * take the case.  Offering it makes the three-level family CONTAIN the
+     * two-level one -- decline everywhere and you have it back -- so the result
+     * can never be worse, which is exactly what a forced word cannot promise.
+     * It is opt-in because it is a different strategy, not a better search. */
+    if (allow_decline) {
+        double declined = 0.0;
+        for (int j = 0; j < nidx; j++)
+            declined += T(m, jbuf + jstart[idx[j]], jlen[idx[j]], depth + 1);
+        if (!(bestv < declined)) { bestv = declined; *best = -1; }
     }
     return bestv;
 }
@@ -651,7 +663,7 @@ static double fired_with_third(Memo *m, int og, const uint16_t *q, int nq,
                                int nb, int g2, int third_max, int topk,
                                Cand *cand, uint16_t *jbuf, int *jstart, int *jlen,
                                int8_t *jm, int *idx, uint16_t *out,
-                               const int *forced, int *chosen) {
+                               const int *forced, int *chosen, int allow_decline) {
     int nj = joint_split(m, og, q, rstart, rlen, rpat, nb, g2,
                          jbuf, jstart, jlen, jm, 1);
     /* EVERY case, not just the ones that can fire: the caller copies the whole
@@ -678,7 +690,7 @@ static double fired_with_third(Memo *m, int og, const uint16_t *q, int nq,
         } else {
             int best = -1;
             tot += choose_third(m, jbuf, jstart, jlen, idx, nidx, og, g2, topk,
-                                cand, out, 1, &best);
+                                cand, out, 1, &best, allow_decline);
             if (chosen) chosen[mm] = best;
         }
     }
@@ -690,7 +702,7 @@ static void solve_opener(Memo *m, int og, Row *r, double incumbent, int no_prune
                          uint16_t *q, uint16_t *out, int *rstart, int *rlen,
                          int *rpat, int *nbs, int *nqs, const double *gbound,
                          const uint8_t *fu, int topk, int third_max,
-                         const int *shared_third) {
+                         const int *shared_third, int third_decline) {
     memo_clear(m);
     r->opener = og;
     r->decline = decline_total(m, og, out, 0, fu);
@@ -754,7 +766,7 @@ static void solve_opener(Memo *m, int og, Row *r, double incumbent, int no_prune
                     v = fired_with_third(m, og, qq, nq, rs, rl, rp, nb,
                                          cand[i].w, third_max, topk, cand3,
                                          jbuf, jstart, jlen, jm, idx3, out,
-                                         shared_third, chosen);
+                                         shared_third, chosen, third_decline);
                 }
                 r->scanned[g]++;
                 if (v < bestk) {
@@ -1025,6 +1037,7 @@ int main(int argc, char **argv) {
     int min_grays = 3, by_grays = 0, threads = 0, limit = 0, no_prune = 0,
         memo_bits = 19, split_v = 0, split_mv = 0, print_label = 0, topk = 0;
     int third_max = -1;                        /* -1: no third level at all */
+    int third_decline = 0;
     const char *third_key = NULL;
     const int *shared_third = NULL;
     double report = 10.0;
@@ -1070,6 +1083,9 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--third-key") && i + 1 < argc) third_key = argv[++i];
         else if (!strcmp(argv[i], "--third-max-matched") && i + 1 < argc)
             third_max = atoi(argv[++i]);
+        /* --third-decline lets a case play NO committed word when the random
+         * tail is cheaper.  A different strategy, not a better search. */
+        else if (!strcmp(argv[i], "--third-decline")) third_decline = 1;
         /* --print-label resolves the firing condition, prints its CANONICAL name
          * and stops.  The wrapper needs that name for the filename, and groups.c
          * is the one place that knows it -- deriving it in shell would be a
@@ -1093,6 +1109,11 @@ int main(int argc, char **argv) {
         return 1;
     }
     if (topk < 0) { fprintf(stderr, "--topk must be at least 1\n"); return 1; }
+    if (third_decline && third_max < 0) {
+        fprintf(stderr, "--third-decline is an option ON the third level; it "
+                        "needs --third-key and --third-max-matched\n");
+        return 1;
+    }
     if ((third_key != NULL) != (third_max >= 0)) {
         fprintf(stderr, "--third-key and --third-max-matched go together: one "
                         "says WHICH cases share a word, the other WHEN a word\n"
@@ -1308,8 +1329,10 @@ int main(int argc, char **argv) {
                 "\n# exactly (math/secondexact.py states the recursion).\n");
         fprintf(outf, "# expected is over all %d answers; decline/fired split it "
                 "by whether the rule fired.\n", NA);
-        fprintf(outf, "# settings fire=%s openers=%d follow_up=answer topk=%d\n",
-                label, nopen, topk);
+        fprintf(outf, "# settings fire=%s openers=%d follow_up=answer topk=%d"
+                " third=%d third_key=%s third_decline=%d\n",
+                label, nopen, topk, third_max,
+                third_key ? third_key : "none", third_decline);
         if (topk)
             fprintf(outf, "# TOPK=%d: each group's word is the best of the %d "
                     "ranked by the one-ply\n# score, so every total here is an "
@@ -1438,7 +1461,8 @@ int main(int argc, char **argv) {
             opener_bound(&m, rr->opener, q, out, rstart, rlen, rpat, nbs, nqs,
                          gbs, gf, fu);
             solve_opener(&m, rr->opener, rr, inc, no_prune, q, out, rstart, rlen,
-                         rpat, nbs, nqs, gbs, fu, topk, third_max, shared_third);
+                         rpat, nbs, nqs, gbs, fu, topk, third_max, shared_third,
+                         third_decline);
 #ifdef _OPENMP
 #pragma omp critical (progress)
 #endif

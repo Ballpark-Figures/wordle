@@ -654,6 +654,54 @@ def check_third():
           % checked)
     if not any("|" in g for by in rows.values() for g in by):
         bad("no third word was ever committed, so nothing was exercised")
+        return
+
+    # --- DECLINING makes the three-level family CONTAIN the two-level one, so
+    # its total can never be worse.  That is a free oracle and it is asserted
+    # per opener, not just on the winner.
+    dec = os.path.join(tmp, "decline.csv")
+    run(base + ["--third-key", "group", "--third-max-matched", "2",
+                "--third-decline", "--out", dec])
+
+    def totals(path):
+        out = {}
+        with open(path) as f:
+            for line in f:
+                if line.startswith("#") or line.startswith("opener,"):
+                    continue
+                c = line.rstrip("\n").split(",")
+                if len(c) > 4 and c[4]:
+                    out[c[0]] = float(c[4])
+        return out
+
+    t2, td = totals(two), totals(dec)
+    shared = [w for w in t2 if w in td]
+    worse = [w for w in shared if td[w] > t2[w] + 1e-9]
+    if worse:
+        bad("declining is allowed but %d openers got WORSE than the two-level "
+            "strategy, e.g. %s: %.6f vs %.6f"
+            % (len(worse), worse[0], td[worse[0]], t2[worse[0]]))
+        return
+    better = sum(1 for w in shared if td[w] < t2[w] - 1e-9)
+    print("   ok   with declining, %d openers match or beat the two-level "
+          "strategy (%d strictly)" % (len(shared), better))
+
+    # and declining must ACTUALLY happen somewhere, or the option is untested
+    forced_cases = sum(1 for by in rows.values() for g in by if "|" in g)
+    drows = {}
+    with open(dec) as f:
+        for line in f:
+            if line.startswith("#") or line.startswith("opener,"):
+                continue
+            c = line.split(",")
+            if "|" in c[1]:
+                drows[(c[0], c[1])] = 1
+    if len(drows) >= forced_cases:
+        bad("declining never dropped a single committed word (%d cases both "
+            "ways), so the option was not exercised" % forced_cases)
+    else:
+        print("   ok   declining dropped %d of %d committed words"
+              % (forced_cases - len(drows), forced_cases))
 
 
 def check_bound():

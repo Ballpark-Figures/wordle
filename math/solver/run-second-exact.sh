@@ -75,6 +75,9 @@ THREADS=""
 MEMOBITS=""
 REPORT=30
 TOPK=""
+THIRDKEY=""
+THIRDMAX=""
+THIRDDEC=0
 NOPRUNE=0
 DRYRUN=0
 
@@ -92,6 +95,9 @@ while [ $# -gt 0 ]; do
         --memo-bits)  MEMOBITS="$2"; shift 2 ;;
         --report)     REPORT="$2";   shift 2 ;;
         --topk|-k)    TOPK="$2";     shift 2 ;;
+        --third-key)  THIRDKEY="$2"; shift 2 ;;
+        --third-max-matched) THIRDMAX="$2"; shift 2 ;;
+        --third-decline)     THIRDDEC=1;    shift ;;
         --no-prune)   NOPRUNE=1;     shift ;;
         --dry-run)    DRYRUN=1;      shift ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
@@ -142,6 +148,8 @@ STEM="exact_${LABEL}"
 [ -z "$OPENER" ]  || STEM="${STEM}_${OPENER}"
 [ -z "$OPENERS" ] || STEM="${STEM}_$(basename "$OPENERS" .txt)"
 [ -z "$TOPK" ]    || STEM="${STEM}_k${TOPK}"
+[ -z "$THIRDKEY" ] || STEM="${STEM}_3${THIRDKEY}${THIRDMAX}"
+[ "$THIRDDEC" = 0 ] || STEM="${STEM}dec"
 [ -z "$LIMIT" ]   || STEM="${STEM}_limit${LIMIT}"
 [ "$NOPRUNE" = 0 ] || STEM="${STEM}_noprune"
 OUT="$OUTDIR/$STEM.csv"
@@ -150,6 +158,9 @@ FLAGS="--report $REPORT$COND"
 [ -z "$OPENER" ]   || FLAGS="$FLAGS --opener $OPENER"
 [ -z "$OPENERS" ]  || FLAGS="$FLAGS --openers $OPENERS"
 [ -z "$TOPK" ]     || FLAGS="$FLAGS --topk $TOPK"
+[ -z "$THIRDKEY" ] || FLAGS="$FLAGS --third-key $THIRDKEY"
+[ -z "$THIRDMAX" ] || FLAGS="$FLAGS --third-max-matched $THIRDMAX"
+[ "$THIRDDEC" = 0 ] || FLAGS="$FLAGS --third-decline"
 [ -z "$LIMIT" ]    || FLAGS="$FLAGS --limit $LIMIT"
 [ -z "$THREADS" ]  || FLAGS="$FLAGS --threads $THREADS"
 [ -z "$MEMOBITS" ] || FLAGS="$FLAGS --memo-bits $MEMOBITS"
@@ -160,6 +171,10 @@ NGRP=$(echo "$LABEL" | tr '.' '\n' | wc -l | tr -d ' ')
 echo "  fires on   $LABEL$([ "$NGRP" -gt 1 ] && echo "  ($NGRP groups, a SEPARATE word for each)")"
 echo "  openers    ${OPENER:-${OPENERS:-${TOPK:+the $TOPK best by expected answers remaining}}}${OPENER:-${OPENERS:-${TOPK:+}}}${LIMIT:+ (first $LIMIT)}"
 echo "  follow-up  answer (a uniformly random consistent answer)"
+if [ -n "$THIRDKEY" ]; then
+    echo "  THIRD WORD when the two replies have proved at most $THIRDMAX letters,"
+    echo "             keyed per $THIRDKEY$([ "$THIRDDEC" = 1 ] && echo ", declining where the random tail is cheaper" || echo ", FORCED where it fires")"
+fi
 if [ -n "$TOPK" ]; then
     echo "  BEAM k=$TOPK    the $TOPK best OPENERS, and the $TOPK best second words per group"
     echo "             ONE K governs both, as in every other solver here."
