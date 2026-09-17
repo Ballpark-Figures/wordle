@@ -159,7 +159,15 @@ if [ "$DEPTH" = "$DEPTHMAX" ]; then
 fi
 
 # the timestamped header is what inflight.py uses to find the run boundary
-echo "[$(date -Is)] resuming wordle HARD sweep ($PHASE, threads=$THREADS, tt-bits=$TTBITS, depth=$DEPTH..$DEPTHMAX) $WARM" \
+# PORTABLE TIMESTAMP, and NOT run-greens.sh's form.  `date -Is` is a GNU-ism that
+# prints nothing on macOS, so this header came out as `[] resuming` there -- which
+# matters, because inflight.py finds the run boundary with
+#     \[(\d{4}-\d\d-\d\dT[\d:+-]+)\] resuming
+# run-greens.sh uses `date -u +%Y-%m-%dT%H:%M:%SZ`, and that trailing Z is NOT in
+# that character class, so copying it here would have silently broken the boundary
+# detection instead of fixing it.  %z gives -0400, which matches, and is the same
+# shape GNU's -Is already wrote -- so every log already on the desktop still parses.
+echo "[$(date +%Y-%m-%dT%H:%M:%S%z)] resuming wordle HARD sweep ($PHASE, threads=$THREADS, tt-bits=$TTBITS, depth=$DEPTH..$DEPTHMAX) $WARM" \
     | tee -a "$LOC/sweep.log"
 
 # --order bisect: THIS SWEEP IS THE ONE THAT WANTS IT, and it is now the only
@@ -175,7 +183,10 @@ echo "[$(date -Is)] resuming wordle HARD sweep ($PHASE, threads=$THREADS, tt-bit
 # cutoffs arrives late), which is exactly why it must be asked for and never
 # inherited.  It was hardcoded into both sweep call sites for a while, so every
 # other sweep silently paid that cost for reporting nobody was reading.
-"${NICE[@]}" ./solver/hardturns --sweep --order bisect \
+# ${NICE[@]+"${NICE[@]}"}, not "${NICE[@]}": phase2 sets NICE=(), and macOS bash
+# 3.2 treats an EMPTY array's expansion as an unbound variable under `set -u`
+# (bash 4.4+ does not), so the plain form aborted every phase2 run on a Mac.
+${NICE[@]+"${NICE[@]}"} ./solver/hardturns --sweep --order bisect \
     --out "$OUT" \
     --trees "$TRE" \
     --depth "$DEPTH" --depth-max "$DEPTHMAX" \
