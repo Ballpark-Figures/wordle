@@ -715,6 +715,96 @@ def check_third():
               % (forced_cases - len(drows), forced_cases))
 
 
+def check_levels():
+    """11. --max-level: a committed word at EVERY level, each able to decline.
+
+    Three oracles, and they are the ones that caught the real bug:
+      * --max-level 2 must reproduce the plain two-level beam;
+      * --max-level 3 must reproduce the fixed third level WITH declining,
+        since that is exactly its N=3 case;
+      * it must be MONOTONE in N -- a deeper cap can always decline its extra
+        level, so it can never come out worse.
+    A shared candidate array across levels broke all three: a case ranked into
+    it, sorted, then walked it calling the recursion, which re-ranked the SAME
+    array, so the parent resumed reading its child's list.
+    """
+    print("11. --max-level, a word at every level")
+    tmp = tempfile.mkdtemp(prefix="checkse-lvl-")
+    make_data(tmp, MINI_GUESSES, MINI_ANSWERS)
+    base = ["--data", tmp, "--by-grays", "3", "--threads", "1", "--topk", "3"]
+
+    def total(path):
+        with open(path) as f:
+            for line in f:
+                if line.startswith("#") or line.startswith("opener,"):
+                    continue
+                c = line.rstrip("\n").split(",")
+                if len(c) > 4 and c[4]:
+                    return float(c[4])
+        return None
+
+    def best(path):
+        b = None
+        with open(path) as f:
+            for line in f:
+                if line.startswith("#") or line.startswith("opener,"):
+                    continue
+                c = line.rstrip("\n").split(",")
+                if len(c) > 4 and c[4] and (b is None or float(c[4]) < b):
+                    b = float(c[4])
+        return b
+
+    two = os.path.join(tmp, "two.csv")
+    lvl2 = os.path.join(tmp, "l2.csv")
+    run(base + ["--out", two])
+    run(base + ["--max-level", "2", "--out", lvl2])
+    # NOT equality: --max-level 2 may DECLINE at level 2, which the old path
+    # cannot, so it can only be better.  On the real lists declining never wins
+    # and the two coincide exactly; on this mini problem it declines everywhere.
+    if best(lvl2) is None or best(lvl2) > best(two) + 1e-9:
+        bad("--max-level 2 gives %s, WORSE than the two-level beam %s -- it can "
+            "always play the same words" % (best(lvl2), best(two)))
+        return
+    print("   ok   --max-level 2 is never worse than the two-level beam "
+          "(%.6f vs %.6f)" % (best(lvl2), best(two)))
+
+    thr = os.path.join(tmp, "third.csv")
+    lvl3 = os.path.join(tmp, "l3.csv")
+    run(base + ["--third-key", "group", "--third-max-matched", "2",
+                "--third-decline", "--out", thr])
+    run(base + ["--max-level", "3", "--out", lvl3])
+    if best(lvl3) > best(thr) + 1e-9:
+        bad("--max-level 3 gives %.6f, WORSE than the fixed third level with "
+            "declining at %.6f" % (best(lvl3), best(thr)))
+        return
+    print("   ok   --max-level 3 is never worse than the fixed third level "
+          "(%.6f vs %.6f)" % (best(lvl3), best(thr)))
+
+    # MONOTONICITY ON THE REAL LISTS, one opener.  The mini problem declines at
+    # every level -- 16 answers are too few for a committed word to beat the
+    # tail -- so depth is only exercised where committed words actually win.
+    prev, seen = None, []
+    real = ["--by-grays", "3", "--threads", "1", "--topk", "5",
+            "--opener", "soare"]
+    for n in (2, 3, 4):
+        p = os.path.join(tmp, "m%d.csv" % n)
+        run(real + ["--max-level", str(n), "--out", p])
+        v = best(p)
+        seen.append(v)
+        if prev is not None and v > prev + 1e-9:
+            bad("--max-level %d gives %.6f, WORSE than --max-level %d at %.6f "
+                "-- a deeper cap can always decline its extra level"
+                % (n, v, n - 1, prev))
+            return
+        prev = v
+    if len(set(seen)) < 2:
+        bad("every --max-level gave the same total on the real lists, so depth "
+            "was not exercised: %s" % seen)
+    else:
+        print("   ok   monotone in the level cap: %s"
+              % " >= ".join("%.6f" % v for v in seen))
+
+
 def check_bound():
     print("3. the bound is sound")
     rng = np.random.default_rng(11)
@@ -794,6 +884,7 @@ def main(argv):
     check_topk()
     check_resume()
     check_third()
+    check_levels()
     check_real()
     check_refusals()
     print()

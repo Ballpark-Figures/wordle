@@ -2232,6 +2232,31 @@ is the proven optimum over all 12972 x 12972 (opener, second word) pairs.
     word is never exercised there -- that case wants constructing.
   - Third words get their own CSV rows, `fires` = `<group>|m<matched count>`
     with `third` in the status column.
+- **`--max-level N` PUTS A COMMITTED WORD AT EVERY LEVEL, each able to DECLINE**
+  (user's call, 2026-09-17), and supersedes `--third-key`, which is its N=3 case.
+  A CASE is a set of buckets sharing one word; it plays that word or declines to
+  the random tail, whichever is cheaper, and the resulting buckets are regrouped
+  by matched count into cases one level down. Level 2's cases are the
+  partition's groups; below that the key is the matched count, nested under the
+  path. Rows are named `<group>|m<a>|m<b>...`.
+  - **DECLINING AT EVERY LEVEL MAKES THE FAMILY CONTAIN EVERY SHALLOWER ONE** --
+    decline everywhere at level 2 and the plain opener is back -- which is where
+    the gate's three oracles come from: `--max-level 2` can never be worse than
+    the plain two-level beam, `--max-level 3` never worse than the fixed third
+    level with declining, and the result must be MONOTONE in N.
+  - **THE THREE ORACLES EARNED THEIR KEEP IMMEDIATELY.** `L->cand` was ONE array
+    shared by every level: a case ranked into it, sorted, then walked it calling
+    the recursion, which re-ranked the SAME array, so the parent resumed reading
+    its child's candidate list. The symptom was `--max-level 4` coming out WORSE
+    than 3 and every second word being `aahed` (guess index 0). **The fix is one
+    candidate array PER LEVEL** -- the same per-depth scratch rule the memo
+    arrays already carry, and ASan cannot see it because nothing is out of
+    bounds. Note `--max-level 2` equals the two-level beam on the REAL lists but
+    is strictly better on the mini problem, where declining always wins.
+  - **COST IS THE BEAM WIDTH PER LEVEL**, `k^(N-1)` per group, so deep runs want
+    a far smaller K than shallow ones. It requires `--topk` for that reason.
+  - **An opener that declines everywhere still has a value**, and its rows now
+    carry the total: it is the plain opener, not a blank.
 - **IT RESUMES, and the CSV is the checkpoint.** Each opener's rows are appended
   the moment it finishes, so re-running the same command skips what is on file
   and -- the part that saves real time -- SEEDS THE INCUMBENT with the best total

@@ -295,6 +295,10 @@ typedef struct {
     double  fired[MAXGRP];        /* and that group's exact total */
     int32_t nq[MAXGRP], scanned[MAXGRP], cut[MAXGRP];
     int32_t third[MAXGRP][MAXCASE];   /* the committed third word per case, -1 */
+    int32_t ntree[MAXGRP];            /* --max-level: the committed-word tree,
+                                       * flattened as (path, word) pairs */
+    uint32_t tpath[MAXGRP][24];
+    int32_t  tword[MAXGRP][24];
     double  decline;              /* exact total over the replies that do NOT fire */
     double  bound;                /* a sound lower bound on the whole total */
     int     done;
@@ -591,14 +595,26 @@ typedef struct {
     int32_t kid[MAXCASE];         /* child node per matched count, -1 = none */
 } CaseNode;
 
+/* One committed word and the path of matched counts that reaches it.  `path` is
+ * 1 for the level-2 word, then path*6+m per level down, so it decodes back to
+ * the case and sorts naturally by depth. */
+typedef struct { uint32_t path; int32_t word; } TreeEnt;
+#define MAXTREE 512
+
 typedef struct {
     CaseNode *node;
     int n, cap;
+    TreeEnt ent[MAXTREE];
+    int nent;
     uint16_t *buf[MAXLVL];        /* one answer buffer per level */
     Bkt      *bkt[MAXLVL];
     MState   *st[MAXLVL];
     int8_t   *mc[MAXLVL];
-    Cand     *cand;
+    /* ONE CANDIDATE ARRAY PER LEVEL.  A single shared one is clobbered by the
+     * recursion: a case ranks into it, sorts, then walks it calling expand --
+     * which recurses and re-ranks the SAME array, so the parent's loop resumes
+     * reading its child's list.  Same shape as the per-depth memo scratch. */
+    Cand     *cand[MAXLVL];
 } Levels;
 
 static int node_new(Levels *L) {
@@ -615,6 +631,17 @@ static int node_new(Levels *L) {
 static double solve_case(Memo *m, Levels *L, const uint16_t *buf, const Bkt *bk,
                          const MState *st, int nbk, int depth, int maxlvl,
                          int topk, uint16_t *out, int *node_out);
+
+static void tree_walk(Levels *L, int node, uint32_t path) {
+    if (node < 0 || L->nent >= MAXTREE) return;
+    const CaseNode *nd = &L->node[node];
+    if (nd->word < 0) return;                  /* declined: nothing below it */
+    L->ent[L->nent].path = path;
+    L->ent[L->nent].word = nd->word;
+    L->nent++;
+    for (int c = 0; c < MAXCASE; c++)
+        if (nd->kid[c] >= 0) tree_walk(L, nd->kid[c], path * 6 + (uint32_t)c);
+}
 
 /* Expand one candidate word over a case's buckets: play it, drop the answers it
  * wins, regroup the rest by matched count and solve each group one level down. */
@@ -688,13 +715,13 @@ static double solve_case(Memo *m, Levels *L, const uint16_t *buf, const Bkt *bk,
     double declined = 0.0;
     for (int b = 0; b < nbk; b++)
         declined += T(m, buf + bk[b].start, bk[b].len, depth + 1);
-    if (depth >= maxlvl) return declined;
+    if (depth > maxlvl) return declined;     /* depth = the guess about to be played */
 
     /* rank candidates by the one-ply score over this case's buckets -- the same
      * rule every other level here ranks by.  A word already played on this path
      * splits nothing (every answer in a bucket replied to it identically), so it
      * scores worst and falls out of the beam without being named. */
-    Cand *cand = L->cand;
+    Cand *cand = L->cand[depth];
     int *cnt = m->cnt + (size_t)depth * NPAT;
     int *touch = m->touch + (size_t)depth * NPAT;
     for (int w = 0; w < NG; w++) {
@@ -942,6 +969,30 @@ static void format_strategy(char *buf, size_t n, const Row *v, int labelled) {
               : snprintf(buf + k, n - k, "%s %s", g == NGROUP - 1 ? "" : " |", w);
         if (r < 0 || (size_t)r >= n - k) break;
         k += (size_t)r;
+        /* --max-level's tree, or the fixed third level -- whichever produced
+         * this row.  Both are committed words below the second one, so both
+         * belong on the line a watched run prints. */
+        for (int i = 1; i < v->ntree[g]; i++) {
+            const char *t = GWORD[v->tword[g][i]];
+            uint32_t pth = v->tpath[g][i], digits[8];
+            int nd = 0;
+            while (pth > 1 && nd < 8) { digits[nd++] = pth % 6; pth /= 6; }
+            if (labelled) {
+                r = snprintf(buf + k, n - k, " %s (%s", t, GSPEC[g]);
+                if (r < 0 || (size_t)r >= n - k) break;
+                k += (size_t)r;
+                for (int d = nd - 1; d >= 0; d--) {
+                    r = snprintf(buf + k, n - k, "|m%u", digits[d]);
+                    if (r < 0 || (size_t)r >= n - k) break;
+                    k += (size_t)r;
+                }
+                r = snprintf(buf + k, n - k, ")");
+            } else {
+                r = snprintf(buf + k, n - k, " +%s", t);
+            }
+            if (r < 0 || (size_t)r >= n - k) break;
+            k += (size_t)r;
+        }
         for (int c = 0; c < MAXCASE; c++) {
             if (v->third[g][c] < 0) continue;      /* declined, or never fired */
             const char *t = GWORD[v->third[g][c]];
@@ -959,7 +1010,8 @@ static void solve_opener(Memo *m, int og, Row *r, double incumbent, int no_prune
                          uint16_t *q, uint16_t *out, int *rstart, int *rlen,
                          int *rpat, int *nbs, int *nqs, const double *gbound,
                          const uint8_t *fu, int topk, int third_max,
-                         const int *shared_third, int third_decline) {
+                         const int *shared_third, int third_decline,
+                         int maxlvl, Levels *L) {
     memo_clear(m);
     r->opener = og;
     r->decline = decline_total(m, og, out, 0, fu);
@@ -982,6 +1034,7 @@ static void solve_opener(Memo *m, int og, Row *r, double incumbent, int no_prune
         r->fired[g] = 0.0;
         r->scanned[g] = r->cut[g] = 0;
         r->nq[g] = nqs[g];
+        r->ntree[g] = 0;
         for (int c = 0; c < MAXCASE; c++) r->third[g][c] = -1;
         int nq = nqs[g], nb = nbs[g];
         if (!nq) continue;
@@ -1009,6 +1062,35 @@ static void solve_opener(Memo *m, int og, Row *r, double incumbent, int no_prune
          * beam stays the ONE approximation in play and the claim stays exactly
          * "the best of the k examined".  The OPENER-level cut is untouched and
          * still sound: the incumbent is the value of a strategy that exists. */
+        /* --max-level: ONE recursion per group, declining at every level
+         * including this one.  The opener is charged here, once per qualifying
+         * answer; solve_case charges everything from the second guess down. */
+        if (maxlvl) {
+            Bkt *gb = malloc(sizeof(Bkt) * nb);
+            MState *gs = malloc(sizeof(MState) * nb);
+            for (int b = 0; b < nb; b++) {
+                gb[b].start = rs[b];
+                gb[b].len = rl[b];
+                memset(&gs[b], 0, sizeof gs[b]);
+                mstate_add(&gs[b], og, rp[b]);
+            }
+            L->n = 0;
+            int node = -1;
+            double v = solve_case(m, L, qq, gb, gs, nb, 2, maxlvl, topk,
+                                  out, &node);
+            L->nent = 0;
+            tree_walk(L, node, 1);
+            r->ntree[g] = L->nent < 24 ? L->nent : 24;
+            for (int i = 0; i < r->ntree[g]; i++) {
+                r->tpath[g][i] = L->ent[i].path;
+                r->tword[g][i] = L->ent[i].word;
+            }
+            if (L->nent) r->second[g] = L->ent[0].word;   /* path 1 = level 2 */
+            r->scanned[g] = topk;
+            r->fired[g] = nq + v;
+            free(gb); free(gs);
+            continue;
+        }
         if (topk) {
             int lim = topk < NG ? topk : NG;
             double bestk = HUGE_VAL;
@@ -1228,14 +1310,35 @@ static void write_rows(FILE *f, Row *v) {
             continue;
         }
         if (v->second[g] < 0) {
-            fprintf(f, "%s,%s,,,,,,%d,%d,none\n", GWORD[v->opener], GSPEC[g],
-                    v->nq[g], v->scanned[g]);
+            /* No word for this group -- nothing qualified, or it DECLINED.  The
+             * strategy still has a value, so the total is written here too: an
+             * opener that declines everywhere is the plain opener, not a blank. */
+            fprintf(f, "%s,%s,,%.6f,%.4f,%.4f,%.4f,%d,%d,none\n",
+                    GWORD[v->opener], GSPEC[g], tot / NA, tot, v->decline,
+                    v->fired[g], v->nq[g], v->scanned[g]);
             continue;
         }
         fprintf(f, "%s,%s,%s,%.6f,%.4f,%.4f,%.4f,%d,%d,%d\n",
                 GWORD[v->opener], GSPEC[g], GWORD[v->second[g]],
                 any ? tot / NA : 0.0, any ? tot : 0.0, v->decline,
                 v->fired[g], v->nq[g], v->scanned[g], v->cut[g]);
+        /* --max-level's TREE: one row per committed word below the second, named
+         * `<group>|m<a>|m<b>...` -- the path of matched counts that reaches it.
+         * `path` is 1 for the level-2 word and path*6+m per level down, so the
+         * digits after the leading 1 decode straight back to the case. */
+        for (int i = 1; i < v->ntree[g]; i++) {
+            char lab[64];
+            int k = snprintf(lab, sizeof lab, "%s", GSPEC[g]);
+            uint32_t pth = v->tpath[g][i];
+            uint32_t digits[8];
+            int nd = 0;
+            while (pth > 1 && nd < 8) { digits[nd++] = pth % 6; pth /= 6; }
+            for (int d = nd - 1; d >= 0; d--)
+                k += snprintf(lab + k, sizeof lab - k, "|m%u", digits[d]);
+            fprintf(f, "%s,%s,%s,%.6f,%.4f,,,,,level%d\n",
+                    GWORD[v->opener], lab, GWORD[v->tword[g][i]],
+                    any ? tot / NA : 0.0, any ? tot : 0.0, nd + 2);
+        }
         /* THE THIRD LEVEL's own rows, named `<group>|m<matched>` so a reader can
          * tell them from a group's row by the separator and recover both keys.
          * The strategy's expected/total repeat here as they do on every row. */
@@ -1257,6 +1360,7 @@ int main(int argc, char **argv) {
     int min_grays = 3, by_grays = 0, threads = 0, limit = 0, no_prune = 0,
         memo_bits = 19, split_v = 0, split_mv = 0, split_nz = 0, print_label = 0, topk = 0;
     int third_max = -1;                        /* -1: no third level at all */
+    int maxlvl = 0;                            /* 0: the fixed 2/3-level paths */
     int third_decline = 0;
     const char *third_key = NULL;
     const int *shared_third = NULL;
@@ -1309,6 +1413,9 @@ int main(int argc, char **argv) {
         /* --third-decline lets a case play NO committed word when the random
          * tail is cheaper.  A different strategy, not a better search. */
         else if (!strcmp(argv[i], "--third-decline")) third_decline = 1;
+        /* --max-level N: a committed word at EVERY level down to N, each with a
+         * decline option.  Supersedes --third-key, which is the N=3 case. */
+        else if (!strcmp(argv[i], "--max-level") && i + 1 < argc) maxlvl = atoi(argv[++i]);
         /* --print-label resolves the firing condition, prints its CANONICAL name
          * and stops.  The wrapper needs that name for the filename, and groups.c
          * is the one place that knows it -- deriving it in shell would be a
@@ -1332,6 +1439,22 @@ int main(int argc, char **argv) {
         return 1;
     }
     if (topk < 0) { fprintf(stderr, "--topk must be at least 1\n"); return 1; }
+    if (maxlvl && (maxlvl < 2 || maxlvl >= MAXLVL)) {
+        fprintf(stderr, "--max-level must be 2..%d: 2 is a second word then the "
+                        "random tail, and each level beyond\n"
+                        "multiplies the search by the beam width\n", MAXLVL - 1);
+        return 1;
+    }
+    if (maxlvl && !topk) {
+        fprintf(stderr, "--max-level needs --topk: the search is k per level, "
+                        "so it only exists inside a beam\n");
+        return 1;
+    }
+    if (maxlvl && third_max >= 0) {
+        fprintf(stderr, "--max-level supersedes --third-key: the third level is "
+                        "its N=3 case.  Pass one or the other\n");
+        return 1;
+    }
     if (third_decline && third_max < 0) {
         fprintf(stderr, "--third-decline is an option ON the third level; it "
                         "needs --third-key and --third-max-matched\n");
@@ -1660,6 +1783,18 @@ int main(int argc, char **argv) {
         uint8_t (*gf)[NPAT] = malloc(sizeof(uint8_t) * MAXGROUP * NPAT);
         uint8_t *fu = malloc(NPAT);
         int8_t *gvow = malloc(NPAT), *mvow = malloc(NPAT);
+        /* THE LEVEL RECURSION'S WORKSPACE, per thread: one answer buffer,
+         * bucket list and state array PER LEVEL, so a level cannot clobber the
+         * one above it.  Allocated once per thread, not per opener. */
+        Levels lev;
+        memset(&lev, 0, sizeof lev);
+        for (int d = 0; d < MAXLVL; d++) {
+            lev.cand[d] = malloc(sizeof(Cand) * NG);
+            lev.buf[d] = malloc(sizeof(uint16_t) * NA);
+            lev.bkt[d] = malloc(sizeof(Bkt) * NA);
+            lev.st[d]  = malloc(sizeof(MState) * NA);
+            lev.mc[d]  = malloc(NA);
+        }
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic, 1)
 #endif
@@ -1686,7 +1821,7 @@ int main(int argc, char **argv) {
                          gbs, gf, fu);
             solve_opener(&m, rr->opener, rr, inc, no_prune, q, out, rstart, rlen,
                          rpat, nbs, nqs, gbs, fu, topk, third_max, shared_third,
-                         third_decline);
+                         third_decline, maxlvl, &lev);
 #ifdef _OPENMP
 #pragma omp critical (progress)
 #endif
@@ -1723,6 +1858,11 @@ int main(int argc, char **argv) {
                     fflush(stderr);
                 }
             }
+        }
+        free(lev.node);
+        for (int d = 0; d < MAXLVL; d++) {
+            free(lev.cand[d]); free(lev.buf[d]); free(lev.bkt[d]);
+            free(lev.st[d]); free(lev.mc[d]);
         }
         free(q); free(out); free(rstart); free(rlen); free(rpat);
         free(gf); free(fu); free(gvow); free(mvow);

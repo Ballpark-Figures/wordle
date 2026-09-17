@@ -76,6 +76,7 @@ THREADS=""
 MEMOBITS=""
 REPORT=30
 TOPK=""
+MAXLVL=""
 THIRDKEY=""
 THIRDMAX=""
 THIRDDEC=0
@@ -97,6 +98,7 @@ while [ $# -gt 0 ]; do
         --memo-bits)  MEMOBITS="$2"; shift 2 ;;
         --report)     REPORT="$2";   shift 2 ;;
         --topk|-k)    TOPK="$2";     shift 2 ;;
+        --max-level)  MAXLVL="$2";   shift 2 ;;
         --third-key)  THIRDKEY="$2"; shift 2 ;;
         --third-max-matched) THIRDMAX="$2"; shift 2 ;;
         --third-decline)     THIRDDEC=1;    shift ;;
@@ -151,6 +153,7 @@ STEM="exact_${LABEL}"
 [ -z "$OPENER" ]  || STEM="${STEM}_${OPENER}"
 [ -z "$OPENERS" ] || STEM="${STEM}_$(basename "$OPENERS" .txt)"
 [ -z "$TOPK" ]    || STEM="${STEM}_k${TOPK}"
+[ -z "$MAXLVL" ]   || STEM="${STEM}_L${MAXLVL}"
 [ -z "$THIRDKEY" ] || STEM="${STEM}_3${THIRDKEY}${THIRDMAX}"
 [ "$THIRDDEC" = 0 ] || STEM="${STEM}dec"
 [ -z "$LIMIT" ]   || STEM="${STEM}_limit${LIMIT}"
@@ -161,6 +164,7 @@ FLAGS="--report $REPORT$COND"
 [ -z "$OPENER" ]   || FLAGS="$FLAGS --opener $OPENER"
 [ -z "$OPENERS" ]  || FLAGS="$FLAGS --openers $OPENERS"
 [ -z "$TOPK" ]     || FLAGS="$FLAGS --topk $TOPK"
+[ -z "$MAXLVL" ]   || FLAGS="$FLAGS --max-level $MAXLVL"
 [ -z "$THIRDKEY" ] || FLAGS="$FLAGS --third-key $THIRDKEY"
 [ -z "$THIRDMAX" ] || FLAGS="$FLAGS --third-max-matched $THIRDMAX"
 [ "$THIRDDEC" = 0 ] || FLAGS="$FLAGS --third-decline"
@@ -174,6 +178,11 @@ NGRP=$(echo "$LABEL" | tr '.' '\n' | wc -l | tr -d ' ')
 echo "  fires on   $LABEL$([ "$NGRP" -gt 1 ] && echo "  ($NGRP groups, a SEPARATE word for each)")"
 echo "  openers    ${OPENER:-${OPENERS:-${TOPK:+the $TOPK best by expected answers remaining}}}${OPENER:-${OPENERS:-${TOPK:+}}}${LIMIT:+ (first $LIMIT)}"
 echo "  follow-up  answer (a uniformly random consistent answer)"
+if [ -n "$MAXLVL" ]; then
+    echo "  LEVELS     a committed word at every level down to $MAXLVL, each of which"
+    echo "             may DECLINE to the random tail where that is cheaper"
+    echo "             ^ cost is the beam width PER LEVEL: k^($MAXLVL-1) per group"
+fi
 if [ -n "$THIRDKEY" ]; then
     echo "  THIRD WORD when the two replies have proved at most $THIRDMAX letters,"
     echo "             keyed per $THIRDKEY$([ "$THIRDDEC" = 1 ] && echo ", declining where the random tail is cheaper" || echo ", FORCED where it fires")"
