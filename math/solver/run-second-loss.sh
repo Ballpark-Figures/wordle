@@ -58,6 +58,7 @@ SEED=0
 PROGRESS=""
 DRYRUN=0
 SPLITMV=0
+BYCASE=0
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -68,6 +69,7 @@ while [ $# -gt 0 ]; do
         --seed)        SEED="$2";       shift 2 ;;
         --progress)    PROGRESS="$2";   shift 2 ;;
         --split-matched-vowels) SPLITMV=1; shift ;;
+        --by-case)     BYCASE=1;         shift ;;
         --dry-run)     DRYRUN=1;        shift ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
     esac
@@ -100,6 +102,7 @@ LOC=data/local/secondloss
 # The matched-vowel split is a different report, so it gets its own filename.
 MVTAG=""
 [ "$SPLITMV" = 0 ] || MVTAG="_mv"
+[ "$BYCASE" = 0 ]  || MVTAG="_case"
 STEM="loss_${OPENER}_${LABEL}_${FALLBACK}_n${N}_s${SEED}${MVTAG}"
 OUT="$OUTDIR/$STEM.csv"
 
@@ -109,6 +112,7 @@ echo "  strategy   ${SECONDFROM:-(none: the plain opener)}  (fires on $LABEL)"
 echo "  follow-up  $FALLBACK"
 echo "  games      $N per answer x 2315 answers, seed $SEED"
 [ "$SPLITMV" = 0 ] || echo "  report     3- and 4-grey split by matched vowels"
+[ "$BYCASE" = 0 ]  || echo "  report     the STRATEGY'S OWN cases, one row per group"
 echo "  out        $OUT"
 
 if [ "$DRYRUN" = 1 ]; then
@@ -129,5 +133,6 @@ FLAGS="--opener $OPENER --fallback $FALLBACK --n $N --seed $SEED --out $OUT"
 [ -z "$SECONDFROM" ] || FLAGS="$FLAGS --second-from $SECONDFROM"
 [ -z "$PROGRESS" ]   || FLAGS="$FLAGS --progress $PROGRESS"
 [ "$SPLITMV" = 0 ]   || FLAGS="$FLAGS --split-matched-vowels"
+[ "$BYCASE" = 0 ]    || FLAGS="$FLAGS --by-case"
 
 "$PY" -u tools/secondloss.py $FLAGS 2>&1 | tee -a "$LOC/$STEM.log"

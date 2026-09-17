@@ -74,7 +74,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import paths  # noqa: E402
 from build_patterns import load_patterns  # noqa: E402
-from secondword import read_table, word_by_code  # noqa: E402
+from secondword import read_table, word_by_code, group_masks  # noqa: E402
 from wordle import load_words, pattern  # noqa: E402
 from wordlesim import (answer_to_guess, make_opening_rule, make_tail,  # noqa: E402
                        play_game, second_rule_for)
@@ -87,6 +87,9 @@ COLUMNS = ("grays,answers,share,opt_mean,optword_mean,sim_mean,sim_stderr,gap,"
            "word_gap,followup_gap,contribution,word_contrib,followup_contrib,"
            "pct_of_gap,fires")
 COLUMNS_MV = "grays,matched_vowels," + COLUMNS[len("grays,"):]
+# --by-case reports the STRATEGY'S OWN cases, so the key is the group's spec
+# rather than any count, and a reply that declines has no group at all.
+COLUMNS_CASE = "case," + COLUMNS[len("grays,"):]
 
 INF = 10 ** 9
 VOWELS = "aeiouy"                            # y is a vowel; matches secondword.py
@@ -94,7 +97,8 @@ VOWELS = "aeiouy"                            # y is a vowel; matches secondword.
 
 def parse_args(argv):
     a = {"opener": None, "second_from": "", "fallback": "answer", "n": 100,
-         "seed": 0, "out": None, "progress": 500, "split_matched_vowels": False}
+         "seed": 0, "out": None, "progress": 500, "split_matched_vowels": False,
+         "by_case": False}
     i = 0
     while i < len(argv):
         k = argv[i].lstrip("-").replace("-", "_")
@@ -102,7 +106,7 @@ def parse_args(argv):
             a["out"] = False
             i += 1
             continue
-        if k == "split_matched_vowels":
+        if k in ("split_matched_vowels", "by_case"):
             a[k] = True
             i += 1
             continue
@@ -381,7 +385,31 @@ def main(argv):
     # sit on a vowel of the opener (y a vowel).  Both keys are a function of the
     # opener's REPLY, so each is constant within a reply and a residual set.
     split = a["split_matched_vowels"]
-    if split:
+    by_case = a["by_case"]
+    if by_case and by_code is None:
+        raise SystemExit("--by-case reports the STRATEGY's own cases, so it "
+                         "needs a --second-from table to read them from")
+    if by_case and split:
+        raise SystemExit("--by-case and --split-matched-vowels are two "
+                         "different report keys; pick one")
+    if by_case:
+        # THE STRATEGY'S OWN CASES.  Whatever partition the table was built on
+        # -- grey counts, vowel splits, which-tiles -- its groups ARE the cases
+        # the strategy distinguishes, so the report can key on them directly
+        # instead of on a count that may be coarser than the rule.  Replies that
+        # DECLINE belong to no group and keep their grey count, since that is
+        # the only thing that separates them.
+        specs = label.split(".")
+        gmask = group_masks(specs, a["opener"])
+        codes = pat[gi]
+        grp_of_code = np.full(len(gmask[0][1]), -1, dtype=np.int32)
+        for i, (_canon, m) in enumerate(gmask):
+            grp_of_code[m] = i
+        gidx = grp_of_code[codes]
+        mvow = np.zeros(na, dtype=np.int8)
+        order = ([("decline g%d" % g, (0, g)) for g in range(6)]
+                 + [(gmask[i][0], (1, i)) for i in range(len(gmask))])
+    elif split:
         mvow = np.array([_matched_vowels(a["opener"], w) for w in answers],
                         dtype=np.int8)
         # 3 greys leaves 2 matched tiles, 4 greys leaves 1; all-grey has none and
@@ -393,12 +421,16 @@ def main(argv):
     else:
         mvow = np.zeros(na, dtype=np.int8)
         order = [(g, -1) for g in range(6)]
-    idx_of = {d: i for i, d in enumerate(order)}
+    if by_case:
+        idx_of = {d: i for i, (_lab, d) in enumerate(order)}
+        def desc(ai):
+            return (1, int(gidx[ai])) if gidx[ai] >= 0 else (0, int(grays[ai]))
+    else:
+        idx_of = {d: i for i, d in enumerate(order)}
+        def desc(ai):
+            g = int(grays[ai])
+            return (g, int(mvow[ai])) if split and g in (3, 4) else (g, -1)
     nb = len(order)
-
-    def desc(ai):
-        g = int(grays[ai])
-        return (g, int(mvow[ai])) if split and g in (3, 4) else (g, -1)
 
     bkey = np.array([idx_of[desc(ai)] for ai in range(na)], dtype=np.int32)
 
@@ -438,16 +470,23 @@ def main(argv):
               % (infeasible, CAP))
 
     rows = []
-    for b, (g, mvk) in enumerate(order):
-        sel = grays == g if mvk == -1 else (grays == g) & (mvow == mvk)
+    for b, entry in enumerate(order):
+        sel = bkey == b
         k = int(sel.sum())
         if not k:
             continue
+        if by_case:
+            case, (_kind, _n) = entry[0], entry[1]
+            g, mvk = -1, -1
+        else:
+            g, mvk = entry
+            case = ""
         bm = float(mean_a[sel].mean())
         bse = float(np.sqrt(var_a[sel].sum() / a["n"]) / k)
         om = float(opt[sel].mean())
         wm = Bsum[b] / k                    # B per answer: our word, optimal after
-        rows.append(dict(grays=g, mv=mvk, answers=k, share=k / na, opt=om,
+        rows.append(dict(grays=g, mv=mvk, case=case, answers=k,
+                         share=k / na, opt=om,
                          optword=wm, sim=bm, se=bse, gap=bm - om, word_gap=wm - om,
                          foll_gap=bm - wm, contrib=(k / na) * (bm - om),
                          word_contrib=(k / na) * (wm - om),
@@ -482,7 +521,18 @@ def main(argv):
     print("  gap  C - A = %.5f  =  %.5f (word choice)  +  %.5f (followup)"
           % (gap, word_total, foll_total))
     print()
-    if split:
+    if by_case:
+        wid = max(len(r["case"]) for r in rows)
+        print("  %-*s %8s %7s %9s %9s %9s %9s %9s %10s %10s %6s"
+              % (wid, "case", "answers", "share", "A opt", "B our g2",
+                 "C strat", "word", "followup", "w-contrib", "f-contrib", "fires"))
+        for r in rows:
+            print(("  %-*s %8d %6.1f%% %9.4f %9.4f %9.4f %9.4f %9.4f %10.5f "
+                   "%10.5f %5.0f%%")
+                  % (wid, r["case"], r["answers"], 100 * r["share"], r["opt"],
+                     r["optword"], r["sim"], r["word_gap"], r["foll_gap"],
+                     r["word_contrib"], r["foll_contrib"], 100 * r["fires"]))
+    elif split:
         print("  %5s %4s %8s %7s %9s %9s %9s %9s %9s %10s %10s %6s"
               % ("grays", "mvow", "answers", "share", "A opt", "B our g2",
                  "C strat", "word", "followup", "w-contrib", "f-contrib", "fires"))
@@ -490,7 +540,7 @@ def main(argv):
         print("  %5s %8s %7s %9s %9s %9s %9s %9s %10s %10s %6s"
               % ("grays", "answers", "share", "A opt", "B our g2", "C strat",
                  "word", "followup", "w-contrib", "f-contrib", "fires"))
-    for r in rows:
+    for r in [] if by_case else rows:
         mvs = (" %4s" % ("-" if r["mv"] == -1 else r["mv"])) if split else ""
         print(("  %5d" + mvs + " %8d %6.1f%% %9.4f %9.4f %9.4f %9.4f %9.4f %10.5f "
                "%10.5f %5.0f%%")
@@ -502,7 +552,8 @@ def main(argv):
         os.makedirs(os.path.dirname(a["out"]) or ".", exist_ok=True)
         with open(a["out"], "w") as f:
             head = ("by grey count and matched vowels (3- and 4-grey split)"
-                    if split else "by grey count")
+                    if split else "by the strategy's own cases" if by_case
+                    else "by grey count")
             f.write("# EV loss vs optimal for the opener %s, %s, split into "
                     "word-choice and followup loss\n" % (a["opener"], head))
             f.write("# strategy: second word from %s firing on %s, follow-up "
@@ -523,9 +574,11 @@ def main(argv):
                     "%.6f (C-B)\n" % (gap, word_total, foll_total))
             f.write("# gate: forcing each reply's own optimal 2nd move reproduces "
                     "A per grey bucket, validating the residual solver\n")
-            f.write((COLUMNS_MV if split else COLUMNS) + "\n")
+            f.write((COLUMNS_CASE if by_case else
+                     COLUMNS_MV if split else COLUMNS) + "\n")
             for r in rows:
-                pre = "%d,%d," % (r["grays"], r["mv"]) if split \
+                pre = ("%s," % r["case"]) if by_case \
+                    else "%d,%d," % (r["grays"], r["mv"]) if split \
                     else "%d," % r["grays"]
                 f.write((pre + "%d,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,"
                          "%.6f,%.6f,%.4f,%.6f\n")

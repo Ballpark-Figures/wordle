@@ -2283,6 +2283,20 @@ price what the second word buys.
   is the thing being decomposed, not noise in it — which is why this is per
   answer rather than a uniform draw, whose bucket shares would carry sampling
   noise of their own.
+- **`--by-case` REPORTS THE STRATEGY'S OWN CASES, one row per group**, instead of
+  by grey count. Whatever partition the table was built on -- grey counts, vowel
+  splits, `nz` which-tiles -- its groups ARE the cases the strategy
+  distinguishes, so the report keys on them directly rather than on a count that
+  may be far coarser than the rule. Replies that DECLINE belong to no group and
+  keep their grey count (`decline g2`), since that is all that separates them.
+  - **It needs a `--second-from` table**, which is where the cases come from, and
+    it is refused alongside `--split-matched-vowels`: two different report keys.
+  - **THE TOTALS ARE INVARIANT TO THE BUCKETING and that is a free check** -- A,
+    B, C and the word/followup split are properties of the strategy, not of how
+    the rows are cut. MEASURED on `slane`'s 16-group table: A 3.43110 and
+    word-choice loss 0.06825 both ways, to five decimals.
+  - Its CSV carries a `case` column in place of `grays`, and the stem ends
+    `_case`.
 - **THE GATE IS BUILT IN and always runs**: the tree's per-answer costs must sum
   to the total the committed CSV records for that opener, it must cover every
   answer exactly once and open with that word, the grey counts are recomputed
