@@ -2431,6 +2431,25 @@ moment that becomes true, and the survivors double.
     guess total, so the mean stays reportable — the mirror of `wins` under mean
     ranking). It is added ONLY in that mode, so a mean race's checkpoint format,
     and any halted mean race resuming into it, are untouched.
+  - **MEAN GUESSES IS THE SECONDARY KEY under win-rate ranking** (added
+    2026-09-17, user's call): fewest guesses among those winning equally often.
+    Without it the "leader" is whichever tied opener the ranking file listed
+    first — and at 100 games a quad field is **9637 of 10000 tied at exactly
+    1.0000**, so that is nearly the whole field. The status line prints it beside
+    the win rate (`leader covet gland shrub wimpy 1.0000 [mean 4.2050]`) and the
+    standings order breaks the same way, so the file and the log agree.
+    - **IT IS NOT PURELY COSMETIC, and that is worth knowing before quoting a
+      cut.** The leader is the reference the paired difference is measured
+      against, so a different leader among ties leaves every `md` unchanged (the
+      means are equal, by definition of a tie) but MOVES the paired errors — the
+      variance of a difference depends on which entry you difference against. So
+      a few borderline openers can be cut that otherwise would not, and the
+      reverse. The cut is equally sound either way; it is simply better justified
+      against a leader that is best on a stated key than against an arbitrary one.
+    - **OPT-IN in the shared driver** (`tiebreak=(live, n_games) -> array`,
+      taking the game count so it can return a printable MEAN rather than a
+      running total). The mean-ranked race passes none and is untouched, which
+      the gate asserts by requiring `[mean ` never to appear in its output.
   - **A FREE ORACLE, asserted at every write**: the reported win rate comes from
     the driver's mean of the indicator, and `wins` from a tally of the raw guess
     counts against the same threshold — two independent routes to one number, and

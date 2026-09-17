@@ -1001,7 +1001,7 @@ def main(argv):
         return [ln for ln in open(rpaths(tag)[0]) if not ln.startswith("# race_")]
 
     for tag in ("whole", "split", "switch", "chunky", "pairsplit",
-                "win", "winsplit", "winall"):
+                "win", "winsplit", "winall", "tie"):
         rwipe(tag)
     rsaid = {}
     rsaid["whole"] = rrun("whole", 800, 0, 5)
@@ -1238,6 +1238,47 @@ def main(argv):
     except SystemExit:
         pass
 
+    # --- the secondary key: mean guesses breaks a tie on the win rate ---------
+    # At a small game count a win-rate field is mostly TIES, and without a
+    # secondary key the leader is whichever tied entry sits at the lowest index.
+    # So: the top block must be ordered by mean, and the leader must be its
+    # argmin -- and ties must actually have occurred, or this proves nothing.
+    rwipe("tie")
+    rsaid["tie"] = rrun("tie", 100, 0, 5, rank="win_rate", sigma="1e9")
+    tdata = [c.split(",") for c in rbody("tie")
+             if not c.startswith("#") and not c.startswith("word,")]
+    tlive = [c for c in tdata if c[8] == "live"]
+    if not tlive:
+        failures.append("the tie-break race kept nobody")
+    else:
+        tbest = float(tlive[0][2])
+        ttied = [c for c in tlive if float(c[2]) == tbest]
+        if len(ttied) < 2:
+            failures.append("no two openers tied on the win rate at 100 games, "
+                            "so the secondary key was never exercised")
+        tmeans = [float(c[7]) for c in ttied]
+        if tmeans != sorted(tmeans):
+            failures.append("the tied block is not ordered by mean guesses: %s"
+                            % tmeans[:5])
+        if abs(tmeans[0] - min(tmeans)) > 1e-12:
+            failures.append("the leader is not the lowest-mean opener among "
+                            "those tied on the win rate")
+        # and the SAME leader the driver named in its own status line
+        tlead = [ln for ln in rsaid["tie"].splitlines() if "live  leader" in ln]
+        if tlead and tlive[0][0] not in tlead[-1]:
+            failures.append("the standings' first row (%s) is not the leader the "
+                            "log named" % tlive[0][0])
+        print("secondary key: %d of %d openers tied at win rate %.4f, the block "
+              "is ordered by mean guesses and the leader is its lowest (%.4f)"
+              % (len(ttied), len(tlive), tbest, tmeans[0]))
+
+    # AND IT IS OPT-IN: the mean-ranked race passes no tiebreak, so its leader
+    # rule is untouched -- which the whole-vs-split-vs-switch diffs above already
+    # pin, since they run without one.
+    if "[mean " in rsaid["whole"]:
+        failures.append("the MEAN-ranked race printed a secondary key, so the "
+                        "tiebreak is not opt-in")
+
     # COVERAGE: the flag must actually RANK DIFFERENTLY, or none of the above
     # distinguishes it from the mean race it was copied from.
     worder = [c[0] for c in wdata]
@@ -1254,7 +1295,7 @@ def main(argv):
               % (moved, len(worder), worder[0], morder[0]))
 
     for tag in ("whole", "split", "switch", "chunky", "pairsplit",
-                "win", "winsplit", "winall"):
+                "win", "winsplit", "winall", "tie"):
         rwipe(tag)
     os.remove(rfield)
 

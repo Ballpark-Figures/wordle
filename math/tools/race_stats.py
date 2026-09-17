@@ -201,8 +201,29 @@ def _identity(v):
 
 
 def run(cfg, player, names, is_answer, writer, elim_path, ck_path,
-        elim_columns, noun="opening", extra=None, stem="", display=_identity):
+        elim_columns, noun="opening", extra=None, stem="", display=_identity,
+        tiebreak=None, tiebreak_name=""):
     """Race `names` until one is left, `--max-games` is reached, or it is halted.
+
+    `tiebreak` is an optional callable `(live, n_games) -> array over live
+    positions, lower better`, used ONLY to break EXACT ties in the ranked total
+    when choosing the leader and when ordering.  It takes the game count so it
+    can return a per-game MEAN rather than a running total -- the two order
+    identically, but only one of them is a number worth printing.  It exists because a ranked score with few distinct
+    values -- a win rate at 100 games, say, where thousands tie at 1 -- otherwise
+    makes the leader whichever tied entry happens to sit at the lowest index,
+    which is an artifact of the input file's order.
+
+      IT IS NOT PURELY COSMETIC, and the caller should know why.  The leader is
+      the reference point the paired difference is measured against, so choosing
+      a different one among ties leaves every `md` unchanged (the means are equal
+      by definition of a tie) but moves the paired ERRORS, since the variance of
+      a difference depends on WHICH entry you difference against.  So a few
+      borderline entries can be cut that would not have been, and the reverse.
+      The cut is equally sound either way -- it is a valid paired comparison
+      against any leader -- and it is better justified against a leader that is
+      actually best on a stated secondary key than against an arbitrary one.
+      Omit it and the behaviour is exactly what it was.
 
     `display` maps the RANKED value to the one the console and the elimination
     log show, for an adapter that ranks on an inverted score -- the wordlesim
@@ -346,13 +367,26 @@ def run(cfg, player, names, is_answer, writer, elim_path, ck_path,
                 last_report = time.time()
 
         # --- the cut, on the paired difference against the leader
+        tb = (None if tiebreak is None
+              else np.asarray(tiebreak(live, n_games), dtype=float))
+
+        def _leader(tot):
+            """The best total, ties broken by the secondary key when there is one.
+
+            `tot` is a SUM over a game count every live entry shares, so ties in
+            it are exactly ties in the mean -- no division needed to compare.
+            """
+            if tb is None:
+                return int(np.argmin(tot))
+            return int(np.lexsort((tb, tot))[0])
+
         if paired is None:
             tot, sq = history_sums(hist, n_games)
-            lead = int(np.argmin(tot))
+            lead = _leader(tot)
             tot, sq, sum_d_l, sumsq_d_l = history_paired(hist, n_games, lead)
         else:
             sum_d, sumsq_d, tot, sq = paired
-            lead = int(np.argmin(tot))
+            lead = _leader(tot)
             sum_d_l, sumsq_d_l = sum_d[:, lead], sumsq_d[:, lead]
         md, se = paired_error(sum_d_l, sumsq_d_l, n_games)
         mean, ose = own_error(tot, sq, n_games)
@@ -388,24 +422,30 @@ def run(cfg, player, names, is_answer, writer, elim_path, ck_path,
 
         mean, ose, md, se = mean[keep], ose[keep], md[keep], se[keep]
         live = live[keep]
-        lead = int(np.argmin(mean))
+        if tb is not None:
+            tb = tb[keep]
+        lead = _leader(mean)
         if paired is None:
             hist = hist[keep]
         else:
             paired = tuple(x[np.ix_(keep, keep)] if x.ndim == 2 else x[keep]
                            for x in paired)
 
-        order = np.argsort(mean, kind="stable")
+        order = (np.argsort(mean, kind="stable") if tb is None
+                 else np.lexsort((tb, mean)))
         gap = sig2 = float("nan")
         if len(order) > 1:
             j = int(order[1])
             gap = mean[j] - mean[int(order[0])]
             sig2 = md[j] / se[j] if se[j] > 0 else float("inf")
         best_ans = [int(live[p]) for p in order if is_answer[int(live[p])]]
-        print("%9d games  %6d live  leader %-14s %.4f (own se %.4f)  "
+        print("%9d games  %6d live  leader %-14s %.4f%s (own se %.4f)  "
               "2nd is %.4f = %.1f paired sigma back  |  %s"
               % (n_games, len(live), names[int(live[lead])],
-                 display(mean[lead]), ose[lead], gap, sig2,
+                 display(mean[lead]),
+                 "" if tb is None else " [%s %.4f]" % (tiebreak_name or "2nd key",
+                                                       tb[lead]),
+                 ose[lead], gap, sig2,
                  ("best answer %s %s" % (noun, names[best_ans[0]])) if best_ans
                  else "NO answer %ss left" % noun))
 

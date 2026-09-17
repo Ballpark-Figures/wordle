@@ -528,7 +528,16 @@ def main(argv):
            player, names, is_answer, writer, elim_path, ck_path, ELIM_COLUMNS,
            noun="opener", extra=extra, stem=stem,
            # the driver ranks a loss rate; everything it SHOWS is the win rate
-           display=(lambda v: 1.0 - v) if a["rank"] == "win_rate" else rs._identity)
+           display=(lambda v: 1.0 - v) if a["rank"] == "win_rate" else rs._identity,
+           # UNDER WIN-RATE RANKING THE SCORE HAS FEW DISTINCT VALUES -- at 100
+           # games most of a quad field ties at 1.0000 -- so without a secondary
+           # key the "leader" is whichever tied opener the ranking file happened
+           # to list first.  Mean guesses breaks it: fewest guesses among those
+           # winning equally often.  `gsum` is a total over a game count every
+           # live opener shares, so it orders the same as the mean.
+           tiebreak=((lambda live, n: gsum[live] / max(1, n))
+                     if gsum is not None else None),
+           tiebreak_name="mean")
 
 
 def write_standings(out, stem, a, names, status, elim_at, live, mean, ose, md,
@@ -549,7 +558,13 @@ def write_standings(out, stem, a, names, status, elim_at, live, mean, ose, md,
     # ranking -- the LOSS rate, whose complement is the win rate.  The error is
     # the same either way: a constant minus a variable has the variable's spread.
     value = 1.0 - mean if win else mean
-    order = np.argsort(-value if win else value, kind="stable")
+    if win and gsum is not None:
+        # SAME TIE-BREAK THE DRIVER USES, or the standings would rank the tied
+        # block differently from the log that named the leader.
+        order = np.lexsort((np.asarray([gsum[int(c)] / n_games for c in live],
+                                       dtype=float), -value))
+    else:
+        order = np.argsort(-value if win else value, kind="stable")
     tmp = out + ".tmp"
     with open(tmp, "w") as f:
         f.write("# %s -- single-board wordle opener RACE (tools/wordle_race.py)\n"
