@@ -1129,6 +1129,55 @@ def main(argv):
     if "resuming" not in rsaid["winsplit"]:
         failures.append("the resumed win-rate race started over")
 
+    # --- the race can express --pair-adaptive, and it is the SAME rule ---------
+    # Without it a race over a multi-word opening measures the BLIND strategy
+    # while the cascade that chose the field measured the adaptive one -- two
+    # different strategies, quietly compared.  So the check is not that the flag
+    # parses but that the rule it builds is wordlesim's, game for game.
+    apos = {w: i for i, w in enumerate(guesses)}
+    apair = [[guesses[0], guesses[len(guesses) // 3]],
+             [guesses[1], guesses[len(guesses) // 2]]]
+    # ENOUGH GAMES THAT THE SWITCH ACTUALLY FIRES OFTEN.  At 40 games it changed
+    # a single one, which is a coverage assertion that passes on an accident.
+    aans, afl = wrace.make_games(len(answers), 11, 0, 300, wrace.FLIPS)
+    for adapt in (0, 2):
+        arules = wrace.build_rules(apair, guesses, None, ctail, adapt)
+        asc = wrace.play_chunk(pat, ans2g, arules, ctail, aans, afl)
+        for i, o in enumerate(apair):
+            ref = make_opening_rule([apos[w] for w in o], tail=ctail,
+                                    adapt=adapt)
+            for j in range(len(aans)):
+                n = len(play_game(pat, ans2g, int(aans[j]), ref, ctail,
+                                  wrace.FloatCursor(afl[j]))[0])
+                if asc[i, j] != n:
+                    failures.append(
+                        "the race's --pair-adaptive %d rule is not wordlesim's "
+                        "(opening %d, game %d)" % (adapt, i, j))
+                    break
+    # and it must actually CHANGE the games, or the flag is inert
+    a0 = wrace.play_chunk(pat, ans2g,
+                          wrace.build_rules(apair, guesses, None, ctail, 0),
+                          ctail, aans, afl)
+    a2 = wrace.play_chunk(pat, ans2g,
+                          wrace.build_rules(apair, guesses, None, ctail, 2),
+                          ctail, aans, afl)
+    if np.array_equal(a0, a2):
+        failures.append("--pair-adaptive changed no game in the race, so it was "
+                        "never shown to do anything")
+    else:
+        print("the race's --pair-adaptive rule IS wordlesim's (%d games x 2 "
+              "openings at N=0 and N=2), and N=2 changes %d of them"
+              % (len(aans), int((a0 != a2).sum())))
+    if wrace.parse_args.__doc__ is not None:
+        pass
+    try:
+        wrace.parse_args(["--fallback", "answer", "--pair-adaptive", "2",
+                          "--second-from", "x.csv", "--out", "y.csv"])
+        failures.append("the race accepted --pair-adaptive beside --second-from, "
+                        "which is two rules for the same turn")
+    except SystemExit:
+        pass
+
     # COVERAGE: the flag must actually RANK DIFFERENTLY, or none of the above
     # distinguishes it from the mean race it was copied from.
     worder = [c[0] for c in wdata]

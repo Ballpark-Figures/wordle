@@ -145,9 +145,10 @@ def parse_args(argv):
         "second_from": "", "seed": 0, "sigma": 5.0, "block": 100, "growth": 2.0,
         "out": None, "max_games": None, "pair_at": 2000, "chunk": 0,
         "max_mem": 2.0, "report": 60.0, "checkpoint": 30.0, "dry_run": False,
-        "win_within": WIN_WITHIN, "rank": "mean",
+        "win_within": WIN_WITHIN, "rank": "mean", "pair_adaptive": 0,
     }
-    ints = {"seed", "block", "pair_at", "chunk", "top", "max_games", "win_within"}
+    ints = {"seed", "block", "pair_at", "chunk", "top", "max_games",
+            "win_within", "pair_adaptive"}
     floats = {"sigma", "growth", "max_mem", "report", "checkpoint"}
     i = 0
     while i < len(argv):
@@ -178,6 +179,13 @@ def parse_args(argv):
             "opener hands the rest of the game to.\nIt is part of the question, "
             "and it is in the result filename.\n" % ", ".join(tail_names()) +
             "Use the wrapper: bash solver/run-wordle-race.sh --fallback answer")
+    if a["pair_adaptive"] < 0:
+        raise SystemExit("--pair-adaptive must be a non-negative number of words")
+    if a["pair_adaptive"] and a["second_from"]:
+        raise SystemExit(
+            "--pair-adaptive and --second-from are two rules for the same turn, "
+            "so they\n  cannot both be in play -- the sweep refuses this pair "
+            "for the same reason")
     if a["rank"] not in ("mean", "win_rate"):
         raise SystemExit(
             "--rank must be 'mean' or 'win_rate' -- two different questions of "
@@ -341,19 +349,23 @@ def play_chunk(pat, ans2g, rules, tail, ans, fl):
     return sc
 
 
-def build_rules(field, guesses, table, tail):
+def build_rules(field, guesses, table, tail, adapt=0):
     """One rule per opener: the gray-second rule under a table, else the opener.
 
     Both come from wordlesim's own constructors, so a race runs exactly the
     strategy the sweep and the paired comparison run -- there is no third
-    definition of either rule here.
+    definition of either rule here.  `adapt` is `--pair-adaptive N`, and it
+    matters that a race can express it: without it a race over a multi-word
+    opening would be measuring the BLIND strategy while the cascade that chose
+    the field measured the adaptive one, and the two numbers would be quietly
+    incomparable.
     """
     pos = {w: i for i, w in enumerate(guesses)}
     out = []
     for o in field:
         gi = [pos[w] for w in o]
         out.append(second_rule_for(gi, table, guesses) if table
-                   else make_opening_rule(gi, tail=tail, adapt=0))
+                   else make_opening_rule(gi, tail=tail, adapt=adapt))
     return out
 
 
@@ -370,6 +382,8 @@ def stem_for(a, list_name, table):
         stem += "_%s-%s" % (table.fire, table.seconds)
     if a["win_within"] != WIN_WITHIN:
         stem += "_w%d" % a["win_within"]
+    if a["pair_adaptive"]:
+        stem += "_adapt%d" % a["pair_adaptive"]
     if a["rank"] == "win_rate":
         # A win-rate race and a mean race over the same field are two different
         # experiments; sharing a stem would mean sharing a CHECKPOINT and each
@@ -459,7 +473,7 @@ def main(argv):
     pat = np.array(load_patterns())
     ans2g = answer_to_guess(answers, guesses)
     tail = CoupledDraw(make_tail(a["fallback"], guesses, answers, ans2g))
-    rules = build_rules(field, guesses, table, tail)
+    rules = build_rules(field, guesses, table, tail, a["pair_adaptive"])
 
     wins = np.zeros(len(field), dtype=np.int64)
     # Under win-rate ranking the driver's own mean is a LOSS RATE, so the mean
@@ -537,11 +551,11 @@ def write_standings(out, stem, a, names, status, elim_at, live, mean, ose, md,
                     "openers=%s seconds=%s)\n"
                     % (a["second_from"], table.fire, table.openers,
                        table.seconds))
-        f.write("# settings follow_up=%s pair_adaptive=0 win_within=%d "
+        f.write("# settings follow_up=%s pair_adaptive=%d win_within=%d "
                 "trials=%d seed=%d words=%d rank=%s second_table=%s "
                 "fire=%s\n"
-                % (a["fallback"], a["win_within"], n_games, a["seed"],
-                   len(names), a["rank"], a["second_from"] or "-",
+                % (a["fallback"], a["pair_adaptive"], a["win_within"], n_games,
+                   a["seed"], len(names), a["rank"], a["second_from"] or "-",
                    table.fire if table else "-"))
         f.write("# lineage root=%s pass=1 source=(race)\n" % list_name)
         f.write(columns_for(a["rank"]) + "\n")

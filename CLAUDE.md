@@ -2409,6 +2409,16 @@ moment that becomes true, and the survivors double.
     the driver's mean of the indicator, and `wins` from a tally of the raw guess
     counts against the same threshold — two independent routes to one number, and
     they must agree. It is what caught both mutations when the flag was built.
+- **`--pair-adaptive N` WORKS IN THE RACE TOO** (added 2026-09-17, same session).
+  It had been hardcoded to 0, which is a COMPARABILITY bug for multi-word fields:
+  every quad/quint cascade here ran `--pair-adaptive 2`, so racing the same
+  openings would have measured the BLIND strategy against a field the ADAPTIVE
+  one had chosen, and the two numbers would look like one experiment. It builds
+  the rule through `wordlesim.make_opening_rule`, so there is no third definition
+  of it; it lands in the stem as `_adapt<N>` and in the settings line; and it is
+  REFUSED beside `--second-from`, two rules for the same turn, exactly as the
+  sweep refuses it. Gated by replaying the race's rule against wordlesim's game
+  for game at N=0 and N=2, with coverage asserting N=2 actually changed games.
   - Gated in `checkwordlesim.py`: a win-rate race's value column is NAMED
     `win_rate`, the mean race's columns have not moved, an UNCUT race's every
     win rate and mean guesses equal the same games recomputed from `play_chunk`,

@@ -71,6 +71,7 @@ SECONDFROM=""
 SEED=0
 SIGMA=5
 RANK=mean
+ADAPT=0
 BLOCK=100
 GROWTH=2
 MAXGAMES=""
@@ -89,6 +90,7 @@ while [ $# -gt 0 ]; do
         --seed)           SEED="$2";       shift 2 ;;
         --sigma)          SIGMA="$2";      shift 2 ;;
         --rank)           RANK="$2";       shift 2 ;;
+        --pair-adaptive)  ADAPT="$2";      shift 2 ;;
         --block)          BLOCK="$2";      shift 2 ;;
         --growth)         GROWTH="$2";     shift 2 ;;
         --max-games)      MAXGAMES="$2";   shift 2 ;;
@@ -109,6 +111,10 @@ case "$FALLBACK" in
 esac
 case "$SEED" in
     ''|*[!0-9]*) echo "--seed must be a non-negative number" >&2; exit 1 ;;
+esac
+case "$ADAPT" in
+    ''|*[!0-9]*) echo "--pair-adaptive must be a non-negative number of words" >&2
+                 exit 1 ;;
 esac
 case "$RANK" in
     mean|win_rate) ;;
@@ -142,7 +148,7 @@ if [ -n "$SECONDFROM" ]; then
 fi
 
 FLAGS="--fallback $FALLBACK --seed $SEED --sigma $SIGMA --block $BLOCK --growth $GROWTH"
-FLAGS="$FLAGS --rank $RANK"
+FLAGS="$FLAGS --rank $RANK --pair-adaptive $ADAPT"
 [ -z "$OPENFROM" ]   || FLAGS="$FLAGS --openings-from $OPENFROM"
 [ -n "$OPENFROM" ]   || FLAGS="$FLAGS --words $WORDS"
 [ -z "$TOP" ]        || FLAGS="$FLAGS --top $TOP"
@@ -166,7 +172,7 @@ OUT="$OUTDIR/$STEM.csv"
 echo "wordle opener race"
 echo "  openers    $NOPEN from ${OPENFROM:-$WORDS}${TOP:+ (top $TOP)}"
 echo "  follow-up  $FALLBACK"
-[ -z "$SECONDFROM" ] && echo "  rule       blind opener, then the follow-up" \
+[ -z "$SECONDFROM" ] && echo "  rule       $([ "$ADAPT" -gt 0 ] && echo "opening, ABANDONED once the follow-up is down to $ADAPT" || echo "blind opener"), then the follow-up" \
                      || echo "  rule       gray-second, table $SECONDFROM"
 echo "  ranked on  $RANK$([ "$RANK" = win_rate ] && echo " (higher better; the mean is reported, never cut on)")"
 echo "  cut        $SIGMA paired sigma; blocks of $BLOCK then x$GROWTH; seed $SEED"
