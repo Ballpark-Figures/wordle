@@ -556,6 +556,45 @@ def check_fire():
             break
     print("   ok   the groups partition the firing replies exactly")
 
+    # WHICH TILES WERE MATCHED (`nz`), a function of the REPLY alone.  Checked
+    # against a from-the-strings non-grey POSITION SET, so a wrong trit order --
+    # the bug that bit the matched-letter key -- shows up as a mismatch here.
+    def nz_fires(greys, positions):
+        want = frozenset(positions)
+        def fires(tiles):
+            if sum(1 for t in tiles if t == 0) != greys:
+                return False
+            return frozenset(i for i, t in enumerate(tiles) if t != 0) == want
+        return fires
+
+    nzspecs, nzwant = [], {}
+    for i in range(5):
+        sp = "e4_nz%d" % i
+        nzspecs.append(sp); nzwant[sp] = nz_fires(4, [i])
+    for i in range(5):
+        for j in range(i + 1, 5):
+            sp = "e3_nz%d%d" % (i, j)
+            nzspecs.append(sp); nzwant[sp] = nz_fires(3, [i, j])
+    nzout = os.path.join(tmp, "nz.csv")
+    args = []
+    for sp in nzspecs:
+        args += ["--group", sp]
+    run(["--data", tmp, "--out", nzout, "--threads", "2"] + args)
+    ok = True
+    for spec in nzspecs:
+        for opener, got in sorted(read_rows(nzout, spec).items()):
+            want = ref_best_second(MINI_GUESSES, MINI_ANSWERS, opener,
+                                   nzwant[spec], MINI_GUESSES)
+            if got != want:
+                bad("nz partition %s opener %s: C gave %s, strings %s"
+                    % (spec, opener, got, want))
+                ok = False
+                break
+        if not ok:
+            break
+    if ok:
+        notes["nz-partition"] += 1
+
     # THE VOWEL PARTITION, where the bucket depends on the OPENER'S LETTERS.
     # This is the one key that is not a function of the reply alone, so it is
     # checked against a from-the-strings count of greyed vowels -- position by
@@ -775,6 +814,7 @@ def main(argv):
         "vowel-partition": "a partition keyed on the opener's greyed vowels",
         "matched-vowel-partition": "a partition keyed on the opener's matched vowels",
         "matched-vs-greyed": "matched and complementary greyed groups agree",
+        "nz-partition": "a partition keyed on WHICH tiles came back non-grey",
     }
     for key, what in need.items():
         if notes[key]:

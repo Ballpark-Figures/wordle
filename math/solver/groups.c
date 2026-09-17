@@ -8,6 +8,7 @@
 #include "groups.h"
 
 int8_t GRAYS[NPAT], GREENS[NPAT], YELLOWS[NPAT];
+int8_t NONGRAY[NPAT];
 Group  GRP[MAXGROUP];
 char   GSPEC[MAXGROUP][64];
 int    NGROUP;
@@ -79,6 +80,16 @@ void groups_build_tiles(void) {
         GRAYS[code] = (int8_t)n;
         GREENS[code] = (int8_t)g;
         YELLOWS[code] = (int8_t)y;
+        /* WHICH positions were matched, green and yellow alike.  Position 0 is
+         * the MOST significant trit (wordle.py), so the bit for position i is
+         * read from trit WORDLEN-1-i -- the trap `secondword.py`'s tile_at
+         * documents, and the reason this is built here rather than per caller. */
+        int mask = 0, cc = code;
+        for (int i = WORDLEN - 1; i >= 0; i--) {
+            if (cc % 3) mask |= 1 << i;
+            cc /= 3;
+        }
+        NONGRAY[code] = (int8_t)mask;
     }
 }
 
@@ -106,7 +117,10 @@ static int cmp_spec(const void *a, const void *b) {
 }
 
 static int atom_key(const Atom *a) {
-    static const int order[5] = {0, 1, 2, 3, 4};
+    /* ONE ENTRY PER KIND -- a new atom must extend this or `order[a->kind]`
+     * reads off the end, which is exactly what `nz` did: the term came out as
+     * `nz01_e3` instead of `e3_nz01` because the key was garbage. */
+    static const int order[6] = {0, 1, 2, 3, 4, 5};
     return order[a->kind] * 1000 + a->a * 10 + a->b;
 }
 
@@ -135,6 +149,27 @@ static int parse_atom(const char *text, Atom *out) {
     }
     if (text[0] == 'v' && len > 1 && strspn(text + 1, "0123456789") == len - 1) {
         out->kind = 3; out->a = atoi(text + 1); out->b = 0; return 1;
+    }
+    if (text[0] == 'n' && text[1] == 'z' && len > 2
+            && strspn(text + 2, "01234") == len - 2) {
+        int mask = 0, ok = 1;
+        for (size_t i = 2; i < len; i++) {
+            int bit = 1 << (text[i] - '0');
+            if (mask & bit) ok = 0;            /* a repeated position is a typo */
+            mask |= bit;
+        }
+        if (!ok) return 0;
+        out->kind = 5; out->a = mask; out->b = 0;
+        /* CANONICAL TEXT: the digits ascending, so `nz20` and `nz02` are one
+         * group with one name rather than two spellings of it. */
+        char d[WORDLEN + 3];
+        size_t k = 0;
+        d[k++] = 'n'; d[k++] = 'z';
+        for (int i = 0; i < WORDLEN; i++)
+            if (mask & (1 << i)) d[k++] = (char)('0' + i);
+        d[k] = 0;
+        snprintf(out->text, sizeof out->text, "%s", d);
+        return 1;
     }
     if (sscanf(text, "%dg%dy", &g, &y) == 2 && g + y <= WORDLEN) {
         out->kind = 2; out->a = g; out->b = y; return 1;
@@ -203,7 +238,8 @@ void groups_mask_for(const Group *g, const int8_t *gvow,
                 case 1: all = GRAYS[c] == a->a; break;
                 case 2: all = GREENS[c] == a->a && YELLOWS[c] == a->b; break;
                 case 3: all = gvow[c] == a->a; break;
-                default: all = mvow[c] == a->a; break;   /* kind 4: matched vowels */
+                case 4: all = mvow[c] == a->a; break;    /* matched vowels */
+                default: all = NONGRAY[c] == a->a; break; /* kind 5: which tiles */
                 }
             }
             hit = all;
@@ -353,9 +389,31 @@ int groups_opener_dependent(void) {
  * simply groups that never fire.  Getting the bound wrong does not fail: it
  * produces a DIFFERENT CANONICAL LABEL for the same strategy, so one solver's
  * table stops matching the other's name. */
-void groups_add_by_grays(int from, int split_v, int split_mv) {
+void groups_add_by_grays(int from, int split_v, int split_mv, int split_nz) {
     for (int n = WORDLEN; n >= from; n--) {
         char spec[24];
+        /* WHICH tiles were matched: one group per SET of non-grey positions of
+         * the right size.  n greys leaves WORDLEN-n matched, so e5 has the one
+         * empty set and needs no atom, e4 has 5 singletons and e3 has 10 pairs
+         * -- 16 groups at --by-grays 3, against 3 without the split. */
+        if (split_nz) {
+            int want = WORDLEN - n;
+            if (want == 0) {
+                snprintf(spec, sizeof spec, "e%d", n);
+                groups_add(spec);
+                continue;
+            }
+            for (int mask = 0; mask < (1 << WORDLEN); mask++) {
+                int pop = 0;
+                for (int i = 0; i < WORDLEN; i++) if (mask & (1 << i)) pop++;
+                if (pop != want) continue;
+                int k = snprintf(spec, sizeof spec, "e%d_nz", n);
+                for (int i = 0; i < WORDLEN; i++)
+                    if (mask & (1 << i)) k += snprintf(spec + k, sizeof spec - k, "%d", i);
+                groups_add(spec);
+            }
+            continue;
+        }
         if (!split_v && !split_mv) {
             snprintf(spec, sizeof spec, "e%d", n);
             groups_add(spec);

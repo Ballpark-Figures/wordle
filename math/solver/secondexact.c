@@ -1066,7 +1066,7 @@ int main(int argc, char **argv) {
     const char *matchpath = NULL;              /* --dump-matched, the gate hook */
     const char *one = NULL, *openpath = NULL;
     int min_grays = 3, by_grays = 0, threads = 0, limit = 0, no_prune = 0,
-        memo_bits = 19, split_v = 0, split_mv = 0, print_label = 0, topk = 0;
+        memo_bits = 19, split_v = 0, split_mv = 0, split_nz = 0, print_label = 0, topk = 0;
     int third_max = -1;                        /* -1: no third level at all */
     int third_decline = 0;
     const char *third_key = NULL;
@@ -1090,6 +1090,9 @@ int main(int argc, char **argv) {
          * here so the flag means the same thing in both solvers. */
         else if (!strcmp(argv[i], "--split-vowels")) split_v = 1;
         else if (!strcmp(argv[i], "--split-matched-vowels")) split_mv = 1;
+        /* --split-nongray: cross the --by-grays groups with WHICH tiles came
+         * back non-grey (green and yellow alike), not how many. */
+        else if (!strcmp(argv[i], "--split-nongray")) split_nz = 1;
         else if (!strcmp(argv[i], "--opener") && i + 1 < argc) one = argv[++i];
         else if (!strcmp(argv[i], "--openers") && i + 1 < argc) openpath = argv[++i];
         else if (!strcmp(argv[i], "--threads") && i + 1 < argc) threads = atoi(argv[++i]);
@@ -1178,14 +1181,15 @@ int main(int argc, char **argv) {
         fprintf(stderr, "--by-grays must be 1..%d\n", WORDLEN);
         return 1;
     }
-    if (split_v && split_mv) {
-        fprintf(stderr, "--split-vowels and --split-matched-vowels are two "
-                        "different partitions; pick one\n");
+    if (split_v + split_mv + split_nz > 1) {
+        fprintf(stderr, "--split-vowels, --split-matched-vowels and "
+                        "--split-nongray are three different partitions; "
+                        "pick one\n");
         return 1;
     }
-    if ((split_v || split_mv) && !by_grays) {
-        fprintf(stderr, "--split-%svowels splits the --by-grays groups; pass "
-                        "--by-grays N too\n", split_mv ? "matched-" : "");
+    if ((split_v || split_mv || split_nz) && !by_grays) {
+        fprintf(stderr, "--split-* splits the --by-grays groups; pass "
+                        "--by-grays N too\n");
         return 1;
     }
     if (print_label) {
@@ -1193,7 +1197,7 @@ int main(int argc, char **argv) {
          * checks to the opener loop), so this answers without loading a thing */
         char lab[512];
         groups_build_tiles();
-        if (by_grays) groups_add_by_grays(by_grays, split_v, split_mv);
+        if (by_grays) groups_add_by_grays(by_grays, split_v, split_mv, split_nz);
         groups_resolve(min_grays, lab, sizeof lab);
         printf("%s\n", lab);
         return 0;
@@ -1251,7 +1255,7 @@ int main(int argc, char **argv) {
      * --group spec is passed straight through, so `--group e3_mv1` means here
      * exactly what it means to secondword. */
     char label[512];
-    if (by_grays) groups_add_by_grays(by_grays, split_v, split_mv);
+    if (by_grays) groups_add_by_grays(by_grays, split_v, split_mv, split_nz);
     groups_resolve(min_grays, label, sizeof label);
     OPENER_DEP = groups_opener_dependent();
     if (!OPENER_DEP) {

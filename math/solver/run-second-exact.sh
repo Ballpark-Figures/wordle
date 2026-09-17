@@ -69,6 +69,7 @@ MINGRAYS=3
 BYGRAYS=""
 SPLITV=0
 SPLITMV=0
+SPLITNZ=0
 GSPECS=""
 LIMIT=""
 THREADS=""
@@ -89,6 +90,7 @@ while [ $# -gt 0 ]; do
         --by-grays)   BYGRAYS="$2";  shift 2 ;;
         --split-vowels)         SPLITV=1;  shift ;;
         --split-matched-vowels) SPLITMV=1; shift ;;
+        --split-nongray)        SPLITNZ=1; shift ;;
         --group)      GSPECS="$GSPECS --group $2"; shift 2 ;;
         --limit)      LIMIT="$2";    shift 2 ;;
         --threads)    THREADS="$2";  shift 2 ;;
@@ -134,6 +136,7 @@ COND=""
 [ -z "$BYGRAYS" ]  || COND="$COND --by-grays $BYGRAYS"
 [ "$SPLITV" = 0 ]  || COND="$COND --split-vowels"
 [ "$SPLITMV" = 0 ] || COND="$COND --split-matched-vowels"
+[ "$SPLITNZ" = 0 ] || COND="$COND --split-nongray"
 COND="$COND$GSPECS"
 # --min-grays is the SUGAR for "no groups named", so it applies only then.
 [ -n "$COND" ] || COND=" --min-grays $MINGRAYS"

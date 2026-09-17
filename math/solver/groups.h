@@ -43,6 +43,7 @@ typedef struct { int natom; Atom at[6]; int key; char text[48]; } Term;
 typedef struct { int nterm; Term t[8]; char text[64]; } Group;
 
 extern int8_t GRAYS[NPAT], GREENS[NPAT], YELLOWS[NPAT];
+extern int8_t NONGRAY[NPAT];        /* bitmask of the non-grey POSITIONS */
 extern Group  GRP[MAXGROUP];
 extern char   GSPEC[MAXGROUP][64];
 extern int    NGROUP;
@@ -58,7 +59,7 @@ void groups_add_fire(int greens, int yellows);
 /* The --by-grays cross products: e5..e<from>, optionally crossed with the greyed
  * or matched vowel count.  The two splits have different bounds (see groups.c),
  * which is why this is here and not in each caller. */
-void groups_add_by_grays(int from, int split_v, int split_mv);
+void groups_add_by_grays(int from, int split_v, int split_mv, int split_nz);
 
 /* Canonicalise everything added (plus the --min-grays sugar when no --group was
  * given), fill GRP/GSPEC/NGROUP and write the canonical label.  Refuses an

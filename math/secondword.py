@@ -186,6 +186,9 @@ def group_mask(spec, opener=None, word_len=WORD_LEN):
         e<N>        greys == N exactly  (what a per-grey-count rule wants)
         v<N>        exactly N GREYED vowels   (vowels the guess got wrong)
         mv<N>       exactly N MATCHED vowels  (green/yellow vowels; y is a vowel)
+        nz<DIGITS>  exactly those POSITIONS came back non-grey, e.g. `nz02`.
+                    GREEN AND YELLOW ARE THE SAME HERE: it keys on WHICH tiles
+                    were matched, not on how.  Opener-independent.
         <G>g<Y>y    exactly that composition, e.g. 0g3y
 
     `v<N>` and `mv<N>` both depend on the OPENER's letters (which positions are
@@ -232,6 +235,25 @@ def group_mask(spec, opener=None, word_len=WORD_LEN):
                         "named opener" % term)
                 m &= gv == int(atom[1:])
                 k = (3, int(atom[1:]))
+            elif re.fullmatch(r"nz[01234]+", atom):
+                # WHICH tiles came back non-grey, green and yellow alike -- a
+                # function of the reply alone, so no opener is needed.  Position
+                # 0 is the MOST significant trit, which `tile_at` handles.
+                pos = [int(c) for c in atom[2:]]
+                if len(pos) != len(set(pos)):
+                    raise SystemExit("the atom %r repeats a position" % atom)
+                want = 0
+                for i in pos:
+                    want |= 1 << i
+                nzm = np.zeros(len(g), dtype=np.int64)
+                for code in range(len(g)):
+                    bits = 0
+                    for i in range(word_len):
+                        if tile_at(code, i, word_len) != 0:
+                            bits |= 1 << i
+                    nzm[code] = bits
+                m &= nzm == want
+                k = (5, want)
             elif re.fullmatch(r"\d+g\d+y", atom):
                 gg, yy = (int(x) for x in re.findall(r"\d+", atom))
                 if gg + yy > word_len:
@@ -241,12 +263,14 @@ def group_mask(spec, opener=None, word_len=WORD_LEN):
                 k = (2, gg * (word_len + 1) + yy)
             else:
                 raise SystemExit("cannot read the group %r: an atom is g<N>, "
-                                 "e<N>, v<N>, mv<N> or <G>g<Y>y, joined by _ "
-                                 "within a term and by + between terms" % spec)
+                                 "e<N>, v<N>, mv<N>, nz<DIGITS> or <G>g<Y>y, "
+                                 "joined by _ within a term and by + between "
+                                 "terms" % spec)
             key = k if key is None else key
         if len(atoms) != len(set(atoms)):
             raise SystemExit("the term %r repeats an atom" % term)
-        canon_term = "_".join(sorted(atoms, key=_atom_key))
+        canon_term = "_".join(sorted((_canon_atom(a) for a in atoms),
+                                     key=_atom_key))
         if canon_term in terms:
             raise SystemExit("the group %r repeats the term %r" % (spec, term))
         terms[canon_term] = (key, m)
@@ -271,10 +295,30 @@ def group_mask(spec, opener=None, word_len=WORD_LEN):
     return mask, canon
 
 
+def _canon_atom(atom):
+    """One SPELLING per atom, so one rule cannot have two names.
+
+    Only `nz` has any freedom -- its positions are a SET, so `nz20` and `nz02`
+    mean the same group -- and groups.c rewrites the digits ascending, so this
+    must too or the C and the Python would canonicalise the same spec to two
+    different labels and therefore two different filenames.
+    """
+    if atom.startswith("nz") and atom[2:].isdigit():
+        return "nz" + "".join(sorted(atom[2:]))
+    return atom
+
+
 def _atom_key(atom):
     """Sort key for the atoms inside one term, so `v1_e3` and `e3_v1` are one name."""
     if atom.startswith("mv") and atom[2:].isdigit():
-        return (4, int(atom[2:]))            # matched vowels sort last
+        return (4, int(atom[2:]))            # matched vowels
+    if atom.startswith("nz") and atom[2:].isdigit():
+        # WHICH tiles, sorting last; the key is the position BITMASK so the
+        # order matches groups.c's atom_key, which sorts on the same number.
+        bits = 0
+        for c in atom[2:]:
+            bits |= 1 << int(c)
+        return (5, bits)
     order = {"g": 0, "e": 1, "v": 3}
     if atom[0] in order and atom[1:].isdigit():
         return (order[atom[0]], int(atom[1:]))

@@ -24,6 +24,11 @@
 # A greyed vowel is counted by POSITION, so this bucket depends on the OPENER's
 # letters as well as the reply, and the groups are built per opener.
 #
+# --split-nongray CROSSES each --by-grays group with WHICH tiles came back
+# non-grey (green and yellow alike), rather than how many of anything: with
+# --by-grays 3 that is 16 groups -- the all-grey reply, five single-match cases
+# and ten two-match cases.
+#
 # --split-matched-vowels CROSSES each --by-grays group with the number of MATCHED
 # (green or yellow) vowels instead -- "how many vowels we matched versus how many
 # consonants" (the consonants matched are (5 - greys) minus the vowels matched).
@@ -99,6 +104,7 @@ GSPECS=""
 BYGRAYS=""
 SPLITV=0
 SPLITMV=0
+SPLITNZ=0
 GIVEN=0
 LIMIT=0
 THREADS=0
@@ -113,6 +119,7 @@ while [ $# -gt 0 ]; do
         --by-grays)   BYGRAYS="$2"; GIVEN=1; shift 2 ;;
         --split-vowels) SPLITV=1; shift ;;
         --split-matched-vowels) SPLITMV=1; shift ;;
+        --split-nongray)        SPLITNZ=1; shift ;;
         --limit)      LIMIT="$2"; shift 2 ;;
         --threads)    THREADS="$2"; shift 2 ;;
         --dry-run)    DRY=1; shift ;;
@@ -150,6 +157,7 @@ else
     [ -z "$BYGRAYS" ] || SPEC="$SPEC --by-grays $BYGRAYS"
     [ "$SPLITV" = 0 ]  || SPEC="$SPEC --split-vowels"
     [ "$SPLITMV" = 0 ] || SPEC="$SPEC --split-matched-vowels"
+    [ "$SPLITNZ" = 0 ] || SPEC="$SPEC --split-nongray"
 fi
 case "$LIMIT" in
     ''|*[!0-9]*) echo "--limit must be a number of openers" >&2; exit 1 ;;

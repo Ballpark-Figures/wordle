@@ -2420,6 +2420,26 @@ the source of truth; `solver/secondword.c` computes the table.
   with three GREENS has pinned three positions, and those do not belong on the
   same side of the line. `--fire G,Y` adds one composition, so the
   three-yellow rule is `--min-grays 3 --fire 0,3`.
+  - **`nz<DIGITS>` KEYS ON *WHICH* TILES CAME BACK NON-GREY**, not on how many
+    (user's call, 2026-09-16). `e3_nz02` is "exactly three greys, and the
+    non-grey ones are positions 0 and 2". **GREEN AND YELLOW ARE THE SAME HERE**
+    -- it asks which tiles matched, never how. It reads the REPLY alone, so
+    unlike `v`/`mv` it is opener-INDEPENDENT and one mask serves every opener.
+    - **`--split-nongray` is the sugar**: `--by-grays 3 --split-nongray` gives
+      **16 groups** -- the all-grey reply, five one-match cases and ten
+      two-match cases -- against 3 for the count alone.
+    - **The digits are a SET and are canonicalised ascending**, so `nz20` and
+      `nz02` are one group with one name. Both implementations do it; they
+      disagreed at first, which is the "one rule, two names" trap the
+      canonicalisation exists to close.
+    - **A NEW ATOM MUST EXTEND `atom_key`'s table in groups.c.** It is
+      `static const int order[5]` indexed BY KIND, so adding kind 5 read off
+      the end and the term came out as `nz01_e3` instead of `e3_nz01`.
+    - **MEASURED and it is the biggest single win so far**: against the same
+      beam, keying on WHICH tiles beats keying on how many by ~0.055 --
+      k=20 **3.654019** against 3.707971, k=50 **3.625487** against 3.680804.
+      The k=50 figure already beats the best two-level number from any other
+      partition (3.643368 at k=1000 on the matched-vowel split).
   - **THE LABEL IS A FUNCTION OF THE SET, NOT OF HOW IT WAS TYPED** — an
     `--fire` the threshold already covers is dropped and the rest are sorted, so
     two spellings of one rule cannot make two filenames (`g3+0g3y`). The label
