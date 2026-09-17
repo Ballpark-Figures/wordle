@@ -84,6 +84,8 @@ static char   (*GWORD)[WBUF];
  * mask depend on the OPENER, so the masks are rebuilt per opener where they are
  * used rather than once at startup. */
 #define MAXGRP MAXGROUP
+/* matched letters run 0..5, so a case index is one of six */
+#define MAXCASE 6
 static uint8_t  GFIRE[MAXGRP][NPAT]; /* the CURRENT opener's group masks */
 static uint8_t  FIRE[NPAT];          /* any group at all: the union */
 static int      OPENER_DEP;          /* do the masks depend on the opener? */
@@ -292,6 +294,7 @@ typedef struct {
     int32_t second[MAXGRP];       /* one word per group */
     double  fired[MAXGRP];        /* and that group's exact total */
     int32_t nq[MAXGRP], scanned[MAXGRP], cut[MAXGRP];
+    int32_t third[MAXGRP][MAXCASE];   /* the committed third word per case, -1 */
     double  decline;              /* exact total over the replies that do NOT fire */
     double  bound;                /* a sound lower bound on the whole total */
     int     done;
@@ -410,6 +413,83 @@ static double decline_total(Memo *m, int og, uint16_t *out, int depth,
     return tot;
 }
 
+static int matched_letters(int g1, int p1, int g2, int p2);
+
+/* --------------------------------------------------- the third level ------ *
+ * A committed THIRD word, played on the residual set of a joint bucket whose
+ * matched-letter count is still low.  The accounting matches the second level's:
+ * one guess charged to every answer in the set, then the random tail on whatever
+ * that word leaves -- and nothing at all for the answers it wins outright.
+ */
+static double third_total(Memo *m, const uint16_t *s, int n, int g3,
+                          uint16_t *out, int depth) {
+    const uint8_t *row3 = PAT + (size_t)g3 * NA;
+    int *cnt = m->cnt + (size_t)depth * NPAT;
+    int *touch = m->touch + (size_t)depth * NPAT;
+    int *pstart = m->start + (size_t)depth * NPAT;
+    int *plen = m->len + (size_t)depth * NPAT;
+    double tot = n;                                   /* the third guess itself */
+    int nt = 0;
+    for (int i = 0; i < n; i++) {
+        int p = row3[s[i]];
+        if (cnt[p]++ == 0) touch[nt++] = p;
+    }
+    int acc = 0;
+    for (int k = 0; k < nt; k++) {
+        int p = touch[k];
+        plen[k] = cnt[p];
+        pstart[k] = acc;
+        cnt[p] = acc;
+        acc += plen[k];
+    }
+    for (int i = 0; i < n; i++) out[cnt[row3[s[i]]]++] = s[i];
+    for (int k = 0; k < nt; k++) {
+        if (touch[k] == ALL_GREEN) continue;          /* g3 won: no tail */
+        tot += T(m, out + pstart[k], plen[k], depth + 1);
+    }
+    for (int k = 0; k < nt; k++) cnt[touch[k]] = 0;
+    return tot;
+}
+
+/* The JOINT buckets of one group under one second word, each with the
+ * matched-letter count that selects its third word.  Answers the second word
+ * WINS are dropped -- there is nothing left to play for them.  `jbuf` receives
+ * the answers reordered so each bucket is contiguous. */
+static int joint_split(Memo *m, int og, const uint16_t *q, const int *rstart,
+                       const int *rlen, const int *rpat, int nb, int g2,
+                       uint16_t *jbuf, int *jstart, int *jlen, int8_t *jm,
+                       int depth) {
+    const uint8_t *row2 = PAT + (size_t)g2 * NA;
+    int *cnt = m->cnt + (size_t)depth * NPAT;
+    int *touch = m->touch + (size_t)depth * NPAT;
+    int nj = 0, fill = 0;
+    for (int b = 0; b < nb; b++) {
+        const uint16_t *s = q + rstart[b];
+        int n = rlen[b], nt = 0;
+        for (int i = 0; i < n; i++) {
+            int p = row2[s[i]];
+            if (cnt[p]++ == 0) touch[nt++] = p;
+        }
+        int acc = fill;
+        for (int k = 0; k < nt; k++) {
+            int p = touch[k];
+            int len = cnt[p];
+            cnt[p] = acc;
+            acc += len;
+            if (p == ALL_GREEN) continue;
+            jstart[nj] = cnt[p];
+            jlen[nj] = len;
+            jm[nj] = (int8_t)matched_letters(og, rpat[b], g2, p);
+            nj++;
+        }
+        for (int i = 0; i < n; i++) jbuf[cnt[row2[s[i]]]++] = s[i];
+        for (int k = 0; k < nt; k++) cnt[touch[k]] = 0;
+        fill = acc;
+    }
+    return nj;
+}
+
+
 /* ------------------------------------------------------------- the walk ---- */
 
 typedef struct { double key; int64_t ssq; int32_t w; } Cand;
@@ -430,6 +510,57 @@ static int cmp_cand_ssq(const void *a, const void *b) {
     return x->w - y->w;
 }
 
+/* Choose ONE case's third word: rank every candidate by the one-ply score over
+ * that case's buckets -- the same sum-of-squares rule the second level ranks by,
+ * summed across the buckets the case collects -- then evaluate the best `topk`
+ * exactly and keep the cheapest.  `idx` lists which joint buckets belong to the
+ * case; the cost returned is the total over all of them.
+ *
+ * The opener and the second word are excluded as candidates: within a joint
+ * bucket every answer replied identically to both, so replaying either splits
+ * nothing and simply burns a guess. */
+static double choose_third(Memo *m, const uint16_t *jbuf, const int *jstart,
+                           const int *jlen, const int *idx, int nidx,
+                           int og, int g2, int topk, Cand *cand,
+                           uint16_t *out, int depth, int *best) {
+    int *cnt = m->cnt + (size_t)depth * NPAT;
+    int *touch = m->touch + (size_t)depth * NPAT;
+    for (int w = 0; w < NG; w++) {
+        cand[w].w = w;
+        if (w == og || w == g2) { cand[w].ssq = INT64_MAX; continue; }
+        const uint8_t *row3 = PAT + (size_t)w * NA;
+        int64_t ssq = 0;
+        for (int j = 0; j < nidx; j++) {
+            const uint16_t *sb = jbuf + jstart[idx[j]];
+            int n = jlen[idx[j]], nt = 0;
+            for (int i = 0; i < n; i++) {
+                int p = row3[sb[i]];
+                if (cnt[p]++ == 0) touch[nt++] = p;
+            }
+            for (int k = 0; k < nt; k++) {
+                int64_t v = cnt[touch[k]];
+                ssq += v * v;
+                cnt[touch[k]] = 0;
+            }
+        }
+        cand[w].ssq = ssq;
+    }
+    qsort(cand, (size_t)NG, sizeof(Cand), cmp_cand_ssq);
+    int lim = topk < NG ? topk : NG;
+    double bestv = HUGE_VAL;
+    *best = -1;
+    for (int i = 0; i < lim; i++) {
+        if (cand[i].ssq == INT64_MAX) break;
+        double v = 0.0;
+        for (int j = 0; j < nidx; j++)
+            v += third_total(m, jbuf + jstart[idx[j]], jlen[idx[j]],
+                             cand[i].w, out, depth + 1);
+        if (v < bestv) { bestv = v; *best = cand[i].w; }
+    }
+    return bestv;
+}
+
+
 /* A CHEAP LOWER BOUND on an opener's total, with no recursion at all: the decline
  * branch bounded by T(S) >= 2|S| - 1 per bucket, plus the cheapest possible
  * second-word part over every candidate word.
@@ -444,7 +575,7 @@ static int cmp_cand_ssq(const void *a, const void *b) {
  * computation, not a detail.
  */
 static double opener_bound(Memo *m, int og, uint16_t *q, uint16_t *out,
-                           int *rstart, int *rlen, int *nbp, int *nqp,
+                           int *rstart, int *rlen, int *rpat, int *nbp, int *nqp,
                            double *gbound, const uint8_t (*gf)[NPAT],
                            const uint8_t *fu) {
     const uint8_t *row = PAT + (size_t)og * NA;
@@ -480,6 +611,7 @@ static double opener_bound(Memo *m, int og, uint16_t *q, uint16_t *out,
             int p = touch[k];
             rlen[g * NPAT + k] = cnt[p];
             rstart[g * NPAT + k] = acc;
+            rpat[g * NPAT + k] = p;      /* the OPENER's reply for this bucket */
             cnt[p] = acc;
             acc += rlen[g * NPAT + k];
         }
@@ -506,25 +638,87 @@ static double opener_bound(Memo *m, int og, uint16_t *q, uint16_t *out,
  * `incumbent` is the best total seen so far, in guesses over all 2315 answers;
  * a second word whose BOUND is not below it cannot win and is skipped.  Pass
  * HUGE_VAL to evaluate every word. */
+/* One group's exact cost under one second word, WITH a committed third word on
+ * every joint bucket whose matched-letter count is at most `third_max`.
+ *
+ * `forced` is the SHARED key: the three words are given from outside and this
+ * only prices them.  `chosen` is the PER-GROUP key: each case picks its own word
+ * here, which is sound because this group's joint buckets are disjoint from
+ * every other group's, so the sum still decomposes exactly.
+ */
+static double fired_with_third(Memo *m, int og, const uint16_t *q, int nq,
+                               const int *rstart, const int *rlen, const int *rpat,
+                               int nb, int g2, int third_max, int topk,
+                               Cand *cand, uint16_t *jbuf, int *jstart, int *jlen,
+                               int8_t *jm, int *idx, uint16_t *out,
+                               const int *forced, int *chosen) {
+    int nj = joint_split(m, og, q, rstart, rlen, rpat, nb, g2,
+                         jbuf, jstart, jlen, jm, 1);
+    /* EVERY case, not just the ones that can fire: the caller copies the whole
+     * array into the row, so a case above `third_max` left unwritten is stack
+     * garbage read back as a word index. */
+    if (chosen) for (int c = 0; c < MAXCASE; c++) chosen[c] = -1;
+    double tot = 2.0 * nq;                      /* the opener and the second word */
+    for (int j = 0; j < nj; j++)
+        if (jm[j] > third_max)                  /* too much known: random tail */
+            tot += T(m, jbuf + jstart[j], jlen[j], 2);
+    for (int mm = 0; mm <= third_max; mm++) {
+        int nidx = 0;
+        for (int j = 0; j < nj; j++) if (jm[j] == mm) idx[nidx++] = j;
+        if (!nidx) continue;                    /* no answer reaches this case */
+        if (forced) {
+            if (forced[mm] < 0) {               /* no word for it: random tail */
+                for (int j = 0; j < nidx; j++)
+                    tot += T(m, jbuf + jstart[idx[j]], jlen[idx[j]], 2);
+                continue;
+            }
+            for (int j = 0; j < nidx; j++)
+                tot += third_total(m, jbuf + jstart[idx[j]], jlen[idx[j]],
+                                   forced[mm], out, 2);
+        } else {
+            int best = -1;
+            tot += choose_third(m, jbuf, jstart, jlen, idx, nidx, og, g2, topk,
+                                cand, out, 1, &best);
+            if (chosen) chosen[mm] = best;
+        }
+    }
+    return tot;
+}
+
+
 static void solve_opener(Memo *m, int og, Row *r, double incumbent, int no_prune,
                          uint16_t *q, uint16_t *out, int *rstart, int *rlen,
-                         int *nbs, int *nqs, const double *gbound,
-                         const uint8_t *fu, int topk) {
+                         int *rpat, int *nbs, int *nqs, const double *gbound,
+                         const uint8_t *fu, int topk, int third_max,
+                         const int *shared_third) {
     memo_clear(m);
     r->opener = og;
     r->decline = decline_total(m, og, out, 0, fu);
     r->done = 1;
 
     Cand *cand = malloc(sizeof(Cand) * NG);
+    /* the third level's scratch, allocated only when it is switched on */
+    Cand *cand3 = NULL; uint16_t *jbuf = NULL;
+    int *jstart = NULL, *jlen = NULL, *idx3 = NULL; int8_t *jm = NULL;
+    if (third_max >= 0) {
+        cand3 = malloc(sizeof(Cand) * NG);
+        jbuf = malloc(sizeof(uint16_t) * NA);
+        jstart = malloc(sizeof(int) * NA);
+        jlen = malloc(sizeof(int) * NA);
+        idx3 = malloc(sizeof(int) * NA);
+        jm = malloc(NA);
+    }
     for (int g = 0; g < NGROUP; g++) {
         r->second[g] = -1;
         r->fired[g] = 0.0;
         r->scanned[g] = r->cut[g] = 0;
         r->nq[g] = nqs[g];
+        for (int c = 0; c < MAXCASE; c++) r->third[g][c] = -1;
         int nq = nqs[g], nb = nbs[g];
         if (!nq) continue;
         const uint16_t *qq = q + g * NA;
         const int *rs = rstart + g * NPAT, *rl = rlen + g * NPAT;
+        const int *rp = rpat + g * NPAT;
 
         for (int w = 0; w < NG; w++) {
             cand[w].w = w;
@@ -549,12 +743,26 @@ static void solve_opener(Memo *m, int og, Row *r, double incumbent, int no_prune
         if (topk) {
             int lim = topk < NG ? topk : NG;
             double bestk = HUGE_VAL;
+            int chosen[MAXCASE];
             for (int i = 0; i < lim; i++) {
                 if (cand[i].ssq == INT64_MAX) break;      /* nothing left to try */
-                double v = fired_total(m, qq, nq, rs, rl, nb, cand[i].w, 0,
-                                       out, 1, NULL);
+                double v;
+                if (third_max < 0) {
+                    v = fired_total(m, qq, nq, rs, rl, nb, cand[i].w, 0,
+                                    out, 1, NULL);
+                } else {
+                    v = fired_with_third(m, og, qq, nq, rs, rl, rp, nb,
+                                         cand[i].w, third_max, topk, cand3,
+                                         jbuf, jstart, jlen, jm, idx3, out,
+                                         shared_third, chosen);
+                }
                 r->scanned[g]++;
-                if (v < bestk) { bestk = v; r->second[g] = cand[i].w; }
+                if (v < bestk) {
+                    bestk = v;
+                    r->second[g] = cand[i].w;
+                    if (third_max >= 0 && !shared_third)
+                        for (int c = 0; c < MAXCASE; c++) r->third[g][c] = chosen[c];
+                }
             }
             /* NG - 1: the opener is never a candidate, so a beam at least as
              * wide as the pool must report 0 cut, exactly as the full scan does */
@@ -594,6 +802,7 @@ static void solve_opener(Memo *m, int og, Row *r, double incumbent, int no_prune
         r->fired[g] = best;
     }
     free(cand);
+    free(cand3); free(jbuf); free(jstart); free(jlen); free(idx3); free(jm);
     (void)incumbent;
 }
 
@@ -795,6 +1004,15 @@ static void write_rows(FILE *f, Row *v) {
                 GWORD[v->opener], GSPEC[g], GWORD[v->second[g]],
                 any ? tot / NA : 0.0, any ? tot : 0.0, v->decline,
                 v->fired[g], v->nq[g], v->scanned[g], v->cut[g]);
+        /* THE THIRD LEVEL's own rows, named `<group>|m<matched>` so a reader can
+         * tell them from a group's row by the separator and recover both keys.
+         * The strategy's expected/total repeat here as they do on every row. */
+        for (int c = 0; c < MAXCASE; c++) {
+            if (v->third[g][c] < 0) continue;
+            fprintf(f, "%s,%s|m%d,%s,%.6f,%.4f,,,,,third\n",
+                    GWORD[v->opener], GSPEC[g], c, GWORD[v->third[g][c]],
+                    any ? tot / NA : 0.0, any ? tot : 0.0);
+        }
     }
     fflush(f);
 }
@@ -806,6 +1024,9 @@ int main(int argc, char **argv) {
     const char *one = NULL, *openpath = NULL;
     int min_grays = 3, by_grays = 0, threads = 0, limit = 0, no_prune = 0,
         memo_bits = 19, split_v = 0, split_mv = 0, print_label = 0, topk = 0;
+    int third_max = -1;                        /* -1: no third level at all */
+    const char *third_key = NULL;
+    const int *shared_third = NULL;
     double report = 10.0;
 
     for (int i = 1; i < argc; i++) {
@@ -842,6 +1063,13 @@ int main(int argc, char **argv) {
          * one-ply score, instead of every candidate that survives the bound.
          * It turns a PROOF into a SCREEN -- see solve_opener. */
         else if (!strcmp(argv[i], "--topk") && i + 1 < argc) topk = atoi(argv[++i]);
+        /* THE THIRD LEVEL.  --third-max-matched N commits a word wherever the
+         * two replies together have proved at most N letters; --third-key says
+         * whether that word is per (group, matched count) or shared across the
+         * groups by matched count alone. */
+        else if (!strcmp(argv[i], "--third-key") && i + 1 < argc) third_key = argv[++i];
+        else if (!strcmp(argv[i], "--third-max-matched") && i + 1 < argc)
+            third_max = atoi(argv[++i]);
         /* --print-label resolves the firing condition, prints its CANONICAL name
          * and stops.  The wrapper needs that name for the filename, and groups.c
          * is the one place that knows it -- deriving it in shell would be a
@@ -865,6 +1093,35 @@ int main(int argc, char **argv) {
         return 1;
     }
     if (topk < 0) { fprintf(stderr, "--topk must be at least 1\n"); return 1; }
+    if ((third_key != NULL) != (third_max >= 0)) {
+        fprintf(stderr, "--third-key and --third-max-matched go together: one "
+                        "says WHICH cases share a word, the other WHEN a word\n"
+                        "is committed at all, and neither has a default\n");
+        return 1;
+    }
+    if (third_key && strcmp(third_key, "group") && strcmp(third_key, "shared")) {
+        fprintf(stderr, "--third-key must be `group` (a word per group and "
+                        "matched count) or `shared` (per matched count only)\n");
+        return 1;
+    }
+    if (third_key && !strcmp(third_key, "shared")) {
+        fprintf(stderr, "--third-key shared is NOT BUILT YET.  Sharing one word "
+                        "across the groups couples them, so the second words\n"
+                        "have to be re-chosen inside a search over word TRIPLES "
+                        "rather than group by group; `group` is the separable\n"
+                        "key and is what works today.\n");
+        return 1;
+    }
+    if (third_max >= 0 && (third_max > WORDLEN || third_max < 0)) {
+        fprintf(stderr, "--third-max-matched must be 0..%d\n", WORDLEN);
+        return 1;
+    }
+    if (third_max >= 0 && !topk) {
+        fprintf(stderr, "--third-key needs --topk: choosing a third word for "
+                        "every candidate second word is a nested search, and\n"
+                        "only the beam makes it affordable\n");
+        return 1;
+    }
     if (by_grays && (by_grays < 1 || by_grays > WORDLEN)) {
         fprintf(stderr, "--by-grays must be 1..%d\n", WORDLEN);
         return 1;
@@ -1073,6 +1330,7 @@ int main(int argc, char **argv) {
         uint16_t *out = malloc(sizeof(uint16_t) * NA);
         int *rstart = malloc(sizeof(int) * NPAT * MAXGRP);
         int *rlen = malloc(sizeof(int) * NPAT * MAXGRP);
+        int *rpat = malloc(sizeof(int) * NPAT * MAXGRP);
         int nb[MAXGROUP], nq[MAXGROUP];
         double gb[MAXGROUP];
         /* the opener's own masks: shared when the condition is grey counts
@@ -1091,7 +1349,7 @@ int main(int argc, char **argv) {
              * perfectly good word, so the zero read back as a real choice. */
             masks_for(openers[oi], gf, fu, gvow, mvow);
             rows[oi].bound = opener_bound(&m, openers[oi], q, out, rstart, rlen,
-                                          nb, nq, gb, gf, fu);
+                                          rpat, nb, nq, gb, gf, fu);
             /* PHASE 1 NARRATES.  It is a minute of work on the full list, and
              * silence reads as a hang -- the same reason every other phase in
              * this repo prints. */
@@ -1111,7 +1369,7 @@ int main(int argc, char **argv) {
                 }
             }
         }
-        free(q); free(out); free(rstart); free(rlen);
+        free(q); free(out); free(rstart); free(rlen); free(rpat);
         free(gf); free(fu); free(gvow); free(mvow);
         free(m.e); free(m.buf); free(m.cnt); free(m.touch); free(m.start); free(m.len);
     }
@@ -1145,6 +1403,7 @@ int main(int argc, char **argv) {
         uint16_t *out = malloc(sizeof(uint16_t) * NA);
         int *rstart = malloc(sizeof(int) * NPAT * MAXGRP);
         int *rlen = malloc(sizeof(int) * NPAT * MAXGRP);
+        int *rpat = malloc(sizeof(int) * NPAT * MAXGRP);
         int nbs[MAXGROUP], nqs[MAXGROUP];
         double gbs[MAXGROUP];
         /* the opener's own masks: shared when the condition is grey counts
@@ -1176,10 +1435,10 @@ int main(int argc, char **argv) {
             /* the layout again -- cheap, and it keeps phase 2 independent of
              * whatever phase 1 left in the shared buffers */
             masks_for(rr->opener, gf, fu, gvow, mvow);
-            opener_bound(&m, rr->opener, q, out, rstart, rlen, nbs, nqs, gbs,
-                         gf, fu);
+            opener_bound(&m, rr->opener, q, out, rstart, rlen, rpat, nbs, nqs,
+                         gbs, gf, fu);
             solve_opener(&m, rr->opener, rr, inc, no_prune, q, out, rstart, rlen,
-                         nbs, nqs, gbs, fu, topk);
+                         rpat, nbs, nqs, gbs, fu, topk, third_max, shared_third);
 #ifdef _OPENMP
 #pragma omp critical (progress)
 #endif
@@ -1219,7 +1478,7 @@ int main(int argc, char **argv) {
                 }
             }
         }
-        free(q); free(out); free(rstart); free(rlen);
+        free(q); free(out); free(rstart); free(rlen); free(rpat);
         free(gf); free(fu); free(gvow); free(mvow);
         free(m.e); free(m.buf); free(m.cnt); free(m.touch); free(m.start); free(m.len);
     }

@@ -2187,6 +2187,39 @@ is the proven optimum over all 12972 x 12972 (opener, second word) pairs.
     the value of a strategy that exists.
   - **`--no-prune` still means "every opener"** and composes with `--topk`, which
     is how the beam gets compared against the exact answer.
+- **THE THIRD LEVEL (`--third-key group --third-max-matched N`)**: after the
+  opener and the committed second word, a case whose two replies together have
+  proved at most N letters plays a THIRD committed word, chosen in advance.
+  Only on lines where the second word actually fired; above N, and on declined
+  lines, the random tail takes over as before.
+  - **THE KEY IS MATCHED LETTERS = `tree_states`' greens + yellows** (user's
+    definition, 2026-09-16): distinct letters known present, counted AGAIN per
+    proved copy. It is a function of the two REPLIES alone, so it is CONSTANT
+    within a joint bucket -- which is what makes it a legal key, and the gate
+    ASSERTS that constancy rather than assuming it.
+    - **POSITION 0 IS THE MOST SIGNIFICANT TRIT** and the first implementation
+      got this wrong, disagreeing with `tree_states` on 1161 of 4000 triples.
+      `--dump-matched` exists for exactly that diff. See `secondword.py`'s
+      `tile_at`, which documents the same trap.
+  - **`group` KEEPS THE PROBLEM SEPARABLE; `shared` DOES NOT.** A word per
+    (group, matched count) leaves each group's joint buckets disjoint from every
+    other group's, so each group still picks its own second word and its own
+    third words and the sum decomposes exactly. Sharing one word per matched
+    count across the groups couples them: the second words must then be re-chosen
+    inside a search over word TRIPLES, roughly `6k^4` per opener against
+    `18k^2`. **`shared` is NOT BUILT YET and the flag says so.**
+  - **IT REQUIRES `--topk`** -- choosing a third word for every candidate second
+    word is a nested search and only the beam makes it affordable.
+  - **MEASURED 2026-09-16, and the answer is NEGATIVE**: on the real lists a
+    forced third word is WORSE than the random tail it replaces, by a roughly
+    constant margin at every beam width tried -- k=5 3.751380 against 3.708983,
+    k=20 3.720679 against 3.686815, k=50 3.699032 against 3.663450. The same
+    shape as firing a second word on two greys. **The third word is FORCED where
+    it fires**, so the three-level family does not contain the two-level
+    strategy and can be worse; letting a case DECLINE would fix that by
+    construction and is the obvious next experiment.
+  - Third words get their own CSV rows, `fires` = `<group>|m<matched count>`
+    with `third` in the status column.
 - **IT RESUMES, and the CSV is the checkpoint.** Each opener's rows are appended
   the moment it finishes, so re-running the same command skips what is on file
   and -- the part that saves real time -- SEEDS THE INCUMBENT with the best total

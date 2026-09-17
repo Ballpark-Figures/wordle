@@ -33,6 +33,7 @@ import numpy as np
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
 from wordle import load_words, pattern  # noqa: E402
+from tree_states import state_from_strings  # noqa: E402
 
 MATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 BINARY = os.path.join(MATH, "solver", "secondexact")
@@ -550,6 +551,111 @@ def check_resume():
         print("   ok   a resume across a different condition is refused")
 
 
+def ref_total_third(opener, words, third, third_max):
+    """The THREE-level strategy, enumerated from the strings.
+
+    Opener, then the group's committed word, then -- where the two replies
+    together have proved at most `third_max` letters -- that case's committed
+    third word, then the random tail.  The matched count comes from
+    `tree_states.state_from_strings`, which derives it from the WORDS and never
+    looks at a tile, so it shares nothing with the C's reply arithmetic.
+    """
+    tot = Fraction(0)
+    decline, fired = {}, {}
+    for a in MINI_ANSWERS:
+        t = tiles(opener, a)
+        n = sum(1 for x in t if x == 0)
+        (fired if n >= 3 else decline).setdefault(t, []).append(a)
+    for t, grp in decline.items():
+        tot += len(grp)
+        if any(x != 2 for x in t):
+            tot += ref_T(grp)
+    for t, grp in fired.items():
+        key = matched_vowel_label(opener, t)
+        second = words[key]
+        tot += 2 * len(grp)
+        parts = {}
+        for a in grp:
+            parts.setdefault(tiles(second, a), []).append(a)
+        for p, sub in parts.items():
+            if all(x == 2 for x in p):
+                continue                       # the second word won outright
+            # the matched count is constant on a joint bucket -- assert it
+            ms = {sum(state_from_strings(a, [opener, second])) for a in sub}
+            assert len(ms) == 1, (
+                "matched is not constant on a joint bucket: %s" % ms)
+            m = ms.pop()
+            w3 = third.get((key, m)) if m <= third_max else None
+            if w3 is None:
+                tot += ref_T(sub)
+                continue
+            tot += len(sub)                     # the third guess itself
+            sub2 = {}
+            for a in sub:
+                sub2.setdefault(tiles(w3, a), []).append(a)
+            for p2, s2 in sub2.items():
+                if all(x == 2 for x in p2):
+                    continue
+                tot += ref_T(s2)
+    return tot
+
+
+def check_third():
+    """10. THE THIRD LEVEL, against an enumeration from the strings.
+
+    The C is told nothing; the reference is told which words the C committed to
+    at both levels and must reproduce its total exactly.  It also re-derives the
+    matched count by a route that never looks at a tile, and ASSERTS that the
+    count is constant within a joint bucket -- the property that makes it a legal
+    key in the first place.
+    """
+    print("10. the third level")
+    tmp = tempfile.mkdtemp(prefix="checkse-third-")
+    make_data(tmp, MINI_GUESSES, MINI_ANSWERS)
+    two = os.path.join(tmp, "two.csv")
+    three = os.path.join(tmp, "three.csv")
+    base = ["--data", tmp, "--by-grays", "3", "--split-matched-vowels",
+            "--threads", "1", "--no-prune", "--topk", "3"]
+    run(base + ["--out", two])
+    run(base + ["--third-key", "group", "--third-max-matched", "2",
+                "--out", three])
+
+    rows = {}
+    with open(three) as f:
+        for line in f:
+            if line.startswith("#") or line.startswith("opener,"):
+                continue
+            c = line.rstrip("\n").split(",")
+            rows.setdefault(c[0], {})[c[1]] = c[2:]
+
+    checked = 0
+    for opener, by in rows.items():
+        words = {g: v[0] for g, v in by.items() if "|" not in g and v[0]}
+        third = {}
+        for g, v in by.items():
+            if "|" in g and v[0]:
+                grp, mm = g.split("|m")
+                third[(grp, int(mm))] = v[0]
+        if not words:
+            continue
+        tot = next((float(v[2]) for v in by.values() if v[2]), None)
+        if tot is None:
+            continue
+        want = ref_total_third(opener, words, third, 2)
+        if abs(float(want) - tot) > 1e-9:
+            bad("%s: the C totals %.6f, the three-level enumeration %.6f"
+                % (opener, tot, float(want)))
+            return
+        checked += 1
+    if checked < 1:
+        bad("no opener was compared in the third-level check")
+        return
+    print("   ok   %d openers match a three-level enumeration from the strings"
+          % checked)
+    if not any("|" in g for by in rows.values() for g in by):
+        bad("no third word was ever committed, so nothing was exercised")
+
+
 def check_bound():
     print("3. the bound is sound")
     rng = np.random.default_rng(11)
@@ -628,6 +734,7 @@ def main(argv):
     check_vowel_groups()
     check_topk()
     check_resume()
+    check_third()
     check_real()
     check_refusals()
     print()
