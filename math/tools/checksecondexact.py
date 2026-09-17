@@ -405,6 +405,142 @@ def check_vowel_groups():
               "than the grey count alone" % (checked, better))
 
 
+def check_topk():
+    """8. THE BEAM (--topk K), and its free oracle.
+
+    A beam at least as wide as the guess pool examines every candidate, so it
+    must reproduce the EXACT run row for row -- that single equality exercises
+    the whole beam path (the ranking, the tie-break, the bookkeeping) against
+    the answer the rest of this gate already trusts.  Narrower beams are then
+    checked for the two properties a beam must have: never better than exact
+    (better would mean it found something the full scan missed), and monotone
+    in K.  Finally the RANKING itself is diffed against `secondword`, which
+    computes the same one-ply score by a different route -- if the two ever
+    disagree, `--topk` is not selecting the words the table would.
+    """
+    print("8. the beam, --topk K")
+    tmp = tempfile.mkdtemp(prefix="checkse-topk-")
+    make_data(tmp, MINI_GUESSES, MINI_ANSWERS)
+    npool = len(MINI_GUESSES)
+    base = ["--data", tmp, "--by-grays", "3", "--split-matched-vowels",
+            "--threads", "1", "--no-prune"]
+    paths = {}
+    for k in (0, 1, 3, npool):
+        paths[k] = os.path.join(tmp, "k%d.csv" % k)
+        run(base + (["--topk", str(k)] if k else []) + ["--out", paths[k]])
+
+    def cells(p):
+        out = {}
+        with open(p) as f:
+            for line in f:
+                if line.startswith("#") or line.startswith("opener,"):
+                    continue
+                c = line.rstrip("\n").split(",")
+                out[(c[0], c[1])] = c[2:]
+        return out
+
+    ex = cells(paths[0])
+    wide = cells(paths[npool])
+    if ex != wide:
+        diff = [k for k in ex if ex[k] != wide.get(k)]
+        bad("a beam of %d over a %d-word pool differs from the exact run in %d "
+            "cells, e.g. %s" % (npool, npool, len(diff), diff[:3]))
+        return
+    print("   ok   a beam as wide as the pool reproduces the exact run exactly")
+
+    prev, moved = None, 0
+    for k in (1, 3, npool):
+        c = cells(paths[k])
+        for key in ex:
+            if not ex[key][1] or not c[key][1]:
+                continue
+            if float(c[key][1]) < float(ex[key][1]) - 1e-9:
+                bad("k=%d beat the exact answer on %s: %s vs %s"
+                    % (k, key, c[key][1], ex[key][1]))
+                return
+        if prev is not None:
+            for key in ex:
+                if c[key][1] and prev[key][1] and \
+                        float(c[key][1]) > float(prev[key][1]) + 1e-9:
+                    bad("k=%d is WORSE than a narrower beam on %s" % (k, key))
+                    return
+            moved += sum(1 for key in ex if c[key][0] != prev[key][0])
+        prev = c
+    if not moved:
+        bad("every K chose the same words, so nothing here exercises the beam")
+        return
+    print("   ok   no beam beats exact, wider is never worse, and K moved "
+          "%d choices" % moved)
+
+    # the ranking itself, against the other implementation of the same score
+    one = os.path.join(tmp, "oneply.csv")
+    sw = os.path.join(MATH, "solver", "secondword")
+    if not os.path.exists(sw):
+        bad("no solver/secondword to diff the ranking against")
+        return
+    p = subprocess.run([sw] + base[:-1] + ["--out", one],
+                       cwd=MATH, capture_output=True, text=True)
+    if p.returncode:
+        bad("secondword failed: %s" % p.stderr[-300:])
+        return
+    k1, sword = cells(paths[1]), cells(one)
+    diff = [key for key in k1 if key in sword and k1[key][0] != sword[key][0]]
+    if diff:
+        bad("--topk 1 and secondword disagree on %d cells, e.g. %s -- the beam "
+            "is not ranking by the table's score" % (len(diff), diff[:3]))
+    else:
+        print("   ok   --topk 1 picks secondword's argmin in all %d cells "
+              "(ties included)" % len(k1))
+
+
+def check_resume():
+    """9. RESUME: the CSV is the checkpoint, so a part-run plus a finish must
+    equal an uninterrupted run -- same rows, same values, same leader."""
+    print("9. resume")
+    tmp = tempfile.mkdtemp(prefix="checkse-res-")
+    make_data(tmp, MINI_GUESSES, MINI_ANSWERS)
+    base = ["--data", tmp, "--by-grays", "3", "--split-matched-vowels",
+            "--threads", "1", "--topk", "3"]
+    fresh = os.path.join(tmp, "fresh.csv")
+    part = os.path.join(tmp, "part.csv")
+    run(base + ["--out", fresh])
+    run(base + ["--limit", "8", "--out", part])
+    p = run(base + ["--out", part])
+    if "resumed" not in p.stderr:
+        bad("the second run did not report resuming: %s" % p.stderr[-200:])
+        return
+
+    def cells(path):
+        out = {}
+        with open(path) as f:
+            for line in f:
+                if line.startswith("#") or line.startswith("opener,"):
+                    continue
+                c = line.rstrip("\n").split(",")
+                out[(c[0], c[1])] = c[2:7]
+        return out
+
+    a, b = cells(fresh), cells(part)
+    if set(a) != set(b):
+        bad("resumed file covers %d cells, fresh covers %d" % (len(b), len(a)))
+        return
+    diff = [k for k in a if a[k] != b[k]]
+    if diff:
+        bad("%d cells differ after a resume, e.g. %s: %s vs %s"
+            % (len(diff), diff[0], a[diff[0]], b[diff[0]]))
+        return
+    print("   ok   a part-run plus a finish equals an uninterrupted run "
+          "(%d cells)" % len(a))
+
+    # a file written under a DIFFERENT condition must be refused, not continued
+    p = run(["--data", tmp, "--by-grays", "3", "--threads", "1", "--topk", "3",
+             "--out", part], expect_fail=True)
+    if not p.returncode:
+        bad("resuming a file written for another firing condition was allowed")
+    else:
+        print("   ok   a resume across a different condition is refused")
+
+
 def check_bound():
     print("3. the bound is sound")
     rng = np.random.default_rng(11)
@@ -481,6 +617,8 @@ def main(argv):
     check_bound()
     check_by_grays()
     check_vowel_groups()
+    check_topk()
+    check_resume()
     check_real()
     check_refusals()
     print()

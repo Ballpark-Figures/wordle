@@ -25,7 +25,20 @@
 # ~290000 games EACH -- some 3.8 billion for ONE opener, hours of work, and the
 # answer still has an error bar.  The recursion does it in under a second.
 #
-# IT IS A PROOF, NOT A SCREEN.  Every opener gets a sound lower bound first
+# --topk K MAKES IT A SCREEN.  Only the K best second words per group by the
+# one-ply sum-of-squares score (secondword's rule, the same code path) are
+# evaluated exactly, so each total is an UPPER BOUND and the winner is the best
+# of the openers examined.  K is part of the objective: it is in the filename and
+# in the settings stamp, and a resume refuses a file written under a different K.
+# MEASURED on the completed by-grays run: the exact walk performed 286 million
+# second-word evaluations; at K=10 it would perform at most 322800.
+#
+# IT RESUMES.  Each opener's rows are appended the moment it finishes, so the CSV
+# IS the checkpoint: re-run the same command and it skips what is on file and
+# seeds the bound with the best total already proved.  A cut opener is not
+# recorded -- re-cutting it is free and still sound.
+#
+# WITHOUT --topk IT IS A PROOF, NOT A SCREEN.  Every opener gets a sound lower bound first
 # (T(S) >= 2|S| - 1 per bucket, no recursion), they are walked ASCENDING against
 # a shared incumbent, and an opener whose bound is not below it cannot win and is
 # never evaluated.  What comes out is the optimum over every (opener, second
@@ -57,6 +70,7 @@ LIMIT=""
 THREADS=""
 MEMOBITS=""
 REPORT=30
+TOPK=""
 NOPRUNE=0
 DRYRUN=0
 
@@ -73,6 +87,7 @@ while [ $# -gt 0 ]; do
         --threads)    THREADS="$2";  shift 2 ;;
         --memo-bits)  MEMOBITS="$2"; shift 2 ;;
         --report)     REPORT="$2";   shift 2 ;;
+        --topk|-k)    TOPK="$2";     shift 2 ;;
         --no-prune)   NOPRUNE=1;     shift ;;
         --dry-run)    DRYRUN=1;      shift ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
@@ -122,6 +137,7 @@ LABEL=$($BIN $COND --print-label) || exit 1
 STEM="exact_${LABEL}"
 [ -z "$OPENER" ]  || STEM="${STEM}_${OPENER}"
 [ -z "$OPENERS" ] || STEM="${STEM}_$(basename "$OPENERS" .txt)"
+[ -z "$TOPK" ]    || STEM="${STEM}_k${TOPK}"
 [ -z "$LIMIT" ]   || STEM="${STEM}_limit${LIMIT}"
 [ "$NOPRUNE" = 0 ] || STEM="${STEM}_noprune"
 OUT="$OUTDIR/$STEM.csv"
@@ -129,6 +145,7 @@ OUT="$OUTDIR/$STEM.csv"
 FLAGS="--report $REPORT$COND"
 [ -z "$OPENER" ]   || FLAGS="$FLAGS --opener $OPENER"
 [ -z "$OPENERS" ]  || FLAGS="$FLAGS --openers $OPENERS"
+[ -z "$TOPK" ]     || FLAGS="$FLAGS --topk $TOPK"
 [ -z "$LIMIT" ]    || FLAGS="$FLAGS --limit $LIMIT"
 [ -z "$THREADS" ]  || FLAGS="$FLAGS --threads $THREADS"
 [ -z "$MEMOBITS" ] || FLAGS="$FLAGS --memo-bits $MEMOBITS"
@@ -139,7 +156,15 @@ NGRP=$(echo "$LABEL" | tr '.' '\n' | wc -l | tr -d ' ')
 echo "  fires on   $LABEL$([ "$NGRP" -gt 1 ] && echo "  ($NGRP groups, a SEPARATE word for each)")"
 echo "  openers    ${OPENER:-${OPENERS:-all 12972}}${LIMIT:+ (first $LIMIT)}"
 echo "  follow-up  answer (a uniformly random consistent answer)"
+if [ -n "$TOPK" ]; then
+    echo "  BEAM       top $TOPK second words per group, by the one-ply score"
+    echo "             ^ a SCREEN, not a proof: every total is an UPPER BOUND and"
+    echo "               the winner is the best of the openers examined."
+else
+    echo "  beam       none -- every candidate, so the result is PROVEN optimal"
+fi
 [ "$NOPRUNE" = 0 ] || echo "  NO PRUNING: every second word evaluated (the gate's check)"
+[ ! -f "$OUT" ] || echo "  RESUMING   $OUT exists; its openers are skipped and its best seeds the bound"
 echo "  out        $OUT"
 echo "  log        $LOC/$STEM.log"
 

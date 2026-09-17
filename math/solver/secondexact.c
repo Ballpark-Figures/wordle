@@ -295,6 +295,7 @@ typedef struct {
     double  decline;              /* exact total over the replies that do NOT fire */
     double  bound;                /* a sound lower bound on the whole total */
     int     done;
+    int     resumed;              /* already on file from an earlier run */
 } Row;
 
 /* The exact total over the FIRING answers for one second word -- or a LOWER
@@ -306,9 +307,14 @@ typedef struct {
  * second reply inside each run.  The bucket where w is itself the answer costs
  * no tail at all: the game ended on that guess.
  */
+/* `ssq_out`, when given, receives the SUM OF SQUARED JOINT BUCKET SIZES -- the
+ * one-ply score `secondword` ranks by.  It is a different aggregation of the
+ * very buckets this function already walks, so it costs an add per bucket and
+ * needs no second pass.  It counts EVERY bucket, the all-green one included,
+ * because that is what secondword.c does (solver/secondword.c, `ssq`). */
 static double fired_total(Memo *m, const uint16_t *q, int nq, const int *rstart,
                           const int *rlen, int nb, int w, int bound_only,
-                          uint16_t *out, int depth) {
+                          uint16_t *out, int depth, int64_t *ssq_out) {
     const uint8_t *row2 = PAT + (size_t)w * NA;
     int *cnt = m->cnt + (size_t)depth * NPAT;
     int *touch = m->touch + (size_t)depth * NPAT;
@@ -332,6 +338,10 @@ static double fired_total(Memo *m, const uint16_t *q, int nq, const int *rstart,
         }
         for (int i = 0; i < n; i++) out[cnt[row2[s[i]]]++] = s[i];
         for (int k = 0; k < nt; k++) {
+            if (ssq_out) {
+                int64_t v = plen[k];
+                *ssq_out += v * v;
+            }
             if (touch[k] == ALL_GREEN) continue;         /* w won: no tail */
             if (bound_only)
                 tot += 2.0 * plen[k] - 1.0;              /* T(S) >= 2|S| - 1 */
@@ -402,12 +412,22 @@ static double decline_total(Memo *m, int og, uint16_t *out, int depth,
 
 /* ------------------------------------------------------------- the walk ---- */
 
-typedef struct { double key; int32_t w; } Cand;
+typedef struct { double key; int64_t ssq; int32_t w; } Cand;
 
 static int cmp_cand(const void *a, const void *b) {
     const Cand *x = a, *y = b;
     if (x->key != y->key) return x->key < y->key ? -1 : 1;
     return x->w - y->w;                       /* ties on the lowest guess index */
+}
+
+/* THE BEAM'S ORDER, and it is secondword.c's rule verbatim: ascending sum of
+ * squared JOINT bucket sizes, ties on the lowest guess index.  Keeping the two
+ * rankings identical is what makes `--topk` mean "the words the one-ply table
+ * would have picked" rather than "some other shortlist". */
+static int cmp_cand_ssq(const void *a, const void *b) {
+    const Cand *x = a, *y = b;
+    if (x->ssq != y->ssq) return x->ssq < y->ssq ? -1 : 1;
+    return x->w - y->w;
 }
 
 /* A CHEAP LOWER BOUND on an opener's total, with no recursion at all: the decline
@@ -473,7 +493,7 @@ static double opener_bound(Memo *m, int og, uint16_t *q, uint16_t *out,
         for (int w = 0; w < NG; w++) {
             if (w == og) continue;
             double v = fired_total(m, q + g * NA, nq, rstart + g * NPAT,
-                                   rlen + g * NPAT, nb, w, 1, out, 1);
+                                   rlen + g * NPAT, nb, w, 1, out, 1, NULL);
             if (v < best) best = v;
         }
         gbound[g] = best;
@@ -489,7 +509,7 @@ static double opener_bound(Memo *m, int og, uint16_t *q, uint16_t *out,
 static void solve_opener(Memo *m, int og, Row *r, double incumbent, int no_prune,
                          uint16_t *q, uint16_t *out, int *rstart, int *rlen,
                          int *nbs, int *nqs, const double *gbound,
-                         const uint8_t *fu) {
+                         const uint8_t *fu, int topk) {
     memo_clear(m);
     r->opener = og;
     r->decline = decline_total(m, og, out, 0, fu);
@@ -508,10 +528,40 @@ static void solve_opener(Memo *m, int og, Row *r, double incumbent, int no_prune
 
         for (int w = 0; w < NG; w++) {
             cand[w].w = w;
-            cand[w].key = (w == og) ? HUGE_VAL
-                        : fired_total(m, qq, nq, rs, rl, nb, w, 1, out, 1);
+            cand[w].ssq = INT64_MAX;                  /* the opener itself sorts last */
+            if (w == og) { cand[w].key = HUGE_VAL; continue; }
+            cand[w].ssq = 0;
+            cand[w].key = fired_total(m, qq, nq, rs, rl, nb, w, 1, out, 1,
+                                      topk ? &cand[w].ssq : NULL);
         }
-        qsort(cand, (size_t)NG, sizeof(Cand), cmp_cand);
+        qsort(cand, (size_t)NG, sizeof(Cand), topk ? cmp_cand_ssq : cmp_cand);
+
+        /* THE BEAM.  Evaluate exactly the `topk` best by the one-ply score and
+         * nothing else, so the result is the best of those k -- an UPPER BOUND
+         * on this group's true optimum, never the optimum.
+         *
+         * The within-group incumbent cut is deliberately NOT applied here.  That
+         * cut leans on the other groups' costs, and once a group's value is
+         * itself only an upper bound the reasoning stops being sound -- so the
+         * beam stays the ONE approximation in play and the claim stays exactly
+         * "the best of the k examined".  The OPENER-level cut is untouched and
+         * still sound: the incumbent is the value of a strategy that exists. */
+        if (topk) {
+            int lim = topk < NG ? topk : NG;
+            double bestk = HUGE_VAL;
+            for (int i = 0; i < lim; i++) {
+                if (cand[i].ssq == INT64_MAX) break;      /* nothing left to try */
+                double v = fired_total(m, qq, nq, rs, rl, nb, cand[i].w, 0,
+                                       out, 1, NULL);
+                r->scanned[g]++;
+                if (v < bestk) { bestk = v; r->second[g] = cand[i].w; }
+            }
+            /* NG - 1: the opener is never a candidate, so a beam at least as
+             * wide as the pool must report 0 cut, exactly as the full scan does */
+            r->cut[g] = NG - 1 - r->scanned[g];
+            r->fired[g] = bestk;
+            continue;
+        }
 
         /* TWO CUTS, and the second is what makes this affordable.  The groups
          * are independent, so a word whose bound is not below the best found
@@ -537,7 +587,7 @@ static void solve_opener(Memo *m, int og, Row *r, double incumbent, int no_prune
                 r->cut[g] = NG - i;
                 break;
             }
-            double v = fired_total(m, qq, nq, rs, rl, nb, cand[i].w, 0, out, 1);
+            double v = fired_total(m, qq, nq, rs, rl, nb, cand[i].w, 0, out, 1, NULL);
             r->scanned[g]++;
             if (v < best) { best = v; r->second[g] = cand[i].w; }
         }
@@ -547,11 +597,129 @@ static void solve_opener(Memo *m, int og, Row *r, double incumbent, int no_prune
     (void)incumbent;
 }
 
+/* ------------------------------------------------------- resume ---------- *
+ * A run is hours long and there is no checkpoint but the CSV itself, so the CSV
+ * IS the checkpoint: every opener's rows are appended the moment it finishes.
+ * A resume reads them back, skips those openers and -- the part that actually
+ * saves time -- SEEDS THE INCUMBENT with the best total already proved, so the
+ * bound starts cutting from the first opener instead of after the first dozen.
+ *
+ * A previously CUT opener is deliberately NOT recorded.  It costs nothing to cut
+ * again, and it is still sound to do so: it was cut against an incumbent that is
+ * necessarily no better than the one a resume starts with, so `bound >= old`
+ * gives `bound >= new`.
+ *
+ * Returns the number of openers recognised, or -1 if the file is for a DIFFERENT
+ * condition -- refused rather than continued, because the rows would be answers
+ * to another question wearing this one's filename. */
+static int read_resume(const char *path, Row *rows, int nopen, const char *label,
+                       int topk, double *incumbent, int *best_i) {
+    FILE *f = fopen(path, "r");
+    if (!f) return 0;
+    char line[1024];
+    int stamped = 0, found = 0;
+    /* opener name -> row index, by linear scan; 13k openers x a few thousand
+     * resumed rows is nothing beside one exact evaluation. */
+    while (fgets(line, sizeof line, f)) {
+        if (line[0] == '#') {
+            char *fire = strstr(line, "fire=");
+            if (fire) {
+                stamped = 1;
+                /* the WHOLE stamp, topk included: a beam file and an exact one
+                 * are different quantities, and a k=10 file read into a k=50 run
+                 * would silently mix two of them under one name. */
+                char want[512];
+                snprintf(want, sizeof want, "fire=%s openers=", label);
+                int ok = !strncmp(fire, want, strlen(want));
+                int filek = -1;
+                char *tk = strstr(line, "topk=");
+                if (tk) filek = atoi(tk + 5);
+                if (!ok || filek != topk) {
+                    fprintf(stderr, "%s was written for a DIFFERENT run:\n  %s",
+                            path, line);
+                    fprintf(stderr, "  this run is firing on %s with topk=%d\n",
+                            label, topk);
+                    fclose(f);
+                    return -1;
+                }
+            }
+            continue;
+        }
+        if (!strncmp(line, "opener,", 7)) continue;
+        char ow[32], fires[128], sec[32];
+        double expected, total, decline, fired;
+        int nq, scanned, cutn;
+        int n = sscanf(line, "%31[^,],%127[^,],%31[^,],%lf,%lf,%lf,%lf,%d,%d,%d",
+                       ow, fires, sec, &expected, &total, &decline, &fired,
+                       &nq, &scanned, &cutn);
+        int oi = -1;
+        for (int i = 0; i < nopen; i++)
+            if (!strcmp(GWORD[rows[i].opener], ow)) { oi = i; break; }
+        if (oi < 0) continue;
+        if (!rows[oi].resumed) { rows[oi].resumed = 1; found++; }
+        if (n < 7) continue;                       /* a `none` row: no numbers */
+        /* the best total on file becomes the starting incumbent */
+        if (total < *incumbent) { *incumbent = total; *best_i = oi; }
+        /* and the leader's own words, so the final report can name them */
+        if (*best_i == oi) {
+            for (int g = 0; g < NGROUP; g++)
+                if (!strcmp(GSPEC[g], fires)) {
+                    for (int k = 0; k < NG; k++)
+                        if (!strcmp(GWORD[k], sec)) { rows[oi].second[g] = k; break; }
+                    rows[oi].fired[g] = fired;
+                    rows[oi].nq[g] = nq;
+                    rows[oi].scanned[g] = scanned;
+                    rows[oi].cut[g] = cutn;
+                    rows[oi].decline = decline;
+                    rows[oi].done = 1;
+                    break;
+                }
+        }
+    }
+    fclose(f);
+    if (!stamped && found) {
+        fprintf(stderr, "%s has no `# settings fire=` stamp, so it cannot say "
+                "which condition it holds -- refusing to resume from it\n", path);
+        return -1;
+    }
+    return found;
+}
+
+
+/* One opener's rows, appended the moment it is known.  The SAME format the
+ * end-of-run write uses -- one writer, so a resumed file and a fresh one cannot
+ * drift apart. */
+static void write_rows(FILE *f, Row *v) {
+    double tot = v->decline;
+    int any = 0;
+    for (int g = 0; g < NGROUP; g++) {
+        tot += v->fired[g];
+        any |= v->second[g] >= 0;
+    }
+    for (int g = NGROUP - 1; g >= 0; g--) {
+        if (!v->done) {
+            fprintf(f, "%s,%s,,,,,,%d,0,cut\n", GWORD[v->opener], GSPEC[g], v->nq[g]);
+            continue;
+        }
+        if (v->second[g] < 0) {
+            fprintf(f, "%s,%s,,,,,,%d,%d,none\n", GWORD[v->opener], GSPEC[g],
+                    v->nq[g], v->scanned[g]);
+            continue;
+        }
+        fprintf(f, "%s,%s,%s,%.6f,%.4f,%.4f,%.4f,%d,%d,%d\n",
+                GWORD[v->opener], GSPEC[g], GWORD[v->second[g]],
+                any ? tot / NA : 0.0, any ? tot : 0.0, v->decline,
+                v->fired[g], v->nq[g], v->scanned[g], v->cut[g]);
+    }
+    fflush(f);
+}
+
+
 int main(int argc, char **argv) {
     const char *datadir = "data", *outpath = NULL, *patpath = NULL;
     const char *one = NULL, *openpath = NULL;
     int min_grays = 3, by_grays = 0, threads = 0, limit = 0, no_prune = 0,
-        memo_bits = 19, split_v = 0, split_mv = 0, print_label = 0;
+        memo_bits = 19, split_v = 0, split_mv = 0, print_label = 0, topk = 0;
     double report = 10.0;
 
     for (int i = 1; i < argc; i++) {
@@ -577,10 +745,17 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--memo-bits") && i + 1 < argc) memo_bits = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--report") && i + 1 < argc) report = atof(argv[++i]);
         else if (!strcmp(argv[i], "--limit") && i + 1 < argc) limit = atoi(argv[++i]);
-        /* --no-prune evaluates EVERY second word, which must give the same answer
-         * as the pruned walk.  That equality is the gate's sharpest check, so the
-         * flag exists for it rather than for production. */
+        /* --no-prune evaluates EVERY second word AND every opener, which must
+         * give the same answer as the pruned walk.  That equality is the gate's
+         * sharpest check, so the flag exists for it rather than for production.
+         * WITH --topk it keeps only its opener half -- the beam still restricts
+         * the second words, so the pair means "every opener, k words each",
+         * which is how the beam gets compared against the exact answer. */
         else if (!strcmp(argv[i], "--no-prune")) no_prune = 1;
+        /* --topk K: evaluate only the K best second words per group by the
+         * one-ply score, instead of every candidate that survives the bound.
+         * It turns a PROOF into a SCREEN -- see solve_opener. */
+        else if (!strcmp(argv[i], "--topk") && i + 1 < argc) topk = atoi(argv[++i]);
         /* --print-label resolves the firing condition, prints its CANONICAL name
          * and stops.  The wrapper needs that name for the filename, and groups.c
          * is the one place that knows it -- deriving it in shell would be a
@@ -598,6 +773,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "--min-grays must be 1..%d\n", WORDLEN);
         return 1;
     }
+    if (topk < 0) { fprintf(stderr, "--topk must be at least 1\n"); return 1; }
     if (by_grays && (by_grays < 1 || by_grays > WORDLEN)) {
         fprintf(stderr, "--by-grays must be 1..%d\n", WORDLEN);
         return 1;
@@ -673,6 +849,11 @@ int main(int argc, char **argv) {
     fprintf(stderr, "loaded %d guesses x %d answers; firing on %s (%d group%s%s)\n",
             NG, NA, label, NGROUP, NGROUP == 1 ? "" : "s",
             OPENER_DEP ? ", per opener" : "");
+    if (topk)
+        fprintf(stderr, "BEAM: only the %d best second words per group are "
+                "evaluated -- every\n      total is an UPPER BOUND, and the "
+                "winner is the best of the openers examined,\n      not the "
+                "proven optimum.\n", topk);
 
     int *openers = malloc(sizeof(int) * NG), nopen = 0;
     if (one) {
@@ -710,7 +891,44 @@ int main(int argc, char **argv) {
     double t0 = now_s(), last = t0;
     long long done = 0;
     double incumbent = HUGE_VAL;
-    int best_i = -1, cut_openers = 0, bounded = 0;
+    int best_i = -1, cut_openers = 0, bounded = 0, resumed = 0;
+
+    for (int oi = 0; oi < nopen; oi++) {
+        rows[oi].opener = openers[oi];
+        for (int g = 0; g < MAXGRP; g++) rows[oi].second[g] = -1;
+    }
+    /* RESUME BEFORE ANYTHING IS COMPUTED, so the seeded incumbent is already
+     * cutting during phase 2's very first opener. */
+    resumed = read_resume(outpath, rows, nopen, label, topk, &incumbent, &best_i);
+    if (resumed < 0) return 1;
+    /* NOT `out` -- that name is taken by a per-thread scratch buffer inside
+     * both parallel regions, which would shadow it exactly where it is used. */
+    FILE *outf = fopen(outpath, resumed ? "a" : "w");
+    if (!outf) { fprintf(stderr, "cannot write %s\n", outpath); return 1; }
+    char resumed_note[64] = "";
+    if (resumed) snprintf(resumed_note, sizeof resumed_note,
+                          ", %d resumed", resumed);
+    if (resumed) {
+        fprintf(stderr, "resuming: %d openers already on file, best %.6f\n",
+                resumed, incumbent / NA);
+    } else {
+        fprintf(outf, "# secondexact: the EXACT best predetermined second word, "
+                "and the exact value of the\n# strategy -- opener, then that word "
+                "when the reply fires, then a uniformly random\n# consistent "
+                "ANSWER.  No seed and no standard error: the random tail is summed "
+                "\n# exactly (math/secondexact.py states the recursion).\n");
+        fprintf(outf, "# expected is over all %d answers; decline/fired split it "
+                "by whether the rule fired.\n", NA);
+        fprintf(outf, "# settings fire=%s openers=%d follow_up=answer topk=%d\n",
+                label, nopen, topk);
+        if (topk)
+            fprintf(outf, "# TOPK=%d: each group's word is the best of the %d "
+                    "ranked by the one-ply\n# score, so every total here is an "
+                    "UPPER BOUND, not the optimum.\n", topk, topk);
+        fprintf(outf, "opener,fires,second,expected,total,decline,fired,"
+                "qualifying,scanned,cut\n");
+        fflush(outf);
+    }
 
     /* PHASE 1: a cheap sound lower bound for every opener, with no recursion. */
 #ifdef _OPENMP
@@ -736,11 +954,9 @@ int main(int argc, char **argv) {
 #pragma omp for schedule(dynamic, 8)
 #endif
         for (int oi = 0; oi < nopen; oi++) {
-            rows[oi].opener = openers[oi];
-            /* -1, NOT the calloc'd 0: a cut opener never reaches solve_opener,
-             * and index 0 is a perfectly good word, so the zero read back as a
-             * real choice and printed as one. */
-            for (int g = 0; g < MAXGRP; g++) rows[oi].second[g] = -1;
+            /* second[] is -1, NOT the calloc'd 0 (set before the resume read):
+             * a cut opener never reaches solve_opener, and index 0 is a
+             * perfectly good word, so the zero read back as a real choice. */
             masks_for(openers[oi], gf, fu, gvow, mvow);
             rows[oi].bound = opener_bound(&m, openers[oi], q, out, rstart, rlen,
                                           nb, nq, gb, gf, fu);
@@ -812,6 +1028,7 @@ int main(int argc, char **argv) {
         for (int k = 0; k < nopen; k++) {
             int oi = order[k];
             Row *rr = &rows[oi];
+            if (rr->resumed) continue;           /* already proved, already filed */
             double inc;
 #ifdef _OPENMP
 #pragma omp atomic read
@@ -830,7 +1047,7 @@ int main(int argc, char **argv) {
             opener_bound(&m, rr->opener, q, out, rstart, rlen, nbs, nqs, gbs,
                          gf, fu);
             solve_opener(&m, rr->opener, rr, inc, no_prune, q, out, rstart, rlen,
-                         nbs, nqs, gbs, fu);
+                         nbs, nqs, gbs, fu, topk);
 #ifdef _OPENMP
 #pragma omp critical (progress)
 #endif
@@ -853,6 +1070,7 @@ int main(int argc, char **argv) {
                     fprintf(stderr, "  %.6f  NEW BEST\n", v / NA);
                     fflush(stderr);
                 }
+                write_rows(outf, rr);
                 if (now_s() - last >= report) {
                     last = now_s();
                     /* PROGRESS IS evaluated + cut, both SHARED and both only
@@ -860,10 +1078,11 @@ int main(int argc, char **argv) {
                      * under schedule(dynamic) is wherever the reporting thread
                      * happened to be -- so it jumped 1446, 1451, 735, 5050 and
                      * meant nothing. */
-                    fprintf(stderr, "  %d/%d openers  %d evaluated, %d cut  "
+                    fprintf(stderr, "  %d/%d openers  %d evaluated, %d cut%s  "
                             "best %.6f  (%.0fs)\n",
-                            (int)done + cut_openers, nopen, (int)done,
-                            cut_openers, incumbent / NA, now_s() - t0);
+                            (int)done + cut_openers + resumed, nopen, (int)done,
+                            cut_openers, resumed_note, incumbent / NA,
+                            now_s() - t0);
                     fflush(stderr);
                 }
             }
@@ -873,57 +1092,22 @@ int main(int argc, char **argv) {
         free(m.e); free(m.buf); free(m.cnt); free(m.touch); free(m.start); free(m.len);
     }
 
-    FILE *f = fopen(outpath, "w");
-    if (!f) { fprintf(stderr, "cannot write %s\n", outpath); return 1; }
-    fprintf(f, "# secondexact: the EXACT best predetermined second word, and the "
-               "exact value of the\n# strategy -- opener, then that word when the "
-               "reply shows at least %d greys, then a\n# uniformly random "
-               "consistent ANSWER.  No seed and no standard error: the random "
-               "tail\n# is summed exactly (math/secondexact.py states the "
-               "recursion).\n", min_grays);
-    fprintf(f, "# expected is over all %d answers; decline/fired split it by "
-               "whether the rule fired.\n", NA);
-    fprintf(f, "# settings fire=%s openers=%d follow_up=answer\n", label, nopen);
-    fprintf(f, "opener,fires,second,expected,total,decline,fired,qualifying,"
-               "scanned,cut\n");
-    for (int oi = 0; oi < nopen; oi++) {
-        Row *v = &rows[oi];
-        double tot = v->decline;
-        int any = 0;
-        for (int g = 0; g < NGROUP; g++) {
-            tot += v->fired[g];
-            any |= v->second[g] >= 0;
-        }
-        for (int g = NGROUP - 1; g >= 0; g--) {
-            if (!v->done) {
-                fprintf(f, "%s,%s,,,,,,%d,0,cut\n", GWORD[v->opener], GSPEC[g],
-                        v->nq[g]);
-                continue;
-            }
-            if (v->second[g] < 0) {
-                fprintf(f, "%s,%s,,,,,,%d,%d,none\n", GWORD[v->opener], GSPEC[g],
-                        v->nq[g], v->scanned[g]);
-                continue;
-            }
-            /* `expected` and `total` are the WHOLE strategy's, repeated on every
-             * group's row: the groups are independent but the value is not one
-             * of them, it is their sum plus the decline branch. */
-            fprintf(f, "%s,%s,%s,%.6f,%.4f,%.4f,%.4f,%d,%d,%d\n",
-                    GWORD[v->opener], GSPEC[g], GWORD[v->second[g]],
-                    any ? tot / NA : 0.0, any ? tot : 0.0, v->decline,
-                    v->fired[g], v->nq[g], v->scanned[g], v->cut[g]);
-        }
-    }
-    fclose(f);
+    /* Everything still unwritten is an opener the bound CUT -- it never reached
+     * solve_opener, so it has no numbers and nothing to resume from.  Appended
+     * here so the finished file still describes all every opener. */
+    for (int oi = 0; oi < nopen; oi++)
+        if (!rows[oi].resumed && !rows[oi].done) write_rows(outf, &rows[oi]);
+    fclose(outf);
     if (best_i >= 0) {
         fprintf(stderr, "\nbest: %s then", GWORD[rows[best_i].opener]);
         for (int g = NGROUP - 1; g >= 0; g--)
             fprintf(stderr, " %s (%s)", rows[best_i].second[g] >= 0
                     ? GWORD[rows[best_i].second[g]] : "-", GSPEC[g]);
-        fprintf(stderr, " -- %.6f expected guesses (exact)\n", incumbent / NA);
+        fprintf(stderr, " -- %.6f expected guesses (%s)\n", incumbent / NA,
+                topk ? "UPPER BOUND, beam" : "exact");
     }
-    fprintf(stderr, "%d openers: %lld evaluated exactly, %d cut by the bound, "
-            "in %.1fs\nwrote %s\n", nopen, done, cut_openers, now_s() - t0,
-            outpath);
+    fprintf(stderr, "%d openers: %lld evaluated exactly, %d cut by the bound%s, "
+            "in %.1fs\nwrote %s\n", nopen, done, cut_openers, resumed_note,
+            now_s() - t0, outpath);
     return 0;
 }

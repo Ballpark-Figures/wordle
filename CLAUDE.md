@@ -2136,6 +2136,49 @@ is the proven optimum over all 12972 x 12972 (opener, second word) pairs.
 - **THE MATCHED-VOWEL RESULT (2026-09-16): `slant` scores 3.643368**, against
   3.650558 for the grey count alone and 3.666937 for one shared word — measured
   on one opener in 5.7 s, which is the whole point of the extraction.
+- **`--topk K` MAKES IT A SCREEN, and that is the whole point of the flag.** Only
+  the K best second words per group by the ONE-PLY sum-of-squares score are
+  evaluated exactly, so every total is an **UPPER BOUND** and the winner is the
+  best of the openers examined -- never the proven optimum. K is part of the
+  objective: it is in the filename and in the `# settings` stamp, and a resume
+  refuses a file written under a different K.
+  - **WHY IT IS WORTH HAVING, measured on the completed by-grays run**: the
+    within-opener bound barely prunes on the big groups (median words scanned per
+    opener: e3 2803, e4 10809, **e5 12971 -- all of them**), so that run made
+    **286 million** exact second-word evaluations. At K=10 it would make at most
+    322800, an **886x** cut in the dominant cost. Reordering the exact walk
+    cannot recover this: the within-group cut fires on the bound's VALUE, so when
+    the bounds are clustered below the threshold no order prunes anything.
+  - **THE RANKING IS `secondword`'s RULE, not a second copy of it** -- ascending
+    sum of squared JOINT bucket sizes over the group's qualifying answers, every
+    bucket counted including the all-green one, ties on the lowest guess index.
+    It is computed in the SAME pass that already builds those buckets for the
+    bound, so it costs one add per bucket. The gate diffs `--topk 1` against
+    `secondword`'s own argmin and requires agreement in every cell, ties included.
+  - **K=1 IS NOT ENOUGH, and that is measured**: over the 10760 openers of the
+    completed by-grays run the one-ply argmin is the exact best second word only
+    **22.9%** of the time (e3 27.7%, e4 22.9%, e5 18.0%). That is the same fact
+    that made `spilt` win the RACE and `clint` win the exact solve. Choose K from
+    data, never by eye.
+  - **The within-group incumbent cut is deliberately OFF under `--topk`.** That
+    cut leans on the other groups' costs, and once a group's value is itself only
+    an upper bound the reasoning stops being sound -- so the beam stays the ONE
+    approximation and the claim stays exactly "the best of the K examined". The
+    OPENER-level cut is untouched and still sound, since the incumbent is always
+    the value of a strategy that exists.
+  - **`--no-prune` still means "every opener"** and composes with `--topk`, which
+    is how the beam gets compared against the exact answer.
+- **IT RESUMES, and the CSV is the checkpoint.** Each opener's rows are appended
+  the moment it finishes, so re-running the same command skips what is on file
+  and -- the part that saves real time -- SEEDS THE INCUMBENT with the best total
+  already proved, so the bound cuts from the first opener instead of after the
+  first dozen. A CUT opener is deliberately not recorded: re-cutting it is free
+  and still sound, because it was cut against an incumbent no better than the one
+  a resume starts with. A file whose stamp names a different condition or a
+  different K is REFUSED, not continued.
+  - **Rows are therefore in COMPLETION order, not opener order.** Every reader
+    here parses by column name, so nothing cares -- but a diff against a
+    pre-resume file will not line up.
 - Data under `math/data/shared/secondexact/`, log under `data/local/secondexact/`.
   **The LABEL is the filename**, so `exact_e3_mv0.e3_mv1.e3_mv2.e4_mv0.e4_mv1.e5`
   is one partition's file and cannot be confused with another's.
@@ -3090,6 +3133,36 @@ still be a POSSIBLE ANSWER — consistent with every clue so far?". Run it with
 - **The rest of the antiwordle family (`antistall`, `antiexpect`, `antiwordle.py`,
   `eldrow.py`) has NO section here** — the source headers and the wrapper comments
   are the documentation. Worth writing up when one of them is next touched.
+
+## `schedule(dynamic)` IS STATIC-STEAL ON THE MACS -- what a progress log means
+**MEASURED 2026-09-16, and it explains a log that reads like a bug.** libomp
+implements `schedule(dynamic, N)` as **static-steal**: each thread starts on its
+own contiguous 1/nthreads slice of the iteration space and only steals from the
+others once its own slice is exhausted. Verified three ways: thread first-touches
+in `secondexact`'s walk were `0, 721, 1442, ... 12252` (exactly `ceil(12972/18)`
+apart), a 20-line standalone program reproduces it with no solver code, and the
+clause IS parsed -- `static,1` gives round-robin and `guided` its own pattern.
+**`schedule(monotonic:dynamic, 1)` restores a true shared queue** (all threads
+then start near k=0); a manual atomic counter would too.
+- **IT IS NOT A LOAD-BALANCE PROBLEM -- CHECK BEFORE ASSUMING IT IS.** The
+  stealing works: after 4 hours `ps -M <pid>` showed all 18 threads `R` with
+  per-thread CPU between **119:58 and 120:01** -- a 3-second spread in 7200.
+  Process-level `%CPU` CANNOT distinguish "18 threads at 47%" from "9 threads at
+  100%"; `ps -M` can, and is the tool to reach for.
+- **WHAT IT DOES CHANGE is the ORDER openers are TESTED in**, which is why a
+  bound-sorted walk's cuts arrive in lumps of one slice. In the mv run, threads
+  16 and 17 owned k=11532-12251 and 12252-12971, both entirely above the
+  incumbent, so each evaluated ONE opener (its first, before the incumbent had
+  improved past its band) and then cut the other 719 in milliseconds: **1438 =
+  2 x (720 - 1)**, arriving a full evaluation AFTER the incumbent that enabled
+  them. The next band flips only when a thread grinds down to it.
+- **It does NOT affect any RESULT.** Every iteration runs exactly once, and a cut
+  is sound whatever the order, since the incumbent is always the value of a
+  strategy that exists.
+- **The comment in `secondexact.c` claiming "the first opener whose bound exceeds
+  the incumbent proves the whole tail is worse" describes a SERIAL walk and is
+  not what runs.** The end-of-run claim is still true; the "first cut ends it"
+  mechanism is not. Not yet corrected in the source (2026-09-16).
 
 ## `--tt-save` IS BACKWARDS EVERYWHERE — no wrapper writes a table any more
 **Fixed 2026-09-09 in all five wrappers that did it** (`run-length-sweep.sh`,
