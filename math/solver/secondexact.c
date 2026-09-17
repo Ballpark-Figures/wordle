@@ -597,6 +597,59 @@ static void solve_opener(Memo *m, int og, Row *r, double incumbent, int no_prune
     (void)incumbent;
 }
 
+/* ------------------------------------------------ matched letters --------- *
+ * THE THIRD LEVEL'S KEY (user's definition, 2026-09-16): how many letters we
+ * know are in the answer after two guesses -- distinct letters, but counted
+ * AGAIN for every copy a reply proves, so a letter non-grey twice in one guess
+ * counts twice and a letter pinned green in two places counts twice.
+ *
+ * That is exactly `tree_states`' greens + yellows: per letter, the most copies
+ * either reply proves (`max over guesses of min(count in guess, count in
+ * answer)`, which a reply reports as its non-grey tiles of that letter), summed,
+ * with the pinned ones counted as greens.  `tree_states.state_from_strings` is
+ * the independent implementation the gate diffs against.
+ *
+ * IT IS A FUNCTION OF THE TWO REPLIES ALONE, never of the answer beyond them --
+ * which is what makes it a legal key: it is CONSTANT within a joint (p1, p2)
+ * bucket, so every answer in a bucket gets the same third word.
+ */
+static int matched_letters(int g1, int p1, int g2, int p2) {
+    int known[26] = {0}, pin[26] = {0};
+    unsigned pinned = 0;
+    char pinch[WORDLEN];
+    const char *ws[2];
+    int ps[2];
+    ws[0] = GWORD[g1]; ps[0] = p1;
+    ws[1] = GWORD[g2]; ps[1] = p2;
+    for (int k = 0; k < 2; k++) {
+        int cnt[26] = {0}, c = ps[k];
+        /* POSITION 0 IS THE MOST SIGNIFICANT TRIT (wordle.py), so this walks the
+         * word from the RIGHT.  A repeated `% 3` paired with a left-to-right
+         * index reads position 0's letter against position 4's tile -- which is
+         * exactly the trap secondword.py's `tile_at` is written to avoid, and
+         * exactly what this got wrong first. */
+        for (int i = WORDLEN - 1; i >= 0; i--) {
+            int t = c % 3;
+            c /= 3;
+            int ch = ws[k][i] - 'a';
+            if (t) cnt[ch]++;                      /* non-grey: a proved copy */
+            if (t == 2) { pinned |= 1u << i; pinch[i] = ws[k][i]; }
+        }
+        for (int ch = 0; ch < 26; ch++)
+            if (cnt[ch] > known[ch]) known[ch] = cnt[ch];
+    }
+    int greens = 0;
+    for (int i = 0; i < WORDLEN; i++)
+        if (pinned & (1u << i)) { greens++; pin[pinch[i] - 'a']++; }
+    int yellows = 0;
+    for (int ch = 0; ch < 26; ch++) {
+        int y = known[ch] - pin[ch];
+        if (y > 0) yellows += y;
+    }
+    return greens + yellows;
+}
+
+
 /* --------------------------------------------------- the root beam -------- *
  * `--topk K` RESTRICTS THE OPENERS TOO -- the root is a branching point like any
  * other, and one K governs both, as in every other solver here (strturns,
@@ -749,6 +802,7 @@ static void write_rows(FILE *f, Row *v) {
 
 int main(int argc, char **argv) {
     const char *datadir = "data", *outpath = NULL, *patpath = NULL;
+    const char *matchpath = NULL;              /* --dump-matched, the gate hook */
     const char *one = NULL, *openpath = NULL;
     int min_grays = 3, by_grays = 0, threads = 0, limit = 0, no_prune = 0,
         memo_bits = 19, split_v = 0, split_mv = 0, print_label = 0, topk = 0;
@@ -793,9 +847,14 @@ int main(int argc, char **argv) {
          * is the one place that knows it -- deriving it in shell would be a
          * second implementation of the rule the two solvers share. */
         else if (!strcmp(argv[i], "--print-label")) print_label = 1;
+        /* --dump-matched FILE: a deterministic sample of (g1, g2, answer) triples
+         * with the matched-letter count, for the gate to diff against
+         * tree_states.state_from_strings.  The key is new machinery, so it gets
+         * an independent check rather than being trusted. */
+        else if (!strcmp(argv[i], "--dump-matched") && i + 1 < argc) matchpath = argv[++i];
         else { fprintf(stderr, "unknown arg: %s\n", argv[i]); return 1; }
     }
-    if (!outpath && !print_label) {
+    if (!outpath && !print_label && !matchpath) {
         fprintf(stderr, "secondexact needs --out FILE -- a run that prints its "
                         "answer and saves NOTHING is a run lost.\n"
                         "Use the wrapper: bash solver/run-second-exact.sh\n");
@@ -857,6 +916,25 @@ int main(int argc, char **argv) {
             fprintf(stderr, "the answer %s is not a legal guess\n", AWORD[a]);
             return 1;
         }
+    }
+    if (matchpath) {
+        FILE *mf = fopen(matchpath, "w");
+        fprintf(mf, "g1,g2,answer,matched\n");
+        uint64_t st = 88172645463325252ULL;
+        for (int n = 0; n < 4000; n++) {
+            st ^= st << 13; st ^= st >> 7; st ^= st << 17;
+            int a = (int)(st % (uint64_t)NA);
+            st ^= st << 13; st ^= st >> 7; st ^= st << 17;
+            int w1 = (int)(st % (uint64_t)NG);
+            st ^= st << 13; st ^= st >> 7; st ^= st << 17;
+            int w2 = (int)(st % (uint64_t)NG);
+            fprintf(mf, "%s,%s,%s,%d\n", GWORD[w1], GWORD[w2], AWORD[a],
+                    matched_letters(w1, PAT[(size_t)w1 * NA + a],
+                                    w2, PAT[(size_t)w2 * NA + a]));
+        }
+        fclose(mf);
+        fprintf(stderr, "dumped 4000 matched-letter samples to %s\n", matchpath);
+        return 0;
     }
     groups_build_tiles();
     groups_build_vpos(GWORD, NG);
