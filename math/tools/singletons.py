@@ -49,9 +49,27 @@ from wordle import all_green, load_words  # noqa: E402
 
 FULL = "--full" in sys.argv
 ANSWERS_ONLY = "--answers" in sys.argv
+# --word-list is the general form of --answers: restrict WHICH WORDS ARE RANKED
+# to a named list, leaving what they are counted against alone.  --answers is
+# exactly --word-list mystery, kept under its own name because every committed
+# `_answers` file is named by it.
+WORD_LIST = None
+if "--word-list" in sys.argv:
+    WORD_LIST = sys.argv[sys.argv.index("--word-list") + 1]
+    if ANSWERS_ONLY:
+        raise SystemExit("--answers and --word-list are the same choice; "
+                         "pass only one (--answers is --word-list mystery)")
 TOP = 25
 if "--top" in sys.argv:
     TOP = int(sys.argv[sys.argv.index("--top") + 1])
+
+
+def _read_list(spec):
+    """A word list from a stem in data/shared/words, or from a path."""
+    if os.sep in spec or spec.endswith(".txt"):
+        with open(spec) as fh:
+            return [ln.strip() for ln in fh if ln.strip()]
+    return load_words(spec)
 
 _MATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 OUT_DIR = os.path.join(_MATH, "data", "shared", "singletons")
@@ -60,6 +78,11 @@ if FULL:
     _NAME += "_full"
 if ANSWERS_ONLY:
     _NAME += "_answers"
+if WORD_LIST:
+    _stem = os.path.basename(WORD_LIST)
+    _stem = _stem[:-4] if _stem.endswith(".txt") else _stem
+    # the same search --answers already names keeps that name
+    _NAME += "_answers" if _stem == "mystery" else "_" + _stem
 OUT = os.path.join(OUT_DIR, _NAME + ".csv")
 
 guesses = load_words("guess")
@@ -88,22 +111,31 @@ for lo in range(0, len(guesses), CHUNK):
 nowin = singles - win_is_single
 
 keep = range(len(guesses))
-if ANSWERS_ONLY:
-    answer_set = set(load_words("mystery"))
-    keep = [i for i in keep if guesses[i] in answer_set]
+if ANSWERS_ONLY or WORD_LIST:
+    rank_set = set(load_words("mystery") if ANSWERS_ONLY
+                   else _read_list(WORD_LIST))
+    missing = rank_set - set(guesses)
+    if missing:
+        raise SystemExit(
+            "%d word(s) in the ranking list are not legal guesses, so they "
+            "could never be played: %s"
+            % (len(missing), ", ".join(sorted(missing)[:5])))
+    keep = [i for i in keep if guesses[i] in rank_set]
 order = sorted(keep, key=lambda i: (-singles[i], guesses[i]))
 os.makedirs(OUT_DIR, exist_ok=True)
 with open(OUT, "w") as f:
     f.write("# singleton feedback patterns per guess, over %d answers (%s)%s\n"
             % (len(answers), "all words" if FULL else "the 2315 mystery answers",
-               "; ranking restricted to answer words" if ANSWERS_ONLY else ""))
+               ("; ranking restricted to answer words" if ANSWERS_ONLY else
+                "; ranking restricted to %s" % WORD_LIST if WORD_LIST else "")))
     f.write("word,singletons,singletons_nowin,rank\n")
     for r, i in enumerate(order, 1):
         f.write("%s,%d,%d,%d\n" % (guesses[i], singles[i], nowin[i], r))
 
 print("%d guesses x %d answers, %d patterns, %.1fs%s" %
       (len(guesses), len(answers), NPAT, time.time() - t0,
-       "  (ranking %d answer words)" % len(order) if ANSWERS_ONLY else ""))
+       "  (ranking %d of %d words)" % (len(order), len(guesses))
+       if (ANSWERS_ONLY or WORD_LIST) else ""))
 print("wrote %s\n" % os.path.relpath(OUT, _MATH))
 print("%7s %12s %14s %8s" % ("word", "singletons", "singletons_nowin", "rank"))
 for r, i in enumerate(order[:TOP], 1):
@@ -114,4 +146,5 @@ for r, i in list(enumerate(order, 1))[-3:]:
 kept = singles[list(order)]
 print("\nmean %.1f, median %d, max %d, min %d over %d %s"
       % (kept.mean(), int(np.median(kept)), kept.max(), kept.min(), len(kept),
-         "answer words" if ANSWERS_ONLY else "guesses"))
+         "answer words" if ANSWERS_ONLY else
+         (WORD_LIST + " words") if WORD_LIST else "guesses"))

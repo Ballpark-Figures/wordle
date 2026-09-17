@@ -142,6 +142,7 @@ PAIRFROM=""         # which pair ranking to extend; default is the widest on dis
 TRIPFROM=""         # which triple ranking to extend; default is the widest on disk
 THREADS=0           # 0 = let OpenMP pick, which is right on both machines
 ANSWERS=0           # --answers: only the 2315 answer words may open
+WORDS=""            # --words LIST: only that list's words may open
 DISJOINT=0          # --disjoint: every word of the opener shares no letter
 MINLET=0            # --min-letters N: at least N distinct letters in the opener
 DISJTRI=0           # --disjoint-triples: disjoint PARENTS only, 4th word free
@@ -163,6 +164,7 @@ while [ $# -gt 0 ]; do
         --triples-from) TRIPFROM="$2"; shift 2 ;;
         --threads)    THREADS="$2";  shift 2 ;;
         --answers)    ANSWERS=1;     shift ;;
+        --words)      WORDS="$2";    shift 2 ;;
         --disjoint)   DISJOINT=1;    shift ;;
         --min-letters) MINLET="$2";  shift 2 ;;
         --disjoint-triples) DISJTRI=1; shift ;;
@@ -183,8 +185,9 @@ done
 # invalidate.  BIGTOP just has to exceed any of them.
 BIGTOP=100000000
 
-if [ "$EXHAUSTIVE" = 1 ] && [ "$ANSWERS" = 0 ] && [ "$DISJOINT" = 0 ]; then
-    echo "--exhaustive needs --answers or --disjoint: extending all 84129906" >&2
+if [ "$EXHAUSTIVE" = 1 ] && [ "$ANSWERS" = 0 ] && [ -z "$WORDS" ] \
+        && [ "$DISJOINT" = 0 ]; then
+    echo "--exhaustive needs --answers, --words or --disjoint: extending all 84129906" >&2
     echo "unrestricted pairs by 12972 words each is roughly a day and a half," >&2
     echo "which is not a run anyone should start by accident." >&2
     exit 1
@@ -200,11 +203,43 @@ DFLAG=""
 # it rather than the 12972 they used to hardcode: under --answers an
 # "unrestricted" last word still comes from the 2315 answers, and saying 12972
 # there described a run that was not happening.
+# WHICH WORDS MAY OPEN.  --answers is the original two-way choice and keeps its
+# own suffix, because every committed `_answers` file is named by it; --words is
+# the general form the same mechanism always supported (pairsplit has taken
+# --guess-list all along -- only this wrapper limited it to two lists).
+#
+# RESTRICTING HERE IS NOT THE SAME AS FILTERING THE RESULT, and that is the whole
+# point of having it: a ranking is a capped top-N of an enormous screen, so
+# filtering it afterwards keeps only the qualifying rows that happened to make
+# that cap.  The quad file is the top 100000 of 1758571509 scored quads, of which
+# 3.23% are all-custom -- so a read-time filter can never yield more than ~3230
+# however large a --top is asked for.  Screening over the list instead spends the
+# whole cap on qualifying openings.
 NOPEN=12972
-[ "$ANSWERS" = 1 ] && NOPEN=2315
 if [ "$ANSWERS" = 1 ]; then
+    [ -n "$WORDS" ] && {
+        echo "--answers and --words are the same choice; pass only one" >&2
+        echo "  (--answers is exactly --words mystery, under its own file name)" >&2
+        exit 1; }
     SUF="_answers"
     GLIST="--guess-list data/shared/words/mystery.txt"
+    NOPEN=$(grep -c . data/shared/words/mystery.txt)
+elif [ -n "$WORDS" ]; then
+    case "$WORDS" in
+        */*|*.txt) WLIST="$WORDS" ;;
+        *)         WLIST="data/shared/words/$WORDS.txt" ;;
+    esac
+    [ -f "$WLIST" ] || {
+        echo "--words: no such list: $WLIST" >&2
+        echo "give a stem in data/shared/words or a path:" >&2
+        ls -1 data/shared/words/*.txt 2>/dev/null | sed 's/^/  /' >&2
+        exit 1; }
+    WNAME=$(basename "$WLIST" .txt)
+    # mystery under --words is the SAME search --answers already names, so it
+    # keeps that name rather than making a second set of files for one question.
+    if [ "$WNAME" = mystery ]; then SUF="_answers"; else SUF="_$WNAME"; fi
+    GLIST="--guess-list $WLIST"
+    NOPEN=$(grep -c . "$WLIST")
 fi
 if [ "$DISJOINT" = 1 ]; then
     SUF="${SUF}_disjoint"
@@ -317,7 +352,7 @@ cd "$MATH" || exit 1
 mkdir -p "$SHARED" "$LOC"
 
 # BSD date has no -Is; this form works on both macOS and Linux.
-echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] singleton ranking, stage=$STAGE top=$TOP pairs-top=$PAIRSTOP answers=$ANSWERS exhaustive=$EXHAUSTIVE" \
+echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] singleton ranking, stage=$STAGE top=$TOP pairs-top=$PAIRSTOP openers=${SUF:-all}($NOPEN) exhaustive=$EXHAUSTIVE" \
     | tee -a "$LOC/singles.log"
 
 if [ "$STAGE" = words ] || [ "$STAGE" = both ] || [ "$STAGE" = all ]; then
@@ -328,6 +363,9 @@ if [ "$STAGE" = words ] || [ "$STAGE" = both ] || [ "$STAGE" = all ]; then
     [ -x ../.venv/bin/python ] && PY=../.venv/bin/python
     AFLAG=""
     [ "$ANSWERS" = 1 ] && AFLAG="--answers"
+    # the word stage ranks single openers; --words restricts which are LISTED,
+    # exactly as --answers does, and singletons.py takes the list directly
+    [ -n "$WORDS" ] && AFLAG="--word-list $WLIST"
     "$PY" tools/singletons.py $AFLAG 2>&1 | tee -a "$LOC/singles.log"
 fi
 

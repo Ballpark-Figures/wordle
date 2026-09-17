@@ -1401,6 +1401,25 @@ Carlo, so its numbers carry a standard error and are not comparable with any
     exhaustive vs truncated) and those are DIFFERENT QUESTIONS, not variants of one —
     so the wrapper lists what is on disk and makes the user pick with `--openers-from`
     rather than guessing. Settle which quad ranking is canonical before wiring one in.
+  - **`--words <list>` RESTRICTS WHICH WORDS MAY OPEN, at every stage** (added
+    2026-09-17, user's call) — a stem in `data/shared/words` or a path, on
+    `run-singles.sh` and (as `--word-list`) on `tools/singletons.py`. **The
+    mechanism always existed**: `pairsplit` has taken `--guess-list` all along
+    and the wrapper simply limited it to two lists. `--answers` is exactly
+    `--words mystery` and KEEPS ITS OWN `_answers` file names, because every
+    committed file is named by it; passing both is refused. Every other list
+    gets `_<stem>`, which flows through the pair, triple, quad and quint
+    filenames, so a restricted chain cannot overwrite or be mistaken for the
+    unrestricted one.
+    - **THIS IS THE DIFFERENCE BETWEEN A TOP-N OF QUALIFYING OPENINGS AND A
+      FILTERED TOP-N.** Restricting at screen time spends the whole `--top` cap
+      on openings that qualify; filtering the committed ranking afterwards
+      cannot exceed what survived ITS cap (3230 all-custom quads, of 100000
+      written from 1.76 billion scored).
+    - VERIFIED at the C level: `--guess-list custom.txt` ranks **9165621**
+      unordered pairs, exactly `C(4282, 2)`, against 84129906 unrestricted — a
+      9.2x smaller pair space. The unrestricted `guess_singletons.csv` is
+      byte-identical after the change, so the generalisation is inert.
   - **WORDS AND PAIRS ARE EXHAUSTIVE; TRIPLES AND QUADS ARE GREEDY SCREENS**
     (`solver/run-singles.sh` says so). So `clint soare` IS the top pair, but a
     triple/quad head is "best of those screened" — never call such a run "the best
@@ -1818,6 +1837,16 @@ CSV row per word, flushed).
   path, on `run-wordle-sweep.sh`, `run-wordle-race.sh` and `tools/opening_list.py`.
   It exists to pair an opening pool with a follow-up drawing from the SAME list, so
   the strategy is one player who knows one list rather than two.
+  - **IT CANNOT MANUFACTURE OPENINGS THE RANKING DOES NOT HOLD, and for quads it
+    runs out.** A singletons ranking is a CAPPED top-N of an enormous screen —
+    the quad file is the best **100000 of 1758571509** scored quads (its `.meta`
+    says `written=100000 complete=0`) — so filtering it afterwards keeps only the
+    qualifying rows that happened to make that cap. MEASURED: 3230 all-custom
+    quads exist in it, so **no `--top` can ever yield more**, and a "top 10000
+    all-custom quads" does not exist to be read. **The fix is to screen over the
+    list in the first place** — see `--words` on `run-singles.sh` — which spends
+    the whole cap on qualifying openings. Read-time filtering stays right for a
+    ranking you do not want to regenerate.
   - **A REJECTED ROW DOES NOT SPEND THE `--top` BUDGET.** `--top N` keeps meaning
     "N openings examined" with and without the filter; the screen keeps its width
     and reads DEEPER into the ranking to fill it. The scan reports how deep it
