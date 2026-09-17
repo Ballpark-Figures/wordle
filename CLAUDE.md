@@ -2381,9 +2381,39 @@ moment that becomes true, and the survivors double.
   hundred games can push a better opener out. The head of a race is **the best of
   the openers ENTERED, judged on the games actually played** — never "the best
   opener". The generous cut is a mitigation, not a proof.
-- **IT RANKS ON THE MEAN ONLY.** The win rate is reported per opener; nothing
-  cuts on it. The sweep's parallel `--rank win_rate` is deliberately absent
-  rather than half-built.
+- **IT RANKS ON THE MEAN *OR* THE WIN RATE — `--rank`, the sweep's own flag**
+  (added 2026-09-17, user's call; it had been deliberately left out rather than
+  half-built). Two different questions of the same games, which need not agree,
+  so they are two different races: the ranking is in the stem (`_win`), in the
+  `# settings` line and in the NAME of the value column, and whichever is not
+  ranked rides along beside it, reported and never cut on.
+  - **THE DRIVER STILL MINIMISES — each game scores 1 for a LOSS and 0 for a win**,
+    so the race ranks a LOSS rate and the standings report its complement. That is
+    not presentation: `race_stats` is shared with the multiwordle race, and
+    inverting at the source is what keeps it meaning exactly what it meant there.
+    Everything the console and the elimination log SHOW goes through an opt-in
+    `display` hook that defaults to the identity, so the multiwordle race is
+    byte-identical (`checkmultiwordle.py` passes unchanged).
+  - **THE PLUS-FOUR PROBLEM DOES NOT ARISE HERE, unlike in the sweep.** The cut is
+    on the PAIRED difference of two indicators, which lives in `{-1, 0, 1}` and
+    whose spread is set by how often two openers DISAGREE — not by how close
+    either rate is to 1, which is exactly what `sqrt(p(1-p)/n)` loses at the
+    ceiling. `race_stats.paired_error`'s docstring says so; it used to justify
+    this by "the difference of two guess COUNTS", which stopped covering the case
+    the moment a score could be an indicator.
+  - **Under win-rate ranking the checkpoint carries an EXTRA accumulator** (the
+    guess total, so the mean stays reportable — the mirror of `wins` under mean
+    ranking). It is added ONLY in that mode, so a mean race's checkpoint format,
+    and any halted mean race resuming into it, are untouched.
+  - **A FREE ORACLE, asserted at every write**: the reported win rate comes from
+    the driver's mean of the indicator, and `wins` from a tally of the raw guess
+    counts against the same threshold — two independent routes to one number, and
+    they must agree. It is what caught both mutations when the flag was built.
+  - Gated in `checkwordlesim.py`: a win-rate race's value column is NAMED
+    `win_rate`, the mean race's columns have not moved, an UNCUT race's every
+    win rate and mean guesses equal the same games recomputed from `play_chunk`,
+    a resume still changes nothing, and **coverage FAILS unless the two rankings
+    actually ordered the field differently**.
 - **`--fallback` is REQUIRED and `--second-from` is the other half of the
   strategy** — with a table every opener plays its own predetermined second word
   at the threshold, without one the opener is blind and the follow-up takes over.

@@ -339,14 +339,14 @@ def main(argv):
     # as a different draw the moment the two sides' live sets differ in size.
     custom = load_words("custom")
     custom_set = set(custom)
-    crule, ctail_name = make_strategy("random-custom", guesses, answers, ans2g)
-    ctail = make_tail(ctail_name, guesses, answers, ans2g)
-    if ctail_name != "custom":
+    crule, cust_tail_name = make_strategy("random-custom", guesses, answers, ans2g)
+    cust_tail = make_tail(cust_tail_name, guesses, answers, ans2g)
+    if cust_tail_name != "custom":
         failures.append("strategy 'random-custom' resolved to the %r follow-up"
-                        % ctail_name)
-    if ctail.pool_size != len(custom):
+                        % cust_tail_name)
+    if cust_tail.pool_size != len(custom):
         failures.append("the custom follow-up's pool is %d words, the list is %d"
-                        % (ctail.pool_size, len(custom)))
+                        % (cust_tail.pool_size, len(custom)))
     # The precondition the termination argument rests on, checked here rather
     # than assumed: every answer is in the pool, so it can never be filtered out.
     if not set(answers) <= custom_set:
@@ -363,7 +363,7 @@ def main(argv):
                             "answers" % seed)
             break
         answer = answers[a_fast]
-        played, replies = play_game(pat, ans2g, a_fast, crule, ctail, fast_rng)
+        played, replies = play_game(pat, ans2g, a_fast, crule, cust_tail, fast_rng)
         words = [guesses[g] for g in played]
         ref_words, _ = refplay_game(custom, answer, ref_rng)
         if words != ref_words:
@@ -400,7 +400,7 @@ def main(argv):
         a_g = draw_answer(len(answers), gr)
         a_c = draw_answer(len(answers), cr)
         gw = [guesses[i] for i in play_game(pat, ans2g, a_g, None, gtail, gr)[0]]
-        cw = [guesses[i] for i in play_game(pat, ans2g, a_c, None, ctail, cr)[0]]
+        cw = [guesses[i] for i in play_game(pat, ans2g, a_c, None, cust_tail, cr)[0]]
         custom_differed += gw != cw
     print("the custom pool is not the guess pool: %d of %d identically-seeded "
           "games diverged" % (custom_differed, guess_games))
@@ -987,19 +987,21 @@ def main(argv):
             if os.path.exists(q):
                 os.remove(q)
 
-    def rrun(tag, max_games, pair_at, chunk):
+    def rrun(tag, max_games, pair_at, chunk, rank="mean", sigma="2"):
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
             wrace.main(["--fallback", "answer", "--words", rfield,
                         "--max-games", str(max_games), "--pair-at", str(pair_at),
                         "--chunk", str(chunk), "--report", "1e9", "--seed", "3",
-                        "--sigma", "2", "--out", rpaths(tag)[0]])
+                        "--rank", rank,
+                        "--sigma", sigma, "--out", rpaths(tag)[0]])
         return buf.getvalue()
 
     def rbody(tag):
         return [ln for ln in open(rpaths(tag)[0]) if not ln.startswith("# race_")]
 
-    for tag in ("whole", "split", "switch", "chunky", "pairsplit"):
+    for tag in ("whole", "split", "switch", "chunky", "pairsplit",
+                "win", "winsplit", "winall"):
         rwipe(tag)
     rsaid = {}
     rsaid["whole"] = rrun("whole", 800, 0, 5)
@@ -1061,7 +1063,89 @@ def main(argv):
     print("a race's standings parse as a sweep's (%d live rows the cut can read)"
           % len(rrows))
 
-    for tag in ("whole", "split", "switch", "chunky", "pairsplit"):
+    # --- the race's OTHER ranking: win rate, the same games asked differently -
+    # The driver ranks a LOSS rate so that lower still wins, and the standings
+    # report the complement.  So the load-bearing question is whether the number
+    # that comes out is the win rate of the games actually played -- recomputed
+    # here from the raw guess counts of those same games, never from the race's
+    # own accumulators.
+    rsaid["win"] = rrun("win", 800, 0, 5, rank="win_rate")
+    wmeta = read_sweep_settings(rpaths("win")[0])
+    if wmeta["rank"] != "win_rate":
+        failures.append("a win-rate race's settings line does not say so")
+    whead = [ln for ln in open(rpaths("win")[0]) if ln.startswith("word,")][0]
+    if not whead.startswith("word,trials,win_rate,win_rate_stderr,"):
+        failures.append("a win-rate race names its value column %r, so every "
+                        "reader asking for win_rate fails on it"
+                        % whead.strip().split(",")[2])
+    mhead = [ln for ln in open(rpaths("whole")[0]) if ln.startswith("word,")][0]
+    if not mhead.startswith("word,trials,mean,stderr,"):
+        failures.append("the MEAN race's columns moved; files written before "
+                        "--rank existed no longer parse the same way")
+
+    # WITH NOBODY ELIMINATED every opener has played the identical games, so each
+    # one's win rate can be recomputed outright.  (A race that cuts leaves the
+    # field on different game counts, which is a different and weaker check.)
+    rsaid["winall"] = rrun("winall", 200, 0, 5, rank="win_rate", sigma="1e9")
+    wdata = [r.split(",") for r in rbody("winall")
+             if not r.startswith("#") and not r.startswith("word,")]
+    wfield = [ln.split() for ln in open(rfield) if ln.strip()]
+    wpos = {w: i for i, w in enumerate(guesses)}
+    wrules = [make_opening_rule([wpos[o[0]]], tail=ctail, adapt=0)
+              for o in wfield]
+    wans, wfl = wrace.make_games(len(answers), 3, 0, 200, wrace.FLIPS)
+    wsc = wrace.play_chunk(pat, ans2g, wrules, ctail, wans, wfl)
+    want = {" ".join(o): float((wsc[i] <= WIN_WITHIN).mean())
+            for i, o in enumerate(wfield)}
+    wmean = {" ".join(o): float(wsc[i].mean()) for i, o in enumerate(wfield)}
+    wbad = 0
+    for c in wdata:
+        if c[8] != "live":
+            continue
+        if abs(float(c[2]) - want[c[0]]) > 1e-9:
+            wbad += 1
+        if abs(float(c[7]) - wmean[c[0]]) > 1e-9:
+            wbad += 1
+    if len(wdata) != len(wfield):
+        failures.append("the uncut win-rate race lost %d opener(s), so every "
+                        "opener did NOT play the same games"
+                        % (len(wfield) - len(wdata)))
+    if wbad:
+        failures.append("%d win-rate/mean cell(s) disagree with the same games "
+                        "replayed from play_chunk" % wbad)
+    else:
+        print("win-rate race: all %d openers' win rates AND mean guesses equal "
+              "the same games recomputed independently" % len(wdata))
+
+    # A RESUME MUST STILL CHANGE NOTHING under the other ranking -- it carries an
+    # extra accumulator in the checkpoint that the mean race does not have, and
+    # an extra rebound rather than filled in place is exactly the bug that
+    # reaches only the reported numbers.
+    rrun("winsplit", 400, 0, 5, rank="win_rate")
+    rsaid["winsplit"] = rrun("winsplit", 800, 0, 5, rank="win_rate")
+    if rbody("winsplit") != rbody("win"):
+        failures.append("a win-rate race resumed from its checkpoint does not "
+                        "equal an uninterrupted one")
+    if "resuming" not in rsaid["winsplit"]:
+        failures.append("the resumed win-rate race started over")
+
+    # COVERAGE: the flag must actually RANK DIFFERENTLY, or none of the above
+    # distinguishes it from the mean race it was copied from.
+    worder = [c[0] for c in wdata]
+    morder = [c[0] for c in
+              sorted(wdata, key=lambda c: float(c[7]))]
+    if worder == morder:
+        failures.append("the win-rate ranking put the field in the same order "
+                        "as the mean would have, so --rank was never shown to "
+                        "do anything (this field cannot distinguish them)")
+    else:
+        moved = sum(1 for x, y in zip(worder, morder) if x != y)
+        print("the two rankings genuinely differ: %d of %d openers sit in a "
+              "different place (%s leads on win rate, %s on mean guesses)"
+              % (moved, len(worder), worder[0], morder[0]))
+
+    for tag in ("whole", "split", "switch", "chunky", "pairsplit",
+                "win", "winsplit", "winall"):
         rwipe(tag)
     os.remove(rfield)
 

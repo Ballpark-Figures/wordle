@@ -41,9 +41,14 @@
 # race REFUSES a table with no row for an opener in the field -- which is what
 # stops the answers-only table being raced over the 12972.
 #
-# IT RANKS ON THE MEAN.  The win rate is reported per opener but nothing cuts on
-# it; the sweep's parallel --rank win_rate has no analogue here and is left out
-# rather than half-built.
+# --rank mean|win_rate, the sweep's own flag and the same parallel ranking: two
+# different questions of the same games, which need not agree, so they are two
+# different races and the ranking is in the stem, the settings line and the name
+# of the value column.  Under win_rate each game scores 1 for a loss and 0 for a
+# win, so the race still MINIMISES and the standings report the complement; the
+# cut is on the paired difference of those indicators, whose error comes from how
+# often two openers disagree, so the ceiling that forces the SWEEP to a plus-four
+# error cannot bite here.  Whichever is ranked, the other is reported beside it.
 #
 # THE TAIL IS THE EXPENSIVE PART, not the field.  The first block is every opener
 # x 100 games and takes a couple of minutes; the field then collapses, and what
@@ -65,6 +70,7 @@ TOP=""
 SECONDFROM=""
 SEED=0
 SIGMA=5
+RANK=mean
 BLOCK=100
 GROWTH=2
 MAXGAMES=""
@@ -82,6 +88,7 @@ while [ $# -gt 0 ]; do
         --second-from)    SECONDFROM="$2"; shift 2 ;;
         --seed)           SEED="$2";       shift 2 ;;
         --sigma)          SIGMA="$2";      shift 2 ;;
+        --rank)           RANK="$2";       shift 2 ;;
         --block)          BLOCK="$2";      shift 2 ;;
         --growth)         GROWTH="$2";     shift 2 ;;
         --max-games)      MAXGAMES="$2";   shift 2 ;;
@@ -102,6 +109,11 @@ case "$FALLBACK" in
 esac
 case "$SEED" in
     ''|*[!0-9]*) echo "--seed must be a non-negative number" >&2; exit 1 ;;
+esac
+case "$RANK" in
+    mean|win_rate) ;;
+    *) echo "--rank must be 'mean' or 'win_rate' -- two different questions of" >&2
+       echo "  the same games, so they are different races" >&2; exit 1 ;;
 esac
 
 cd "$MATH" || exit 1
@@ -130,6 +142,7 @@ if [ -n "$SECONDFROM" ]; then
 fi
 
 FLAGS="--fallback $FALLBACK --seed $SEED --sigma $SIGMA --block $BLOCK --growth $GROWTH"
+FLAGS="$FLAGS --rank $RANK"
 [ -z "$OPENFROM" ]   || FLAGS="$FLAGS --openings-from $OPENFROM"
 [ -n "$OPENFROM" ]   || FLAGS="$FLAGS --words $WORDS"
 [ -z "$TOP" ]        || FLAGS="$FLAGS --top $TOP"
@@ -155,6 +168,7 @@ echo "  openers    $NOPEN from ${OPENFROM:-$WORDS}${TOP:+ (top $TOP)}"
 echo "  follow-up  $FALLBACK"
 [ -z "$SECONDFROM" ] && echo "  rule       blind opener, then the follow-up" \
                      || echo "  rule       gray-second, table $SECONDFROM"
+echo "  ranked on  $RANK$([ "$RANK" = win_rate ] && echo " (higher better; the mean is reported, never cut on)")"
 echo "  cut        $SIGMA paired sigma; blocks of $BLOCK then x$GROWTH; seed $SEED"
 echo "  out        $OUT"
 echo "  log        $LOC/$STEM.log"

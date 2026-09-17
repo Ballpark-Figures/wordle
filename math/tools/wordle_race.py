@@ -42,10 +42,20 @@ generous cut is a mitigation, not a proof, and it is why `--sigma` is a flag.  A
 race is still a SCREEN: its winner is the best of the openers ENTERED, judged on
 the games actually played.
 
-IT RANKS ON THE MEAN, and only on the mean.  The sweep's parallel `--rank
-win_rate` has no analogue here and is deliberately absent rather than
-half-built: the win rate is still reported per opener in the standings, but
-nothing cuts on it.
+IT RANKS ON THE MEAN OR ON THE WIN RATE -- `--rank`, the sweep's own flag, and
+the same parallel ranking.  They are two different questions of the same games
+and need not agree, so they are two different races: the ranking is in the stem
+(`_win`), in the `# settings` line and in the NAME of the value column, and the
+other number rides along beside it, reported and never cut on.
+
+  HOW THE WIN RATE IS RANKED, since the driver's contract is that LOWER wins:
+  each game scores 1 for a loss and 0 for a win, so the race minimises the LOSS
+  rate and the standings report its complement.  That is not a presentation
+  trick -- it is what keeps `race_stats` meaning exactly what it means for the
+  multiwordle race, which runs the same driver.  It also disposes of the
+  ceiling problem that forces the SWEEP to use a plus-four error: the paired
+  difference of two indicators is in {-1, 0, 1}, and its spread is set by how
+  often two openers DISAGREE rather than by how close either rate is to 1.
 
 THE FOLLOW-UP IS AN INPUT AND IS NEVER DEFAULTED, as everywhere else in
 wordlesim: `--fallback answer` and `--fallback guess` feed the opener to two
@@ -79,8 +89,20 @@ from wordlesim import (WIN_WITHIN, TAILS, CoupledDraw,  # noqa: E402
                        answer_to_guess, draw_answer, make_opening_rule,
                        make_tail, play_game, second_rule_for, tail_names)
 
-COLUMNS = ("word,trials,mean,stderr,diff_vs_leader,paired_stderr,sigma,"
-           "win_rate,status,is_answer")
+# THE VALUE COLUMN IS NAMED AFTER THE RANKING, and the other number rides along
+# beside it.  This is paired_compare.py's scar: it wrote `mean` whatever was
+# ranked, so a win-rate file carried a win rate in a column called `mean` and
+# every reader asking for `win_rate` failed on it.  A column name that lies is
+# worse than one that is missing.
+def columns_for(rank):
+    if rank == "win_rate":
+        return ("word,trials,win_rate,win_rate_stderr,diff_vs_leader,"
+                "paired_stderr,sigma,mean,status,is_answer")
+    return ("word,trials,mean,stderr,diff_vs_leader,paired_stderr,sigma,"
+            "win_rate,status,is_answer")
+
+
+COLUMNS = columns_for("mean")
 ELIM_COLUMNS = "word,trials,mean,diff_vs_leader,paired_stderr,sigma,leader"
 
 # Kept apart from the answer-draw stream so one opener's coin flips can never
@@ -123,7 +145,7 @@ def parse_args(argv):
         "second_from": "", "seed": 0, "sigma": 5.0, "block": 100, "growth": 2.0,
         "out": None, "max_games": None, "pair_at": 2000, "chunk": 0,
         "max_mem": 2.0, "report": 60.0, "checkpoint": 30.0, "dry_run": False,
-        "win_within": WIN_WITHIN,
+        "win_within": WIN_WITHIN, "rank": "mean",
     }
     ints = {"seed", "block", "pair_at", "chunk", "top", "max_games", "win_within"}
     floats = {"sigma", "growth", "max_mem", "report", "checkpoint"}
@@ -156,6 +178,11 @@ def parse_args(argv):
             "opener hands the rest of the game to.\nIt is part of the question, "
             "and it is in the result filename.\n" % ", ".join(tail_names()) +
             "Use the wrapper: bash solver/run-wordle-race.sh --fallback answer")
+    if a["rank"] not in ("mean", "win_rate"):
+        raise SystemExit(
+            "--rank must be 'mean' or 'win_rate' -- two different questions of "
+            "the same games,\n  so they are different races and the file says "
+            "which")
     if a["out"] == "--print-stem":
         return a
     if a["out"] is None:
@@ -225,7 +252,8 @@ class Player:
     rate is REPORTED per opener even though nothing cuts on it.
     """
 
-    def __init__(self, pat, ans2g, rules, tail, na, win_within, wins, chunk):
+    def __init__(self, pat, ans2g, rules, tail, na, win_within, wins, chunk,
+                 rank="mean", gsum=None):
         self.pat = pat
         self.ans2g = ans2g
         self.rules = rules
@@ -234,21 +262,52 @@ class Player:
         self.win_within = win_within
         self.wins = wins
         self.chunk = chunk
+        self.rank = rank
+        self.gsum = gsum      # total guesses, carried only when ranking on wins
+        self.raw = None       # the guess counts behind the last `play`
         self.nf = FLIPS
 
     def make_games(self, seed, g0, g1):
         return make_games(self.na, seed, g0, g1, self.nf)
 
     def play(self, ids, games):
-        return play_chunk(self.pat, self.ans2g, [self.rules[i] for i in ids],
-                          self.tail, games[0], games[1])
+        """The per-game score the driver ranks on, LOWER BETTER.
+
+        Under `win_rate` that is the LOSS indicator, not the win rate: the
+        driver's whole contract is that smaller wins, and inverting it here
+        keeps `race_stats` -- which the multiwordle race also runs -- meaning
+        exactly what it meant.  The rate is recovered as `1 - mean` where the
+        standings are written, and the per-game difference of two indicators is
+        what the cut then uses, so its error comes from how often two openings
+        DISAGREE rather than from how close either rate is to 1.
+
+        The guess counts stay on `self.raw` for `record`, so whichever number is
+        not being ranked is still REPORTED.  `play` may be retried after a
+        Regrow; each attempt overwrites `raw`, and only the attempt that returns
+        is the one `record` is then called for.
+        """
+        raw = play_chunk(self.pat, self.ans2g, [self.rules[i] for i in ids],
+                         self.tail, games[0], games[1])
+        self.raw = raw
+        if self.rank == "win_rate":
+            return (raw > self.win_within).astype(np.int16)
+        return raw
 
     def regrow(self):
         self.nf *= 2
         print("  (coin-flip array regrown to %d)" % self.nf)
 
     def record(self, ids, sc, g0, g1):
-        self.wins[ids] += (sc <= self.win_within).sum(axis=1)
+        """Accumulate BOTH numbers, whichever one the driver just ranked on.
+
+        `sc` is the ranked score; `self.raw` is the guess counts it came from.
+        The shapes must agree -- if they ever did not, `raw` would belong to a
+        different chunk and every reported extra would be quietly wrong.
+        """
+        assert self.raw is not None and self.raw.shape == sc.shape
+        self.wins[ids] += (self.raw <= self.win_within).sum(axis=1)
+        if self.gsum is not None:
+            self.gsum[ids] += self.raw.sum(axis=1, dtype=np.int64)
 
     def chunk_size(self, ids, n_games, target, seed):
         """None: use the driver's measured default.
@@ -311,6 +370,11 @@ def stem_for(a, list_name, table):
         stem += "_%s-%s" % (table.fire, table.seconds)
     if a["win_within"] != WIN_WITHIN:
         stem += "_w%d" % a["win_within"]
+    if a["rank"] == "win_rate":
+        # A win-rate race and a mean race over the same field are two different
+        # experiments; sharing a stem would mean sharing a CHECKPOINT and each
+        # resuming into the other.  The sweep marks the same distinction `_win`.
+        stem += "_win"
     return stem
 
 
@@ -398,24 +462,35 @@ def main(argv):
     rules = build_rules(field, guesses, table, tail)
 
     wins = np.zeros(len(field), dtype=np.int64)
+    # Under win-rate ranking the driver's own mean is a LOSS RATE, so the mean
+    # guesses has to be accumulated to stay reportable -- the mirror of `wins`,
+    # which exists for the same reason under mean ranking.  It is added to the
+    # checkpoint ONLY in that mode, so a mean race's checkpoint format, and any
+    # halted mean race resuming into it, are untouched.
+    gsum = np.zeros(len(field), dtype=np.int64) if a["rank"] == "win_rate" else None
     player = Player(pat, ans2g, rules, tail, na, a["win_within"], wins,
-                    a["chunk"])
+                    a["chunk"], a["rank"], gsum)
     extra = {"wins": wins}
+    if gsum is not None:
+        extra["gsum"] = gsum
 
     def writer(status, elim_at, live, mean, ose, md, se, n_games, lead):
         write_standings(out, stem, a, names, status, elim_at, live, mean, ose,
                         md, se, extra["wins"], is_answer, n_games, lead,
-                        list_name, table)
+                        list_name, table, gsum)
 
     rs.run({k: a[k] for k in ("sigma", "block", "growth", "max_games",
                               "pair_at", "max_mem", "report", "checkpoint",
                               "chunk", "seed")},
            player, names, is_answer, writer, elim_path, ck_path, ELIM_COLUMNS,
-           noun="opener", extra=extra, stem=stem)
+           noun="opener", extra=extra, stem=stem,
+           # the driver ranks a loss rate; everything it SHOWS is the win rate
+           display=(lambda v: 1.0 - v) if a["rank"] == "win_rate" else rs._identity)
 
 
 def write_standings(out, stem, a, names, status, elim_at, live, mean, ose, md,
-                    se, wins, is_answer, n_games, lead, list_name, table):
+                    se, wins, is_answer, n_games, lead, list_name, table,
+                    gsum=None):
     """The standings, rewritten in full at every block.
 
     SWEEP-SHAPED LEADING COLUMNS -- word, trials, mean, stderr -- plus the same
@@ -426,7 +501,12 @@ def write_standings(out, stem, a, names, status, elim_at, live, mean, ose, md,
     """
     if not out:
         return
-    order = np.argsort(mean, kind="stable")
+    win = a["rank"] == "win_rate"
+    # `mean` is whatever the driver ranked on: guesses, or -- under win-rate
+    # ranking -- the LOSS rate, whose complement is the win rate.  The error is
+    # the same either way: a constant minus a variable has the variable's spread.
+    value = 1.0 - mean if win else mean
+    order = np.argsort(-value if win else value, kind="stable")
     tmp = out + ".tmp"
     with open(tmp, "w") as f:
         f.write("# %s -- single-board wordle opener RACE (tools/wordle_race.py)\n"
@@ -443,6 +523,14 @@ def write_standings(out, stem, a, names, status, elim_at, live, mean, ose, md,
         f.write("# NO guess cap: the mean is expected guesses OUTRIGHT, and "
                 "win_rate is the fraction\n# of those untruncated scores at %d "
                 "guesses or fewer\n" % a["win_within"])
+        if win:
+            f.write("# RANKED ON THE WIN RATE, higher better: each game scores "
+                    "1 for a loss and 0 for a\n# win, so the paired difference "
+                    "is a per-game win/lose difference and its error comes\n"
+                    "# from how often two openers DISAGREE, never from how close "
+                    "a rate is to 1.  The\n# mean guesses is reported beside it "
+                    "and nothing cuts on it -- a DIFFERENT ranking\n# of the "
+                    "same games, which need not agree\n")
         if table:
             f.write("# each opener plays the predetermined second word from %s "
                     "whenever its\n# reply fires %s (math/secondword.py; pools "
@@ -450,23 +538,49 @@ def write_standings(out, stem, a, names, status, elim_at, live, mean, ose, md,
                     % (a["second_from"], table.fire, table.openers,
                        table.seconds))
         f.write("# settings follow_up=%s pair_adaptive=0 win_within=%d "
-                "trials=%d seed=%d words=%d rank=mean second_table=%s "
+                "trials=%d seed=%d words=%d rank=%s second_table=%s "
                 "fire=%s\n"
                 % (a["fallback"], a["win_within"], n_games, a["seed"],
-                   len(names), a["second_from"] or "-",
+                   len(names), a["rank"], a["second_from"] or "-",
                    table.fire if table else "-"))
         f.write("# lineage root=%s pass=1 source=(race)\n" % list_name)
-        f.write(COLUMNS + "\n")
+        f.write(columns_for(a["rank"]) + "\n")
         for k in order:
             c = int(live[k])
             sig = md[k] / se[k] if se[k] > 0 else 0.0
+            # `md` is measured on the ranked score, so under win-rate ranking it
+            # is already leader-minus-this in win-rate terms -- a loss-rate
+            # excess IS a win-rate shortfall.  It needs no sign flip, which is
+            # the whole reason the indicator is inverted at the source.
+            other = (gsum[c] / n_games if win else wins[c] / n_games)
+            if win:
+                # A FREE ORACLE, so take it: `value` comes from the driver's mean
+                # of the loss indicator, `wins` from a tally of the raw guess
+                # counts against the same threshold -- two independent routes to
+                # one number.  They can only disagree if `raw` and the ranked
+                # score ever came from different chunks.
+                assert abs(wins[c] / n_games - value[k]) < 1e-9, (
+                    "win rate disagrees with the win tally for %s: %.9f vs %.9f"
+                    % (names[c], wins[c] / n_games, value[k]))
             f.write("%s,%d,%.6f,%.6f,%.6f,%.6f,%.3f,%.6f,%s,%d\n"
-                    % (names[c], n_games, mean[k], ose[k], md[k], se[k], sig,
-                       wins[c] / n_games, status[c], int(is_answer[c])))
+                    % (names[c], n_games, value[k], ose[k], md[k], se[k], sig,
+                       other, status[c], int(is_answer[c])))
         for c in np.flatnonzero(np.array(status) == "out"):
-            f.write("%s,%d,,,,,,%.6f,out,%d\n"
-                    % (names[int(c)], int(elim_at[c]),
-                       wins[c] / max(1, elim_at[c]), int(is_answer[int(c)])))
+            # The paired columns stay blank: they were measured against a leader
+            # this opener no longer runs behind, so they would be stale rather
+            # than merely absent.  Its OWN numbers are still true of the games it
+            # played.  Under win-rate ranking both are accumulated, so the ranked
+            # value is filled in; under mean ranking the guess total is not
+            # carried, which is why that column has always been blank there.
+            n_at = max(1, int(elim_at[c]))
+            if win:
+                f.write("%s,%d,%.6f,,,,,%.6f,out,%d\n"
+                        % (names[int(c)], int(elim_at[c]), wins[c] / n_at,
+                           gsum[c] / n_at, int(is_answer[int(c)])))
+            else:
+                f.write("%s,%d,,,,,,%.6f,out,%d\n"
+                        % (names[int(c)], int(elim_at[c]), wins[c] / n_at,
+                           int(is_answer[int(c)])))
     os.replace(tmp, out)
 
 

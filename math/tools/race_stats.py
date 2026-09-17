@@ -99,9 +99,14 @@ def paired_error(sum_d, sumsq_d, n):
 
     Zero variance is a real answer, not a degenerate one: two entries that scored
     identically in EVERY game have a difference of exactly 0 with no spread, and an
-    entry strictly worse in every game is eliminated on the mean alone.  This is
-    also where the win-rate ceiling problem of a proportion cannot arise -- the
-    difference of two guess COUNTS has no ceiling to be pinned against.
+    entry strictly worse in every game is eliminated on the mean alone.
+
+    THE WIN-RATE CEILING PROBLEM CANNOT ARISE HERE whatever the score is.  For
+    guess counts there is no ceiling to be pinned against; for the 0/1 indicator
+    the wordlesim race ranks on, the DIFFERENCE is in {-1, 0, 1} and its spread
+    is set by how often two entries DISAGREE, not by how close either rate is to
+    1 -- which is exactly what a proportion's own `sqrt(p(1-p)/n)` loses at p=1,
+    and why the sweep needs a plus-four error there and this does not.
     """
     md = sum_d / n
     if n < 2:
@@ -191,9 +196,21 @@ class Regrow(Exception):
 CHUNK_SECONDS = 2.0
 
 
+def _identity(v):
+    return v
+
+
 def run(cfg, player, names, is_answer, writer, elim_path, ck_path,
-        elim_columns, noun="opening", extra=None, stem=""):
+        elim_columns, noun="opening", extra=None, stem="", display=_identity):
     """Race `names` until one is left, `--max-games` is reached, or it is halted.
+
+    `display` maps the RANKED value to the one the console and the elimination
+    log show, for an adapter that ranks on an inverted score -- the wordlesim
+    race ranks a win rate as a LOSS rate so that lower stays better here, and
+    shows `1 - x`.  It defaults to the identity, so a caller that does not pass
+    it is byte-identical to before: this is a hook for one caller, NOT a change
+    of behaviour for every caller.  GAPS are never passed through it -- a
+    difference of ranked values is already "how far behind", in either sense.
 
     Returns (live, n_games).  `extra` is a dict of per-entry arrays the adapter
     wants carried in the checkpoint (a win count, say); it is updated in place
@@ -349,15 +366,15 @@ def run(cfg, player, names, is_answer, writer, elim_path, ck_path,
             elim_at[c] = n_games
             sig = md[pos] / se[pos] if se[pos] > 0 else float("inf")
             rows.append((c, "%s,%d,%.6f,%.6f,%.6f,%.3f,%s"
-                         % (names[c], n_games, mean[pos], md[pos], se[pos],
-                            sig, names[int(live[lead])])))
+                         % (names[c], n_games, display(mean[pos]), md[pos],
+                            se[pos], sig, names[int(live[lead])])))
             # EVERY elimination prints, one line each, as it happens.  The first
             # block of a full field drops thousands at once and that is a lot of
             # scrollback -- but it is what the run is watched FOR, so it is never
             # summarised or capped.  The log is tee'd, so nothing has to be
             # caught live.
             print("  OUT  %-14s %9.4f   %+.4f +/- %.4f  (%.1f sigma behind %s)"
-                  % (names[c], mean[pos], md[pos], se[pos], sig,
+                  % (names[c], display(mean[pos]), md[pos], se[pos], sig,
                      names[int(live[lead])]))
         if rows and elim_path:
             with open(elim_path, "a") as f:
@@ -387,8 +404,8 @@ def run(cfg, player, names, is_answer, writer, elim_path, ck_path,
         best_ans = [int(live[p]) for p in order if is_answer[int(live[p])]]
         print("%9d games  %6d live  leader %-14s %.4f (own se %.4f)  "
               "2nd is %.4f = %.1f paired sigma back  |  %s"
-              % (n_games, len(live), names[int(live[lead])], mean[lead],
-                 ose[lead], gap, sig2,
+              % (n_games, len(live), names[int(live[lead])],
+                 display(mean[lead]), ose[lead], gap, sig2,
                  ("best answer %s %s" % (noun, names[best_ans[0]])) if best_ans
                  else "NO answer %ss left" % noun))
 
