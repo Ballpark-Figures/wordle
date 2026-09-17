@@ -2535,6 +2535,53 @@ moment that becomes true, and the survivors double.
   resume, the pairwise switch and the chunk size all change nothing. Mutation-
   tested by seeding the games per chunk instead of per index.
 
+### `guarantee` — does an opening reach 100%?  EXACT, not simulated
+`math/guarantee.py` states the question and IS the source of truth;
+`tools/guarantee_sweep.py` is the driver. Run it with
+**`bash solver/run-guarantee.sh [--pool P] [--adapt N] --openings-from RANK.csv
+--top N`** (from `math/`), attached, tee'd log, `--dry-run`, resumable per opening.
+- **A 100% WIN RATE AND A GUARANTEE ARE THE SAME STATEMENT, which is the whole
+  point.** Every reachable draw of the random follow-up has POSITIVE probability
+  (it draws uniformly from a finite live set), so "probability 1" and "no
+  reachable draw sequence loses" coincide. `wordlesim` ESTIMATES the first; this
+  DECIDES the second — no seed, no standard error, and a re-run reproduces the
+  file byte for byte.
+- **IT IS NOT OPTIMAL PLAY, and the `max` is not a solver choosing well.** The
+  follow-up is the SAME random rule the race measures; the maximum is over what
+  it could unluckily DRAW. So it is not an `optturns`-family number either —
+  those are optima over a solver that chooses — and **never table a worst case
+  beside a wordlesim win rate or mean**, which AVERAGE over these same draws.
+- **The recursion:** `L(S,a) = 1` if `S == {a}`, else `1 + max over g in S, g != a
+  of L(S|g,a, a)`. It terminates because a word's reply against itself is
+  all-green, so playing one always eliminates it. An opening's worst case is the
+  largest `t + L(S,a)` over answers, `t` being how many opening words were
+  actually PLAYED — so **`--adapt` changes the budget per ANSWER, not per opening**.
+  Skipping `g == answer` is an OPTIMISATION, not the rule (mutation-verified inert).
+- **THE POOL IS PART OF THE QUESTION and is never defaulted in the tool** (the
+  wrapper carries a default a human reads). Under `custom` the follow-up can
+  spend a guess on a word that could never be the answer — which is what a worst
+  case is made of, and the whole difference from `mystery`. Pool, `--adapt` and
+  the cap are all in the filename.
+- **MEASURED 2026-09-17, and it explains the race exactly**: the race leader
+  `clown derby fight vamps` has a **worst case of 7** and **3 of 2315 answers that
+  CAN lose**, so it does NOT reach 100%. The witness is checkable by hand — the
+  opening leaves `odder order rodeo` live with two guesses left, and drawing
+  `rodeo` (1 in 3) separates nothing, leaving a coin flip. That predicts a loss
+  rate near 7e-5; the race measured **0.999922**, one loss in 12800. The exact
+  and sampled answers agree.
+- **COST: 0.06 s per opening**, all 2315 answers — so 3230 openings is ~3 minutes
+  and the full 100000-row quad ranking ~1.7 h, single-threaded.
+- **`python3 tools/checkguarantee.py` is the GATE**: a reference that keeps live
+  sets as LISTS OF WORDS, recomputes every reply FROM THE STRINGS and ENUMERATES
+  the draws rather than recursing on a sub-matrix, diffed over openings x two
+  `--adapt` settings x three caps; every witness line replayed from the strings
+  (each draw live, ending on its answer); and a COVERAGE tally that FAILS unless
+  guaranteed AND non-guaranteed cells both occurred and the adaptive rule
+  actually shortened an opening. Mutation-tested (an off-by-one in the
+  recursion, an inverted part filter, and `<` for `<=` in the adaptive threshold
+  were each caught).
+- Data under `math/data/shared/guarantee/`, log under `math/data/local/guarantee/`.
+
 ### `gray-second` — a PREDETERMINED second word, played only on enough greys
 A `wordlesim` strategy, and a table that feeds it (the user's, 2026-09-10): play
 an opener; if its reply shows **at least N grey tiles**, play a word committed to
