@@ -84,13 +84,14 @@ cd "$MATH" || exit 1
 
 DEPTH=6          # where the cap starts
 DEPTHMAX=19      # ceiling; MAXD-1 in optturns.c, raise both together
+ORDER=ssq        # ssq, lb or bisect -- bisect ONLY if asked for, see below
 
 PHASE=${1:-}
 shift 2>/dev/null
 case "$PHASE" in
     phase1) THREADS=14; TTBITS=24; NICE=(nice -n 19) ;;
     phase2) THREADS=20; TTBITS=29; NICE=() ;;
-    *) echo "usage: bash solver/run-hard-sweep.sh {phase1|phase2} [--threads N] [--tt-bits N]" >&2
+    *) echo "usage: bash solver/run-hard-sweep.sh {phase1|phase2} [--threads N] [--tt-bits N] [--depth N] [--depth-max N] [--order ssq|lb|bisect]" >&2
        echo "  phase1  share the machine with a running optturns sweep" >&2
        echo "  phase2  take the whole machine once optturns has finished" >&2
        exit 1 ;;
@@ -102,6 +103,7 @@ while [ $# -gt 0 ]; do
         --tt-bits)   TTBITS=$2;  shift 2 ;;
         --depth)     DEPTH=$2;   shift 2 ;;
         --depth-max) DEPTHMAX=$2; shift 2 ;;
+        --order)     ORDER=$2;   shift 2 ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
     esac
 done
@@ -167,26 +169,32 @@ fi
 # that character class, so copying it here would have silently broken the boundary
 # detection instead of fixing it.  %z gives -0400, which matches, and is the same
 # shape GNU's -Is already wrote -- so every log already on the desktop still parses.
-echo "[$(date +%Y-%m-%dT%H:%M:%S%z)] resuming wordle HARD sweep ($PHASE, threads=$THREADS, tt-bits=$TTBITS, depth=$DEPTH..$DEPTHMAX) $WARM" \
+echo "[$(date +%Y-%m-%dT%H:%M:%S%z)] resuming wordle HARD sweep ($PHASE, threads=$THREADS, tt-bits=$TTBITS, depth=$DEPTH..$DEPTHMAX, order=$ORDER) $WARM" \
     | tee -a "$LOC/sweep.log"
 
-# --order bisect: THIS SWEEP IS THE ONE THAT WANTS IT, and it is now the only
-# one that gets it.  The opener list is still sorted by split score; bisection
-# changes the DISPATCH to ends, median, quartiles, odd eighths, so the solved
-# subset is a stratified sample of the whole difficulty range at every moment
-# rather than a prefix of the easy end.  That is what makes this run's in-flight
-# percentiles, histogram and worst-list mean anything -- and reading the partial
-# distribution while it runs is the point of the hard sweep.
+# --order: FORWARDED FROM THE CALLER, NEVER CHOSEN HERE.  The default is ssq,
+# the binary's own default, and bisection is used ONLY when somebody types
+# `--order bisect` on this command line (the user's call, 2026-09-17).
 #
-# It COSTS early throughput (the second opener dispatched is the worst-
-# partitioned word in the list, so the incumbent that drives the lower-bound
-# cutoffs arrives late), which is exactly why it must be asked for and never
-# inherited.  It was hardcoded into both sweep call sites for a while, so every
-# other sweep silently paid that cost for reporting nobody was reading.
+# The bisection sorts by split score exactly as ssq does, then changes the
+# DISPATCH to ends, median, quartiles, odd eighths, so a stopped run is a
+# stratified sample of the whole difficulty range rather than a prefix of the
+# easy end.  That is worth buying only while somebody is READING the partial
+# distribution as the run goes, which is what the long escalating sweep was for.
+#
+# It COSTS early throughput -- the second opener dispatched is the worst-
+# partitioned word in the list, so the incumbent that drives every lower-bound
+# cutoff arrives late.  That is why it must always be asked for.  It was once
+# hardcoded into both sweep_order() call sites, so every sweep in the repo
+# silently paid that cost for reporting nobody was reading; it was then
+# hardcoded HERE instead, which was the same mistake one level out -- a pinned
+# `--depth N --depth-max N` decision run has no distribution to watch and wants
+# the incumbent early.
+#
 # ${NICE[@]+"${NICE[@]}"}, not "${NICE[@]}": phase2 sets NICE=(), and macOS bash
 # 3.2 treats an EMPTY array's expansion as an unbound variable under `set -u`
 # (bash 4.4+ does not), so the plain form aborted every phase2 run on a Mac.
-${NICE[@]+"${NICE[@]}"} ./solver/hardturns --sweep --order bisect \
+${NICE[@]+"${NICE[@]}"} ./solver/hardturns --sweep --order "$ORDER" \
     --out "$OUT" \
     --trees "$TRE" \
     --depth "$DEPTH" --depth-max "$DEPTHMAX" \
