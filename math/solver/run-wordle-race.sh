@@ -66,6 +66,7 @@ MATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FALLBACK=""
 WORDS="guess"
 OPENFROM=""
+OPENIN=""
 TOP=""
 SECONDFROM=""
 SEED=0
@@ -85,6 +86,7 @@ while [ $# -gt 0 ]; do
         --fallback)       FALLBACK="$2";   shift 2 ;;
         --words)          WORDS="$2";      shift 2 ;;
         --openings-from)  OPENFROM="$2";   shift 2 ;;
+        --openings-in)    OPENIN="$2";     shift 2 ;;
         --top)            TOP="$2";        shift 2 ;;
         --second-from)    SECONDFROM="$2"; shift 2 ;;
         --seed)           SEED="$2";       shift 2 ;;
@@ -151,6 +153,7 @@ FLAGS="--fallback $FALLBACK --seed $SEED --sigma $SIGMA --block $BLOCK --growth 
 FLAGS="$FLAGS --rank $RANK --pair-adaptive $ADAPT"
 [ -z "$OPENFROM" ]   || FLAGS="$FLAGS --openings-from $OPENFROM"
 [ -n "$OPENFROM" ]   || FLAGS="$FLAGS --words $WORDS"
+[ -z "$OPENIN" ]     || FLAGS="$FLAGS --openings-in $OPENIN"
 [ -z "$TOP" ]        || FLAGS="$FLAGS --top $TOP"
 [ -z "$SECONDFROM" ] || FLAGS="$FLAGS --second-from $SECONDFROM"
 [ -z "$MAXGAMES" ]   || FLAGS="$FLAGS --max-games $MAXGAMES"
@@ -170,7 +173,7 @@ LOC=data/local/wordlesim
 OUT="$OUTDIR/$STEM.csv"
 
 echo "wordle opener race"
-echo "  openers    $NOPEN from ${OPENFROM:-$WORDS}${TOP:+ (top $TOP)}"
+echo "  openers    $NOPEN from ${OPENFROM:-$WORDS}${TOP:+ (top $TOP)}${OPENIN:+, every word in $OPENIN}"
 echo "  follow-up  $FALLBACK"
 [ -z "$SECONDFROM" ] && echo "  rule       $([ "$ADAPT" -gt 0 ] && echo "opening, ABANDONED once the follow-up is down to $ADAPT" || echo "blind opener"), then the follow-up" \
                      || echo "  rule       gray-second, table $SECONDFROM"

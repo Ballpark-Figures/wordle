@@ -81,7 +81,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from build_patterns import load_patterns                        # noqa: E402
-from opening_list import read_openings                          # noqa: E402
+from opening_list import read_openings, resolve_word_set        # noqa: E402
 import race_stats as rs                                          # noqa: E402
 from secondword import read_table                               # noqa: E402
 from wordle import load_words                                   # noqa: E402
@@ -146,6 +146,7 @@ def parse_args(argv):
         "out": None, "max_games": None, "pair_at": 2000, "chunk": 0,
         "max_mem": 2.0, "report": 60.0, "checkpoint": 30.0, "dry_run": False,
         "win_within": WIN_WITHIN, "rank": "mean", "pair_adaptive": 0,
+        "openings_in": None,
     }
     ints = {"seed", "block", "pair_at", "chunk", "top", "max_games",
             "win_within", "pair_adaptive"}
@@ -210,12 +211,31 @@ def parse_args(argv):
 
 def load_field(a, guesses):
     """The openers to race, as lists of words, plus a name for the file stem."""
+    restrict = (resolve_word_set(a["openings_in"]) if a["openings_in"] else None)
     if a["openings_from"]:
-        field = read_openings(a["openings_from"], a["top"])
+        stats = {}
+        field = read_openings(a["openings_from"], a["top"], restrict, stats)
         name = os.path.basename(a["openings_from"])
         name = name[:-4] if name.endswith(".csv") else name
         if a["top"]:
             name += "_top%d" % a["top"]
+        if restrict is not None:
+            # STDERR, NOT STDOUT.  `--print-stem` parses this process's stdout,
+            # so an informational line there lands IN THE FILENAME -- which it
+            # did, producing a path with spaces, brackets and a percent sign.
+            print("restricted to openings whose every word is in %s (%d words): "
+                  "%d of the first %d ranked qualify (%.2f%%)%s"
+                  % (a["openings_in"], len(restrict), stats["kept"],
+                     stats["scanned"],
+                     100.0 * stats["kept"] / max(1, stats["scanned"]),
+                     " -- the ranking was EXHAUSTED, so this is every qualifying "
+                     "opening in it" if stats["exhausted"] else ""),
+                  file=sys.stderr)
+            # A DIFFERENT FIELD IS A DIFFERENT EXPERIMENT, so it is in the stem:
+            # otherwise the restricted race and the unrestricted one share a
+            # filename, hence a CHECKPOINT, and each resumes into the other.
+            name += "_in-%s" % os.path.basename(a["openings_in"]).replace(
+                ".txt", "")
         return field, name
     if a["words"] in ("guess", "mystery"):
         words = load_words(a["words"])
@@ -226,6 +246,15 @@ def load_field(a, guesses):
         name = os.path.basename(a["words"])
         name = name[:-4] if name.endswith(".txt") else name
     field = [w.split() for w in words]
+    if restrict is not None:
+        before = len(field)
+        field = [o for o in field if all(w in restrict for w in o)]
+        if not field:
+            raise SystemExit("no opener in %s has every word in %s"
+                             % (a["words"], a["openings_in"]))
+        print("restricted to %s: %d of %d openers qualify"
+              % (a["openings_in"], len(field), before), file=sys.stderr)
+        name += "_in-%s" % os.path.basename(a["openings_in"]).replace(".txt", "")
     if a["top"]:
         field = field[:a["top"]]
         name += "_top%d" % a["top"]

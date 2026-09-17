@@ -20,6 +20,15 @@ from expected guesses under random-compatible play.  So:
 Report such a sweep as "the best of the N screened", never "the best pair".
 Widening --top widens the net; it never makes the screen exhaustive.
 
+RESTRICTING THE WORDS.  `--openings-in custom` (a list stem in data/shared/words,
+or a path) keeps only openings whose EVERY word is in that list -- for pairing an
+opening pool with a follow-up that draws from the same one, so the strategy is a
+player who knows a single list rather than two.  A rejected row does NOT count
+toward `--top`, so the screen keeps its width and reads deeper into the ranking
+instead; the scan reports how deep it went and whether the ranking ran out.  It
+narrows what is EXAMINED, so it narrows the claim in the same way `--top` does: a
+restricted run's head is the best of the qualifying openings screened.
+
 ORDERINGS.  A ranking lists each SET once, because a blind opening's partition
 cannot depend on play order.  An adaptive rule breaks that -- it keys on what the
 words played so far have left -- so every permutation becomes its own strategy:
@@ -42,10 +51,44 @@ import sys
 from itertools import permutations
 from math import factorial
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
-def read_openings(path, top=None):
-    """The first `top` openings of a ranking CSV, as lists of words."""
-    header, out = None, []
+from wordle import load_words  # noqa: E402
+
+
+def resolve_word_set(spec):
+    """A set of words from a list STEM in data/shared/words, or from a path.
+
+    The same two forms `--words` takes elsewhere, so `custom` means the committed
+    custom.txt and a path means that file -- one spelling of "which list" across
+    the tools rather than a new one here.
+    """
+    if os.sep in spec or spec.endswith(".txt"):
+        with open(spec) as f:
+            return {ln.strip() for ln in f if ln.strip()}
+    try:
+        return set(load_words(spec))
+    except FileNotFoundError:
+        raise SystemExit(
+            "no word list %r: give a stem in data/shared/words (custom, "
+            "mystery, guess) or a path to a .txt" % spec)
+
+
+def read_openings(path, top=None, restrict=None, stats=None):
+    """The first `top` openings of a ranking CSV, as lists of words.
+
+    `restrict` is a set every word of an opening must be in.  **A REJECTED ROW
+    DOES NOT COUNT TOWARD `top`**, so `--top N` still means "N openings to
+    examine" rather than "N rows read, of which some survived" -- the screen
+    keeps its width and simply reads deeper into the ranking to fill it.  That
+    is the reading the count is worth having: `--top 10000` should mean the same
+    thing with and without the filter.
+
+    `stats`, if given, is filled in with how deep the scan actually went, which
+    is what says whether the ranking was EXHAUSTED -- a field smaller than `top`
+    means there were no more qualifying rows, not that the file was short.
+    """
+    header, out, scanned = None, [], 0
     with open(path) as f:
         for line in f:
             if line.startswith("#") or not line.strip():
@@ -60,11 +103,21 @@ def read_openings(path, top=None):
                 continue
             if len(cols) <= max(idx):
                 continue
-            out.append([cols[i] for i in idx])
+            scanned += 1
+            row = [cols[i] for i in idx]
+            if restrict is not None and not all(w in restrict for w in row):
+                continue
+            out.append(row)
             if top is not None and len(out) >= top:
                 break
+    if stats is not None:
+        stats["scanned"] = scanned
+        stats["kept"] = len(out)
+        stats["exhausted"] = top is not None and len(out) < top
     if not out:
-        raise SystemExit("no data rows in %s" % path)
+        raise SystemExit(
+            "no openings in %s%s" % (path, "" if restrict is None else
+                                     " have every word in the restriction list"))
     return out
 
 
@@ -73,6 +126,7 @@ def main(argv):
     top = None
     both = False
     allorders = False
+    inlist = None
     i = 0
     while i < len(argv):
         a = argv[i]
@@ -80,6 +134,8 @@ def main(argv):
             src = argv[i + 1]; i += 2
         elif a == "--out":
             out = argv[i + 1]; i += 2
+        elif a == "--openings-in":
+            inlist = argv[i + 1]; i += 2
         elif a == "--top":
             top = int(argv[i + 1]); i += 2
         elif a == "--both-orders":
@@ -100,7 +156,17 @@ def main(argv):
                          "the sweep will examine, and everything below it is "
                          "never looked at")
 
-    rows = read_openings(src, top=top)
+    stats = {}
+    restrict = resolve_word_set(inlist) if inlist else None
+    rows = read_openings(src, top=top, restrict=restrict, stats=stats)
+    if restrict is not None:
+        print("restricted to openings whose every word is in %s (%d words): "
+              "%d of the first %d ranked openings qualify (%.2f%%)%s"
+              % (inlist, len(restrict), stats["kept"], stats["scanned"],
+                 100.0 * stats["kept"] / max(1, stats["scanned"]),
+                 " -- THE RANKING WAS EXHAUSTED, so this is every qualifying "
+                 "opening in it, not a top-%d" % top if stats["exhausted"]
+                 else ""))
     if allorders:
         # EVERY ordering, which is what an adaptive rule needs at any size: it
         # keys on what the words played SO FAR have left, so each permutation is
@@ -141,6 +207,9 @@ def main(argv):
     print("  from: %s (its own order, best first)" % src)
     print("  head: %s" % " | ".join(" ".join(r) for r in rows[:4]))
     print("  a SCREEN of that ranking -- the best of these, never the best opening")
+    if restrict is not None:
+        print("  and a RESTRICTED screen: an opening using any word outside %s "
+              "was never examined" % inlist)
     return 0
 
 

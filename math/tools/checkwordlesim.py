@@ -1129,6 +1129,66 @@ def main(argv):
     if "resuming" not in rsaid["winsplit"]:
         failures.append("the resumed win-rate race started over")
 
+    # --- restricting the opening pool: --openings-in ---------------------------
+    # The filter is in the SHARED reader, so it reaches the sweep and the race at
+    # once.  What has to hold: only qualifying openings survive, a rejected row
+    # does NOT spend the --top budget, and an exhausted ranking says so rather
+    # than looking like a short file.
+    import opening_list as olist
+    orank = os.path.join(rloc, "_checkrank.csv")
+    ocustom = os.path.join(rloc, "_checkin.txt")
+    # a ranking whose rows alternate qualifying and not, so a filter that ignored
+    # the restriction and one that stopped counting correctly both show
+    oallow = [guesses[i] for i in range(0, 400, 7)]
+    with open(ocustom, "w") as f:
+        f.write("\n".join(oallow) + "\n")
+    orows = []
+    for i in range(30):
+        if i % 2 == 0:
+            orows.append([oallow[i % len(oallow)], oallow[(i + 1) % len(oallow)]])
+        else:
+            orows.append([oallow[i % len(oallow)], guesses[5000 + i]])
+    with open(orank, "w") as f:
+        f.write("word1,word2,score\n")
+        for j, r in enumerate(orows):
+            f.write("%s,%s,%d\n" % (r[0], r[1], j))
+    oset = olist.resolve_word_set(ocustom)
+    ostats = {}
+    okept = olist.read_openings(orank, top=5, restrict=oset, stats=ostats)
+    if len(okept) != 5:
+        failures.append("--openings-in returned %d openings for --top 5, so a "
+                        "rejected row spent the budget" % len(okept))
+    if not all(all(w in oset for w in o) for o in okept):
+        failures.append("--openings-in kept an opening with a word outside the "
+                        "restriction list")
+    if ostats["scanned"] != 9:
+        failures.append("filling --top 5 from an alternating ranking scanned %d "
+                        "rows, not the 9 it must" % ostats["scanned"])
+    if ostats["exhausted"]:
+        failures.append("a ranking that had more qualifying rows was reported "
+                        "exhausted")
+    # AND THE EXHAUSTED CASE, which is the one a reader would otherwise mistake
+    # for a short file: ask for more than qualify.
+    ostats2 = {}
+    oall = olist.read_openings(orank, top=999, restrict=oset, stats=ostats2)
+    if len(oall) != 15 or not ostats2["exhausted"]:
+        failures.append("the exhausted restriction reported %d openings, "
+                        "exhausted=%s (expected 15, True)"
+                        % (len(oall), ostats2.get("exhausted")))
+    # unrestricted, the same file is untouched -- the filter must be opt-in
+    if len(olist.read_openings(orank, top=5)) != 5 or \
+            olist.read_openings(orank)[1] != orows[1]:
+        failures.append("reading the ranking WITHOUT a restriction changed, so "
+                        "the filter is not opt-in")
+    try:
+        olist.read_openings(orank, restrict={"zzzzz"})
+        failures.append("a restriction nothing satisfies returned openings")
+    except SystemExit:
+        pass
+    print("--openings-in: only qualifying openings survive, a rejected row does "
+          "not spend the --top budget (9 rows scanned to fill 5), an exhausted "
+          "ranking says so, and an unrestricted read is unchanged")
+
     # --- the race can express --pair-adaptive, and it is the SAME rule ---------
     # Without it a race over a multi-word opening measures the BLIND strategy
     # while the cascade that chose the field measured the adaptive one -- two

@@ -165,6 +165,7 @@ SHORTTOP=""
 SHORTVALUE="mean"
 OPENFROM=""
 OPENTOP=""
+OPENIN=""
 RANK=""
 BOTHORDERS=0
 ALLORDERS=0
@@ -191,6 +192,7 @@ while [ $# -gt 0 ]; do
         --shortlist-top)    SHORTTOP="$2";   shift 2 ;;
         --shortlist-value)  SHORTVALUE="$2"; shift 2 ;;
         --openings-from)    OPENFROM="$2";   shift 2 ;;
+        --openings-in)      OPENIN="$2";     shift 2 ;;
         --top)              OPENTOP="$2";    shift 2 ;;
         --both-orders)      BOTHORDERS=1;    shift 1 ;;
         --all-orders)       ALLORDERS=1;     shift 1 ;;
@@ -323,6 +325,13 @@ if [ -n "$OPENFROM" ]; then
     # half the strategies and say nothing about which half.
     OPENFLAGS="--from $OPENFROM --top $OPENTOP"
     LISTNAME="openings_$(basename "$OPENFROM" .csv)_top${OPENTOP}"
+    if [ -n "$OPENIN" ]; then
+        # A RESTRICTED FIELD IS A DIFFERENT EXPERIMENT, so it is in the list name
+        # and therefore in every stem below it -- a restricted pass and an
+        # unrestricted one must not share a file and so a lineage.
+        OPENFLAGS="$OPENFLAGS --openings-in $OPENIN"
+        LISTNAME="${LISTNAME}_in-$(basename "$OPENIN" .txt)"
+    fi
     if [ "$BOTHORDERS" = 1 ] || [ "$ALLORDERS" = 1 ]; then
         BESTORDER=0
         if [ "$ALLORDERS" = 1 ]; then

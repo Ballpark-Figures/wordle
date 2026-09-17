@@ -1813,6 +1813,32 @@ CSV row per word, flushed).
 - **MEASURED (2026-09-08, this machine): ~490 words/s at `-t 100` under the
   `answer` follow-up and ~262/s under `guess`** — so a full 12972-word stage 1 is
   well under two minutes either way.
+- **`--openings-in <list>` RESTRICTS THE FIELD TO OPENINGS WHOSE EVERY WORD IS IN
+  THAT LIST** (added 2026-09-17, user's call) — a stem in `data/shared/words` or a
+  path, on `run-wordle-sweep.sh`, `run-wordle-race.sh` and `tools/opening_list.py`.
+  It exists to pair an opening pool with a follow-up drawing from the SAME list, so
+  the strategy is one player who knows one list rather than two.
+  - **A REJECTED ROW DOES NOT SPEND THE `--top` BUDGET.** `--top N` keeps meaning
+    "N openings examined" with and without the filter; the screen keeps its width
+    and reads DEEPER into the ranking to fill it. The scan reports how deep it
+    went and whether the ranking was EXHAUSTED — a field smaller than `--top` then
+    means there were no more qualifying rows, not that the file was short.
+  - **MEASURED against `custom.txt`**: **3.23%** of the 100000-row quad ranking
+    qualifies (so `--top 10000` exhausts it at **3230** openings) and **0.51%** of
+    the quint one (10000 found by reading 1.96M of its 23.5M rows, 1.2 s).
+  - **IT NARROWS THE CLAIM exactly as `--top` does** — the head is the best of the
+    QUALIFYING openings screened, and an opening using any word outside the list
+    was never examined at all.
+  - **It lands in the list name as `_in-<list>`, hence in every stem and lineage
+    below it.** A restricted race and an unrestricted one must not share a file,
+    and therefore a CHECKPOINT, or each resumes into the other.
+  - **The informational line goes to STDERR**, because `--print-stem` parses the
+    race's stdout — it shipped on stdout for one run and put the whole sentence,
+    spaces and a percent sign included, INSIDE the output filename.
+  - The filter lives in the shared `opening_list.read_openings`, so it reaches the
+    sweep, the race and the multiwordle race at once. Gated and mutation-tested
+    (spending the budget on a rejected row, and ignoring the restriction, were
+    each caught); an unrestricted read is asserted unchanged, so it is opt-in.
 - **AN ENTRY MAY BE A MULTI-WORD OPENING, and the same cascade ranks them.**
   `--openings-from RANKING.csv --top N` takes the top N openings off an existing
   ranking (`tools/opening_list.py`, any `word*` columns, so pair/triple/quad files
