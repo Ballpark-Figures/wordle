@@ -510,6 +510,232 @@ static int cmp_cand_ssq(const void *a, const void *b) {
     return x->w - y->w;
 }
 
+/* THE MATCHED-LETTER STATE, carried down the recursion.
+ *
+ * At two guesses this could be a function of the two replies; from three guesses
+ * on it has to accumulate, so it is a small struct updated one guess at a time.
+ * `known[c]` is the most copies of letter c any reply has PROVED (its non-grey
+ * tiles of that letter), `pinned` the positions some reply turned green.  The
+ * matched count is then greens + yellows in tree_states' sense: every proved
+ * copy, with the pinned ones counted as greens.
+ *
+ * It stays a function of the WORDS AND REPLIES alone, never of the answer, so it
+ * is constant within a bucket -- which is what makes it a legal key at any depth.
+ */
+typedef struct {
+    int16_t known[26];
+    uint8_t pinch[WORDLEN];       /* the letter pinned at each position */
+    uint8_t pinned;               /* bitmask of pinned positions */
+} MState;
+
+static void mstate_add(MState *st, int g, int p) {
+    const char *w = GWORD[g];
+    int cnt[26] = {0}, c = p;
+    /* POSITION 0 IS THE MOST SIGNIFICANT TRIT, so this walks from the right. */
+    for (int i = WORDLEN - 1; i >= 0; i--) {
+        int t = c % 3;
+        c /= 3;
+        int ch = w[i] - 'a';
+        if (t) cnt[ch]++;
+        if (t == 2) { st->pinned |= (uint8_t)(1u << i); st->pinch[i] = (uint8_t)ch; }
+    }
+    for (int ch = 0; ch < 26; ch++)
+        if (cnt[ch] > st->known[ch]) st->known[ch] = (int16_t)cnt[ch];
+}
+
+static int mstate_matched(const MState *st) {
+    int pin[26] = {0}, greens = 0;
+    for (int i = 0; i < WORDLEN; i++)
+        if (st->pinned & (1u << i)) { greens++; pin[st->pinch[i]]++; }
+    int yellows = 0;
+    for (int ch = 0; ch < 26; ch++) {
+        int y = st->known[ch] - pin[ch];
+        if (y > 0) yellows += y;
+    }
+    return greens + yellows;
+}
+
+/* The two-guess case, kept because the gate's --dump-matched diffs it against
+ * tree_states and because the third level's key is exactly this. */
+static int matched_letters(int g1, int p1, int g2, int p2) {
+    MState st;
+    memset(&st, 0, sizeof st);
+    mstate_add(&st, g1, p1);
+    mstate_add(&st, g2, p2);
+    return mstate_matched(&st);
+}
+
+
+/* ------------------------------------------------- the level recursion ---- *
+ * A CASE is a set of buckets that will share one committed word.  It either
+ * plays that word or DECLINES to the random tail -- whichever is cheaper -- and
+ * after a committed word the resulting buckets are regrouped by matched-letter
+ * count, each group becoming a case one level down.
+ *
+ * Level 2's cases are the partition's groups; from there the key is the matched
+ * count, nested under the path.  Declining at every level is what makes the
+ * family CONTAIN every shallower one: decline everywhere at level 2 and the
+ * plain opener is back, so no result here can be worse than the strategy it
+ * generalises, at the same beam.
+ *
+ * COST IS k PER LEVEL.  Each case tries `topk` words and each spawns up to six
+ * child cases, so the search is k^(levels-1) per group before declining prunes
+ * it.  Deep runs want a much smaller k than shallow ones.
+ */
+#define MAXLVL 8
+
+typedef struct { int32_t start, len; } Bkt;
+
+typedef struct {
+    int32_t word;                 /* -1 = this case declined */
+    int32_t kid[MAXCASE];         /* child node per matched count, -1 = none */
+} CaseNode;
+
+typedef struct {
+    CaseNode *node;
+    int n, cap;
+    uint16_t *buf[MAXLVL];        /* one answer buffer per level */
+    Bkt      *bkt[MAXLVL];
+    MState   *st[MAXLVL];
+    int8_t   *mc[MAXLVL];
+    Cand     *cand;
+} Levels;
+
+static int node_new(Levels *L) {
+    if (L->n == L->cap) {
+        L->cap = L->cap ? L->cap * 2 : 1024;
+        L->node = realloc(L->node, sizeof(CaseNode) * (size_t)L->cap);
+    }
+    CaseNode *nd = &L->node[L->n];
+    nd->word = -1;
+    for (int c = 0; c < MAXCASE; c++) nd->kid[c] = -1;
+    return L->n++;
+}
+
+static double solve_case(Memo *m, Levels *L, const uint16_t *buf, const Bkt *bk,
+                         const MState *st, int nbk, int depth, int maxlvl,
+                         int topk, uint16_t *out, int *node_out);
+
+/* Expand one candidate word over a case's buckets: play it, drop the answers it
+ * wins, regroup the rest by matched count and solve each group one level down. */
+static double expand(Memo *m, Levels *L, const uint16_t *buf, const Bkt *bk,
+                     const MState *st, int nbk, int w, int depth, int maxlvl,
+                     int topk, uint16_t *out, int node) {
+    const uint8_t *row = PAT + (size_t)w * NA;
+    int *cnt = m->cnt + (size_t)depth * NPAT;
+    int *touch = m->touch + (size_t)depth * NPAT;
+    uint16_t *nbuf = L->buf[depth];
+    Bkt *nb = L->bkt[depth];
+    MState *nst = L->st[depth];
+    int8_t *nmc = L->mc[depth];
+    double tot = 0.0;
+    int nn = 0, fill = 0;
+
+    for (int b = 0; b < nbk; b++) {
+        const uint16_t *s = buf + bk[b].start;
+        int n = bk[b].len, nt = 0;
+        tot += n;                                  /* this guess, once per answer */
+        for (int i = 0; i < n; i++) {
+            int p = row[s[i]];
+            if (cnt[p]++ == 0) touch[nt++] = p;
+        }
+        int acc = fill;
+        for (int k = 0; k < nt; k++) {
+            int p = touch[k];
+            int len = cnt[p];
+            cnt[p] = acc;
+            acc += len;
+            if (p == ALL_GREEN) continue;          /* won outright */
+            nb[nn].start = cnt[p];
+            nb[nn].len = len;
+            nst[nn] = st[b];
+            mstate_add(&nst[nn], w, p);
+            nmc[nn] = (int8_t)mstate_matched(&nst[nn]);
+            nn++;
+        }
+        for (int i = 0; i < n; i++) nbuf[cnt[row[s[i]]]++] = s[i];
+        for (int k = 0; k < nt; k++) cnt[touch[k]] = 0;
+        fill = acc;
+    }
+
+    /* regroup by matched count: every bucket with the same count shares the
+     * next word, which is what makes this a rule rather than a lookup table */
+    for (int c = 0; c < MAXCASE; c++) {
+        int cn = 0;
+        for (int j = 0; j < nn; j++) if (nmc[j] == c) cn++;
+        if (!cn) continue;
+        Bkt *cb = malloc(sizeof(Bkt) * cn);
+        MState *cs = malloc(sizeof(MState) * cn);
+        int k = 0;
+        for (int j = 0; j < nn; j++)
+            if (nmc[j] == c) { cb[k] = nb[j]; cs[k] = nst[j]; k++; }
+        int kid = -1;
+        tot += solve_case(m, L, nbuf, cb, cs, cn, depth + 1, maxlvl, topk,
+                          out, &kid);
+        if (node >= 0) L->node[node].kid[c] = kid;
+        free(cb); free(cs);
+    }
+    return tot;
+}
+
+static double solve_case(Memo *m, Levels *L, const uint16_t *buf, const Bkt *bk,
+                         const MState *st, int nbk, int depth, int maxlvl,
+                         int topk, uint16_t *out, int *node_out) {
+    int node = node_new(L);
+    if (node_out) *node_out = node;
+
+    /* DECLINING: play no committed word and let the random tail finish it. */
+    double declined = 0.0;
+    for (int b = 0; b < nbk; b++)
+        declined += T(m, buf + bk[b].start, bk[b].len, depth + 1);
+    if (depth >= maxlvl) return declined;
+
+    /* rank candidates by the one-ply score over this case's buckets -- the same
+     * rule every other level here ranks by.  A word already played on this path
+     * splits nothing (every answer in a bucket replied to it identically), so it
+     * scores worst and falls out of the beam without being named. */
+    Cand *cand = L->cand;
+    int *cnt = m->cnt + (size_t)depth * NPAT;
+    int *touch = m->touch + (size_t)depth * NPAT;
+    for (int w = 0; w < NG; w++) {
+        const uint8_t *row = PAT + (size_t)w * NA;
+        int64_t ssq = 0;
+        for (int b = 0; b < nbk; b++) {
+            const uint16_t *s = buf + bk[b].start;
+            int n = bk[b].len, nt = 0;
+            for (int i = 0; i < n; i++) {
+                int p = row[s[i]];
+                if (cnt[p]++ == 0) touch[nt++] = p;
+            }
+            for (int k = 0; k < nt; k++) {
+                int64_t v = cnt[touch[k]];
+                ssq += v * v;
+                cnt[touch[k]] = 0;
+            }
+        }
+        cand[w].w = w;
+        cand[w].ssq = ssq;
+        cand[w].key = 0.0;
+    }
+    qsort(cand, (size_t)NG, sizeof(Cand), cmp_cand_ssq);
+
+    double best = declined;
+    int bestnode = -1, bestw = -1;
+    int lim = topk < NG ? topk : NG;
+    for (int i = 0; i < lim; i++) {
+        int trial = node_new(L);
+        double v = expand(m, L, buf, bk, st, nbk, cand[i].w, depth, maxlvl,
+                          topk, out, trial);
+        if (v < best) { best = v; bestnode = trial; bestw = cand[i].w; }
+    }
+    if (bestw >= 0) {
+        L->node[node] = L->node[bestnode];
+        L->node[node].word = bestw;
+    }
+    return best;
+}
+
+
 /* Choose ONE case's third word: rank every candidate by the one-ply score over
  * that case's buckets -- the same sum-of-squares rule the second level ranks by,
  * summed across the buckets the case collects -- then evaluate the best `topk`
@@ -865,43 +1091,6 @@ static void solve_opener(Memo *m, int og, Row *r, double incumbent, int no_prune
  * which is what makes it a legal key: it is CONSTANT within a joint (p1, p2)
  * bucket, so every answer in a bucket gets the same third word.
  */
-static int matched_letters(int g1, int p1, int g2, int p2) {
-    int known[26] = {0}, pin[26] = {0};
-    unsigned pinned = 0;
-    char pinch[WORDLEN];
-    const char *ws[2];
-    int ps[2];
-    ws[0] = GWORD[g1]; ps[0] = p1;
-    ws[1] = GWORD[g2]; ps[1] = p2;
-    for (int k = 0; k < 2; k++) {
-        int cnt[26] = {0}, c = ps[k];
-        /* POSITION 0 IS THE MOST SIGNIFICANT TRIT (wordle.py), so this walks the
-         * word from the RIGHT.  A repeated `% 3` paired with a left-to-right
-         * index reads position 0's letter against position 4's tile -- which is
-         * exactly the trap secondword.py's `tile_at` is written to avoid, and
-         * exactly what this got wrong first. */
-        for (int i = WORDLEN - 1; i >= 0; i--) {
-            int t = c % 3;
-            c /= 3;
-            int ch = ws[k][i] - 'a';
-            if (t) cnt[ch]++;                      /* non-grey: a proved copy */
-            if (t == 2) { pinned |= 1u << i; pinch[i] = ws[k][i]; }
-        }
-        for (int ch = 0; ch < 26; ch++)
-            if (cnt[ch] > known[ch]) known[ch] = cnt[ch];
-    }
-    int greens = 0;
-    for (int i = 0; i < WORDLEN; i++)
-        if (pinned & (1u << i)) { greens++; pin[pinch[i] - 'a']++; }
-    int yellows = 0;
-    for (int ch = 0; ch < 26; ch++) {
-        int y = known[ch] - pin[ch];
-        if (y > 0) yellows += y;
-    }
-    return greens + yellows;
-}
-
-
 /* --------------------------------------------------- the root beam -------- *
  * `--topk K` RESTRICTS THE OPENERS TOO -- the root is a branching point like any
  * other, and one K governs both, as in every other solver here (strturns,
