@@ -597,6 +597,38 @@ static void solve_opener(Memo *m, int og, Row *r, double incumbent, int no_prune
     (void)incumbent;
 }
 
+/* --------------------------------------------------- the root beam -------- *
+ * `--topk K` RESTRICTS THE OPENERS TOO -- the root is a branching point like any
+ * other, and one K governs both, as in every other solver here (strturns,
+ * greens, mmturns, wturns, ultraturns, nerdle).  The rank is the repo's one
+ * ranking rule applied to the opener's own partition of the answers: ascending
+ * sum of squared bin sizes, ties on the lowest guess index.  It is ONE pass over
+ * the answers per opener, so the K best are known long before anything is
+ * bounded -- which is the point, since bounding all 12972 is the expensive part.
+ */
+typedef struct { int64_t ssq; int32_t w; } RootKey;
+
+static int cmp_rootkey(const void *a, const void *b) {
+    const RootKey *x = a, *y = b;
+    if (x->ssq != y->ssq) return x->ssq < y->ssq ? -1 : 1;
+    return x->w - y->w;
+}
+
+static int64_t root_ssq(int g, int *cnt) {
+    const uint8_t *row = PAT + (size_t)g * NA;
+    int touch[NPAT], nt = 0;
+    for (int a = 0; a < NA; a++)
+        if (cnt[row[a]]++ == 0) touch[nt++] = row[a];
+    int64_t ssq = 0;
+    for (int k = 0; k < nt; k++) {
+        int64_t v = cnt[touch[k]];
+        ssq += v * v;
+        cnt[touch[k]] = 0;
+    }
+    return ssq;
+}
+
+
 /* ------------------------------------------------------- resume ---------- *
  * A run is hours long and there is no checkpoint but the CSV itself, so the CSV
  * IS the checkpoint: every opener's rows are appended the moment it finishes.
@@ -629,7 +661,7 @@ static int read_resume(const char *path, Row *rows, int nopen, const char *label
                  * are different quantities, and a k=10 file read into a k=50 run
                  * would silently mix two of them under one name. */
                 char want[512];
-                snprintf(want, sizeof want, "fire=%s openers=", label);
+                snprintf(want, sizeof want, "fire=%s openers=%d ", label, nopen);
                 int ok = !strncmp(fire, want, strlen(want));
                 int filek = -1;
                 char *tk = strstr(line, "topk=");
@@ -850,10 +882,11 @@ int main(int argc, char **argv) {
             NG, NA, label, NGROUP, NGROUP == 1 ? "" : "s",
             OPENER_DEP ? ", per opener" : "");
     if (topk)
-        fprintf(stderr, "BEAM: only the %d best second words per group are "
-                "evaluated -- every\n      total is an UPPER BOUND, and the "
-                "winner is the best of the openers examined,\n      not the "
-                "proven optimum.\n", topk);
+        fprintf(stderr, "BEAM k=%d: the %d best OPENERS, and within each the %d "
+                "best second words\n          per group -- ONE K governs both, as "
+                "in every other solver here.  Every\n          total is an UPPER "
+                "BOUND and the winner is the best of the openers\n          "
+                "EXAMINED, not the proven optimum.\n", topk, topk, topk);
 
     int *openers = malloc(sizeof(int) * NG), nopen = 0;
     if (one) {
@@ -875,6 +908,27 @@ int main(int argc, char **argv) {
         free(rw);
     } else {
         for (int g = 0; g < NG; g++) openers[nopen++] = g;
+    }
+    /* THE ROOT BEAM, before phase 1: under --topk only the K best openers are
+     * examined at all, so only they are bounded.  A NAMED opener (--opener /
+     * --openers) is exempt: there the user has chosen the root and K beams only
+     * the branching below it, which is how `wturns` splits the two cases. */
+    if (topk && !one && !openpath) {
+        int *cnt = calloc(NPAT, sizeof(int));
+        RootKey *rk = malloc(sizeof(RootKey) * nopen);
+        for (int i = 0; i < nopen; i++) {
+            rk[i].w = openers[i];
+            rk[i].ssq = root_ssq(openers[i], cnt);
+        }
+        qsort(rk, (size_t)nopen, sizeof(RootKey), cmp_rootkey);
+        int keep = topk < nopen ? topk : nopen;
+        for (int i = 0; i < keep; i++) openers[i] = rk[i].w;
+        fprintf(stderr, "root beam: the %d best of %d openers by expected answers "
+                "remaining\n           (%s %.1f best, %s %.1f worst of those kept)\n",
+                keep, nopen, GWORD[rk[0].w], (double)rk[0].ssq / NA,
+                GWORD[rk[keep - 1].w], (double)rk[keep - 1].ssq / NA);
+        nopen = keep;
+        free(rk); free(cnt);
     }
     if (limit > 0 && limit < nopen) nopen = limit;
     fprintf(stderr, "openers: %d%s\n", nopen, no_prune ? "  (--no-prune)" : "");

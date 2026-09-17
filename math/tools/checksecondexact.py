@@ -441,6 +441,15 @@ def check_topk():
 
     ex = cells(paths[0])
     wide = cells(paths[npool])
+    # THE ROOT IS BEAMED TOO: one K governs both, so a small K must examine
+    # FEWER OPENERS.  Asserted, or the convention could be quietly dropped again.
+    op = lambda c: {k[0] for k in c}
+    if len(op(cells(paths[1]))) >= len(op(ex)):
+        bad("--topk 1 examined %d openers of %d -- the root beam did not fire"
+            % (len(op(cells(paths[1]))), len(op(ex))))
+        return
+    print("   ok   --topk 1 examines %d openers, the exact run %d"
+          % (len(op(cells(paths[1]))), len(op(ex))))
     if ex != wide:
         diff = [k for k in ex if ex[k] != wide.get(k)]
         bad("a beam of %d over a %d-word pool differs from the exact run in %d "
@@ -451,20 +460,20 @@ def check_topk():
     prev, moved = None, 0
     for k in (1, 3, npool):
         c = cells(paths[k])
-        for key in ex:
-            if not ex[key][1] or not c[key][1]:
-                continue
-            if float(c[key][1]) < float(ex[key][1]) - 1e-9:
+        for key in c:
+            if key in ex and c[key][1] and ex[key][1] and \
+                    float(c[key][1]) < float(ex[key][1]) - 1e-9:
                 bad("k=%d beat the exact answer on %s: %s vs %s"
                     % (k, key, c[key][1], ex[key][1]))
                 return
         if prev is not None:
-            for key in ex:
+            shared = [key for key in c if key in prev]
+            for key in shared:
                 if c[key][1] and prev[key][1] and \
                         float(c[key][1]) > float(prev[key][1]) + 1e-9:
                     bad("k=%d is WORSE than a narrower beam on %s" % (k, key))
                     return
-            moved += sum(1 for key in ex if c[key][0] != prev[key][0])
+            moved += sum(1 for key in shared if c[key][0] != prev[key][0])
         prev = c
     if not moved:
         bad("every K chose the same words, so nothing here exercises the beam")

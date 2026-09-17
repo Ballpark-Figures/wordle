@@ -25,10 +25,14 @@
 # ~290000 games EACH -- some 3.8 billion for ONE opener, hours of work, and the
 # answer still has an error bar.  The recursion does it in under a second.
 #
-# --topk K MAKES IT A SCREEN.  Only the K best second words per group by the
-# one-ply sum-of-squares score (secondword's rule, the same code path) are
-# evaluated exactly, so each total is an UPPER BOUND and the winner is the best
-# of the openers examined.  K is part of the objective: it is in the filename and
+# --topk K MAKES IT A SCREEN, AND IT RESTRICTS THE OPENERS TOO.  ONE K governs
+# both: the K best OPENERS by ascending expected answers remaining (the root is a
+# branching point like any other, as in strturns / greens / mmturns / wturns /
+# ultraturns / nerdle), and within each the K best second words per group by the
+# one-ply sum-of-squares score (secondword's rule, the same code path).  So each
+# total is an UPPER BOUND and the winner is the best of the openers EXAMINED.
+# A NAMED opener (--opener / --openers) is exempt from the root beam: there you
+# have chosen the root and K beams only the branching below it.  K is part of the objective: it is in the filename and
 # in the settings stamp, and a resume refuses a file written under a different K.
 # MEASURED on the completed by-grays run: the exact walk performed 286 million
 # second-word evaluations; at K=10 it would perform at most 322800.
@@ -154,12 +158,13 @@ FLAGS="--report $REPORT$COND"
 echo "exact second word"
 NGRP=$(echo "$LABEL" | tr '.' '\n' | wc -l | tr -d ' ')
 echo "  fires on   $LABEL$([ "$NGRP" -gt 1 ] && echo "  ($NGRP groups, a SEPARATE word for each)")"
-echo "  openers    ${OPENER:-${OPENERS:-all 12972}}${LIMIT:+ (first $LIMIT)}"
+echo "  openers    ${OPENER:-${OPENERS:-${TOPK:+the $TOPK best by expected answers remaining}}}${OPENER:-${OPENERS:-${TOPK:+}}}${LIMIT:+ (first $LIMIT)}"
 echo "  follow-up  answer (a uniformly random consistent answer)"
 if [ -n "$TOPK" ]; then
-    echo "  BEAM       top $TOPK second words per group, by the one-ply score"
+    echo "  BEAM k=$TOPK    the $TOPK best OPENERS, and the $TOPK best second words per group"
+    echo "             ONE K governs both, as in every other solver here."
     echo "             ^ a SCREEN, not a proof: every total is an UPPER BOUND and"
-    echo "               the winner is the best of the openers examined."
+    echo "               the winner is the best of the openers EXAMINED."
 else
     echo "  beam       none -- every candidate, so the result is PROVEN optimal"
 fi

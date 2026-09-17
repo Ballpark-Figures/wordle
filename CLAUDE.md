@@ -2136,12 +2136,31 @@ is the proven optimum over all 12972 x 12972 (opener, second word) pairs.
 - **THE MATCHED-VOWEL RESULT (2026-09-16): `slant` scores 3.643368**, against
   3.650558 for the grey count alone and 3.666937 for one shared word — measured
   on one opener in 5.7 s, which is the whole point of the extraction.
-- **`--topk K` MAKES IT A SCREEN, and that is the whole point of the flag.** Only
-  the K best second words per group by the ONE-PLY sum-of-squares score are
-  evaluated exactly, so every total is an **UPPER BOUND** and the winner is the
-  best of the openers examined -- never the proven optimum. K is part of the
-  objective: it is in the filename and in the `# settings` stamp, and a resume
-  refuses a file written under a different K.
+- **`--topk K` MAKES IT A SCREEN, and ONE K GOVERNS BOTH ENDS** -- the K best
+  OPENERS, and within each the K best second words per group. Every total is an
+  **UPPER BOUND** and the winner is the best of the openers EXAMINED, never the
+  proven optimum. K is part of the objective: it is in the filename and in the
+  `# settings` stamp, and a resume refuses a file written under a different K or
+  a different opener count.
+  - **THE ROOT IS A BRANCHING POINT LIKE ANY OTHER.** This is the repo-wide
+    convention (`strturns`, `greens`, `mmturns`, `wturns`, `ultraturns`, nerdle
+    all say it) and a separate opener-count flag was proposed and REJECTED by the
+    user for `greens` on 2026-09-03. **It shipped wrong here on 2026-09-16** --
+    beaming only the second words while still sweeping all 12972 openers, so a
+    `--topk 1` run still paid the full 112 s bound of every opener and then
+    walked the lot. Caught by the user within minutes. The ranking convention was
+    carried across and the SCOPE convention was not; the gate now ASSERTS that a
+    small K examines fewer openers, so it cannot be dropped again quietly.
+  - **The root rank is ascending EXPECTED ANSWERS REMAINING** (sum of squared bin
+    sizes over the opener's own partition of the 2315, ties on the lowest guess
+    index) -- one pass over the answers per opener, so the K best are known
+    before anything is bounded, which is what makes a small-K run start in
+    seconds instead of two minutes. **VERIFIED against a known result**: it ranks
+    `roate` 60.4 best and `immix` 967.4 worst, the same figures
+    `run-multiwordle-exact.sh` records for that quantity.
+  - **A NAMED opener (`--opener` / `--openers`) is EXEMPT from the root beam** --
+    there the root is chosen and K beams only the branching below it, which is
+    how `wturns` splits the same two cases.
   - **WHY IT IS WORTH HAVING, measured on the completed by-grays run**: the
     within-opener bound barely prunes on the big groups (median words scanned per
     opener: e3 2803, e4 10809, **e5 12971 -- all of them**), so that run made
