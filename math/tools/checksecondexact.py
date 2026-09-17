@@ -656,6 +656,17 @@ def check_third():
         bad("no third word was ever committed, so nothing was exercised")
         return
 
+    # --- THE PRINTOUT IS THE PRODUCT: a run watched on screen must show the
+    # third words, not just the second ones.  This shipped printing four words
+    # for a nine-word strategy, so it is asserted rather than assumed.
+    p = run(base + ["--third-key", "group", "--third-max-matched", "2",
+                    "--out", os.path.join(tmp, "print.csv")])
+    if "+" not in p.stderr:
+        bad("no third word appears in the run's own output:\n%s"
+            % p.stderr[-400:])
+    else:
+        print("   ok   the progress lines show the third words")
+
     # --- DECLINING makes the three-level family CONTAIN the two-level one, so
     # its total can never be worse.  That is a free oracle and it is asserted
     # per opener, not just on the winner.

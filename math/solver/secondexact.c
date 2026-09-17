@@ -698,6 +698,37 @@ static double fired_with_third(Memo *m, int og, const uint16_t *q, int nq,
 }
 
 
+/* THE WHOLE STRATEGY ON ONE LINE -- every committed word, not just the second
+ * ones.  Both the progress line and the final report go through this so the two
+ * cannot drift: a nine-word strategy was printing as four words on screen while
+ * the CSV held all of it, and the printout is what a watched run is FOR.
+ *
+ * Unlabelled: `shone +chump +chimp | sonce +chimp | sonce`, groups separated by
+ * `|` in the same order the report uses (least informative first), each group's
+ * third words following it as `+word`.  Labelled adds each word's case.
+ */
+static void format_strategy(char *buf, size_t n, const Row *v, int labelled) {
+    size_t k = 0;
+    for (int g = NGROUP - 1; g >= 0; g--) {
+        const char *w = v->second[g] >= 0 ? GWORD[v->second[g]] : "-";
+        int r = labelled
+              ? snprintf(buf + k, n - k, " %s (%s)", w, GSPEC[g])
+              : snprintf(buf + k, n - k, "%s %s", g == NGROUP - 1 ? "" : " |", w);
+        if (r < 0 || (size_t)r >= n - k) break;
+        k += (size_t)r;
+        for (int c = 0; c < MAXCASE; c++) {
+            if (v->third[g][c] < 0) continue;      /* declined, or never fired */
+            const char *t = GWORD[v->third[g][c]];
+            r = labelled ? snprintf(buf + k, n - k, " %s (%s|m%d)", t, GSPEC[g], c)
+                         : snprintf(buf + k, n - k, " +%s", t);
+            if (r < 0 || (size_t)r >= n - k) break;
+            k += (size_t)r;
+        }
+    }
+    buf[k < n ? k : n - 1] = 0;
+}
+
+
 static void solve_opener(Memo *m, int og, Row *r, double incumbent, int no_prune,
                          uint16_t *q, uint16_t *out, int *rstart, int *rlen,
                          int *rpat, int *nbs, int *nqs, const double *gbound,
@@ -1477,12 +1508,10 @@ int main(int argc, char **argv) {
                 if (any && v < incumbent) {
                     incumbent = v;
                     best_i = oi;
-                    fprintf(stderr, "[%6.0fs] %s", now_s() - t0,
-                            GWORD[rr->opener]);
-                    for (int g = NGROUP - 1; g >= 0; g--)
-                        fprintf(stderr, " %s", rr->second[g] >= 0
-                                ? GWORD[rr->second[g]] : "-");
-                    fprintf(stderr, "  %.6f  NEW BEST\n", v / NA);
+                    char line[4096];
+                    format_strategy(line, sizeof line, rr, 0);
+                    fprintf(stderr, "[%6.0fs] %s%s  %.6f  NEW BEST\n",
+                            now_s() - t0, GWORD[rr->opener], line, v / NA);
                     fflush(stderr);
                 }
                 write_rows(outf, rr);
@@ -1514,10 +1543,9 @@ int main(int argc, char **argv) {
         if (!rows[oi].resumed && !rows[oi].done) write_rows(outf, &rows[oi]);
     fclose(outf);
     if (best_i >= 0) {
-        fprintf(stderr, "\nbest: %s then", GWORD[rows[best_i].opener]);
-        for (int g = NGROUP - 1; g >= 0; g--)
-            fprintf(stderr, " %s (%s)", rows[best_i].second[g] >= 0
-                    ? GWORD[rows[best_i].second[g]] : "-", GSPEC[g]);
+        char line[4096];
+        format_strategy(line, sizeof line, &rows[best_i], 1);
+        fprintf(stderr, "\nbest: %s then%s", GWORD[rows[best_i].opener], line);
         fprintf(stderr, " -- %.6f expected guesses (%s)\n", incumbent / NA,
                 topk ? "UPPER BOUND, beam" : "exact");
     }
