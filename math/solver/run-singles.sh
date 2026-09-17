@@ -129,6 +129,17 @@ MATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SHARED=data/shared/singletons
 LOC=data/local/singletons
 PATS=data/local/patterns/patterns.npy
+# --buckets: WHICH WORDS THE SPLIT IS SCORED OVER.  Every metric here counts
+# BUCKETS OF THE PATTERN MATRIX'S COLUMNS, and those are the 2315 answers by
+# default -- so `singles` means "answers alone in their bucket".  That is the
+# wrong quantity whenever the thing being screened for is about a LARGER pool:
+# a random-compatible follow-up drawing from custom.txt is choosing between the
+# CUSTOM words still live, and a bucket can pin the answers while leaving three
+# custom words alive.  Pointing this at that list scores the split over it
+# instead, which needs only a matrix with those columns -- pairsplit reads its
+# answer count from the matrix, so nothing in the solver changes.
+#
+# IT IS A DIFFERENT QUESTION, so it is in every filename below it.
 
 STAGE=both
 # EVERYTHING BY DEFAULT.  These were cuts -- 100000 rows kept, 100000 parents
@@ -143,6 +154,9 @@ TRIPFROM=""         # which triple ranking to extend; default is the widest on d
 THREADS=0           # 0 = let OpenMP pick, which is right on both machines
 ANSWERS=0           # --answers: only the 2315 answer words may open
 WORDS=""            # --words LIST: only that list's words may open
+BUCKETS=""          # --buckets LIST: score the SPLIT over this list, not the 2315
+BLIST=""
+BNAME=""
 DISJOINT=0          # --disjoint: every word of the opener shares no letter
 MINLET=0            # --min-letters N: at least N distinct letters in the opener
 DISJTRI=0           # --disjoint-triples: disjoint PARENTS only, 4th word free
@@ -165,6 +179,7 @@ while [ $# -gt 0 ]; do
         --threads)    THREADS="$2";  shift 2 ;;
         --answers)    ANSWERS=1;     shift ;;
         --words)      WORDS="$2";    shift 2 ;;
+        --buckets)    BUCKETS="$2";  shift 2 ;;
         --disjoint)   DISJOINT=1;    shift ;;
         --min-letters) MINLET="$2";  shift 2 ;;
         --disjoint-triples) DISJTRI=1; shift ;;
@@ -240,6 +255,17 @@ elif [ -n "$WORDS" ]; then
     if [ "$WNAME" = mystery ]; then SUF="_answers"; else SUF="_$WNAME"; fi
     GLIST="--guess-list $WLIST"
     NOPEN=$(grep -c . "$WLIST")
+fi
+# The bucket list joins the suffix HERE, with the others -- every output name is
+# derived below this point, and appending it later left the pair file (and only
+# the pair file) unmarked, which is exactly the collision the suffix prevents.
+if [ -n "$BUCKETS" ]; then
+    case "$BUCKETS" in
+        */*|*.txt) BLIST="$BUCKETS" ;;
+        *)         BLIST="data/shared/words/$BUCKETS.txt" ;;
+    esac
+    BNAME=$(basename "$BLIST" .txt)
+    SUF="${SUF}_over-$BNAME"
 fi
 if [ "$DISJOINT" = 1 ]; then
     SUF="${SUF}_disjoint"
@@ -349,6 +375,24 @@ cd "$MATH" || exit 1
     exit 1
 }
 
+PFLAG=""
+if [ -n "$BUCKETS" ]; then
+    [ -f "$BLIST" ] || {
+        echo "--buckets: no such list: $BLIST" >&2
+        ls -1 data/shared/words/*.txt 2>/dev/null | sed 's/^/  /' >&2
+        exit 1; }
+    PATS="data/local/patterns/patterns_cols_$BNAME.npy"
+    # Additive and off the shared matrix paths, like the per-letter Lingo ones:
+    # a derived matrix is regenerable infrastructure, so it lives under local/
+    # and is built on demand rather than committed.
+    [ -f "$PATS" ] || {
+        echo "building the pattern matrix over $BNAME's columns (once)..."
+        _PY=python3
+        [ -x ../.venv/bin/python ] && _PY=../.venv/bin/python
+        "$_PY" build_patterns.py --answer-list "$BLIST" --out "$PATS" || exit 1; }
+    PFLAG="--patterns $PATS"
+fi
+
 mkdir -p "$SHARED" "$LOC"
 
 # BSD date has no -Is; this form works on both macOS and Linux.
@@ -366,6 +410,12 @@ if [ "$STAGE" = words ] || [ "$STAGE" = both ] || [ "$STAGE" = all ]; then
     # the word stage ranks single openers; --words restricts which are LISTED,
     # exactly as --answers does, and singletons.py takes the list directly
     [ -n "$WORDS" ] && AFLAG="--word-list $WLIST"
+    # singletons.py has no --patterns: it always counts over the 2315 answers.
+    # That is fine (nothing downstream reads this stage -- the pair stage
+    # enumerates pairs itself), but say so rather than let a --buckets run look
+    # as though every stage used the same columns.
+    [ -n "$BUCKETS" ] && echo "NOTE: the WORD stage scores over the 2315 answers;" \
+        "--buckets applies from the PAIR stage on" | tee -a "$LOC/singles.log"
     "$PY" tools/singletons.py $AFLAG 2>&1 | tee -a "$LOC/singles.log"
 fi
 
@@ -377,7 +427,7 @@ if [ "$STAGE" = pairs ] || [ "$STAGE" = both ] || [ "$STAGE" = all ]; then
     TFLAG=""
     [ "$THREADS" -gt 0 ] && TFLAG="--threads $THREADS"
     ./solver/pairsplit --metric singles --top "$PAIRKEEP" \
-        --out "$PAIROUT" $GLIST $DFLAG $TFLAG \
+        --out "$PAIROUT" $GLIST $PFLAG $DFLAG $TFLAG \
         2>&1 | tee -a "$LOC/singles.log"
 fi
 
@@ -470,7 +520,7 @@ if [ "$STAGE" = triples ] || [ "$STAGE" = all ]; then
     # --top bounds what is WRITTEN, never what is searched, so even an exhaustive
     # run emits a file that fits in the repo while still visiting every triple.
     ./solver/pairsplit --metric singles --extend "$CUT" --top "$TOP" \
-        --out "$TRIOUT" $GLIST $DFLAG $PCFLAG --parent-count "$NPAR" $TFLAG \
+        --out "$TRIOUT" $GLIST $PFLAG $DFLAG $PCFLAG --parent-count "$NPAR" $TFLAG \
         2>&1 | tee -a "$LOC/singles.log"
 fi
 
@@ -550,7 +600,7 @@ if [ "$STAGE" = quads ] || [ "$STAGE" = all ]; then
     [ -n "$QPCFLAG" ] && echo "parents are complete: skipping the parent table" \
         | tee -a "$LOC/singles.log"
     ./solver/pairsplit --metric singles --extend "$TCUT" --top "$TOP" \
-        --out "$QUADOUT" $GLIST $QDFLAG $QPCFLAG --parent-count "$NTRI" $TFLAG \
+        --out "$QUADOUT" $GLIST $PFLAG $QDFLAG $QPCFLAG --parent-count "$NTRI" $TFLAG \
         2>&1 | tee -a "$LOC/singles.log"
 fi
 
@@ -615,7 +665,7 @@ if [ "$STAGE" = quints ] || [ "$STAGE" = all ]; then
     [ -n "$QQPCFLAG" ] && echo "parents are complete: skipping the parent table" \
         | tee -a "$LOC/singles.log"
     ./solver/pairsplit --metric singles --extend "$QCUT" --top "$TOP" \
-        --out "$QUINTOUT" $GLIST $QQDFLAG $QQPCFLAG --parent-count "$NQUAD" $TFLAG \
+        --out "$QUINTOUT" $GLIST $PFLAG $QQDFLAG $QQPCFLAG --parent-count "$NQUAD" $TFLAG \
         2>&1 | tee -a "$LOC/singles.log"
 fi
 
@@ -674,7 +724,7 @@ if [ "$STAGE" = sextets ] || [ "$STAGE" = all ]; then
     TFLAG=""
     [ "$THREADS" -gt 0 ] && TFLAG="--threads $THREADS"
     ./solver/pairsplit --metric singles --extend "$XCUT" --top "$TOP" \
-        --out "$SXOUT" $GLIST $SXDFLAG $XPCFLAG --parent-count "$NQUINT" $TFLAG \
+        --out "$SXOUT" $GLIST $PFLAG $SXDFLAG $XPCFLAG --parent-count "$NQUINT" $TFLAG \
         2>&1 | tee -a "$LOC/singles.log"
 fi
 

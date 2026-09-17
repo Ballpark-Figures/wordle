@@ -1420,6 +1420,27 @@ Carlo, so its numbers carry a standard error and are not comparable with any
       unordered pairs, exactly `C(4282, 2)`, against 84129906 unrestricted — a
       9.2x smaller pair space. The unrestricted `guess_singletons.csv` is
       byte-identical after the change, so the generalisation is inert.
+  - **`--buckets <list>` SCORES THE SPLIT OVER A DIFFERENT LIST** (added
+    2026-09-17). Every metric here counts BUCKETS OF THE PATTERN MATRIX'S
+    COLUMNS, and those are the 2315 answers by default — so `singles` means
+    "answers alone in their bucket". **That is the wrong quantity whenever the
+    thing being screened for is about a LARGER pool**: a random-compatible
+    follow-up drawing from `custom.txt` is choosing between the CUSTOM words
+    still live, and a bucket can pin the answers while leaving three custom
+    words alive — which is exactly how the race leader loses (§ `guarantee`).
+    - **NO SOLVER CHANGE WAS NEEDED**: `pairsplit` reads its answer count from
+      the matrix (`NA = c`) and already took `--patterns`; this wrapper simply
+      never passed one. The derived 12972 x N matrix is built on demand under
+      `data/local/patterns/patterns_cols_<list>.npy` (MEASURED 3.65 s, 55 MB for
+      custom's 4282), additive and off the shared matrix paths like Lingo's.
+    - It is a DIFFERENT QUESTION, so `_over-<list>` joins the suffix **with the
+      others, before any output name is derived** — appending it later left the
+      pair file alone unmarked, which is the exact collision the suffix exists
+      to prevent.
+    - **The WORD stage still scores over the 2315** (`singletons.py` has no
+      `--patterns`), and the run SAYS so. Nothing downstream reads that stage —
+      the pair stage enumerates pairs itself — so it is a labelling matter, not
+      a wrong parent.
   - **WORDS AND PAIRS ARE EXHAUSTIVE; TRIPLES AND QUADS ARE GREEDY SCREENS**
     (`solver/run-singles.sh` says so). So `clint soare` IS the top pair, but a
     triple/quad head is "best of those screened" — never call such a run "the best
