@@ -54,7 +54,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 from build_patterns import load_patterns  # noqa: E402
 from wordle import ALL_GREEN, load_words  # noqa: E402
 from secondword import read_table  # noqa: E402
-from wordlesim import (CoupledDraw, answer_to_guess,  # noqa: E402
+from wordlesim import (CoupledDraw, answer_to_guess, check_tail,  # noqa: E402
                        make_opening_rule, second_rule_for, make_tail,
                        draw_answer, play_game)
 
@@ -263,8 +263,7 @@ def parse_args(argv):
             "%d openings is more than --max-openings %d: this compares FINALISTS, "
             "and every pair costs a column.\nCut it with --top N, or raise the "
             "limit deliberately." % (len(openings), max_openings))
-    if fallback not in ("answer", "guess"):
-        raise SystemExit("--fallback answer|guess is required")
+    check_tail(fallback)
     if t is None or t < 1:
         raise SystemExit("-t is required")
     if out is None:

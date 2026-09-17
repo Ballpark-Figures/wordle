@@ -31,7 +31,7 @@ and both named in the result file, because together they are the experiment.
     may return None on some turns and a guess on others; it is asked every turn,
     so it can hand back and take over again.
 
-  * The FOLLOW-UP is one of the two `TAILS` below, and it is a rule of the same
+  * The FOLLOW-UP is one of the `TAILS` below, and it is a rule of the same
     shape that simply never declines.  Which one is part of the strategy: they
     are different strategies and get different result files.
 
@@ -39,6 +39,11 @@ and both named in the result file, because together they are the experiment.
                  consistent with every reply so far (the 2315 mystery words)
         guess    the same draw from the LEGAL GUESSES still consistent with them
                  (the 12972 typeable words)
+        custom   the same draw from `words/custom.txt` (4282): every answer word
+                 plus every other legal word at wordfreq zipf >= 2.5.  It models
+                 a player who knows ordinary English but not the curated answer
+                 list -- between the other two, and a THIRD quantity, not an
+                 interpolation of them.
 
     "Consistent" means what it means in `ultraturns`: a word that could still BE
     the answer, i.e. one reproducing every reply seen so far.  So a word played
@@ -62,8 +67,8 @@ WHY IT TERMINATES (and needs no cap): either follow-up plays a word that is
 itself still consistent, so whatever comes back leaves its live set strictly
 smaller -- an all-green reply ends the game, and any other reply eliminates the
 word just played, since a word's reply against itself is all-green.  The true
-answer is in both pools and reproduces every reply it produced, so it is never
-eliminated.  A rule that plays other words only delays that; it may not do so
+answer is in EVERY pool -- which `pool_mask` enforces rather than assumes -- and
+reproduces every reply it produced, so it is never eliminated.  A rule that plays other words only delays that; it may not do so
 forever, which `_MAX_TURNS` asserts.
 """
 
@@ -96,7 +101,7 @@ def answer_to_guess(answers, guesses):
     return np.array([pos[w] for w in answers], dtype=np.int32)
 
 
-# --- the two follow-ups ----------------------------------------------------
+# --- the follow-ups --------------------------------------------------------
 #
 # Both have the RULE signature and simply never return None, so a follow-up is
 # usable as a strategy in its own right and a rule can hand over to it on any
@@ -131,14 +136,26 @@ class RandomAnswer:
 
 
 class RandomGuess:
-    """Guess a word drawn uniformly from the live LEGAL GUESSES (the 12972).
+    """Guess a word drawn uniformly from the live words of a GUESS-LIST POOL.
 
-    IT PLAYS WORDS THAT CANNOT BE THE ANSWER.  10657 of the 12972 are not in the
-    mystery list, so most draws are words the game would never choose as an
-    answer.  That is the point of it -- it is what a player who does not know the
-    curated answer list can do -- not a defect.
+    The pool is a SUBSET of the 12972 legal words, given as a boolean mask over
+    them; `None` means all 12972 (the `guess` follow-up).  Restricting it is the
+    whole of the `custom` follow-up -- the draw, the live set and the caching are
+    the same machinery, because they are the same question asked of fewer words.
 
-    IT KEEPS ITS OWN LIVE SET, over the GUESS list, because `play_game`'s `alive`
+    IT PLAYS WORDS THAT CANNOT BE THE ANSWER, whatever the pool.  10657 of the
+    12972 are not in the mystery list, and 1967 of custom.txt's 4282 are not; so
+    many draws are words the game would never choose as an answer.  That is the
+    point of it -- it is what a player who does not know the curated answer list
+    can do -- not a defect.
+
+    THE POOL MUST CONTAIN EVERY ANSWER, and `pool_mask` refuses one that does
+    not.  That is not fastidiousness: the termination argument is that the true
+    answer reproduces every reply it produced and so is never filtered out, and a
+    pool missing an answer breaks it -- the live set empties mid-game, on a
+    hidden word the follow-up could never have named.
+
+    IT KEEPS ITS OWN LIVE SET, over the guess list, because `play_game`'s `alive`
     bitmap is over the ANSWERS and cannot express this.  That set is a pure
     function of the (guess, reply) history, so the cache is keyed on the history
     itself: an extension of what it last saw is folded in incrementally, and
@@ -148,16 +165,26 @@ class RandomGuess:
     state into either.
     """
 
-    def __init__(self, full):
+    def __init__(self, full, pool=None):
         self.full = full          # 12972 x 12972: full[g][w] = reply of g against w
+        self.pool = pool          # boolean mask over the 12972, or None for all
         self.hist = []            # the (guess, reply) prefix `live` was built from
         self.live = None
+
+    pool_size = property(lambda self: int(self.full.shape[0] if self.pool is None
+                                          else self.pool.sum()))
+
+    def _seed(self):
+        """A fresh live set: the pool itself, before any reply has narrowed it."""
+        if self.pool is None:
+            return np.ones(self.full.shape[0], dtype=bool)
+        return self.pool.copy()
 
     def _refresh(self, played, replies):
         """Bring the live set up to date with the history, rebuilding if needed."""
         seen = list(zip(played, replies))
         if self.live is None or seen[:len(self.hist)] != self.hist:
-            self.live = np.ones(self.full.shape[0], dtype=bool)
+            self.live = self._seed()
             self.hist = []
         for g, fb in seen[len(self.hist):]:
             self.live &= self.full[g] == fb
@@ -167,7 +194,7 @@ class RandomGuess:
     def live_count(self, alive, played, replies):
         """How many words this follow-up would be choosing between right now.
 
-        Counted over the 12972, NOT the answers: a player drawing from the legal
+        Counted over the POOL, NOT the answers: a player drawing from the legal
         guesses cannot see that only two ANSWERS remain -- knowing that would mean
         knowing the curated list they are defined as not having.
         """
@@ -219,39 +246,149 @@ def _tail_answer(guesses, answers, ans2g):
     return RandomAnswer(ans2g)
 
 
-def _tail_guess(guesses, answers, ans2g):
-    """Build the guess-list follow-up, loading the matrix it needs.
+def load_full(guesses, who):
+    """The SQUARE 12972x12972 pattern matrix, or a refusal naming its build.
 
-    The SQUARE 12972x12972 matrix (~168 MB) is a separate artifact from the
-    12972x2315 one every other tool here reads, and it is gitignored like all of
-    data/local/, so it will be missing on a fresh clone -- refuse with the build
-    command rather than dying inside numpy.
+    A separate artifact from the 12972x2315 one every other tool here reads, and
+    gitignored like all of data/local/, so it is MISSING ON A FRESH CLONE --
+    refuse with the build command rather than dying inside numpy.
     """
     from build_patterns import load_patterns
     try:
         full = np.array(load_patterns(full=True))
     except FileNotFoundError:
         raise SystemExit(
-            "the 'guess' follow-up needs the SQUARE guess x guess pattern matrix.\n"
-            "Build it with 'python3 build_patterns.py --full' (about 18s, 168 MB).")
+            "the %r follow-up needs the SQUARE guess x guess pattern matrix.\n"
+            "Build it with 'python3 build_patterns.py --full' (about 18s, 168 MB)."
+            % who)
     if full.shape != (len(guesses), len(guesses)):
         raise SystemExit("patterns_full.npy is %s, not %d x %d -- rebuild it"
                          % (full.shape, len(guesses), len(guesses)))
-    return RandomGuess(full)
+    return full
+
+
+def pool_mask(guesses, answers, pool_words, who):
+    """A boolean mask over the 12972 for `pool_words`, with both preconditions.
+
+    TWO THINGS MUST HOLD, and neither is checked anywhere else, so both are
+    checked here rather than discovered as a wrong number or a mid-game crash:
+
+      * every pool word must be a LEGAL GUESS, or it cannot be played at all;
+      * every ANSWER must be in the pool, or the follow-up's live set can empty
+        mid-game -- the termination argument in the module docstring rests on
+        the true answer surviving every filter, and a pool missing one breaks
+        it on exactly the games that hide that word.
+    """
+    pos = {w: i for i, w in enumerate(guesses)}
+    missing = [w for w in pool_words if w not in pos]
+    if missing:
+        raise SystemExit(
+            "the %r follow-up's pool has %d word(s) that are not legal guesses, "
+            "so they could never be played: %s"
+            % (who, len(missing), ", ".join(missing[:5])))
+    mask = np.zeros(len(guesses), dtype=bool)
+    for w in pool_words:
+        mask[pos[w]] = True
+    absent = [w for w in answers if not mask[pos[w]]]
+    if absent:
+        raise SystemExit(
+            "the %r follow-up's pool is missing %d ANSWER word(s) -- it could "
+            "never name them, and its live set would empty mid-game on exactly "
+            "those: %s" % (who, len(absent), ", ".join(absent[:5])))
+    return mask
+
+
+def _tail_guess(guesses, answers, ans2g):
+    """The whole 12972-word guess list: the pool is unrestricted."""
+    return RandomGuess(load_full(guesses, "guess"))
+
+
+def _tail_custom(guesses, answers, ans2g):
+    """words/custom.txt -- every answer, plus every legal word at zipf >= 2.5.
+
+    THE LIST IS AN INPUT, NOT A RESULT: it is the committed artifact
+    build_freq_wordlist.py writes, the same one the adversarial hill-climb uses,
+    so a zipf means here what it means there.  NB it carries no spellcheck and
+    no curated block/allow lists -- only the frequency bar and the answer floor.
+    """
+    return RandomGuess(
+        load_full(guesses, "custom"),
+        pool_mask(guesses, answers,
+                  tail_pool_words("custom", guesses, answers), "custom"))
 
 
 TAILS = {
     "answer": _tail_answer,
     "guess": _tail_guess,
+    "custom": _tail_custom,
 }
+
+# A pool-restricted follow-up's word list, by its stem in data/shared/words/.
+# Adding a follow-up that draws from a list means one entry here and one in
+# TAILS; nothing else in the repo learns a filename.
+TAIL_LISTS = {
+    "custom": "custom",
+}
+
+# What each follow-up draws from, for the prose line a result file carries.  Kept
+# beside TAILS so a new follow-up cannot be registered without describing itself
+# -- `describe_tail` asserts the two agree.
+TAIL_POOLS = {
+    "answer": "2315 mystery",
+    "guess": "12972 legal guess",
+    "custom": "4282 custom",
+}
+assert set(TAIL_POOLS) == set(TAILS)
+
+
+def tail_pool_words(name, guesses, answers):
+    """The WORDS a follow-up draws from, as a list.
+
+    THE ONE PLACE A FOLLOW-UP NAME RESOLVES TO A LIST.  The follow-up itself
+    needs it as a mask and the ordering chooser needs it as pattern COLUMNS, and
+    if each resolved the name for itself the two could quietly come to mean
+    different lists -- the ordering optimised for one player and the games played
+    by another.
+    """
+    check_tail(name)
+    if name == "answer":
+        return list(answers)
+    if name == "guess":
+        return list(guesses)
+    from wordle import load_words
+    return load_words(TAIL_LISTS[name])
+
+
+def tail_names():
+    """The registered follow-ups, sorted -- the ONE list every caller validates
+    against, so adding one here reaches every tool instead of none of them."""
+    return sorted(TAILS)
+
+
+def check_tail(name, why=""):
+    """Refuse an unknown or missing follow-up, naming the registered ones.
+
+    Every entry point takes `--fallback` and every one of them used to spell the
+    valid set out for itself, so a third follow-up would have been valid in some
+    tools and unknown in others.  They all come through here now.
+    """
+    if name not in TAILS:
+        raise SystemExit(
+            "--fallback must be one of: %s\n"
+            "  (which random word fills in wherever the strategy's own rule "
+            "declines)%s" % (", ".join(tail_names()),
+                             "\n  " + why if why else ""))
+    return name
+
+
+def describe_tail(name):
+    """The pool a follow-up draws from, as a result file's prose names it."""
+    return TAIL_POOLS[check_tail(name)]
 
 
 def make_tail(name, guesses, answers, ans2g):
     """Build the named follow-up, or refuse with the list of known names."""
-    if name not in TAILS:
-        raise SystemExit("unknown follow-up %r; known: %s"
-                         % (name, ", ".join(sorted(TAILS))))
-    return TAILS[name](guesses, answers, ans2g)
+    return TAILS[check_tail(name)](guesses, answers, ans2g)
 
 
 # --- the game --------------------------------------------------------------
@@ -599,10 +736,14 @@ def _make_gray_second(guesses, answers, ans2g, args, name, tail=None, adapt=0):
 
 
 STRATEGIES = {
-    # The two baselines: the same empty rule under the two follow-ups.  Each
-    # PINS its follow-up, because the name is what says which one it used.
-    "random":       Strategy(_no_rule, "answer"),
-    "random-guess": Strategy(_no_rule, "guess"),
+    # The baselines: the SAME empty rule under each follow-up.  Each PINS its
+    # follow-up, because the name is what says which one it used -- so they take
+    # no --fallback and a conflicting one is refused rather than run under a name
+    # that hides it.  On turn one every word in the pool is live, so the opening
+    # word is itself a uniform draw: no opener is an input to any of them.
+    "random":        Strategy(_no_rule, "answer"),
+    "random-guess":  Strategy(_no_rule, "guess"),
+    "random-custom": Strategy(_no_rule, "custom"),
     # One fixed opener, then the follow-up.  It pins NOTHING: both follow-ups are
     # meaningful under it, they are different strategies, and --fallback says which.
     "opener":       Strategy(_make_opener, None),
@@ -642,8 +783,9 @@ def make_strategy(name, guesses, answers, ans2g, args=(), fallback=None,
                 "a different strategy under a name that hides it.\n"
                 "The %s follow-up with no rule is the strategy %r."
                 % (name, entry.fallback, fallback, fallback,
-                   next(n for n, e in STRATEGIES.items()
-                        if e.fallback == fallback and e.factory is _no_rule)))
+                   next((n for n, e in STRATEGIES.items()
+                         if e.fallback == fallback and e.factory is _no_rule),
+                        "a strategy that does not pin one")))
         tail_name = entry.fallback
     else:
         if fallback is None:
@@ -651,10 +793,7 @@ def make_strategy(name, guesses, answers, ans2g, args=(), fallback=None,
                 "strategy %r does not pin a follow-up, so --fallback is required "
                 "(one of: %s).\nIt is part of the strategy, and it is in the "
                 "result filename." % (name, ", ".join(sorted(TAILS))))
-        if fallback not in TAILS:
-            raise SystemExit("unknown follow-up %r; known: %s"
-                             % (fallback, ", ".join(sorted(TAILS))))
-        tail_name = fallback
+        tail_name = check_tail(fallback)
     if adapt:
         if entry.factory is _no_rule:
             raise SystemExit("--pair-adaptive needs an opening to abandon; "

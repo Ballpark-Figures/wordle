@@ -76,8 +76,8 @@ import paths  # noqa: E402
 from build_patterns import load_patterns  # noqa: E402
 from secondword import read_table, word_by_code, group_masks  # noqa: E402
 from wordle import load_words, pattern  # noqa: E402
-from wordlesim import (answer_to_guess, make_opening_rule, make_tail,  # noqa: E402
-                       play_game, second_rule_for)
+from wordlesim import (answer_to_guess, check_tail, make_opening_rule,  # noqa: E402
+                       make_tail, play_game, second_rule_for)
 
 # The default report: one row per grey count.  With --split-matched-vowels the
 # 3- and 4-grey rows are split by how many MATCHED (green/yellow) tiles sit on a
@@ -118,8 +118,7 @@ def parse_args(argv):
     if not a["opener"]:
         raise SystemExit("--opener is required: the decomposition is for ONE "
                          "opener, against the optimal tree for that same opener")
-    if a["fallback"] not in ("answer", "guess"):
-        raise SystemExit("--fallback must be 'answer' or 'guess'")
+    check_tail(a["fallback"])
     if a["n"] < 2:
         raise SystemExit("-n must be at least 2 (a standard error needs two)")
     if a["out"] is None:

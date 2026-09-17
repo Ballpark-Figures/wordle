@@ -62,7 +62,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 from build_patterns import load_patterns  # noqa: E402
 from wordle import load_words  # noqa: E402
-from wordlesim import answer_to_guess  # noqa: E402
+from wordlesim import (answer_to_guess, check_tail,  # noqa: E402
+                       pool_mask, tail_pool_words)
 
 # Naming one of m live words at random, when the answer is among them.  Exact for
 # m = 1 and 2 only, which is why the tool refuses a larger threshold.
@@ -228,9 +229,7 @@ def main(argv):
             raise SystemExit("unknown argument: %s" % a)
     if src is None or out is None:
         raise SystemExit("--from SETS.txt and --out ORDERED.txt are required")
-    if fallback not in ("answer", "guess"):
-        raise SystemExit("--fallback answer|guess is required: which pool the "
-                         "switch counts is part of the question")
+    check_tail(fallback, "which pool the switch counts is part of the question")
     if adapt not in (0, 1, 2):
         raise SystemExit("--pair-adaptive must be 0, 1 or 2 here: above that the "
                          "continuation is no longer a closed form and this tool "
@@ -240,11 +239,21 @@ def main(argv):
     answers = load_words("mystery")
     ans2g = answer_to_guess(answers, guesses)
     pat = np.array(load_patterns())
+    # The pool's COLUMNS are the words the switch counts -- the follow-up's own
+    # list, since that is what a player drawing from it can see.  `order_costs`
+    # needs nothing more than that: it finds an answer's group by searchsorting
+    # the answer's own key into the pool's, so any pool CONTAINING every answer
+    # works, and `pool_mask` is what guarantees that for a restricted one.
     if fallback == "answer":
         pool = pat                       # columns are the 2315 answers
     else:
         from build_patterns import load_patterns as lp
-        pool = np.array(lp(full=True))   # columns are the 12972 guesses
+        full = np.array(lp(full=True))   # columns are the 12972 guesses
+        if fallback == "guess":
+            pool = full
+        else:
+            words = tail_pool_words(fallback, guesses, answers)
+            pool = full[:, pool_mask(guesses, answers, words, fallback)]
 
     sets = []
     with open(src) as f:

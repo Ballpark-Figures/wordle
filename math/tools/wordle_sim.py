@@ -49,8 +49,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 from build_patterns import load_patterns  # noqa: E402
 from wordle import load_words  # noqa: E402
-from wordlesim import (WIN_WITHIN, answer_to_guess, draw_answer,  # noqa: E402
-                       make_strategy, make_tail, play_game)
+from wordlesim import (WIN_WITHIN, answer_to_guess, describe_tail,  # noqa: E402
+                       draw_answer, make_strategy, make_tail, play_game)
 
 COLUMNS = "game,guesses,won,answer,sequence"
 
@@ -179,8 +179,7 @@ def main(argv):
                  % (label, tail_name, t, seed, win_within))
         fh.write("# the follow-up fills in wherever the rule declines; it draws a "
                  "random word still\n# consistent with every reply, from the %s "
-                 "list\n"
-                 % ("2315 mystery" if tail_name == "answer" else "12972 legal guess"))
+                 "list\n" % describe_tail(tail_name))
         fh.write("# answers drawn uniformly from the 2315 mystery words; guesses "
                  "from the 12972 legal words\n")
         fh.write("# NO guess cap: play continues past %d until the word is found, "

@@ -132,17 +132,17 @@ esac
 # A strategy drawing from the whole guess list needs the SQUARE matrix, which is
 # a separate artifact and gitignored like the rest of data/local/.
 case "$FALLBACK" in
-    ''|answer|guess) ;;
-    *) echo "--fallback must be 'answer' or 'guess' (which random word fills in" >&2
-       echo "  wherever the strategy's own rule declines)" >&2; exit 1 ;;
+    ''|answer|guess|custom) ;;
+    *) echo "--fallback must be 'answer', 'guess' or 'custom' (which random word" >&2
+       echo "  fills in wherever the strategy's own rule declines)" >&2; exit 1 ;;
 esac
 # Either the strategy's own name or an explicit --fallback can put the guess-list
 # follow-up in play, and it needs the SQUARE matrix -- a separate artifact,
 # gitignored like the rest of data/local/.
 case "$STRATEGY $FALLBACK" in
-    *random-guess*|*guess)
+    *random-guess*|*guess|*custom)
         [ -f data/local/patterns/patterns_full.npy ] || {
-            echo "the guess follow-up needs the square guess x guess matrix." >&2
+            echo "the $FALLBACK follow-up needs the square guess x guess matrix." >&2
             echo "  Build it with '$PY build_patterns.py --full' (~18s, 168 MB)." >&2
             exit 1; } ;;
 esac

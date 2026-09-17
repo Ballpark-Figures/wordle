@@ -75,9 +75,9 @@ from opening_list import read_openings                          # noqa: E402
 import race_stats as rs                                          # noqa: E402
 from secondword import read_table                               # noqa: E402
 from wordle import load_words                                   # noqa: E402
-from wordlesim import (WIN_WITHIN, CoupledDraw, answer_to_guess,  # noqa: E402
-                       draw_answer, make_opening_rule, make_tail, play_game,
-                       second_rule_for)
+from wordlesim import (WIN_WITHIN, TAILS, CoupledDraw,  # noqa: E402
+                       answer_to_guess, draw_answer, make_opening_rule,
+                       make_tail, play_game, second_rule_for, tail_names)
 
 COLUMNS = ("word,trials,mean,stderr,diff_vs_leader,paired_stderr,sigma,"
            "win_rate,status,is_answer")
@@ -150,11 +150,11 @@ def parse_args(argv):
         v = argv[i + 1]
         a[k] = int(v) if k in ints else float(v) if k in floats else v
         i += 2
-    if a["fallback"] not in ("answer", "guess"):
+    if a["fallback"] not in TAILS:
         raise SystemExit(
-            "--fallback is required: 'answer' or 'guess', which random word the "
+            "--fallback is required (%s): which random word the "
             "opener hands the rest of the game to.\nIt is part of the question, "
-            "and it is in the result filename.\n"
+            "and it is in the result filename.\n" % ", ".join(tail_names()) +
             "Use the wrapper: bash solver/run-wordle-race.sh --fallback answer")
     if a["out"] == "--print-stem":
         return a

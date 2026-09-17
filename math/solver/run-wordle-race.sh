@@ -94,11 +94,11 @@ while [ $# -gt 0 ]; do
 done
 
 case "$FALLBACK" in
-    answer|guess) ;;
-    '') echo "--fallback is required: 'answer' or 'guess', which random word the" >&2
-        echo "  opener hands the rest of the game to.  It is part of the question." >&2
+    answer|guess|custom) ;;
+    '') echo "--fallback is required: 'answer', 'guess' or 'custom' -- which random" >&2
+        echo "  word the opener hands the rest of the game to.  Part of the question." >&2
         exit 1 ;;
-    *) echo "--fallback must be 'answer' or 'guess'" >&2; exit 1 ;;
+    *) echo "--fallback must be 'answer', 'guess' or 'custom'" >&2; exit 1 ;;
 esac
 case "$SEED" in
     ''|*[!0-9]*) echo "--seed must be a non-negative number" >&2; exit 1 ;;
@@ -112,14 +112,16 @@ PY=../.venv/bin/python
 [ -f data/local/patterns/patterns.npy ] || {
     echo "no data/local/patterns/patterns.npy -- run '$PY build_patterns.py' first" >&2
     exit 1; }
-# The guess follow-up keeps its own live set over the 12972, which needs the
-# SQUARE matrix -- a separate artifact, gitignored like the rest of data/local/.
-if [ "$FALLBACK" = guess ]; then
-    [ -f data/local/patterns/patterns_full.npy ] || {
-        echo "the 'guess' follow-up needs the square guess x guess matrix." >&2
-        echo "  Build it with '$PY build_patterns.py --full' (~18s, 168 MB)." >&2
-        exit 1; }
-fi
+# A follow-up keeping its own live set over the GUESS list needs the SQUARE
+# matrix -- a separate artifact, gitignored like the rest of data/local/.
+# `custom` does too: its pool is a subset of the 12972, filtered the same way.
+case "$FALLBACK" in
+    guess|custom)
+        [ -f data/local/patterns/patterns_full.npy ] || {
+            echo "the '$FALLBACK' follow-up needs the square guess x guess matrix." >&2
+            echo "  Build it with '$PY build_patterns.py --full' (~18s, 168 MB)." >&2
+            exit 1; } ;;
+esac
 if [ -n "$SECONDFROM" ]; then
     [ -f "$SECONDFROM" ] || {
         echo "no such second-word table: $SECONDFROM" >&2

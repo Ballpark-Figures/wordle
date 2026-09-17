@@ -98,8 +98,8 @@ from secondword import (Table, fire_groups, fire_set,  # noqa: E402
 from wordlesim import (WIN_WITHIN, CoupledDraw, answer_to_guess,  # noqa: E402
                        draw_answer,
                        fixed_opening, make_opening_rule, make_strategy,
-                       make_second_rule, second_rule_for,
-                       make_tail, play_game)
+                       make_second_rule, pool_mask, second_rule_for,
+                       make_tail, play_game, tail_names)
 from wordle_sim import summarise  # noqa: E402
 from wordle_sweep import PICK_OFFSET, sweep_word  # noqa: E402
 from sweep_shortlist import shortlist  # noqa: E402
@@ -333,6 +333,99 @@ def main(argv):
         failures.append("%d hidden answers came from outside the 2315 mystery words"
                         % drawn_outside)
 
+    # --- differential: the same draw again, from the 4282-word CUSTOM list ----
+    # The third pool, and the one that is a strict SUBSET of the guess list, so
+    # this is also what pins the pool MASK: a mask off by one word would show up
+    # as a different draw the moment the two sides' live sets differ in size.
+    custom = load_words("custom")
+    custom_set = set(custom)
+    crule, ctail_name = make_strategy("random-custom", guesses, answers, ans2g)
+    ctail = make_tail(ctail_name, guesses, answers, ans2g)
+    if ctail_name != "custom":
+        failures.append("strategy 'random-custom' resolved to the %r follow-up"
+                        % ctail_name)
+    if ctail.pool_size != len(custom):
+        failures.append("the custom follow-up's pool is %d words, the list is %d"
+                        % (ctail.pool_size, len(custom)))
+    # The precondition the termination argument rests on, checked here rather
+    # than assumed: every answer is in the pool, so it can never be filtered out.
+    if not set(answers) <= custom_set:
+        failures.append("%d answers are missing from the custom pool"
+                        % len(set(answers) - custom_set))
+    cscores, coff_list, cout_of_pool = [], 0, 0
+    for seed in range(guess_games):
+        fast_rng = np.random.default_rng(900000 + seed)
+        ref_rng = np.random.default_rng(900000 + seed)
+        a_fast = draw_answer(len(answers), fast_rng)
+        a_ref = int(ref_rng.integers(len(answers)))
+        if a_fast != a_ref:
+            failures.append("random-custom seed %d: the two sides drew different "
+                            "answers" % seed)
+            break
+        answer = answers[a_fast]
+        played, replies = play_game(pat, ans2g, a_fast, crule, ctail, fast_rng)
+        words = [guesses[g] for g in played]
+        ref_words, _ = refplay_game(custom, answer, ref_rng)
+        if words != ref_words:
+            failures.append("random-custom seed %d (%s): fast %s vs reference %s"
+                            % (seed, answer, " ".join(words), " ".join(ref_words)))
+            break
+        if words[-1] != answer or answer in words[:-1]:
+            failures.append("random-custom seed %d (%s): the game did not end on "
+                            "the answer" % (seed, answer))
+            break
+        bad_at = consistent_prefix(words, answer)
+        if bad_at is not None:
+            failures.append("random-custom seed %d (%s): guess %d (%s) was not "
+                            "compatible with the replies so far"
+                            % (seed, answer, bad_at + 1, words[bad_at]))
+            break
+        cscores.append(len(words))
+        coff_list += sum(1 for w in words if w not in mystery)
+        cout_of_pool += sum(1 for w in words if w not in custom_set)
+    print("replayed %d games of random-custom against the same reference over the "
+          "%d-word pool: identical sequences, %d guesses played that are NOT "
+          "mystery words" % (len(cscores), len(custom), coff_list))
+    if cout_of_pool:
+        failures.append("random-custom played %d word(s) from OUTSIDE its pool"
+                        % cout_of_pool)
+
+    # THE POOL MASK MUST DO SOMETHING.  Every check above would also pass with a
+    # mask selecting all 12972, since the reference would then be handed the same
+    # pool -- so play the SAME seeds under both and require them to part company.
+    custom_differed = 0
+    for seed in range(guess_games):
+        gr = np.random.default_rng(700000 + seed)
+        cr = np.random.default_rng(700000 + seed)
+        a_g = draw_answer(len(answers), gr)
+        a_c = draw_answer(len(answers), cr)
+        gw = [guesses[i] for i in play_game(pat, ans2g, a_g, None, gtail, gr)[0]]
+        cw = [guesses[i] for i in play_game(pat, ans2g, a_c, None, ctail, cr)[0]]
+        custom_differed += gw != cw
+    print("the custom pool is not the guess pool: %d of %d identically-seeded "
+          "games diverged" % (custom_differed, guess_games))
+
+    # --- the pool mask defends its two preconditions --------------------------
+    # Both are constructed: the shipped list satisfies each, so neither case can
+    # arise on its own, and a mask that silently accepted them would break a run
+    # only on the games that happen to hide the missing word.
+    pool_refusals = 0
+    try:
+        pool_mask(guesses, answers, [w for w in custom if w != answers[0]], "probe")
+    except SystemExit as e:
+        pool_refusals += "ANSWER" in str(e)
+    try:
+        pool_mask(guesses, answers, list(custom) + ["zzzzz"], "probe")
+    except SystemExit as e:
+        pool_refusals += "legal guesses" in str(e)
+    if pool_refusals != 2:
+        failures.append("pool_mask accepted a pool missing an answer, or one "
+                        "holding an unplayable word (%d of 2 refused)"
+                        % pool_refusals)
+    else:
+        print("pool_mask refuses both constructed bad pools: one missing an "
+              "answer, one holding a word that is not a legal guess")
+
     # --- differential: a prefix strategy that then defers to the tail ---------
     # The opener is taken BY INDEX, so no word is written down in this gate.
     opener_g = 0
@@ -345,7 +438,7 @@ def main(argv):
     # against each -- and the guess follow-up is then FIRST CALLED AT TURN 1,
     # which is what exercises its catch-up from a history it did not watch.
     opened, non_candidate, handed = 0, 0, {}
-    for tname, pool in (("answer", answers), ("guess", guesses)):
+    for tname, pool in (("answer", answers), ("guess", guesses), ("custom", custom)):
         ptail = make_tail(tname, guesses, answers, ans2g)
         n = 0
         for seed in range(min(games, 60 if tname == "answer" else guess_games)):
@@ -408,7 +501,7 @@ def main(argv):
     sweep_t, sweep_seed = 8, 4
     probe = [guesses[0], guesses[len(guesses) // 2], guesses[-1]]
     seen_answers = {}
-    for tname, pool in (("answer", answers), ("guess", guesses)):
+    for tname, pool in (("answer", answers), ("guess", guesses), ("custom", custom)):
         ptail = make_tail(tname, guesses, answers, ans2g)
         for w in probe:
             st = sweep_word(pat, ans2g, len(answers), sweep_t, sweep_seed,
@@ -446,7 +539,7 @@ def main(argv):
     pairs = [[guesses[0], guesses[1]],
              [guesses[len(guesses) // 3], guesses[-1]]]
     blind_hits, pair_rows = 0, 0
-    for tname, pool in (("answer", answers), ("guess", guesses)):
+    for tname, pool in (("answer", answers), ("guess", guesses), ("custom", custom)):
         ptail = make_tail(tname, guesses, answers, ans2g)
         for opening in pairs:
             gs = [guesses.index(w) for w in opening]
@@ -1044,7 +1137,7 @@ def main(argv):
         return a
     gs_opener, gs_second = guesses[gs_opener_g], guesses[gs_second_g]
     gs_fired = gs_declined = 0
-    for tname, pool in (("answer", answers), ("guess", guesses)):
+    for tname, pool in (("answer", answers), ("guess", guesses), ("custom", custom)):
         gtail = make_tail(tname, guesses, answers, ans2g)
         rule = make_second_rule(gs_opener_g, by_code(gs_second_g))
         for seed in range(min(games, 80 if tname == "answer" else guess_games)):
@@ -1275,6 +1368,15 @@ def main(argv):
     if not off_list:
         failures.append("random-guess never played a word outside the mystery list, "
                         "so it was indistinguishable from random (raise --guess-games)")
+    if not cscores:
+        failures.append("no random-custom game completed, so nothing was compared")
+    if not coff_list:
+        failures.append("random-custom never played a word outside the mystery list, "
+                        "so it was indistinguishable from random (raise --guess-games)")
+    if not custom_differed:
+        failures.append("random-custom played the identical games to random-guess on "
+                        "every seed, so the POOL MASK was never shown to do anything "
+                        "-- a mask that selected all 12972 would pass this run")
     if not gs_fired:
         failures.append("the gray-second rule never fired, so its second word "
                         "was never played")

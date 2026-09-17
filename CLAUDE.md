@@ -1660,26 +1660,54 @@ source of truth. Run it with **`bash solver/run-wordle-sim.sh --strategy NAME -t
   fills it in. So a new strategy writes only its own part, and may hand back and
   take over again. Register it in `wordlesim.STRATEGIES` (name -> `Strategy(factory,
   pinned follow-up or None)`); `--strategy list` prints the registry.
-- **TWO FOLLOW-UPS, and which one is part of the strategy** — different strategies,
+- **THREE FOLLOW-UPS, and which one is part of the strategy** — different strategies,
   different numbers, so `--fallback` is REQUIRED for any rule that does not pin one
   and it lands in the filename. **`answer`**: a word drawn UNIFORMLY AT RANDOM from
   the ANSWERS still consistent with every reply (2315). **`guess`**: the same draw
-  from the LEGAL GUESSES still consistent with them (12972). "Consistent" is
-  `ultraturns`' legality notion (a word that could still BE the answer), so a word
-  played and missed is never played again. A game ends only when the answer is
-  actually PLAYED.
+  from the LEGAL GUESSES still consistent with them (12972). **`custom`** (added
+  2026-09-17, user's call): the same draw from **`words/custom.txt` (4282)** — every
+  answer word plus every other legal word at wordfreq zipf >= 2.5, the same committed
+  list the adversarial hill-climb uses. "Consistent" is `ultraturns`' legality notion
+  (a word that could still BE the answer), so a word played and missed is never
+  played again. A game ends only when the answer is actually PLAYED.
+  - **`custom` IS A THIRD QUANTITY, NOT AN INTERPOLATION of the other two**, and its
+    numbers never share a table with theirs. It models a player who knows ordinary
+    English but not the curated answer list. SMOKE-TESTED at 2000 games of the bare
+    baseline, which is where it must structurally sit: mean 4.10 / 98.1% win
+    (`answer`), **4.30 / 97.2% (`custom`)**, 4.87 / 90.6% (`guess`).
+  - **IT IS `RandomGuess` WITH A POOL MASK, not a second implementation** — the pool
+    is a boolean mask over the 12972, `None` meaning all of them, so the draw, the
+    live set and the history cache are the same machinery and the `guess` path is
+    bit-identical (`checkwordlesim.py` still passes unchanged). **So it needs the
+    SQUARE matrix too**, and every wrapper's precondition covers it.
+  - **TWO PRECONDITIONS, BOTH ENFORCED BY `pool_mask`, NEITHER ASSUMED.** Every pool
+    word must be a legal guess (or it could never be played), and **every ANSWER must
+    be in the pool** — the termination argument is that the true answer survives every
+    filter, so a pool missing one empties the live set mid-game, on exactly the games
+    that hide that word. Both refusals are CONSTRUCTED in the gate and mutation-tested.
+  - **`tail_pool_words()` is the ONE place a follow-up name resolves to a list**, and
+    `check_tail()` the ONE place `--fallback` is validated. Before this, five tools
+    each spelled `("answer", "guess")` out for themselves, so a third follow-up would
+    have been valid in some and unknown in others — the § centralize rule.
+  - **The gate ASSERTS the mask does something**: identically-seeded games under
+    `custom` and under `guess` must DIVERGE, or a mask selecting all 12972 would pass
+    every other check (it was mutation-tested exactly that way, and caught).
+  - `random-custom` is the third baseline — the same empty rule under this follow-up,
+    pinning it like the other two.
 - **THE HIDDEN ANSWER IS DRAWN FROM THE 2315 WHICHEVER FOLLOW-UP IS IN USE — the
   pool is the STRATEGY's, never the GAME's.** That is what makes two runs differing
   only in their follow-up directly comparable with each other, unlike a
   cross-game comparison.
-- **`random` and `random-guess` are the SAME EMPTY RULE under the two follow-ups**,
+- **`random`, `random-guess` and `random-custom` are the SAME EMPTY RULE under the
+  three follow-ups**,
   and each PINS its own (the name is what records it), so they take no `--fallback`
   and a conflicting one is refused rather than run under a name that hides it. On
   turn one every word in the pool is live, so the opening word is itself a uniform
   draw: **no opener is an input and no word is hardcoded anywhere.** `guess`
   deliberately plays words that can never be the answer (10657 of the 12972 are not
   mystery words) — what a player without the curated answer list can do, not a defect.
-- **The `guess` follow-up keeps its OWN live set over the guess list** (`play_game`'s
+- **The `guess` and `custom` follow-ups keep their OWN live set over the guess list**
+  (`play_game`'s
   `alive` is over the answers and cannot express it), **cached on the (guess, reply)
   HISTORY it was built from** — an extension is folded in incrementally, anything
   else is rebuilt. That is what makes it safe AS a follow-up: it can be handed a
