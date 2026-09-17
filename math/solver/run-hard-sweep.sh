@@ -77,7 +77,7 @@
 set -u
 
 MATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-OUT=data/shared/hardturns/opener_totals.csv
+SHR=data/shared/hardturns
 LOC=data/local/hardturns
 
 cd "$MATH" || exit 1
@@ -106,6 +106,28 @@ while [ $# -gt 0 ]; do
     esac
 done
 
+# WHERE THE RESULTS GO, and why a PINNED cap gets its own files.  The escalating
+# sweep (DEPTH < DEPTHMAX) keeps the historic unsuffixed names, so every run and
+# every resume made before this existed is untouched.  A PINNED cap
+# (--depth N --depth-max N) is a DIFFERENT QUANTITY -- "the minimum total for the
+# openers that fit in N", with INFEASIBLE the expected answer for the rest -- so
+# it gets its own CSV and its own tree directory, exactly as ansall gives each
+# --depth its own file.  Sharing them would be worse than untidy: resume reads
+# the CSV to skip finished openers, so a pinned run pointed at the escalating
+# file would find all 12972 done, skip every one and exit having measured
+# NOTHING, while its trees overwrote the escalating run's.
+#
+# sweep.log is deliberately NOT stamped -- tools/paths.py hardcodes LOG, so a
+# per-depth log would make report.py read the wrong run.  The CSV and trees are
+# reachable with the overrides paths.py already provides, printed below.
+if [ "$DEPTH" = "$DEPTHMAX" ]; then
+    OUT="$SHR/opener_totals_d$DEPTH.csv"
+    TRE="$LOC/trees_d$DEPTH"
+else
+    OUT="$SHR/opener_totals.csv"
+    TRE="$LOC/trees"
+fi
+
 if pgrep -x hardturns >/dev/null; then
     echo "hardturns is already running (pid $(pgrep -x hardturns | tr '\n' ' '))." >&2
     echo "Attach to its output instead:  tail -F $MATH/$LOC/sweep.log" >&2
@@ -122,11 +144,19 @@ fi
 # Only the DIRECTORIES -- the solver writes the CSV header itself, on the run
 # that finds no resumable rows.  Writing one here too produced a duplicate (and,
 # once the depth column was added, a stale 4-column one on line 1).
-mkdir -p "$(dirname "$OUT")" "$LOC/trees"
+mkdir -p "$(dirname "$OUT")" "$TRE"
 
 # reuse a table snapshot if present, so we resume warm rather than cold
 WARM=""
 [ "$TTBITS" -gt 0 ] && [ -f "$LOC/tt.bin" ] && WARM="--tt-load $LOC/tt.bin"
+
+echo "writing  csv:   $MATH/$OUT"
+echo "         trees: $MATH/$TRE"
+echo "         log:   $MATH/$LOC/sweep.log"
+if [ "$DEPTH" = "$DEPTHMAX" ]; then
+    echo "cap PINNED at $DEPTH -- INFEASIBLE is an expected result, not a failure."
+    echo "read it with:  WORDLE_SOLVER=hardturns WORDLE_CSV=$OUT WORDLE_TREES=$TRE python3 tools/report.py"
+fi
 
 # the timestamped header is what inflight.py uses to find the run boundary
 echo "[$(date -Is)] resuming wordle HARD sweep ($PHASE, threads=$THREADS, tt-bits=$TTBITS, depth=$DEPTH..$DEPTHMAX) $WARM" \
@@ -147,7 +177,7 @@ echo "[$(date -Is)] resuming wordle HARD sweep ($PHASE, threads=$THREADS, tt-bit
 # other sweep silently paid that cost for reporting nobody was reading.
 "${NICE[@]}" ./solver/hardturns --sweep --order bisect \
     --out "$OUT" \
-    --trees "$LOC/trees" \
+    --trees "$TRE" \
     --depth "$DEPTH" --depth-max "$DEPTHMAX" \
     --tt-bits "$TTBITS" --threads "$THREADS" $WARM \
     2>&1 | tee -a "$LOC/sweep.log"
