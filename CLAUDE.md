@@ -2659,6 +2659,50 @@ moment that becomes true, and the survivors double.
   were each caught).
 - Data under `math/data/shared/guarantee/`, log under `math/data/local/guarantee/`.
 
+### `answerpairs` — pairs of ANSWERS ranked by how FEW words split them
+`tools/answer_pairs.py` states the question and IS the source of truth. Run it
+with **`bash solver/run-answer-pairs.sh [--pairs L] [--splitters L] [--top N]`**
+(from `math/`), attached, tee'd log, `--dry-run`. Exact and deterministic — no
+sampling, no seed — so a re-run reproduces the file byte for byte.
+- **THE QUANTITY** (user's, 2026-09-18): for every unordered pair `(a, b)` of
+  words from the PAIR list, count the SPLITTER-pool words `g` with
+  `pattern(g, a) != pattern(g, b)`, and rank **ASCENDING** — fewest splitters
+  first, so the head is the pairs the follow-up can least often separate.
+- **IT IS THE INVERSE OF EVERY OTHER RANKING HERE.** The rest of the repo scores
+  a GUESS by what it does to the answer set; this scores a PAIR OF ANSWERS by
+  how much of the pool can resolve it. A row is a property of two answers, not
+  of an opener — never table it beside a singleton count, an ssq, a max bucket
+  or an `optturns` total.
+- **WHY IT BEARS ON THE GUARANTEE.** An answer is UNSOLVED exactly when some
+  live pool word fails to fully split it, so a pair with few splitters is the
+  raw material a fatal bucket is made of. This says which pairs those are
+  BEFORE an opening is chosen, which no opener-side screen can do.
+- **THE FLOOR IS 2 WHENEVER BOTH WORDS ARE IN THE POOL, and it is forced, not
+  conventional**: a word replies all-green to itself and never to a different
+  word, so each of the two splits the pair. `custom.txt` contains every answer,
+  so under the default pools nothing can score below 2 — and a pair AT 2 is
+  separated by nothing except naming one of them outright.
+- **TWO LISTS, TWO ROLES, NEITHER DEFAULTED IN THE TOOL** (the greens scar; the
+  wrapper carries defaults a human reads). `--pairs` must be a subset of the
+  2315 (they are matrix COLUMNS); `--splitters` must be legal guesses (ROWS).
+  Both are in the filename. `custom` is the wrapper default because it is the
+  pool the random-compatible follow-up draws from; `guess` asks the same
+  question of a player who knows all 12972.
+- **NO NEW MATRIX** — splitters are a subset of the 12972 rows and pair words a
+  subset of the 2315 columns, so it is a sub-block of the DEFAULT
+  `patterns.npy`. It does not want `--full`.
+- **The count is ONE COMPARISON DOWN A COLUMN**, not a bucketing: two columns
+  differ in exactly the rows whose word separates them. Done one column at a
+  time because the `(n, n, m)` broadcast would be 23 GB at the real sizes.
+- **THE GATE IS BUILT IN and always runs**, in two halves that catch different
+  things: sampled pairs are recomputed FROM THE STRINGS with `wordle.pattern`
+  (and checked symmetric), and the floor of 2 is checked over EVERY pair.
+  MUTATION-TESTED — reversing the column index map PASSES the floor check (it
+  permutes the same multiset of counts) and is caught by the string check, which
+  is why both exist.
+- Data under `math/data/shared/answerpairs/` with a `.meta` sidecar recording
+  `scored`/`written`/`complete`, log under `data/local/answerpairs/`.
+
 ### `greedybuild` — build an opening LETTER BY LETTER, against the real objective
 `math/greedybuild.py` states the rule and IS the source of truth;
 `tools/greedy_build.py` is the driver. Run it with
