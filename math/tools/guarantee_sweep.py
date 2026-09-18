@@ -162,13 +162,29 @@ def main(argv):
     apool = np.array([ppos[w] for w in answers])
     ctx = (full, cidx, pool, apool, answers, a["adapt"], a["cap"], gpos)
 
-    done = set()
+    # THE INCUMBENT IS REBUILT FROM THE CSV ON A RESUME, not started fresh.
+    # Without that a resumed run re-announces openings WORSE than ones already on
+    # file as "NEW BEST" -- the same scar greens.c and wturns carry, where a
+    # resumed run reported a tie list it had not actually searched for.
+    done, best = set(), None
     if a["out"] and os.path.exists(a["out"]):
         with open(a["out"]) as f:
             for ln in f:
-                if not ln.startswith("#") and not ln.startswith("word,"):
-                    done.add(ln.split(",")[0])
-        print("resuming: %d opening(s) already on file" % len(done))
+                if ln.startswith("#") or ln.startswith("word,"):
+                    continue
+                c = ln.rstrip("\n").split(",")
+                done.add(c[0])
+                try:
+                    cand = (int(c[1]), int(c[3]))
+                except (IndexError, ValueError):
+                    continue
+                if best is None or cand < best[0]:
+                    best = (cand, c[0])
+        print("resuming: %d opening(s) already on file%s"
+              % (len(done),
+                 "" if best is None else
+                 ", best so far %s (worst %d, %d can lose)"
+                 % (best[1], best[0][0], best[0][1])))
     fh = None
     if a["out"]:
         os.makedirs(os.path.dirname(a["out"]) or ".", exist_ok=True)
@@ -194,6 +210,16 @@ def main(argv):
         guaranteed = int(worst <= a["cap"])
         nguar += guaranteed
         ndone += 1
+        # WHAT "BEST" MEANS: fewest guesses in the worst case, ties broken by how
+        # many answers can lose at all.  Both are exact, so a tie is a real tie
+        # and only a STRICT improvement prints -- a plateau would otherwise
+        # flood the log, which is why pairsplit's incumbent line does the same.
+        cand = (worst, losing)
+        if best is None or cand < best[0]:
+            best = (cand, name)
+            print("[%7.0fs] %-30s worst=%d  %d of %d answers can lose  NEW BEST%s"
+                  % (time.time() - t0, name, worst, losing, len(answers),
+                     "  -- GUARANTEED" if guaranteed else ""), flush=True)
         if fh:
             fh.write("%s,%d,%d,%d,%.8f,%s,%s\n"
                      % (name, worst, guaranteed, losing,
@@ -208,6 +234,9 @@ def main(argv):
         fh.close()
     print("%d of %d examined openings guarantee a win within %d"
           % (nguar, ndone, a["cap"]))
+    if best is not None:
+        print("best: %s -- worst case %d guesses, %d of %d answers can lose"
+              % (best[1], best[0][0], best[0][1], len(answers)))
     if a["out"]:
         print("wrote %s" % a["out"])
     return 0
