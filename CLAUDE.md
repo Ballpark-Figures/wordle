@@ -1469,6 +1469,34 @@ Carlo, so its numbers carry a standard error and are not comparable with any
     - **The cap is NOT defaulted away**, deliberately: how many rows survive IS
       the experiment's coverage, the same reason `opening_list.py` requires
       `--top`. The wrapper still defaults `TOP=all`; the refusal names the flag.
+    - **THE MERGE FREES EACH HEAP AS IT DRAINS, and that is what makes a large
+      `--top` runnable** (added 2026-09-18). At the triple and quad stages every
+      thread's bounded heap FILLS, so the merge array is the same size again and
+      holding both is `2 x top x 56 x threads` — **20.2 GB at `--top 10000000`
+      on 18 threads**, on a 25.8 GB machine. Freeing as it drains makes the
+      RESIDENT high-water mark one copy plus one heap (~10.6 GB there).
+      - **RESIDENT, not reserved, and the distinction IS the mechanism**: `all`
+        is still malloc'd at full size, so the address space is 2x either way —
+        but its pages fault in only as they are written, and a heap that size is
+        mmap'd directly so `free` returns it to the OS at once. Resident is what
+        swaps.
+      - **THE TIMING is why it mattered more than the number suggests**: the
+        merge is the LAST thing a run does, so the old peak arrived AFTER the
+        whole search. A 30-hour triple stage would have died at the allocation
+        having written nothing — the same shape as the `--top all` death, with a
+        30-hour fuse instead of a 4.75-hour one.
+      - **VERIFIED INERT TWO WAYS**: the committed
+        `pair_singletons_answers_disjoint_exhaustive.csv` regenerates
+        byte-identical, and an `--extend` run (5000-row cap over 4605777
+        candidates, so the heaps genuinely fill) is byte-identical between the
+        pre-change and post-change binaries. Nothing reads `heaps` below that
+        loop, so it cannot change an output.
+    - **MEASURED PARENT COST (2026-09-18): the unrestricted `--buckets custom
+      --metric ssq` triple stage extends 1,000,000 parent pairs in 3.0 hours**
+      (18 threads), and the work is LINEAR in the parent count — so 2M is ~6 h
+      and 10M ~30 h, per stage. The pair stage is minutes whatever `--top` says:
+      it scores all 84129906 pairs regardless, and `--top` only changes what is
+      kept.
   - **WORDS AND PAIRS ARE EXHAUSTIVE; TRIPLES AND QUADS ARE GREEDY SCREENS**
     (`solver/run-singles.sh` says so). So `clint soare` IS the top pair, but a
     triple/quad head is "best of those screened" — never call such a run "the best

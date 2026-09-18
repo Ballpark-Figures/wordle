@@ -1129,13 +1129,44 @@ int main(int argc, char **argv) {
     }
 
 merge: ;   /* a label must precede a statement, not a declaration, before C23 */
-    /* merge the per-thread heaps and keep the global best `top` */
+    /* Merge the per-thread heaps and keep the global best `top`.
+     *
+     * EACH HEAP IS FREED THE MOMENT IT HAS BEEN COPIED, AND THAT IS WHAT MAKES
+     * A LARGE --top RUNNABLE AT ALL.  Every thread holds a bounded heap of
+     * `top` entries and at the triple and quad stages they all FILL, so the
+     * merge array is the same size again -- holding both at once is
+     * `2 x top x sizeof(Pair) x threads`, which at --top 10000000 on 18 threads
+     * is 20.2 GB on a 25.8 GB machine.
+     *
+     * IT IS THE RESIDENT PEAK THIS MOVES, NOT THE RESERVATION, and the
+     * distinction is the mechanism: `all` is still malloc'd at full size up
+     * front, so the ADDRESS SPACE is 2x either way -- but its pages fault in
+     * only as they are written, and each heap (a big allocation, so mmap'd
+     * directly and returned to the OS on free) is released as it is drained.
+     * So the resident high-water mark is one copy plus one heap, ~10.6 GB at
+     * that width instead of 20.2.  Resident is what swaps, which is what
+     * killed the --top all run.
+     *
+     * AND THE TIMING IS THE WHOLE POINT: the merge is the LAST thing a run
+     * does, so the old peak arrived AFTER the entire search -- a 30-hour triple
+     * stage would have died here having written nothing, the same shape as the
+     * --top all death that `guard_kept_rows` exists for.  A heap is dead the
+     * instant it is copied and nothing reads `heaps` below this loop, so this
+     * cannot change an output. */
     int total = 0;
     for (int t = 0; t < nth; t++) total += hn[t];
     Pair *all = malloc(sizeof(Pair) * total);
+    if (!all) {
+        fprintf(stderr, "out of memory merging %d kept rows (%.1f GB)\n",
+                total, (double)total * sizeof(Pair) / 1e9);
+        return 1;
+    }
     int m = 0;
-    for (int t = 0; t < nth; t++)
+    for (int t = 0; t < nth; t++) {
         for (int i = 0; i < hn[t]; i++) all[m++] = heaps[t][i];
+        free(heaps[t]);
+        heaps[t] = NULL;
+    }
     qsort(all, total, sizeof(Pair), cmp_pair);
     int keep = total < top ? total : top;
 
