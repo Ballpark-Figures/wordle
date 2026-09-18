@@ -42,8 +42,15 @@ from config import *
 from assets.board import get_board
 from assets import game_data
 
-TYPING_SOUND = "keys"
+TYPING_SOUND = "sequence"
 KEY_SOUNDS = ["key1", "key2", "key3", "key4", "key5"]
+
+# UNDER "sequence" THE BED'S LENGTH IS TIED TO THE TYPING run_time. The clip is one
+# fixed-length sound played once per word, so if the 0.65 below changes, re-slice it
+# to match or it runs on past the last letter:
+#   python -m bpkfigures.sfx_import "<source>" --name typing \
+#       --start 10.0 --duration <the new run_time> --fade 8 --force
+# "keys" has no such coupling — a cue fires per letter, whatever the pace.
 
 GAME = game_data.load()
 WORDS = [g["word"] for g in GAME["guesses"]]
@@ -59,8 +66,10 @@ class Scene97(WordleDarkScene):
         word = WORDS[row]
         per_letter = None
         if TYPING_SOUND == "keys":
-            def per_letter(i, ch):
-                self.sfx(KEY_SOUNDS[i % len(KEY_SOUNDS)])
+            def per_letter(i, ch, at):
+                # `at` places the cue at the letter's own moment — the word is ONE
+                # play now, so the call order alone would stack them all at its start.
+                self.sfx(KEY_SOUNDS[i % len(KEY_SOUNDS)], at=at)
         elif TYPING_SOUND == "sequence":
             self.sfx("typing")
         self.board.type_word(self, row, word, run_time, per_letter=per_letter)
@@ -73,7 +82,7 @@ class Scene97(WordleDarkScene):
     @subscene
     def type_trace(self):
         self._setup_board()
-        self._type(0, 1.1)
+        self._type(0, 0.65)
 
     # b : row 0 flips — nothing in the word
     @subscene
@@ -83,7 +92,7 @@ class Scene97(WordleDarkScene):
     # c : LOINS typed into row 1
     @subscene
     def type_loins(self):
-        self._type(1, 1.1)
+        self._type(1, 0.65)
 
     # d : row 1 flips — O, N, S present
     @subscene
@@ -93,7 +102,7 @@ class Scene97(WordleDarkScene):
     # e : DUMPY typed into row 2
     @subscene
     def type_dumpy(self):
-        self._type(2, 1.1)
+        self._type(2, 0.65)
 
     # f : row 2 flips — Y correct
     @subscene
@@ -103,7 +112,7 @@ class Scene97(WordleDarkScene):
     # g : SNOWY typed into row 3
     @subscene
     def type_snowy(self):
-        self._type(3, 1.1)
+        self._type(3, 0.65)
 
     # h : row 3 flips all correct, then the winning row jumps
     @subscene

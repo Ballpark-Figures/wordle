@@ -63,6 +63,37 @@ class TileFlip(Animation):
             self.letter.move_to(self.center)
 
 
+class TilePop(Animation):
+    """A letter landing in its tile: it appears, and the tile springs and settles.
+
+    `sin(pi*alpha)` is 0 at both ends and 1 in the middle, so the tile returns to
+    exactly its own size without the caller doing arithmetic — the same reasoning as
+    `there_and_back` in `bounce`.
+    """
+
+    def __init__(self, tile, letter, bump=0.10, **kwargs):
+        self.tile, self.letter, self.bump = tile, letter, bump
+        self.t_h, self.t_w = tile.height, tile.width
+        self.l_h, self.l_w = letter.height, letter.width
+        self.center = tile.get_center()
+        super().__init__(VGroup(tile, letter), **kwargs)
+
+    def interpolate_mobject(self, alpha):
+        # Visibility is driven by ALPHA, not set in begin(): an AnimationGroup —
+        # which LaggedStart is — calls begin() on EVERY member up front, so
+        # revealing there made all five letters of a word appear at once, at the
+        # moment the first one was typed. A member that has not reached its lag
+        # offset yet sits at alpha 0, which is exactly "not typed".
+        self.letter.set_opacity(1.0 if alpha > 0 else 0.0)
+        if alpha > 0:
+            self.tile.set_stroke(TILE_FILLED_BORDER, STROKE)
+        s = 1 + self.bump * np.sin(np.pi * self.rate_func(alpha))
+        self.tile.stretch_to_fit_height(self.t_h * s) \
+                 .stretch_to_fit_width(self.t_w * s).move_to(self.center)
+        self.letter.stretch_to_fit_height(self.l_h * s) \
+                   .stretch_to_fit_width(self.l_w * s).move_to(self.center)
+
+
 class WordleBoard(VGroup):
     def __init__(self, rows=ROWS, cols=COLS, **kwargs):
         super().__init__(**kwargs)
@@ -90,26 +121,32 @@ class WordleBoard(VGroup):
     def type_word(self, scene, row, word, run_time, per_letter=None):
         """Type `word` into `row`, one letter at a time, left to right.
 
-        ONE run_time covers the whole word; each letter gets an equal share, split
-        between its pop out and back. `per_letter(i, ch)` fires as each letter lands
-        — the hook the SCENE uses to make a sound, so this asset owns no sound
-        policy and the two typing-sound approaches can be swapped without touching
-        the board.
+        ONE PLAY for the whole word, not two per letter, and that is what makes
+        `run_time` mean what it says. manim rounds every play up to a whole frame,
+        so ten little plays round ten times: MEASURED at 60fps, a word asked to take
+        0.65s actually took 0.749s — 15% long, and enough to leave a length-matched
+        typing bed ending before the letters stop. One LaggedStart rounds once.
+
+        `per_letter(i, ch, at)` fires for each letter with its OFFSET IN SECONDS from
+        the start of the word, so the scene can place a sound precisely with
+        `self.sfx(name, at=offset)` rather than relying on when the call happens.
+        The asset owns no sound policy; the scene does.
         """
-        share = run_time / max(len(word), 1)
+        n = max(len(word), 1)
+        # Letters share the run_time evenly: with lag_ratio 1/n each pop starts as
+        # the previous one is a step along, and the last finishes exactly at the end.
         for i, ch in enumerate(word):
             tile = self.tiles[row][i]
             letter = self._letter(ch, tile)
+            letter.set_opacity(0)              # TilePop reveals it on its turn
             self.letters[row][i] = letter
             self.add(letter)
-            if per_letter is not None:
-                per_letter(i, ch)
-            tile.set_stroke(TILE_FILLED_BORDER, STROKE)
             scene.add(letter)
-            scene.play(tile.animate.scale(1.10), letter.animate.scale(1.10),
-                       run_time=share * 0.45)
-            scene.play(tile.animate.scale(1 / 1.10), letter.animate.scale(1 / 1.10),
-                       run_time=share * 0.55)
+            if per_letter is not None:
+                per_letter(i, ch, i * run_time / n)
+        pops = [TilePop(self.tiles[row][i], self.letters[row][i])
+                for i in range(len(word))]
+        scene.play(LaggedStart(*pops, lag_ratio=1.0 / n), run_time=run_time)
 
     # ── scoring ───────────────────────────────────────────────────────────────
     def reveal(self, scene, row, code, run_time, lag_ratio=0.45):
