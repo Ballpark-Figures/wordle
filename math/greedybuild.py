@@ -96,14 +96,24 @@ def solved_in_bucket(full, cols, members, answer_pos):
     return cand
 
 
-def score(state, ctx):
-    """(unsolved answers, sum of squared bucket sizes) for a partial opening."""
+def score(state, ctx, want_unsolved=True):
+    """(unsolved answers, sum of squared bucket sizes) for a partial opening.
+
+    `want_unsolved` False returns `None` for the first field and skips the walk
+    that produces it.  That is not a speed knob dressed up as an option: while
+    the ranking is on SUM OF SQUARES ALONE (see `--ssq-first`), the unsolved
+    count is not consulted, and computing a number nothing reads is the one cost
+    worth removing from a beam.
+    """
     full, pool_codes, cols, ans_pool_idx, rows_cache = ctx
     rows = [rows_cache[i] for i in range(len(state))]
     key = joint_key(rows)
     uniq, inv = np.unique(key, return_inverse=True)
     sizes = np.bincount(inv, minlength=len(uniq))
     ssq = int((sizes.astype(np.int64) ** 2).sum())
+
+    if not want_unsolved:
+        return None, ssq
 
     order = np.argsort(inv, kind="stable")
     starts = np.searchsorted(inv[order], np.arange(len(uniq)), "left")

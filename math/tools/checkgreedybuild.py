@@ -118,6 +118,40 @@ def main(argv):
         failures.append("qq at positions 0-1 was called completable")
     print("legality: a completable prefix is kept and an impossible one refused")
 
+    # --- the two searches agree where they must, and branch is MONOTONE -----
+    # K=1 is the plain greedy under either search, so they must return the same
+    # opening -- a free oracle across two quite different traversals.  And the
+    # branching search contains its own smaller K by construction, so a wider K
+    # can never come back worse; the beam needed a NESTED selection to get that
+    # property and this checks it did.
+    import subprocess
+    here = os.path.dirname(os.path.abspath(__file__))
+    py = sys.executable
+
+    def run(search, k, nwords=2):
+        out = subprocess.run(
+            [py, os.path.join(here, "greedy_build.py"), "--pool", "custom",
+             "--words", str(nwords), "--topk", str(k), "--search", search,
+             "--no-out"], capture_output=True, text=True).stdout
+        line = [l for l in out.splitlines() if l.startswith("opening:")]
+        uns = [l for l in out.splitlines() if "unsolved" in l and "of" in l]
+        n = int(uns[-1].split()[1]) if uns else -1
+        return (line[-1] if line else "?"), n
+
+    b1, n_b1 = run("branch", 1)
+    m1, n_m1 = run("beam", 1)
+    if (b1, n_b1) != (m1, n_m1):
+        failures.append("at k=1 branch gives %s (%d) and beam %s (%d); both are "
+                        "the plain greedy and must agree" % (b1, n_b1, m1, n_m1))
+    seq = [run("branch", k)[1] for k in (1, 2, 3)]
+    if not all(seq[i] >= seq[i + 1] for i in range(len(seq) - 1)):
+        failures.append("branch is not monotone in K: unsolved went %s" % seq)
+    if seq[0] == seq[-1]:
+        failures.append("K changed nothing for branch (%s), so monotonicity was "
+                        "never actually tested" % seq)
+    print("branch and beam agree at k=1, and branch is monotone in K "
+          "(unsolved %s over k=1,2,3)" % seq)
+
     if failures:
         print("\nFAIL")
         for f in failures:

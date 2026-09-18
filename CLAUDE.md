@@ -2663,9 +2663,36 @@ tee'd log, `--dry-run`. Exact and deterministic — no sampling, no seed.
   on a real string** — `wordle.pattern` gives `_` grey everywhere (never green,
   in no answer, and it does not consume a spare copy), so placed letters get
   ordinary treatment and blanks are a constant column. No second feedback rule.
-- **`-k` IS A BEAM over placements and is REQUIRED**; K=1 is the plain greedy and
-  the result is the best of what the beam examined, never the best opening. Each
-  K is a different search and gets its own file.
+- **TWO SEARCHES, AND `--search` IS REQUIRED** (user's call, 2026-09-18 — keep
+  both). They are different questions, not two speeds of one, and the name is in
+  every filename.
+  - **`branch` — RECURSE INTO THE K BEST at every step**, which is what `--topk`
+    means everywhere else here (`strturns`, `greens`, `wturns`, `mmturns`,
+    `ultraturns`, `secondexact` all say it). K=1 is the leftmost path of the K=2
+    tree, so **a wider K contains a narrower one BY CONSTRUCTION and can never
+    return worse**. Cost is exponential in the placements, tamed only by
+    MEMOISATION on the state — and that works, because the ORDER of placements
+    does not matter, so huge numbers of paths converge. MEASURED on a 2-word
+    opening (10 placements): k=1 is 10 nodes / 1s / 2032 unsolved, k=2 is 812
+    nodes / 472 states / 6s / 1765, k=3 is 10160 nodes / 4579 states / 55s /
+    1596. `--max-nodes` bounds it; a stopped run is the best of what was searched.
+  - **`beam` — carry K states forward.** Cost LINEAR in K, which is the whole
+    reason to want it. **The selection is NESTED, not top-K overall**: slot `i`
+    is filled from the children of slots `0..i`, which makes `beam_K`'s first
+    K-1 slots identical to `beam_{K-1}` by induction. Plain top-K selection is
+    **NOT monotone in K** — slot 1's best child can rank third once slot 2's
+    children join the pool, evicting the K=1 trajectory — and that is not
+    theoretical: **MEASURED at `-n 8`, k=2 came back WORSE than k=1**.
+  - **THE FREE ORACLE: at K=1 both searches are the plain greedy and must return
+    the same opening.** They do (385 unsolved, ssq 11112, by two quite different
+    traversals), and the gate asserts it along with branch's monotonicity —
+    failing if K never changed the answer, so a pass cannot mean it went untested.
+- **`--ssq-first N` RANKS ON SUM OF SQUARES ALONE for the first N placements**
+  (user's call, 2026-09-18), then switches to unsolved. The objective is PINNED
+  early — almost nothing is split, so nearly every answer is unsolved and the
+  number carries no signal — and the run skips the unsolved walk entirely while
+  it is not being ranked on, scoring only the chosen winner for the log. `N=0`
+  is the old behaviour exactly, and N is in the filename.
 - **MEASURED at k=1: 6 seconds**, and it lands on `craps until often fjord` with
   **385 unsolved** — far WORSE than the ranked screens (5-17). The greedy is
   myopic exactly where the objective is flat: it commits to `j` on step 1, which
