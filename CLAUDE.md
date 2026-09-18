@@ -2736,6 +2736,45 @@ sampling, no seed — so a re-run reproduces the file byte for byte.
 - Data under `math/data/shared/answerpairs/` with a `.meta` sidecar recording
   `scored`/`written`/`complete`, log under `data/local/answerpairs/`.
 
+### `hillclimb` — random 4-word starts, improved by SWAPPING ONE WORD
+`math/hillclimb.py` states the rule and IS the source of truth;
+`tools/hill_climb.py` is the driver. Run it with
+**`bash solver/run-hill-climb.sh -t N [--candidates L]`** (from `math/`),
+attached, tee'd log, `--dry-run`.
+- **THE SEARCH** (user's, 2026-09-18): draw `k` random words; repeatedly take
+  the single-word swap that lowers UNSOLVED the most; stop when none does; do
+  that `-t` times from fresh random draws. Every accepted swap PRINTS, because
+  it is the only thing that happens — the scan between two swaps is seconds of
+  silence.
+- **IT IS A LOCAL OPTIMUM, NOT AN OPTIMUM.** A climb stops where no SINGLE swap
+  helps; two words might have to change together and this never tries that. So
+  a result is "the best of `-t` random starts, each climbed until one-word moves
+  run out" — never "the best opening". **The restarts are the only thing
+  exploring**; the climb itself is greedy and deterministic given its start.
+- **IT NEEDED NO NEW SCORER, and that is the reason it is affordable.** A blind
+  opening is a SET, so "swap the word at position i" IS "hold the other k-1
+  fixed and choose the last word" — which `paircover.last_level_scores` already
+  answers for EVERY candidate in one pass. A neighbourhood scan is therefore `k`
+  calls to it rather than `k * ncand` separate evaluations. MEASURED: a 4-way
+  scan over custom's 4282 is 5-8 s, and a whole trial 60-90 s.
+- **STEEPEST, not first-improvement**: all k positions are scanned before
+  moving, so a printed step means "the best move available" rather than "the
+  first one found".
+- **THE GATE RUNS ON EVERY TRIAL and both halves are free**: the climb must END
+  at a local optimum (the stopping scan is re-checked), and the reported
+  unsolved must equal `guarantee_sweep.check_opening`'s losing count for the
+  same opening — a different implementation reached a different way, at 0.06 s.
+  - **IT CAUGHT A REAL DEFECT ON ITS FIRST RUN, and the defect was a LOOSE
+    CONTRACT.** `neighbourhood` returned the best swap whether or not it
+    improved, so "not None" did not mean "can still improve". The climb compared
+    for itself and was correct; the GATE asked the function the question its
+    docstring claimed to answer and got the wrong answer, failing on a climb
+    that had stopped correctly. `current` is now a PARAMETER and the function
+    returns None when nothing beats it. **One caller compensating for a loose
+    contract is how the next caller gets it wrong.**
+- Data under `math/data/shared/hillclimb/` (trials APPEND, so a later seed adds
+  to the same record), log under `data/local/hillclimb/`.
+
 ### `paircover` — cover the hard pairs, harvest the failures, repeat
 `math/paircover.py` states the rule and IS the source of truth;
 `tools/pair_cover.py` is the driver. Run it with
