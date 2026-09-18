@@ -2777,7 +2777,37 @@ tee'd log, `--dry-run`. Exact and deterministic — no sampling, no seed.
   opening DID separate. Recording the bucket whole fills the set with non-
   failures and steers the next round at nothing; that is MUTATION-TESTED and the
   gate names the offending pairs.
-- **BRANCH, NOT BEAM** (user's call), matching `greedy_build.py` and every other
+- **`--search branch|beam`**, the same two searches `greedybuild` carries and
+  the same distinction. **BRANCH** (the default) recurses into the K best at
+  every state: `k ** words` complete openings. **BEAM** carries K states
+  forward and pools their children: `k * k` openings, so a MUCH wider K for the
+  money — at k=20 that is 400 against 160000.
+  - **STATES ARE RANKED BY WEIGHT COVERED SO FAR**, which is the one quantity
+    comparable ACROSS beam states: each carries its own set of still-unsplit
+    pairs, so their per-candidate coverage scores are on different scales, but
+    "weight removed since the start" is not. Ties on ssq.
+  - **THE SELECTION IS NESTED, NOT TOP-K OVERALL** — slot `i` from the children
+    of slots `0..i` — which is what keeps it monotone in K. Plain top-K is not,
+    and `greedybuild` MEASURED a k=2 worse than its k=1 before the same fix.
+    Gated: the beam EQUALS branch at k=1 (both the single greedy path, a free
+    oracle across two traversals) and is monotone, MEASURED `236, 54, 45` over
+    k=1,3,9.
+  - **THE TWO HAVE DIFFERENT LEAF COUNTS and the cost line must say which**:
+    quoting branch's `k ** words` for a beam over-states it by orders of
+    magnitude. MEASURED at k=20 with a real weight set: 13 s a round.
+- **`--pairs-from FILE` STARTS FROM ANOTHER RUN'S WEIGHTS, AND KEEPS THEM**
+  (user's call, 2026-09-18). Any `word1,word2,count` file does — it is the
+  format this loop writes, so runs compose. **These are NOT dropped after round
+  1**: the seed-drop rule exists because the hardest-pairs seed is a PROXY that
+  over-demands, and a harvested set with earned counts is not. Precedence is
+  resume, then `--pairs-from`, then the seed.
+  - **THE WEIGHT SOURCE IS A BOUNDED TAG IN THE STEM, NOT A NESTED NAME**
+    (`_w<8 hex of the path>`). Folding the source's own stem in grows the name
+    ~40 characters per generation, which is the scar that killed a wordlesim
+    cascade at macOS's 255-byte limit — and a weight set is exactly the thing
+    that gets chained. The full path is in the header and in the rounds CSV's
+    `source=` field, which is where lineage belongs.
+- **BRANCH IS THE DEFAULT** (user's call), matching `greedy_build.py` and every other
   `--topk` here. **It must be the K BEST, not the K TIED AT THE TOP** — selecting
   only among candidates sharing the maximum meant a single decisive coverage
   word left nothing to branch on and every K returned the identical opening.

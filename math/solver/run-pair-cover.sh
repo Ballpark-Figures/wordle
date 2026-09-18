@@ -17,6 +17,8 @@ MATH=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 
 POOL=custom
 CANDS=
+SEARCH=branch
+PAIRSFROM=
 NWORDS=4
 TOPK=""
 ROUNDS=10
@@ -32,6 +34,8 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --pool)       POOL="$2";     shift 2 ;;
         --candidates) CANDS="$2";    shift 2 ;;
+        --search)     SEARCH="$2";   shift 2 ;;
+        --pairs-from) PAIRSFROM="$2"; shift 2 ;;
         --words)      NWORDS="$2";   shift 2 ;;
         -k|--topk)    TOPK="$2";     shift 2 ;;
         --rounds)     ROUNDS="$2";   shift 2 ;;
@@ -78,7 +82,19 @@ PY=../.venv/bin/python
 
 STEM="cover_${POOL}"
 [ -z "$CANDS" ] || STEM="${STEM}-from-${CANDS}"
-STEM="${STEM}_w${NWORDS}_k${TOPK}_s${SEEDTOP}_f${FINALTOP}"
+STEM="${STEM}_w${NWORDS}_${SEARCH}_k${TOPK}"
+# THE WEIGHT SOURCE IS A BOUNDED TAG, NOT A NESTED STEM.  Folding the source's
+# own name in grows the stem by ~40 characters per generation, which is the
+# scar that killed a wordlesim cascade at macOS's 255-byte filename limit -- and
+# a weight set is exactly the thing that gets chained.  Eight hex of the path
+# distinguishes sources without growing; the full path is in the header and in
+# the rounds CSV's `source=` field, which is where lineage belongs.
+if [ -n "$PAIRSFROM" ]; then
+    STEM="${STEM}_w$(printf '%s' "$PAIRSFROM" | shasum | cut -c1-8)"
+else
+    STEM="${STEM}_s${SEEDTOP}"
+fi
+STEM="${STEM}_f${FINALTOP}"
 [ "$CAP" = 6 ] || STEM="${STEM}_cap${CAP}"
 OUTDIR=data/shared/paircover
 LOC=data/local/paircover
@@ -86,7 +102,8 @@ OUT="$OUTDIR/$STEM"
 
 FLAGS="--pool $POOL --words $NWORDS --topk $TOPK --rounds $ROUNDS --cap $CAP"
 FLAGS="$FLAGS --seed-from $SEEDFROM --seed-top $SEEDTOP --show $SHOW"
-FLAGS="$FLAGS --final-top $FINALTOP"
+FLAGS="$FLAGS --final-top $FINALTOP --search $SEARCH"
+[ -z "$PAIRSFROM" ] || FLAGS="$FLAGS --pairs-from $PAIRSFROM"
 [ -z "$CANDS" ] || FLAGS="$FLAGS --candidates $CANDS"
 [ "$MAXPAIRS" = 0 ] || FLAGS="$FLAGS --max-pairs $MAXPAIRS"
 
@@ -95,7 +112,12 @@ echo "  pool       $POOL -- what the opening partitions AND what the 5th guess d
 echo "  words      the 4 come from ${CANDS:-$POOL}$([ -z "$CANDS" ] && echo " (the pool itself)" || echo " -- a DIFFERENT list")"
 echo "  opening    $NWORDS words, chosen by weighted pair coverage"
 echo "  objective  fewest answers UNSOLVED after the opening and the 5th draw"
-echo "  search     branch, k=$TOPK$([ "$TOPK" = 1 ] && echo " (plain greedy)")"
+if [ "$SEARCH" = beam ]; then
+    echo "  search     BEAM, k=$TOPK -- K states carried forward, k*k openings"
+else
+    echo "  search     BRANCH, k=$TOPK -- recurse into the K best, k**words openings"
+fi
+[ -z "$PAIRSFROM" ] || echo "  weights    $PAIRSFROM (kept, not dropped after round 1)"
 case "$FINALTOP" in
     all) echo "  last word  EXHAUSTIVE -- every candidate ranked by UNSOLVED" ;;
     0)   echo "  last word  no special case -- the same k as every other level" ;;

@@ -66,7 +66,8 @@ ROUND_COLUMNS = "round,opening,unsolved,ssq,harvested,new_pairs,total_pairs,secs
 def parse_args(argv):
     a = {"pool": None, "words": 4, "topk": None, "rounds": None, "cap": 6,
          "seed_from": None, "seed_top": 1000, "out": None, "max_pairs": 0,
-         "show": 8, "final_top": 0, "candidates": None}
+         "show": 8, "final_top": 0, "candidates": None,
+         "pairs_from": None, "search": "branch"}
     i = 0
     while i < len(argv):
         k = argv[i].lstrip("-").replace("-", "_")
@@ -88,7 +89,14 @@ def parse_args(argv):
     for req in ("pool", "topk", "rounds"):
         if a[req] is None:
             raise SystemExit("--%s is required" % req.replace("_", "-"))
-    if a["seed_from"] is None:
+    if a["search"] not in ("branch", "beam"):
+        raise SystemExit(
+            "--search must be branch or beam.  They are different searches:\n"
+            "  branch  recurse into the K best at EVERY state -- k ** words "
+            "complete openings;\n"
+            "  beam    carry K states forward -- k * k openings, so a much "
+            "wider K for the money.")
+    if a["seed_from"] is None and a["pairs_from"] is None:
         raise SystemExit(
             "--seed-from FILE is required: the answer-pair ranking the first "
             "round starts from.\n  Build it with solver/run-answer-pairs.sh.")
@@ -227,6 +235,73 @@ def build_opening(ctx, k, st, final_top=0):
     return rec((), np.ones(S.shape[1], dtype=bool))
 
 
+def run_beam(ctx, k, st, final_top=0):
+    """Carry K states forward at each level, instead of recursing into K.
+
+    THE COST IS THE POINT.  Branching visits `k ** words` complete openings;
+    a beam pools `k * k` children per level and keeps K, so only `k * k` ever
+    reach the objective.  At k=20 that is 400 against 160000.  It buys a much
+    wider K for the same money, which is what a good weight set deserves.
+
+    STATES ARE RANKED BY WEIGHT COVERED SO FAR, which is the one quantity
+    comparable ACROSS states: each carries its own set of still-unsplit pairs,
+    so their per-candidate coverage scores are not on the same scale, but
+    "weight removed since the start" is.  Ties break on ssq, as everywhere here.
+
+    THE SELECTION IS NESTED, NOT TOP-K OVERALL -- slot `i` is filled from the
+    children of slots `0..i` -- which makes `beam_K`'s first K-1 slots identical
+    to `beam_{K-1}` by induction, so a wider K is never worse.  Plain top-K is
+    NOT monotone: slot 1's best child can rank third once slot 2's children join
+    the pool, evicting the K=1 trajectory.  `greedybuild` MEASURED exactly that
+    (k=2 came back worse than k=1) before its beam was nested; the same trap
+    applies here and this avoids it the same way.
+    """
+    M, S, weights, nwords = ctx["M"], ctx["S"], ctx["w"], ctx["nwords"]
+    total_w = int(weights.sum())
+    beam = [((), np.ones(S.shape[1], dtype=bool))]
+    for step in range(nwords):
+        last = step == nwords - 1
+        wide = max(k, final_top) if last else k
+        pool_c, seen = [], set()
+        for slot, (chosen, alive) in enumerate(beam):
+            banned = np.zeros(S.shape[0], dtype=bool)
+            banned[list(chosen)] = True
+            sc = cover_scores(S, weights, alive, banned)
+            for c in best_k(sc, wide, M, chosen):
+                nxt = chosen + (int(c),)
+                key = tuple(sorted(nxt))
+                if key in seen:
+                    continue        # two parents, one word SET: the same opening
+                seen.add(key)
+                pool_c.append((nxt, alive & ~S[int(c)], slot))
+        if not pool_c:
+            raise SystemExit("step %d: no candidate left to place" % (step + 1))
+        st["nodes"] += len(pool_c)
+        if last:
+            best = None
+            for chosen, _, _ in pool_c:
+                st["leaves"] += 1
+                rows = [M[c] for c in chosen]
+                uns, ssq = score(tuple(chosen), (ctx["full"], ctx["codes"],
+                                                 ctx["cols"], ctx["ans"], rows))
+                if best is None or (uns, ssq) < best[:2]:
+                    best = (uns, ssq, tuple(chosen))
+            return best
+        covered = np.array([total_w - int(weights[al].sum())
+                            for _, al, _ in pool_c])
+        ssqs = np.array([ssq_of(joint_key(M, ch)) for ch, _, _ in pool_c])
+        order = np.lexsort((ssqs, -covered))
+        picked, taken = [], set()
+        for i in range(min(k, len(order))):
+            for idx in order:
+                if idx not in taken and pool_c[idx][2] <= i:
+                    picked.append(int(idx))
+                    taken.add(int(idx))
+                    break
+        beam = [(pool_c[i][0], pool_c[i][1]) for i in picked]
+    raise AssertionError("the loop returns at its last step")
+
+
 def main(argv):
     a = parse_args(argv)
     guesses, answers = load_words("guess"), load_words("mystery")
@@ -266,25 +341,40 @@ def main(argv):
         pair_path = a["out"] + "_pairs.csv"
         round_path = a["out"] + "_rounds.csv"
 
+    # WHERE THE PAIRS COME FROM, in precedence order.  `seeded` says the current
+    # set is the PROXY rather than real failures, and only a proxy is dropped
+    # after the first harvest.
     pairs = read_pairs(pair_path, ppos)
     resumed = len(pairs)
-    # `seeded` says the CURRENT set is the proxy rather than real failures, so
-    # the first harvest must REPLACE it.  A resumed run is already past that
-    # point -- its file holds harvested pairs -- so it never re-seeds.
-    seeded = not resumed
-    if seeded:
+    source = "resumed from %s" % pair_path
+    seeded = False
+    if not pairs and a["pairs_from"]:
+        # WEIGHTS FROM ANOTHER RUN.  These are HARVESTED failures with the
+        # counts another loop earned, not a proxy, so they are NOT dropped after
+        # round 1 -- that rule exists for the hardest-pairs seed, which
+        # over-demands, and these do not.  Any file of `word1,word2,count` does:
+        # the format is the one this loop writes, so runs compose.
+        pairs = read_pairs(a["pairs_from"], ppos)
+        if not pairs:
+            raise SystemExit("--pairs-from %s held no usable pairs -- are its "
+                             "words in the pool?" % a["pairs_from"])
+        source = "loaded from %s (weights kept)" % a["pairs_from"]
+    elif not pairs:
         pairs = seed_pairs(a["seed_from"], a["seed_top"], ppos)
+        seeded = True
+        source = "seeded from %s (top %d)" % (a["seed_from"], a["seed_top"])
 
     print("pair cover: pool %s (%d)  answers %d  words %d  cap %d (budget %d)"
           % (a["pool"], len(pool), len(answers), a["words"], a["cap"], budget))
     print("  words    the 4 come from %s (%d)%s"
           % (a["candidates"] or a["pool"], len(cands),
              "" if same else "  -- a DIFFERENT list from the pool"))
-    print("  search   branch, k=%d -- recurse into the K best coverage choices"
-          % a["topk"])
-    print("  pairs    %d %s" % (len(pairs), "resumed from %s" % pair_path
-                                if resumed else "seeded from %s (top %d)"
-                                % (a["seed_from"], a["seed_top"])))
+
+    print("  pairs    %d, %s" % (len(pairs), source))
+    print("  search   %s, k=%d -- %s"
+          % (a["search"].upper(), a["topk"],
+             "K states carried forward" if a["search"] == "beam" else
+             "recurse into the K best at every state"))
     print("  rounds   %d" % a["rounds"])
 
     # WHAT A ROUND WILL COST -- A ROUGH FIGURE, AND SAID TO BE.  The last level
@@ -299,14 +389,20 @@ def main(argv):
         ch = tuple(int(x) for x in rng.integers(len(cands), size=a["words"]))
         score(ch, (full, codes, cols, ans, [M[c] for c in ch]))
     per_leaf = (time.time() - t0) / 10
-    states = a["topk"] ** (a["words"] - 1)
+    wide = max(a["topk"], a["final_top"])
+    # THE TWO SEARCHES HAVE DIFFERENT LEAF COUNTS, and quoting branch's for a
+    # beam over-states it by orders of magnitude -- k**words against k*k.
+    if a["search"] == "beam":
+        leaves = a["topk"] * wide
+    else:
+        leaves = a["topk"] ** (a["words"] - 1) * wide
     if a["final_top"] < 0:
         print("  last word EXHAUSTIVE -- every candidate ranked by unsolved")
-        print("  cost     %d three-word states, whole pool each" % states)
-    else:
-        wide = max(a["topk"], a["final_top"])
-        leaves = states * wide
+    elif a["final_top"]:
         print("  last word the %d best by coverage, ranked by unsolved" % wide)
+    else:
+        print("  last word no special case -- the same k as every other level")
+    if a["final_top"] >= 0:
         print("  cost     %d leaves x ~%.1f ms = ~%.0f s per round, ~%.1f h for %d"
               % (leaves, per_leaf * 1000, leaves * per_leaf,
                  leaves * per_leaf * a["rounds"] / 3600.0, a["rounds"]))
@@ -318,9 +414,11 @@ def main(argv):
         rh = open(round_path, "a")
         if fresh:
             rh.write("# pair-cover loop (see math/paircover.py)\n")
-            rh.write("# settings pool=%s words=%d topk=%d cap=%d seed=%s seed_top=%d\n"
-                     % (a["pool"], a["words"], a["topk"], a["cap"],
-                        a["seed_from"], a["seed_top"]))
+            rh.write("# settings pool=%s candidates=%s words=%d topk=%d cap=%d "
+                     "search=%s final_top=%d source=%s\n"
+                     % (a["pool"], a["candidates"] or a["pool"], a["words"],
+                        a["topk"], a["cap"], a["search"], a["final_top"],
+                        a["pairs_from"] or a["seed_from"]))
             rh.write(ROUND_COLUMNS + "\n")
 
     st = {"nodes": 0, "leaves": 0}
@@ -345,7 +443,8 @@ def main(argv):
         ctx = {"M": M, "S": S, "w": weights, "nwords": a["words"],
                "full": full, "codes": codes, "cols": cols, "ans": ans}
         st["nodes"] = st["leaves"] = 0
-        uns, ssq, chosen = build_opening(ctx, a["topk"], st, a["final_top"])
+        go = run_beam if a["search"] == "beam" else build_opening
+        uns, ssq, chosen = go(ctx, a["topk"], st, a["final_top"])
         words = [cands[c] for c in chosen]
         print("  opening  %s" % " ".join(words))
         print("           unsolved %d of %d,  ssq %d   (%d nodes, %d complete, %.0fs)"

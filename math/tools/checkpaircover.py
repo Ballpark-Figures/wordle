@@ -205,6 +205,33 @@ def main(argv):
           "losing answers agree 3 ways"
           % (" ".join(wordsw), uw, len(used_outside)))
 
+    # --- 7: the BEAM is monotone in K, and equals BRANCH at k=1 ------------
+    # At k=1 both searches are the same single greedy path, so they must agree
+    # -- a free oracle across two quite different traversals.  Above that the
+    # nested selection is what keeps the beam monotone; plain top-K is not, and
+    # greedybuild MEASURED a k=2 that came back worse than its k=1 before that
+    # fix, so this is checked rather than assumed.
+    from pair_cover import run_beam
+    stb = {"nodes": 0, "leaves": 0}
+    b1 = run_beam(ctx, 1, stb, 0)
+    stc = {"nodes": 0, "leaves": 0}
+    r1 = build_opening(ctx, 1, stc, 0)
+    if b1[:2] != r1[:2] or b1[2] != r1[2]:
+        failures.append("at k=1 beam gives %s and branch %s; both are the same "
+                        "single greedy path and must agree"
+                        % ([pool[c] for c in b1[2]], [pool[c] for c in r1[2]]))
+    bseq = []
+    for kk in (1, 3, 9):
+        stb = {"nodes": 0, "leaves": 0}
+        bseq.append(run_beam(ctx, kk, stb, 0)[0])
+    if not all(bseq[i] >= bseq[i + 1] for i in range(len(bseq) - 1)):
+        failures.append("the beam is not monotone in K: unsolved went %s" % bseq)
+    if bseq[0] == bseq[-1]:
+        failures.append("K changed nothing for the beam (%s), so monotonicity "
+                        "was never actually tested" % bseq)
+    print("beam equals branch at k=1, and is monotone (unsolved %s over "
+          "k=1,3,9)" % bseq)
+
     # --- 5: the SEED is dropped after the first harvest --------------------
     # End to end, through the real main(), because this is a property of the
     # LOOP rather than of any function it calls: a round-1 file still holding
