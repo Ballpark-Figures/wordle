@@ -46,7 +46,11 @@ from assets.board import get_board
 from assets import game_data
 
 TYPING_SOUND = "keys"
-KEY_SOUNDS = ["key1", "key2", "key3", "key4", "key5"]
+# TWENTY one-shots for twenty keypresses (4 words x 5 letters), indexed by
+# row*5 + letter — so no sample is reused anywhere in the scene and each word has
+# its own set. With five it was key1..key5 in the same order every word, which is
+# what made the typing sound identical from guess to guess.
+KEY_SOUNDS = [f"key{i:02d}" for i in range(1, 21)]
 # Which keyboard the "sequence" bed is. Same slice length and level throughout, so
 # swapping this string is an A/B of the KEYBOARD alone.
 #   "typing-classic" | "typing-corsair" | "typing-logitech" | "typing-razer"
@@ -87,7 +91,7 @@ class Scene97(WordleDarkScene):
             def per_letter(i, ch, at):
                 # `at` places the cue at the letter's own moment — the word is ONE
                 # play now, so the call order alone would stack them all at its start.
-                self.sfx(KEY_SOUNDS[i % len(KEY_SOUNDS)], at=at)
+                self.sfx(KEY_SOUNDS[(row * 5 + i) % len(KEY_SOUNDS)], at=at)
         elif TYPING_SOUND == "sequence":
             self.sfx(TYPING_BED)
         self.board.type_word(self, row, word, run_time, per_letter=per_letter)
