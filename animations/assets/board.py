@@ -126,16 +126,22 @@ class WordleBoard(VGroup):
 
     # ── the win ───────────────────────────────────────────────────────────────
     def bounce(self, scene, row, run_time, height=0.35, lag_ratio=0.12):
-        """The winning row's jump — each tile up and back, staggered."""
+        """The winning row's jump — each tile up and back, staggered.
+
+        ONE animation with `there_and_back`, NOT a Succession of up-then-down.
+        `.animate` fixes its target when it is CONSTRUCTED, so a down-shift built
+        alongside the up-shift takes the ORIGINAL position as its reference and
+        targets `y - height` — landing the row a whole `height` below where it
+        started. `there_and_back` ends its rate function at 0, so the row returns
+        to exactly its starting position by construction rather than by arithmetic.
+        """
         ups = []
         for i in range(self.n_cols):
             parts = [self.tiles[row][i]]
             if self.letters[row][i] is not None:
                 parts.append(self.letters[row][i])
-            ups.append(Succession(
-                VGroup(*parts).animate.shift(UP * height),
-                VGroup(*parts).animate.shift(DOWN * height),
-            ))
+            ups.append(VGroup(*parts).animate(rate_func=there_and_back)
+                       .shift(UP * height))
         scene.play(LaggedStart(*ups, lag_ratio=lag_ratio), run_time=run_time)
 
 
