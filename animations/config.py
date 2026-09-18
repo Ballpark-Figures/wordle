@@ -1,7 +1,34 @@
 from bpkfigures.scene import *
 
+# ── Wordle's own dark-mode palette ────────────────────────────────────────────
+# The REAL NYT dark-mode colours, named here because they are not in style.py and a
+# scene may never inline a hex. They are deliberately authentic rather than brand:
+# the green in particular is load-bearing recognition — viewers know these tiles at a
+# glance, and a brand-accent board would not read as Wordle. A later scene wanting
+# brand accents swaps these constants; the board asset reads them and never hardcodes.
+WORDLE_BG = "#121213"          # page background
+TILE_EMPTY_BORDER = "#3a3a3c"  # an untouched tile: border only, no fill
+TILE_FILLED_BORDER = "#565758" # a typed but unsubmitted tile — brighter border
+TILE_ABSENT = "#3a3a3c"        # scored: letter not in the word
+TILE_PRESENT = "#b59f3b"       # scored: right letter, wrong place
+TILE_CORRECT = "#538d4e"       # scored: right letter, right place
+TILE_TEXT = "#ffffff"
+
+# Feedback code -> scored fill, indexed by the trit values wordle.pattern emits
+# (0 absent, 1 present, 2 correct). Keeping this next to the colours means the
+# board asset never maps a code to a colour itself.
+TILE_STATE = {0: TILE_ABSENT, 1: TILE_PRESENT, 2: TILE_CORRECT}
+
 
 class WordleScene(BpkScene):
     def construct(self):
         self.camera.background_color = BG_COLOR
+        super().construct()
+
+
+class WordleDarkScene(BpkScene):
+    """A scene on Wordle's own near-black, for board/gameplay beats."""
+
+    def construct(self):
+        self.camera.background_color = WORDLE_BG
         super().construct()
