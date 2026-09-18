@@ -45,7 +45,7 @@ from config import *
 from assets.board import get_board
 from assets import game_data
 
-TYPING_SOUND = "sequence"
+TYPING_SOUND = "keys"
 KEY_SOUNDS = ["key1", "key2", "key3", "key4", "key5"]
 # Which keyboard the "sequence" bed is. Same slice length and level throughout, so
 # swapping this string is an A/B of the KEYBOARD alone.
