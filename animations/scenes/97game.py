@@ -57,11 +57,29 @@ TYPING_SOUND = "keys"
 KEY_SOUNDS = [f"key{i:02d}" for i in range(1, 26)]
 _Q = ord("q") - ord("a")
 
+# Letters whose assigned key did not sit right, SWAPPED with another letter's. A
+# swap rather than a reassignment, so every letter still owns exactly one sound —
+# the rejected one just moves to a letter this game never types. Pick the partner
+# from a letter that does not appear, or you only move the problem.
+#   s <-> j : S's original key19 was disliked; J is unused here, so it absorbs it.
+KEY_SWAPS = [("s", "j")]
+
+
+def _build_key_map():
+    m = {}
+    for c in "abcdefghijklmnopqrstuvwxyz":
+        m[c] = KEY_SOUNDS[_Q if c == "z" else ord(c) - ord("a")]
+    for a, b in KEY_SWAPS:
+        m[a], m[b] = m[b], m[a]
+    return m
+
+
+KEY_MAP = _build_key_map()
+
 
 def key_for(ch):
     """The keystroke sound for a letter. Q and Z share; every other letter is its own."""
-    i = ord(ch.lower()) - ord("a")
-    return KEY_SOUNDS[_Q if ch.lower() == "z" else i]
+    return KEY_MAP[ch.lower()]
 # Which keyboard the "sequence" bed is. Same slice length and level throughout, so
 # swapping this string is an A/B of the KEYBOARD alone.
 #   "typing-classic" | "typing-corsair" | "typing-logitech" | "typing-razer"
