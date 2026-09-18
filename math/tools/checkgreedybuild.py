@@ -128,11 +128,14 @@ def main(argv):
     here = os.path.dirname(os.path.abspath(__file__))
     py = sys.executable
 
+    outs = {}
+
     def run(search, k, nwords=2):
         out = subprocess.run(
             [py, os.path.join(here, "greedy_build.py"), "--pool", "custom",
              "--words", str(nwords), "--topk", str(k), "--search", search,
              "--no-out"], capture_output=True, text=True).stdout
+        outs[(search, k, nwords)] = out
         line = [l for l in out.splitlines() if l.startswith("opening:")]
         uns = [l for l in out.splitlines() if "unsolved" in l and "of" in l]
         n = int(uns[-1].split()[1]) if uns else -1
@@ -151,6 +154,36 @@ def main(argv):
                         "never actually tested" % seq)
     print("branch and beam agree at k=1, and branch is monotone in K "
           "(unsolved %s over k=1,2,3)" % seq)
+
+    # --- the PROGRESS report, which is only worth having if it is exact ------
+    # A completed branch search must resolve the WHOLE tree, so its fraction
+    # must land on 100.0%: the spans are split evenly among the children
+    # recursed into and every resolved subtree -- leaf, dead end or memo hit --
+    # adds its own, so anything short of 100 means a path added nothing.  And
+    # the beam's trace is its progress: one line per placement, numbered 1..20,
+    # none missing.  Both were absent from the beam entirely until 2026-09-18.
+    btail = [l for l in outs[("branch", 3, 2)].splitlines()
+             if "of the tree" in l]
+    if not btail:
+        failures.append("the branch summary does not report a tree fraction")
+    elif "100.0% of the tree" not in btail[-1]:
+        failures.append("a COMPLETED branch search reported %r, not 100.0%% -- "
+                        "the progress spans do not sum to the whole tree"
+                        % btail[-1].strip())
+
+    steps = [l for l in outs[("beam", 1, 2)].splitlines()
+             if l.lstrip().startswith(tuple("%d/" % i for i in range(1, 11)))]
+    want = 2 * 5
+    if len(steps) != want:
+        failures.append("the beam printed %d step lines, not one per placement "
+                        "(%d) -- its trace is what shows the construction"
+                        % (len(steps), want))
+    elif "100.0%" not in steps[-1]:
+        failures.append("the beam's last step line is not 100%%: %r"
+                        % steps[-1].strip())
+    else:
+        print("progress is exact: branch resolves 100.0%% of its tree, and the "
+              "beam prints all %d placements" % want)
 
     if failures:
         print("\nFAIL")

@@ -24,9 +24,26 @@ different questions, not two speeds of one:
           children of slots 0..i -- which makes beam_K's first K-1 slots
           identical to beam_{K-1} by induction, so wider is never worse.
 
+THERE IS NO BOUND-BASED PRUNING, AND THAT IS A FACT ABOUT THE OBJECTIVE, not an
+omission.  Placing a letter REFINES the partition, so buckets only ever split:
+both `unsolved` and `ssq` are MONOTONE NON-INCREASING as the opening fills in.
+A partial state's score therefore bounds its completions from ABOVE, and an
+upper bound cannot cut a minimisation -- the cheap number points the wrong way.
+What the branch search has instead is MEMOISATION on the state, which is worth
+more than a bound would be here: placement ORDER does not affect the result, so
+the 20! orderings of one assignment collapse to a single search.  `--max-nodes`
+is a STOP, not a prune; a stopped run reports the best it reached.
+
 Exact and deterministic -- no sampling, no seed -- so a re-run reproduces the
 file.  The search, K and `--ssq-first` are all part of the question and all land
 in the filename.
+
+EACH SEARCH WRITES ITS OWN COLUMNS, because the two have genuinely different
+records to keep: the beam's is a TRAJECTORY (one row per placement, the whole
+20-step construction), the branch's is a sequence of INCUMBENTS (one row per
+improvement, found anywhere in the tree).  Forcing one header on both would put
+two meanings under one column name.  `# settings search=` and the filename both
+say which a file is.
 """
 
 import os
@@ -43,8 +60,17 @@ from greedybuild import BLANK, completions, score, spell                # noqa: 
 from opening_list import resolve_word_set                              # noqa: E402
 from wordle import load_words, pattern_row, to_codes                   # noqa: E402
 
-COLUMNS = "found_at,nodes,opening,unsolved,ssq"
+COLUMNS = {
+    "beam": "step,steps,pct,opening,unsolved,ssq,"
+            "placed_letter,placed_word,placed_pos",
+    "branch": "found_at,pct,nodes,leaves,opening,unsolved,ssq",
+}
 LETTERS = "abcdefghijklmnopqrstuvwxyz"
+
+
+def fmt_uns(u):
+    """`--ssq-first` leaves the unsolved count DELIBERATELY uncomputed."""
+    return "    -" if u is None else "%5d" % u
 
 
 def parse_args(argv):
@@ -144,28 +170,41 @@ def children(words, rows, ctx, depth, seen):
     return out
 
 
-def run_branch(state, rows, ctx, k, st):
+def run_branch(state, rows, ctx, k, st, span=1.0):
     """Best opening reachable by recursing into the K best at every step.
 
     Memoised on the STATE, which is what makes it affordable: the order of
     placements does not matter, so an enormous number of paths converge on the
     same set of assignments and are searched once.
+
+    `span` is this call's SHARE OF THE WHOLE SEARCH -- 1.0 at the root, split
+    evenly among the children actually recursed into.  Every resolved subtree
+    adds its span to `st["done"]`, so the fraction is exact and reaches 1.0 on
+    completion.  It measures the TREE, not the time: a memo hit resolves a
+    subtree instantly and counts in full, which is why the percentage can jump.
     """
     depth = sum(1 for w in state for c in w if c is not None)
     if depth == ctx.nw * ctx.L:
         uns, ssq = ctx.full_score(state, rows)
         st["leaves"] += 1
+        st["done"] += span
         return (uns, ssq, state)
     if state in st["memo"]:
+        st["done"] += span
         return st["memo"][state]
-    kids = sorted(children(state, rows, ctx, depth, set()), key=ctx.rank(depth))
+    kids = sorted(children(state, rows, ctx, depth, set()),
+                  key=ctx.rank(depth))[:k]
+    if not kids:
+        st["done"] += span
+        st["memo"][state] = None
+        return None
     best = None
-    for kid in kids[:k]:
+    for kid in kids:
         st["nodes"] += 1
         if st["cap"] and st["nodes"] > st["cap"]:
             break
-        r = run_branch(kid[2], kid[3], ctx, k, st)
-        if best is None or r[:2] < best[:2]:
+        r = run_branch(kid[2], kid[3], ctx, k, st, span / len(kids))
+        if r is not None and (best is None or r[:2] < best[:2]):
             best = r
         st["report"](st, best)
     st["memo"][state] = best
@@ -175,7 +214,8 @@ def run_branch(state, rows, ctx, k, st):
 def run_beam(state, rows, ctx, k, st):
     """Best opening from a NESTED fixed-width beam (linear in K)."""
     beam = [(state, rows)]
-    for step in range(ctx.nw * ctx.L):
+    steps = ctx.nw * ctx.L
+    for step in range(steps):
         seen, cand = set(), []
         for slot, (w, r) in enumerate(beam):
             for kid in children(w, r, ctx, step, seen):
@@ -195,13 +235,19 @@ def run_beam(state, rows, ctx, k, st):
                     break
         beam = [(c[2], c[3]) for c in chosen]
         st["nodes"] += len(cand)
+        # THE STEP LINE REPORTS THE LEADER OF WHAT IS CARRIED FORWARD, which is
+        # the best of `chosen` -- NOT `cand[0]`.  Nested selection can leave the
+        # top-scoring candidate out of the beam when it belongs to a slot past
+        # K, and a line naming a state the beam discarded would be a lie.  At
+        # K=1 the two coincide, so this reproduces the original trace exactly.
+        st["step"](st, step + 1, steps, min(chosen, key=ctx.rank(step)),
+                   len(cand))
     best = None
     for w, r in beam:
         uns, ssq = ctx.full_score(w, r)
         st["leaves"] += 1
         if best is None or (uns, ssq) < best[:2]:
             best = (uns, ssq, w)
-        st["report"](st, best)
     return best
 
 
@@ -227,6 +273,11 @@ def main(argv):
           "  ssq-first=%d"
           % (a["search"], nw, a["pool"], len(pool), len(answers), a["topk"],
              a["ssq_first"]))
+    if a["search"] == "beam":
+        print("  %d placements to make; one line each" % (nw * L))
+    else:
+        print("  progress is the fraction of the SEARCH TREE resolved, "
+              "memo hits included -- not of the time")
 
     fh = None
     if a["out"]:
@@ -237,35 +288,54 @@ def main(argv):
                  "answers=%d\n"
                  % (a["search"], a["pool"], nw, a["topk"], a["ssq_first"],
                     len(answers)))
-        fh.write(COLUMNS + "\n")
+        fh.write(COLUMNS[a["search"]] + "\n")
 
     t0 = time.time()
-    st = {"nodes": 0, "leaves": 0, "memo": {}, "best": None,
+    st = {"nodes": 0, "leaves": 0, "memo": {}, "best": None, "done": 0.0,
           "cap": a["max_nodes"], "last": [0.0]}
 
     def report(st, best):
-        """Only a STRICT improvement prints -- a plateau would flood the log."""
+        """BRANCH only.  A strict improvement prints; a plateau would flood."""
         if best is None:
             return
         if st["best"] is None or best[:2] < st["best"][:2]:
             st["best"] = best
             line = " ".join(spell(w) for w in best[2])
-            print("[%6.0fs] %-34s unsolved=%5d  ssq=%8d  NEW BEST  "
+            print("[%6.0fs] %5.1f%%  %-34s unsolved=%5d  ssq=%8d  NEW BEST  "
                   "(%d nodes, %d complete)"
-                  % (time.time() - t0, line, best[0], best[1],
-                     st["nodes"], st["leaves"]), flush=True)
+                  % (time.time() - t0, 100.0 * st["done"], line, best[0],
+                     best[1], st["nodes"], st["leaves"]), flush=True)
             if fh:
-                fh.write("%.1f,%d,%s,%d,%d\n"
-                         % (time.time() - t0, st["nodes"], line,
-                            best[0], best[1]))
+                fh.write("%.1f,%.4f,%d,%d,%s,%d,%d\n"
+                         % (time.time() - t0, 100.0 * st["done"], st["nodes"],
+                            st["leaves"], line, best[0], best[1]))
                 fh.flush()
         elif time.time() - st["last"][0] > 30:
             st["last"][0] = time.time()
-            print("  ... %d nodes, %d complete openings, %d states memoised "
-                  "(%.0fs)" % (st["nodes"], st["leaves"], len(st["memo"]),
-                               time.time() - t0), flush=True)
+            print("  ... %5.1f%% done  %d nodes, %d complete openings, "
+                  "%d states memoised (%.0fs)"
+                  % (100.0 * st["done"], st["nodes"], st["leaves"],
+                     len(st["memo"]), time.time() - t0), flush=True)
 
-    st["report"] = report
+    def step_line(st, step, steps, lead, examined):
+        """BEAM only.  One line per placement -- the construction as it goes."""
+        st["done"] = float(step) / steps
+        uns, ssq, keyw, _, placed, _ = lead[:6]
+        if fh:
+            fh.write("%d,%d,%.1f,%s,%s,%d,%s,%d,%d\n"
+                     % (step, steps, 100.0 * st["done"],
+                        " ".join(spell(w) for w in keyw),
+                        "" if uns is None else uns, ssq,
+                        placed[0], placed[1], placed[2]))
+            fh.flush()
+        if a["progress"] and step % a["progress"] == 0:
+            print("  %2d/%d %5.1f%%  %-34s unsolved=%s  ssq=%9d"
+                  "  (%.0fs, %d examined)"
+                  % (step, steps, 100.0 * st["done"],
+                     " ".join(spell(w) for w in keyw), fmt_uns(uns), ssq,
+                     time.time() - t0, examined), flush=True)
+
+    st["report"], st["step"] = report, step_line
     blank = tuple(tuple([None] * L) for _ in range(nw))
     rows0 = [pattern_row(BLANK * L, pool_codes) for _ in range(nw)]
     go = run_branch if a["search"] == "branch" else run_beam
@@ -274,8 +344,10 @@ def main(argv):
     print("\nopening: %s" % " ".join(spell(w) for w in best[2]))
     print("  unsolved %d of %d answers,  ssq %d" % (best[0], len(answers),
                                                     best[1]))
-    print("  %d nodes, %d complete openings examined, %d states memoised, %.0fs"
-          % (st["nodes"], st["leaves"], len(st["memo"]), time.time() - t0))
+    print("  %d nodes, %d complete openings examined, %d states memoised, "
+          "%.1f%% of the tree, %.0fs"
+          % (st["nodes"], st["leaves"], len(st["memo"]), 100.0 * st["done"],
+             time.time() - t0))
     if st["cap"] and st["nodes"] > st["cap"]:
         print("  STOPPED at --max-nodes: this is the best of what was searched")
     if fh:

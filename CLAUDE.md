@@ -2698,12 +2698,52 @@ tee'd log, `--dry-run`. Exact and deterministic — no sampling, no seed.
   myopic exactly where the objective is flat: it commits to `j` on step 1, which
   forces `fjord`, and the result carries only 15 distinct letters. **That is the
   finding, not a bug** — and the reason `-k` exists.
+- **THERE IS NO BOUND-BASED PRUNING, AND THAT IS A FACT ABOUT THE OBJECTIVE, not
+  an omission.** Placing a letter REFINES the partition, so buckets only split:
+  both `unsolved` and `ssq` are **monotone non-increasing** as the opening fills
+  in. A partial state's score therefore bounds its completions from **ABOVE**,
+  and an upper bound cannot cut a MINIMISATION — the cheap number points the
+  wrong way. What the branch search has instead is **MEMOISATION on the state**,
+  which is worth more here than a bound would be: placement ORDER does not
+  affect the result, so the orderings of one assignment collapse to one search
+  (measured: k=3 on 2 words visits 10160 nodes against 4579 distinct states).
+  `--max-nodes` is a STOP, not a prune. Do not add a "bound" built on the
+  partial score; it would cut correct openings.
+- **BOTH SEARCHES NARRATE, AND THE BEAM'S TRACE IS ITS PROGRESS** (restored
+  2026-09-18 — the `--search` rewrite had dropped it, so a beam run printed
+  NOTHING between its banner and its answer). The beam prints one line per
+  placement, `N/20` with a percentage, the leader's spelling, `unsolved` and
+  `ssq` — and writes the same as a CSV row, so the file is the whole
+  construction. **The line names the leader of what is CARRIED FORWARD** (the
+  best of the chosen beam), not the top-scoring candidate: nested selection can
+  leave that candidate out of the beam, and naming a discarded state would be a
+  lie. At K=1 the two coincide.
+  - The BRANCH search prints each new best plus **the fraction of its search
+    TREE resolved**. Spans are 1.0 at the root split evenly among the children
+    recursed into, and every resolved subtree — leaf, dead end or memo hit —
+    adds its own, so the fraction is exact and lands on 100.0%. **It measures
+    the TREE, not the time**: a memo hit resolves a subtree instantly and counts
+    in full, so the percentage jumps (measured: 0.2% to 12.7% between two
+    consecutive improvements). Do not read it as an ETA.
+  - **EACH SEARCH WRITES ITS OWN COLUMNS**, because they have different records
+    to keep: the beam's is a TRAJECTORY (one row per placement), the branch's a
+    sequence of INCUMBENTS (one row per improvement, found anywhere in the
+    tree). One header over both would put two meanings under one column name;
+    `# settings search=` and the filename each say which a file is.
 - **`python3 tools/checkgreedybuild.py` is the GATE**: the blank filler against
   `wordle.pattern` scalar-vs-vectorised, `solved_in_bucket` against
   `worst_case <= 2` on random buckets (asserting both branches occurred), the
   whole objective against `guarantee_sweep`'s losing count on complete openings,
-  and the legality refusal. Run it alongside `tools/checkguarantee.py`.
+  the legality refusal, the k=1 cross-search oracle and branch's monotonicity —
+  **plus the progress report itself**, since a percentage nothing checks is
+  decoration: a COMPLETED branch search must report 100.0% of its tree, and the
+  beam must print one step line per placement ending at 100%. MUTATION-TESTED
+  (dropping the memo hit's span credit makes the branch finish at 0.0%, caught).
+  Run it alongside `tools/checkguarantee.py`.
 - Data under `math/data/shared/greedybuild/`, log under `data/local/greedybuild/`.
+  **The committed `greedy_custom_w4_k*.csv` files predate `--search`** — they are
+  beam runs in the old single-header format; new runs are `greedy_beam_*` /
+  `greedy_branch_*`, so nothing collides.
 
 ### `gray-second` — a PREDETERMINED second word, played only on enough greys
 A `wordlesim` strategy, and a table that feeds it (the user's, 2026-09-10): play

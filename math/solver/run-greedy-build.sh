@@ -2,13 +2,18 @@
 # Build an opening LETTER BY LETTER against the guarantee objective.
 # math/greedybuild.py states the rule and IS the source of truth.
 #
-#     bash solver/run-greedy-build.sh -k 1
-#     bash solver/run-greedy-build.sh -k 50 --nwords 5
+#     bash solver/run-greedy-build.sh --search branch -k 2
+#     bash solver/run-greedy-build.sh --search beam   -k 50 --nwords 5
 #
 # Exact and deterministic -- no sampling, no seed -- so a re-run reproduces the
-# file.  -k is a BEAM over (letter, slot) placements: K=1 is the plain greedy,
-# and the result is the best of what the beam examined, never the best opening.
-# K and the word count are part of the search, so both are in the filename.
+# file.  --search picks BRANCH (recurse into the K best, the repo's --topk) or
+# BEAM (K states carried forward); either way K=1 is the plain greedy and the
+# result is the best of what was EXAMINED, never the best opening.  The search,
+# K and the word count are all part of the question and all in the filename.
+#
+# Both narrate as they go: the beam prints one line per placement (N/20 with a
+# percentage), the branch prints each new best plus the fraction of its search
+# TREE resolved.  There is no pruning to report -- see the tool's docstring.
 set -u
 MATH=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 
