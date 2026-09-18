@@ -967,6 +967,32 @@ subject to a guarantee. Do not put the two in one table.
   it and the game itself can pick them. NB hangman applies that cutoff on top of a
   hunspell spellcheck and curated block/allow lists — **this list has NO such
   curation**, only the frequency bar and the answer floor.
+- **`custom.txt` IS ONE MEMBER OF A FAMILY, and the whole family is now committed**
+  (user's call, 2026-09-18): answers plus every guess word at or above a bar, at
+  every multiple of 0.25 up to 2.50. **`build_freq_wordlist.py --from-ranked
+  --cutoff C` (repeatable)** builds them from the COMMITTED `guess_by_freq.txt` —
+  nothing is re-ranked, the ranking file is NOT rewritten, and `wordfreq` is never
+  imported, so a new list cannot disagree with `custom.txt` about a word's zipf.
+  They are ordinary word-list stems (`--candidates zipf200`, `--pool …`).
+  - **The name is HUNDREDTHS, zero-padded to three** — `zipf025` is 0.25 and
+    `zipf250` is 2.50 — because `custom25` reads as either. Derived by
+    `list_name`, the one place that rule lives.
+  - **`zipf250.txt` IS `custom.txt`, byte for byte** (verified), which is the free
+    check that the family is built the same way as the original.
+  - **THERE ARE SEVEN DISTINCT SETS, NOT TEN, and that is a fact about wordfreq.**
+    The lowest NON-ZERO zipf in the whole 12972 is **1.01**, and 4046 words sit at
+    exactly 0.00 (absent from wordfreq's "large" list) — nothing lies between. So
+    every bar at or below 1.00 selects the same 8926 words, and `zipf025`,
+    `zipf050`, `zipf075` and `zipf100` are identical files.
+  - Sizes, with the answer words the bar would have dropped and kept anyway:
+
+        zipf025/050/075/100   8926   (+0 answers rescued)
+        zipf125               8121   (+2)
+        zipf150               7272   (+5)
+        zipf175               6381   (+17)
+        zipf200               5597   (+40)
+        zipf225               4866   (+89)
+        zipf250 = custom      4282   (+216)
 - **`math/topk.py` is the guesser the adversary plays against.** The candidate list
   carries non-normalised WEIGHTS; **all 12972 words are legal guesses**, candidate or
   not. At each node it ranks guesses by `sum over p != all-green of n_p * (W_p / W)`
