@@ -2631,6 +2631,53 @@ moment that becomes true, and the survivors double.
   were each caught).
 - Data under `math/data/shared/guarantee/`, log under `math/data/local/guarantee/`.
 
+### `greedybuild` — build an opening LETTER BY LETTER, against the real objective
+`math/greedybuild.py` states the rule and IS the source of truth;
+`tools/greedy_build.py` is the driver. Run it with
+**`bash solver/run-greedy-build.sh -k K [--nwords N]`** (from `math/`), attached,
+tee'd log, `--dry-run`. Exact and deterministic — no sampling, no seed.
+- **THE CONSTRUCTION** (user's, 2026-09-18): start with N blank words (5N empty
+  slots); at each step consider every (letter, slot) placement, keep the LEGAL
+  ones, score them, take the best; repeat until full. **LEGAL** = the word
+  receiving the letter can still be COMPLETED to a pool word, so a half-built
+  word is always a prefix-pattern of something real.
+- **IT REACHES OPENINGS THE SCREEN CANNOT.** `run-singles.sh` builds a quad by
+  extending pairs that scored well, so an opening whose two-word PREFIXES look
+  mediocre but whose four words combine well is unreachable by it. This never
+  commits to a whole word.
+- **THE OBJECTIVE IS THE GUARANTEE CONDITION, NOT A PROXY.** An ANSWER is
+  UNSOLVED when some live pool word fails to fully split it — exactly
+  `guarantee.worst_case(S,a) > 2`, i.e. the follow-up can draw a word at guess 5
+  and still be choosing at guess 6. **VERIFIED END TO END**: `craps until often
+  fjord` scores 385 unsolved here and `guarantee_sweep` independently reports
+  385 losing.
+  - **Two lists, two roles**: buckets are over the POOL the follow-up draws from
+    (custom's 4282); the count is over the ANSWERS (2315).
+  - **`--adapt` is irrelevant to this count** — abandoning the opening only ever
+    fires when the live set is already ≤ 2, where the answer was solved anyway.
+    MEASURED: adapt 0 and adapt 2 both give 385 for that opening.
+- **TIES BREAK ON SUM OF SQUARES (user's call), AND THAT IS NOT A DETAIL.** For
+  the first several placements almost nothing is split, so `unsolved` is pinned
+  at every answer and the TIE-BREAK is choosing the whole construction.
+- **A HALF-BUILT WORD IS SPELLED WITH `_`, which is the REAL feedback function
+  on a real string** — `wordle.pattern` gives `_` grey everywhere (never green,
+  in no answer, and it does not consume a spare copy), so placed letters get
+  ordinary treatment and blanks are a constant column. No second feedback rule.
+- **`-k` IS A BEAM over placements and is REQUIRED**; K=1 is the plain greedy and
+  the result is the best of what the beam examined, never the best opening. Each
+  K is a different search and gets its own file.
+- **MEASURED at k=1: 6 seconds**, and it lands on `craps until often fjord` with
+  **385 unsolved** — far WORSE than the ranked screens (5-17). The greedy is
+  myopic exactly where the objective is flat: it commits to `j` on step 1, which
+  forces `fjord`, and the result carries only 15 distinct letters. **That is the
+  finding, not a bug** — and the reason `-k` exists.
+- **`python3 tools/checkgreedybuild.py` is the GATE**: the blank filler against
+  `wordle.pattern` scalar-vs-vectorised, `solved_in_bucket` against
+  `worst_case <= 2` on random buckets (asserting both branches occurred), the
+  whole objective against `guarantee_sweep`'s losing count on complete openings,
+  and the legality refusal. Run it alongside `tools/checkguarantee.py`.
+- Data under `math/data/shared/greedybuild/`, log under `data/local/greedybuild/`.
+
 ### `gray-second` — a PREDETERMINED second word, played only on enough greys
 A `wordlesim` strategy, and a table that feeds it (the user's, 2026-09-10): play
 an opener; if its reply shows **at least N grey tiles**, play a word committed to
