@@ -2784,16 +2784,24 @@ tee'd log, `--dry-run`. Exact and deterministic — no sampling, no seed.
   Caught by the gate's monotonicity check on its first run. Ties break on ssq,
   priced only for the group STRADDLING the cut, so a decisive choice is free and
   a flat one still gets a real second key instead of the lowest index.
-- **`--final-top` SETS HOW WIDE THE LAST WORD'S SHORTLIST IS**, and it is the one
-  place the two costs trade off. `N` takes the N best by coverage and prices
-  each on its own (**the default is 100**); `0` uses the same K as every other
-  level; **`all` is EXHAUSTIVE** — every candidate ranked by the real objective.
-  Monotone across all four, each a superset of the one above, and gated as such:
-  MEASURED at k=2, unsolved `115, 54, 41, 18` over k, 20, 200, exhaustive.
-  - **THE EXHAUSTIVE LEVEL IS OPT-IN, and that is the USER'S CALL after running
-    both (2026-09-18): it is not worth its slowdown.** It finds strictly better
+- **`--final-top` GIVES THE LAST WORD A WIDER SHORTLIST THAN THE OTHER LEVELS,
+  AND THE DEFAULT IS 0 — NO SPECIAL CASE AT ALL** (user's call, 2026-09-18). `0`
+  gives the last word the same K as every other level; `N` takes the N best by
+  coverage; **`all` is EXHAUSTIVE**, every candidate ranked by the real
+  objective. Monotone across all four, each a superset of the one above, and
+  gated as such: MEASURED at k=2, unsolved `115, 54, 41, 18` over k, 20, 200,
+  exhaustive.
+  - **WHY 0 RATHER THAN A SHORTLIST, in the user's words: a wider shortlist at
+    the last level "is just increasing k for one level", not a different
+    design.** It shipped as 100 described as a "middle ground" between coverage
+    and the objective, which it was not — coverage still chose the word.
+  - **THE EXHAUSTIVE LEVEL IS OPT-IN, and that is also the USER'S CALL after
+    running both: it is not worth its slowdown.** It finds strictly better
     openings — that is what monotone means — but not enough better per second at
-    the K they work at. Do not quietly make it the default again.
+    the K they work at. Do not quietly make either non-zero value the default.
+  - **"GO BACK TO WHAT WE HAD BEFORE" WAS AMBIGUOUS AND WAS READ WRONG ONCE** —
+    as the 100-shortlist rather than as the no-special-case default that
+    predated the whole flag. When a revert has two readings, ASK which.
 - **`last_level_scores` PRICES THE WHOLE POOL IN ONE PASS — MEASURED 0.9-2.2 s
   against 48 s one at a time (22-52x), exact on unsolved AND ssq.** It is what
   `--final-top all` runs on, and it is worth reading before anyone prices a

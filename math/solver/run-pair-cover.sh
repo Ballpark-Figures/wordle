@@ -24,7 +24,7 @@ CAP=6
 SEEDTOP=1000
 SEEDFROM=""
 MAXPAIRS=0
-FINALTOP=100
+FINALTOP=0
 SHOW=8
 DRYRUN=0
 
@@ -96,11 +96,11 @@ echo "  words      the 4 come from ${CANDS:-$POOL}$([ -z "$CANDS" ] && echo " (t
 echo "  opening    $NWORDS words, chosen by weighted pair coverage"
 echo "  objective  fewest answers UNSOLVED after the opening and the 5th draw"
 echo "  search     branch, k=$TOPK$([ "$TOPK" = 1 ] && echo " (plain greedy)")"
-if [ "$FINALTOP" = all ]; then
-    echo "  last word  EXHAUSTIVE -- every candidate ranked by UNSOLVED"
-else
-    echo "  last word  the $FINALTOP best by coverage, then ranked by UNSOLVED"
-fi
+case "$FINALTOP" in
+    all) echo "  last word  EXHAUSTIVE -- every candidate ranked by UNSOLVED" ;;
+    0)   echo "  last word  no special case -- the same k as every other level" ;;
+    *)   echo "  last word  the $FINALTOP best by coverage, then ranked by UNSOLVED" ;;
+esac
 echo "  seed       top $SEEDTOP of $SEEDFROM"
 echo "  rounds     $ROUNDS"
 echo "  pairs      ${OUT}_pairs.csv (resumed if it exists)"
