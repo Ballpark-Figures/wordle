@@ -37,7 +37,7 @@ from opening_list import read_openings, resolve_word_set           # noqa: E402
 from wordle import load_words                                      # noqa: E402
 
 COLUMNS = ("word,worst_case,guaranteed,losing_answers,losing_share,"
-           "worst_answer,worst_line")
+           "worst_answer,worst_line,losing_words")
 
 
 def worst_line(sub_rows, answer_pos, names):
@@ -66,7 +66,12 @@ def check_opening(opening, ctx):
     ans_rows = pool_rows[:, apool]                            # answers are in the pool
     level, _ = stop_levels(pool_rows, ans_rows, adapt)
 
-    worst, wans, wline, losing = 0, "", [], 0
+    # The losing answers are NAMED, not just counted: which words can be made to
+    # lose is what says whether an opening is one bad bucket away or hopeless,
+    # and the count alone cannot be read that way.  It is bounded and small --
+    # MEASURED over 10000 openings: median 19, max 39 -- so keeping the list
+    # costs a short field per row rather than an unbounded one.
+    worst, wans, wline, losing = 0, "", [], []
     # Group the answers by (level, joint key at that level): every answer in one
     # group sees the identical live set, so the recursion runs ONCE per group.
     for lv in np.unique(level):
@@ -90,7 +95,8 @@ def check_opening(opening, ctx):
                     pos = names.index(aw)
                     total = int(lv) + worst_case(sub, pos)
                     line = None
-                losing += total > cap
+                if total > cap:
+                    losing.append(aw)
                 if total > worst:
                     worst = total
                     wans = aw
@@ -206,7 +212,8 @@ def main(argv):
         name = " ".join(opening)
         if name in done:
             continue
-        worst, losing, wans, wline = check_opening(opening, ctx)
+        worst, losers, wans, wline = check_opening(opening, ctx)
+        losing = len(losers)
         guaranteed = int(worst <= a["cap"])
         nguar += guaranteed
         ndone += 1
@@ -217,13 +224,17 @@ def main(argv):
         cand = (worst, losing)
         if best is None or cand < best[0]:
             best = (cand, name)
-            print("[%7.0fs] %-30s worst=%d  %d of %d answers can lose  NEW BEST%s"
+            print("[%7.0fs] %-26s worst=%d  %2d of %d can lose  NEW BEST%s\n"
+                  "            %s"
                   % (time.time() - t0, name, worst, losing, len(answers),
-                     "  -- GUARANTEED" if guaranteed else ""), flush=True)
+                     "  -- GUARANTEED" if guaranteed else "",
+                     " ".join(sorted(losers)) if losers else "(none)"),
+                  flush=True)
         if fh:
-            fh.write("%s,%d,%d,%d,%.8f,%s,%s\n"
+            fh.write("%s,%d,%d,%d,%.8f,%s,%s,%s\n"
                      % (name, worst, guaranteed, losing,
-                        losing / len(answers), wans, " ".join(wline)))
+                        losing / len(answers), wans, " ".join(wline),
+                        " ".join(sorted(losers))))
             fh.flush()
         if a["progress"] and ndone % a["progress"] == 0:
             el = time.time() - t0

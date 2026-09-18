@@ -107,11 +107,11 @@ def main(argv):
             for op in openings:
                 fast = check_opening(op, ctx)
                 ref = ref_opening(op, pool, ans, adapt, cap)
-                if (fast[0], fast[1]) != ref:
+                if (fast[0], len(fast[1])) != ref:   # check_opening NAMES the losers
                     failures.append(
                         "adapt %d cap %d, opening %s: fast (worst %d, losing %d) "
                         "vs reference (worst %d, losing %d)"
-                        % (adapt, cap, " ".join(op), fast[0], fast[1],
+                        % (adapt, cap, " ".join(op), fast[0], len(fast[1]),
                            ref[0], ref[1]))
                     continue
                 tally["guaranteed" if fast[0] <= cap else "not"] += 1
