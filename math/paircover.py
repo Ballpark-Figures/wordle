@@ -154,3 +154,226 @@ def cover_scores(S, weights, alive, banned):
     sc = S[:, alive].astype(np.int64) @ weights[alive]
     sc[banned] = -1
     return sc
+
+
+# ---------------------------------------------------------------------------
+# THE LAST LEVEL, with the prefix hoisted out of the candidate loop.
+#
+# `greedybuild.score` answers "how many answers does this WHOLE opening leave
+# unsolved", from scratch, which is the right shape when the whole opening
+# varies.  At the last word it is the wrong shape: the first k-1 words are FIXED,
+# so they fix the partition of the pool, and a k-th word only REFINES it.  Doing
+# it from scratch rebuilds a 4282-wide unique and argsort per candidate and then
+# walks every bucket, almost all of which the k-th word cannot affect.
+#
+# TWO FACTS DO THE WORK, and both are about buckets the k-th word cannot save or
+# spoil:
+#
+#   A bucket of ONE is solved, trivially.
+#
+#   A BUCKET OF TWO IS ALSO ALWAYS SOLVED, whatever the k-th word does, and that
+#   is the one worth proving rather than assuming.  For `S = {a, x}` the
+#   follow-up draws one of them; drawing `a` wins outright, and drawing `x`
+#   replies something other than all-green, which eliminates `x` and leaves
+#   exactly `{a}` to name.  So `worst_case(S, a) = 2`, inside a budget of 2.
+#   Refining such a bucket can only split it into singletons, so it is safe
+#   before the k-th word is chosen and safe after.
+#
+# So only the prefix buckets of size >= 3 that contain an ANSWER are in play, and
+# within those only the sub-buckets of size >= 3 the k-th word leaves behind.
+# MEASURED on a real 3-word prefix: 386 of 2296 buckets, holding 47% of the pool.
+# ---------------------------------------------------------------------------
+
+def prefix_buckets(M, prefix, ans_pool_idx):
+    """The only buckets a final word can change: size >= 3 and holding an answer.
+
+    Returns (members, is_answer) per bucket, with members as POOL indices and
+    `is_answer` a boolean over them, computed ONCE for a fixed prefix.
+    Everything it leaves out is an answer that is already solved and stays
+    solved -- see the proof above -- so the unsolved count is exactly what these
+    buckets go on to contribute.
+    """
+    key = joint_key(M, prefix)
+    is_ans = np.zeros(M.shape[1], dtype=bool)
+    is_ans[ans_pool_idx] = True
+    order = np.argsort(key, kind="stable")
+    skey = key[order]
+    cuts = np.flatnonzero(np.r_[True, skey[1:] != skey[:-1], True])
+    out = []
+    for lo, hi in zip(cuts[:-1], cuts[1:]):
+        if hi - lo < 3:
+            continue
+        members = order[lo:hi]
+        flags = is_ans[members]
+        if flags.any():
+            out.append((members, flags))
+    return out
+
+
+# A bucket bigger than this falls back to the walking form.  The vectorised one
+# below is O(s^3) in MEMORY, so it needs a ceiling -- but the ceiling is slack
+# by a wide margin: MEASURED over 7799 real sub-buckets the median size is 3,
+# the 99th percentile 14 and the maximum 25.
+SMALL_BUCKET = 64
+
+
+def unsolved_in_bucket(sub, flags):
+    """How many of this bucket's answers are UNSOLVED, in one pass.
+
+    `greedybuild.solved_in_bucket` walks the live words and exits as soon as the
+    candidate list empties, which is the right shape for a wide bucket.  At the
+    last level the buckets are TINY -- median 3 -- so that loop is all numpy call
+    overhead, and the whole question fits in one expression instead.
+
+    An answer `p` is unsolved exactly when some other live word `g` can be drawn
+    and leave company behind: some `j != p` replies to `g` as `p` does.  So build
+    `eq[g, p, j]`, count the company each `(g, p)` leaves, and ask whether any
+    `g != p` leaves any.  The `g == p` diagonal is dropped because drawing the
+    answer ends the game -- the same exemption `worst_case` makes.
+    """
+    eq = sub[:, :, None] == sub[:, None, :]
+    bad = (eq.sum(axis=2) - 1) > 0
+    np.fill_diagonal(bad, False)
+    return int(bad[:, flags].any(axis=0).sum())
+
+
+def last_level_unsolved(full, cols, buckets, row):
+    """Unsolved answers for one final word, given the prefix's live buckets.
+
+    `row` is that word's reply against every pool word.  Each live bucket is
+    split by it and only the parts still holding three or more words can leave
+    an answer unsolved.
+    """
+    uns = 0
+    for members, flags in buckets:
+        rep = row[members]
+        o = np.argsort(rep, kind="stable")
+        srep = rep[o]
+        cuts = np.flatnonzero(np.r_[True, srep[1:] != srep[:-1], True])
+        for lo, hi in zip(cuts[:-1], cuts[1:]):
+            if hi - lo < 3:
+                continue                  # one or two words: solved, proved above
+            loc = o[lo:hi]
+            fl = flags[loc]
+            if not fl.any():
+                continue                  # no answer here, so nothing to lose
+            sub_idx = cols[members[loc]]
+            sub = full[np.ix_(sub_idx, sub_idx)]
+            if hi - lo <= SMALL_BUCKET:
+                uns += unsolved_in_bucket(sub, fl)
+            else:
+                from greedybuild import solved_in_bucket
+                apos = list(np.flatnonzero(fl))
+                uns += len(apos) - len(solved_in_bucket(full, cols,
+                                                        members[loc], apos))
+    return uns
+
+
+def _parts(rep):
+    """Local index groups of equal reply, as a list of arrays."""
+    o = np.argsort(rep, kind="stable")
+    s = rep[o]
+    cuts = np.flatnonzero(np.r_[True, s[1:] != s[:-1], True])
+    return [o[lo:hi] for lo, hi in zip(cuts[:-1], cuts[1:])]
+
+
+def _partition_key(blk):
+    """Group candidates by the PARTITION they induce, not by their replies.
+
+    THIS IS THE WHOLE SAVING, and grouping by reply values instead throws most
+    of it away.  What a final word does to a bucket is decided entirely by which
+    members it puts TOGETHER -- the actual pattern codes are labels.  A bucket of
+    three therefore has only FIVE possible outcomes however many candidates
+    there are (Bell(3)), and a bucket of four fifteen, so thousands of
+    candidates collapse onto a handful of cases each priced once.
+
+    The key packs one bit per member PAIR -- equal or not -- which determines the
+    partition exactly.  That is s(s-1)/2 bits, so it is exact up to s = 11 and
+    the caller falls back to the raw rows above that.
+    """
+    nc, s = blk.shape
+    key = np.zeros(nc, dtype=np.int64)
+    bit = 0
+    for i in range(s):
+        for j in range(i + 1, s):
+            key |= (blk[:, i] == blk[:, j]).astype(np.int64) << bit
+            bit += 1
+    uniq, inv = np.unique(key, return_inverse=True)
+    # One representative per class, found by sorting rather than by scanning the
+    # candidates: a Python walk over the pool here would cost more than the
+    # pricing it exists to avoid.
+    order = np.argsort(inv, kind="stable")
+    si = inv[order]
+    first = order[np.flatnonzero(np.r_[True, si[1:] != si[:-1]])]
+    return blk[first], inv
+
+
+PAIRBIT_MAX = 11        # s(s-1)/2 bits must fit an int64 sign-free
+
+
+def _rep_rows(blk):
+    """(one representative row per distinct partition, inverse index)."""
+    if blk.shape[1] <= PAIRBIT_MAX:
+        return _partition_key(blk)
+    blk = np.ascontiguousarray(blk)
+    v = blk.view(np.dtype((np.void, blk.dtype.itemsize * blk.shape[1]))).ravel()
+    uniq, inv = np.unique(v, return_inverse=True)
+    return uniq.view(blk.dtype).reshape(len(uniq), blk.shape[1]), inv
+
+
+def last_level_scores(full, cols, M, prefix, ans_pool_idx):
+    """(unsolved, ssq) for EVERY candidate as the final word, in one pass.
+
+    THIS IS THE WHOLE LAST LEVEL AT ONCE, and it is what makes ranking the final
+    word by the REAL objective affordable instead of shortlisting on a proxy
+    first.  Evaluating candidates one at a time costs ~5 ms each -- 21 s for the
+    pool -- and almost all of that is numpy call overhead from re-walking the
+    same few hundred buckets per candidate.
+
+    The saving is that a candidate only matters through the PARTITION it induces
+    on a bucket, and a bucket of three has very few distinct partitions however
+    many words there are.  So each bucket groups the candidates by the partition
+    they induce (`_row_key`), prices each distinct one ONCE, and scatters the
+    result back.  Buckets of one and two need no partitioning at all: their
+    answers are solved whatever comes (see the proof above), and their ssq
+    contribution is a single vectorised comparison.
+    """
+    nc = M.shape[0]
+    key = joint_key(M, prefix)
+    is_ans = np.zeros(M.shape[1], dtype=bool)
+    is_ans[ans_pool_idx] = True
+    order = np.argsort(key, kind="stable")
+    skey = key[order]
+    cuts = np.flatnonzero(np.r_[True, skey[1:] != skey[:-1], True])
+
+    uns = np.zeros(nc, dtype=np.int32)
+    ssq = np.zeros(nc, dtype=np.int64)
+    singles = 0
+    for lo, hi in zip(cuts[:-1], cuts[1:]):
+        members = order[lo:hi]
+        n = hi - lo
+        if n == 1:
+            singles += 1
+            continue
+        if n == 2:
+            same = M[:, members[0]] == M[:, members[1]]
+            ssq += np.where(same, 4, 2)
+            continue
+        rows, inv = _rep_rows(M[:, members])
+        flags = is_ans[members]
+        sub = full[np.ix_(cols[members], cols[members])]
+        cu = np.empty(len(rows), dtype=np.int32)
+        cs = np.empty(len(rows), dtype=np.int64)
+        for r, rep in enumerate(rows):
+            u = s2 = 0
+            for loc in _parts(rep):
+                s2 += len(loc) * len(loc)
+                if len(loc) < 3:
+                    continue           # one or two words: solved, proved above
+                fl = flags[loc]
+                if fl.any():
+                    u += unsolved_in_bucket(sub[np.ix_(loc, loc)], fl)
+            cu[r], cs[r] = u, s2
+        uns += cu[inv]
+        ssq += cs[inv]
+    return uns, ssq + singles

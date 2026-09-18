@@ -137,7 +137,7 @@ def main(argv):
     # A wider last-level shortlist yields a SUPERSET of leaves, so the minimum
     # over them can only improve -- the same containment argument K rests on.
     fseq = []
-    for f in (0, 20, 200):
+    for f in (20, 200, 0):                 # 0 is EXHAUSTIVE, so it comes last
         st = {"nodes": 0, "leaves": 0}
         u, _, _ = build_opening(ctx, 2, st, f)
         fseq.append(u)
@@ -146,7 +146,28 @@ def main(argv):
     if fseq[0] == fseq[-1]:
         failures.append("--final-top changed nothing (%s), so its monotonicity "
                         "was never actually tested" % fseq)
-    print("--final-top is monotone (unsolved %s over 0, 20, 200 at k=2)" % fseq)
+    print("--final-top is monotone (unsolved %s over 20, 200, exhaustive at k=2)"
+          % fseq)
+
+    # --- 4c: the batched last level equals the one-at-a-time objective ------
+    # The exhaustive level exists only because it is fast; it is worth nothing
+    # if it is not also EXACT.  `greedybuild.score` prices a whole opening from
+    # scratch and shares none of the bucket reuse, so it is a real second route
+    # to both numbers.
+    from paircover import last_level_scores
+    pre = [int(c) for c in chosen[:3]]
+    U, Q = last_level_scores(full, cols, M, pre, ans)
+    wrong = 0
+    for c in rng.integers(len(pool), size=120):
+        c = int(c)
+        got = score(tuple(pre + [c]), (full, codes, cols, ans,
+                                       [M[x] for x in pre + [c]]))
+        if got != (int(U[c]), int(Q[c])):
+            wrong += 1
+    if wrong:
+        failures.append("the batched last level disagrees with score() on %d "
+                        "of 120 candidates" % wrong)
+    print("batched last level: 120 candidates match score() on unsolved AND ssq")
 
     # --- 5: the SEED is dropped after the first harvest --------------------
     # End to end, through the real main(), because this is a property of the

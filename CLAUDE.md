@@ -2760,33 +2760,56 @@ tee'd log, `--dry-run`. Exact and deterministic — no sampling, no seed.
   Caught by the gate's monotonicity check on its first run. Ties break on ssq,
   priced only for the group STRADDLING the cut, so a decisive choice is free and
   a flat one still gets a real second key instead of the lowest index.
-- **`--final-top N` WIDENS THE SHORTLIST AT THE LAST WORD ONLY** (user's call,
-  2026-09-18), because that is where coverage is weakest: by then the remaining
-  pair set is smallest, most candidates tie on it, and the tie-break is choosing
-  the word. Since the leaves are ALREADY ranked by `(unsolved, ssq)`, a wider
-  pick at that one level IS "choose the last word by the real objective" — there
-  is no second ranking rule, just more leaves reaching the one that exists.
-  - **MONOTONE BY CONSTRUCTION, exactly as K is**: a larger `--final-top` gives
-    a SUPERSET of leaves, so the minimum can only improve. Gated, with coverage
-    asserted — MEASURED at k=2, unsolved `115, 54, 41` over final-top 0, 20, 200.
-  - **`0` means "same as k"**, which is the behaviour from before the flag, so
-    it stays reachable. The wrapper default is 100 and it is in the stem as
-    `_f<N>`.
-  - **COST: leaves are `k^(words-1) x max(k, final_top)`**, so it multiplies
-    what K alone would cost. Doing the last level EXHAUSTIVELY was priced and
-    rejected: one unsolved evaluation is **10.4 ms**, so all 4282 candidates is
-    45 s per level-3 state — 20 minutes a round at k=3 and unfinishable at k=10.
+- **THE LAST WORD IS RANKED BY THE REAL OBJECTIVE OVER EVERY CANDIDATE**
+  (user's design, 2026-09-18). Coverage chooses words 1..N-1, where it is
+  informative and where a full evaluation would multiply; it chooses NOTHING at
+  the last word, which is where it was weakest — fewest pairs left, most
+  candidates tied. `--final-top N` restores a coverage shortlist if the
+  exhaustive level is not wanted; **0, the default, is exhaustive** and lands in
+  the stem as `_fall`.
+  - **A SCAR: this was first shipped as a 100-word coverage shortlist and sold
+    as a "middle ground".** It was not one — it was `k = 100` at the last level,
+    with coverage still choosing the word. And the "too expensive to do it
+    properly" that justified it was **pricing the implementation, not the
+    design**: the quoted 45 s was `greedybuild.score` rebuilding the whole
+    4282-word partition once per candidate. Caught by the user. **Price the idea
+    against a fit implementation before calling it unaffordable.**
+- **`last_level_scores` PRICES THE WHOLE POOL IN ONE PASS — MEASURED 0.9-2.2 s
+  against 48 s one at a time (22-52x), exact on unsolved AND ssq.** Two ideas do
+  it, and both are about work that does not depend on the candidate:
+  - **THE PREFIX IS FIXED, SO THE BUCKETS ARE.** A final word only REFINES the
+    partition the first N-1 words made, so only buckets of size >= 3 holding an
+    answer are in play — MEASURED 386 of 2296, holding 47% of the pool.
+    **A bucket of TWO is ALWAYS solved, and that wants proving rather than
+    assuming**: the follow-up draws one of the pair, drawing the answer wins,
+    and drawing the other replies non-green, eliminating it and leaving exactly
+    one word to name. So `worst_case = 2`, inside a budget of 2, whatever the
+    last word does.
+  - **CANDIDATES GROUP BY THE PARTITION THEY INDUCE, NOT BY THEIR REPLIES.** The
+    pattern codes are labels; what matters is which members a word puts
+    together. A bucket of three therefore has only **five** possible outcomes
+    (Bell(3)) however many candidates exist, so thousands collapse onto a
+    handful each priced once. Keying on the raw replies instead leaves most of
+    the saving on the table — measured 11x that way against 39x this way.
+    The key packs one bit per member PAIR, exact to size 11, with a raw-row
+    fallback above that.
+  - **GATED AGAINST `greedybuild.score`**, which prices a whole opening from
+    scratch and shares none of the bucket reuse — a real second route to both
+    numbers, checked on 120 candidates per run.
+- **MEASURED EFFECT OF DOING IT PROPERLY**: at k=1 the gate's instance goes from
+  **236** unsolved (coverage picking the last word) to **43** (exhaustive). In
+  the real loop at k=1 a round is ~3 s and lands on 18 unsolved.
 - **ALMOST NOTHING COLLAPSES IN THE MEMO HERE, unlike `greedybuild`.** There the
   order of placements does not matter, so paths converge; here the candidates
   offered at each level DEPEND on the level above, so different paths reach
   different sets. MEASURED: 81 paths gave 81 distinct openings at k=3. Price a
   run as `k^(words-1) x final_top` leaves, not less.
-- **THE HEADER'S COST LINE IS A FLOOR, NOT AN ESTIMATE**, and says so: it times
-  the leaf evaluation at startup (a tenth of a second, so the constant is
-  measured per machine rather than carried as a literal) and multiplies by the
-  leaf count — but when the pair set is SMALL almost every candidate ties on
-  coverage and the ssq tie-break prices a huge group on top. MEASURED 20 s
-  against a 4 s leaf projection on a 23-pair round.
+- **THE HEADER'S COST LINE IS A ROUGH GUIDE AND SAYS SO — it is NOT a bound in
+  either direction.** It times one last level at startup, but on a RANDOM
+  prefix, and the search's own prefixes shatter the pool far better, which makes
+  their last levels cheaper. MEASURED, three consecutive k=2 rounds against a
+  104 s projection: **35 s, 8 s, 42 s**. An earlier version called it a floor;
+  round 2 disproved that.
 - **MEASURED 2026-09-18**: at k=3, 4 words, 1000 seeded pairs, a round is **~1 s**
   (120 nodes, 81 complete openings) and three rounds ran 29 → 25 → **18**
   unsolved. Leaves are `k^4` before the word-set memo collapses orderings, so
