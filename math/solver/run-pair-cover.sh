@@ -19,6 +19,7 @@ POOL=custom
 CANDS=
 SEARCH=branch
 PAIRSFROM=
+ONCE=0
 NWORDS=4
 TOPK=""
 ROUNDS=10
@@ -36,6 +37,7 @@ while [ $# -gt 0 ]; do
         --candidates) CANDS="$2";    shift 2 ;;
         --search)     SEARCH="$2";   shift 2 ;;
         --pairs-from) PAIRSFROM="$2"; shift 2 ;;
+        --once)       ONCE=1;        shift 1 ;;
         --words)      NWORDS="$2";   shift 2 ;;
         -k|--topk)    TOPK="$2";     shift 2 ;;
         --rounds)     ROUNDS="$2";   shift 2 ;;
@@ -95,6 +97,7 @@ else
     STEM="${STEM}_s${SEEDTOP}"
 fi
 STEM="${STEM}_f${FINALTOP}"
+[ "$ONCE" = 0 ] || STEM="${STEM}_once"
 [ "$CAP" = 6 ] || STEM="${STEM}_cap${CAP}"
 OUTDIR=data/shared/paircover
 LOC=data/local/paircover
@@ -103,6 +106,7 @@ OUT="$OUTDIR/$STEM"
 FLAGS="--pool $POOL --words $NWORDS --topk $TOPK --rounds $ROUNDS --cap $CAP"
 FLAGS="$FLAGS --seed-from $SEEDFROM --seed-top $SEEDTOP --show $SHOW"
 FLAGS="$FLAGS --final-top $FINALTOP --search $SEARCH"
+[ "$ONCE" = 0 ] || FLAGS="$FLAGS --once 1"
 [ -z "$PAIRSFROM" ] || FLAGS="$FLAGS --pairs-from $PAIRSFROM"
 [ -z "$CANDS" ] || FLAGS="$FLAGS --candidates $CANDS"
 [ "$MAXPAIRS" = 0 ] || FLAGS="$FLAGS --max-pairs $MAXPAIRS"
@@ -124,7 +128,12 @@ case "$FINALTOP" in
     *)   echo "  last word  the $FINALTOP best by coverage, then ranked by UNSOLVED" ;;
 esac
 echo "  seed       top $SEEDTOP of $SEEDFROM"
-echo "  rounds     $ROUNDS"
+if [ "$ONCE" = 1 ]; then
+    echo "  rounds     1 -- a SINGLE search; the weights are an INPUT and are"
+    echo "             neither fed back nor written"
+else
+    echo "  rounds     $ROUNDS"
+fi
 echo "  pairs      ${OUT}_pairs.csv (resumed if it exists)"
 echo "  rounds log ${OUT}_rounds.csv"
 echo "  log        $LOC/$STEM.log"

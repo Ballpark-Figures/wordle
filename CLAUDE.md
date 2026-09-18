@@ -2795,6 +2795,19 @@ tee'd log, `--dry-run`. Exact and deterministic — no sampling, no seed.
   - **THE TWO HAVE DIFFERENT LEAF COUNTS and the cost line must say which**:
     quoting branch's `k ** words` for a beam over-states it by orders of
     magnitude. MEASURED at k=20 with a real weight set: 13 s a round.
+- **`--once` IS ONE SEARCH, AND IT IS A DIFFERENT JOB FROM THE LOOP** (user's
+  call, 2026-09-18). The ROUNDS are constraint GENERATION — harvest, fold in,
+  search again — and they only do anything because the harvest moves the
+  weights; the search itself is deterministic, so with a fixed set round 2
+  repeats round 1 but for the handful of pairs just added. `--once` is
+  EXPLOITATION: run a wide search on a weight set someone else generated,
+  report, and change nothing. It writes NO pair file, so the set handed in stays
+  exactly the input, and the stem ends `_once`.
+  - It still PRINTS what the opening failed on, with the weight each pair came
+    in carrying — that is the other half of the result, and it is what says
+    whether the search is hitting known constraints or new ones.
+  - **The natural division of labour**: generate with a cheap `k` over thousands
+    of rounds, then exploit with `--search beam --once` at a large `k`.
 - **`--pairs-from FILE` STARTS FROM ANOTHER RUN'S WEIGHTS, AND KEEPS THEM**
   (user's call, 2026-09-18). Any `word1,word2,count` file does — it is the
   format this loop writes, so runs compose. **These are NOT dropped after round

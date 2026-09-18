@@ -67,7 +67,7 @@ def parse_args(argv):
     a = {"pool": None, "words": 4, "topk": None, "rounds": None, "cap": 6,
          "seed_from": None, "seed_top": 1000, "out": None, "max_pairs": 0,
          "show": 8, "final_top": 0, "candidates": None,
-         "pairs_from": None, "search": "branch"}
+         "pairs_from": None, "search": "branch", "once": 0}
     i = 0
     while i < len(argv):
         k = argv[i].lstrip("-").replace("-", "_")
@@ -84,11 +84,22 @@ def parse_args(argv):
             a[k] = -1                      # exhaustive; 0 still means "same as k"
         else:
             a[k] = (int(v) if k in ("topk", "words", "rounds", "cap", "seed_top",
-                                    "max_pairs", "show", "final_top") else v)
+                                    "max_pairs", "show", "final_top",
+                                    "once") else v)
         i += 2
+    # ONE SEARCH, NO FEEDBACK.  The rounds are the constraint-GENERATION loop --
+    # harvest, fold in, search again -- and they only do anything because the
+    # harvest changes the weights.  Handed a set that is already good, the job
+    # is to EXPLOIT it once: the search is deterministic, so a second round
+    # would repeat the first but for the handful of pairs it just added.
+    if a["once"]:
+        a["rounds"] = 1
     for req in ("pool", "topk", "rounds"):
         if a[req] is None:
-            raise SystemExit("--%s is required" % req.replace("_", "-"))
+            raise SystemExit(
+                "--%s is required%s" % (req.replace("_", "-"),
+                                        " (or --once, which means one round)"
+                                        if req == "rounds" else ""))
     if a["search"] not in ("branch", "beam"):
         raise SystemExit(
             "--search must be branch or beam.  They are different searches:\n"
@@ -375,7 +386,8 @@ def main(argv):
           % (a["search"].upper(), a["topk"],
              "K states carried forward" if a["search"] == "beam" else
              "recurse into the K best at every state"))
-    print("  rounds   %d" % a["rounds"])
+    print("  rounds   %s" % ("1 -- a SINGLE search, weights unchanged, "
+                             "nothing fed back" if a["once"] else a["rounds"]))
 
     # WHAT A ROUND WILL COST -- A ROUGH FIGURE, AND SAID TO BE.  The last level
     # dominates, and its cost is machine- and prefix-specific, so it is timed
@@ -403,9 +415,14 @@ def main(argv):
     else:
         print("  last word no special case -- the same k as every other level")
     if a["final_top"] >= 0:
-        print("  cost     %d leaves x ~%.1f ms = ~%.0f s per round, ~%.1f h for %d"
-              % (leaves, per_leaf * 1000, leaves * per_leaf,
-                 leaves * per_leaf * a["rounds"] / 3600.0, a["rounds"]))
+        if a["once"]:
+            print("  cost     %d leaves x ~%.1f ms = ~%.0f s"
+                  % (leaves, per_leaf * 1000, leaves * per_leaf))
+        else:
+            print("  cost     %d leaves x ~%.1f ms = ~%.0f s per round, "
+                  "~%.1f h for %d"
+                  % (leaves, per_leaf * 1000, leaves * per_leaf,
+                     leaves * per_leaf * a["rounds"] / 3600.0, a["rounds"]))
     print("           (ROUGH -- timed on random openings; a real prefix varies)")
 
     rh = None
@@ -436,9 +453,10 @@ def main(argv):
         ib = np.array([p[1] for p in keys])
         weights = np.array([pairs[p] for p in keys], dtype=np.int64)
         S = split_matrix(M, ia, ib)
-        print("\nround %d   %d pairs (weight %d)   split matrix %d x %d (%.1f MB)"
-              % (rnd, len(keys), int(weights.sum()), S.shape[0], S.shape[1],
-                 S.nbytes / 1e6), flush=True)
+        print("\n%s   %d pairs (weight %d)   split matrix %d x %d (%.1f MB)"
+              % ("search" if a["once"] else "round %d" % rnd, len(keys),
+                 int(weights.sum()), S.shape[0], S.shape[1], S.nbytes / 1e6),
+              flush=True)
 
         ctx = {"M": M, "S": S, "w": weights, "nwords": a["words"],
                "full": full, "codes": codes, "cols": cols, "ans": ans}
@@ -458,9 +476,21 @@ def main(argv):
                 "objective counts %d unsolved -- two routes to one number that "
                 "must agree" % (len(losers), uns))
         new = sum(1 for p in got if p not in pairs)
-        print("  harvest  %d pair(s) from %d losing answer(s): %d new, %d repeat"
-              % (len(got), len(losers), new, len(got) - new))
-        if seeded:
+        if not a["once"]:
+            # Under --once the "failed on" block below says this better, with
+            # the weights each pair came in carrying.
+            print("  harvest  %d pair(s) from %d losing answer(s): %d new, "
+                  "%d repeat" % (len(got), len(losers), new, len(got) - new))
+        if a["once"]:
+            # Still WORTH PRINTING -- what a search failed on is the result's
+            # other half -- but not folded in and not written back, so the
+            # weight set handed in stays exactly the input.
+            print("  failed on %d pair(s) from %d losing answer(s)"
+                  % (len(got), len(losers)))
+            for pr in sorted(got, key=lambda q: -pairs.get(q, 0))[:a["show"]]:
+                print("      %-7s %-7s  (weight %d coming in)"
+                      % (pool[pr[0]], pool[pr[1]], pairs.get(pr, 0)))
+        elif seeded:
             # THE SEED IS SCAFFOLDING FOR ROUND 1 ONLY (user's call): it is the
             # hardest-pairs PROXY, which over-demands -- a bucket of two is safe
             # -- so carrying it on would keep spending coverage on pairs that may
@@ -474,15 +504,18 @@ def main(argv):
         else:
             for p in got:
                 pairs[p] = pairs.get(p, 0) + 1
-        print("  tracked  %d pairs" % len(pairs))
-        heavy = sorted(pairs.items(), key=lambda kv: (-kv[1], kv[0]))[:a["show"]]
+        if not a["once"]:
+            print("  tracked  %d pairs" % len(pairs))
+        heavy = [] if a["once"] else sorted(
+            pairs.items(), key=lambda kv: (-kv[1], kv[0]))[:a["show"]]
         if heavy and heavy[0][1] > 1:
             print("  heaviest " + ",  ".join(
                 "%s/%s x%d" % (pool[p[0]], pool[p[1]], n) for p, n in heavy
                 if n > 1))
         if best_ever is None or (uns, ssq) < best_ever[:2]:
             best_ever = (uns, ssq, words, rnd)
-            print("  NEW BEST across rounds")
+            if not a["once"]:
+                print("  NEW BEST across rounds")
         else:
             print("  best so far: round %d, unsolved %d (%s)"
                   % (best_ever[3], best_ever[0], " ".join(best_ever[2])))
@@ -492,7 +525,7 @@ def main(argv):
                      % (rnd, " ".join(words), uns, ssq, len(got), new,
                         len(pairs), time.time() - t0))
             rh.flush()
-        if pair_path:
+        if pair_path and not a["once"]:
             tmp = pair_path + ".tmp"
             with open(tmp, "w") as fh:
                 fh.write("# pairs the opening could not guarantee splitting\n")
@@ -512,13 +545,19 @@ def main(argv):
                      "the harvest added nothing, so the loop stops here"))
             break
 
-    print("\nbest over %d round(s): %s" % (rnd, " ".join(best_ever[2])))
-    print("  unsolved %d of %d,  ssq %d   (round %d)"
-          % (best_ever[0], len(answers), best_ever[1], best_ever[3]))
+    if a["once"]:
+        print("\nopening: %s" % " ".join(best_ever[2]))
+        print("  unsolved %d of %d,  ssq %d" % (best_ever[0], len(answers),
+                                                best_ever[1]))
+    else:
+        print("\nbest over %d round(s): %s" % (rnd, " ".join(best_ever[2])))
+        print("  unsolved %d of %d,  ssq %d   (round %d)"
+              % (best_ever[0], len(answers), best_ever[1], best_ever[3]))
     if rh:
         rh.close()
     if a["out"]:
-        print("wrote %s and %s" % (pair_path, round_path))
+        print("wrote %s" % (round_path if a["once"]
+                            else "%s and %s" % (pair_path, round_path)))
     return 0
 
 
