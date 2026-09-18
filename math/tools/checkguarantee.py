@@ -131,7 +131,7 @@ def main(argv):
     ctx = (full, cidx, pool, apool, ans, 2, 4, gpos)
     checked = 0
     for op in openings:
-        worst, losing, wans, wline = check_opening(op, ctx)
+        worst, losing, wans, wline, _groups = check_opening(op, ctx)
         if len(wline) != worst:
             failures.append("witness for %s is %d words but the worst case is %d"
                             % (" ".join(op), len(wline), worst))

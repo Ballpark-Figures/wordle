@@ -71,7 +71,7 @@ def check_opening(opening, ctx):
     # and the count alone cannot be read that way.  It is bounded and small --
     # MEASURED over 10000 openings: median 19, max 39 -- so keeping the list
     # costs a short field per row rather than an unbounded one.
-    worst, wans, wline, losing = 0, "", [], []
+    worst, wans, wline, losing, groups = 0, "", [], [], []
     # Group the answers by (level, joint key at that level): every answer in one
     # group sees the identical live set, so the recursion runs ONCE per group.
     for lv in np.unique(level):
@@ -86,6 +86,12 @@ def check_opening(opening, ctx):
             members = order[lo:hi]                  # pool indices still live
             names = [pool[i] for i in members]
             sub = full[np.ix_(cidx[members], cidx[members])]
+            # A LOSS IS A PROPERTY OF THE BUCKET, NOT OF THE WORD.  Two answers
+            # sharing a bucket can differ -- one may be isolated by every other
+            # live word and its neighbour not -- so the bucket is recorded whole,
+            # the words that CANNOT lose included, because that is what shows why
+            # it fails: a near-anagram family sitting in one group.
+            bucket_losers = []
             for a in sel[akey == key]:
                 aw = answers[a]
                 if aw in opening[:lv]:
@@ -97,12 +103,15 @@ def check_opening(opening, ctx):
                     line = None
                 if total > cap:
                     losing.append(aw)
+                    bucket_losers.append(aw)
                 if total > worst:
                     worst = total
                     wans = aw
                     wline = (line if line is not None else
                              list(opening[:lv]) + worst_line(sub, pos, names))
-    return worst, losing, wans, wline
+            if bucket_losers:
+                groups.append((list(names), set(bucket_losers)))
+    return worst, losing, wans, wline, groups
 
 
 def parse_args(argv):
@@ -212,7 +221,7 @@ def main(argv):
         name = " ".join(opening)
         if name in done:
             continue
-        worst, losers, wans, wline = check_opening(opening, ctx)
+        worst, losers, wans, wline, groups = check_opening(opening, ctx)
         losing = len(losers)
         guaranteed = int(worst <= a["cap"])
         nguar += guaranteed
@@ -224,12 +233,17 @@ def main(argv):
         cand = (worst, losing)
         if best is None or cand < best[0]:
             best = (cand, name)
-            print("[%7.0fs] %-26s worst=%d  %2d of %d can lose  NEW BEST%s\n"
-                  "            %s"
+            # One line per GROUP that can lose: the whole live set after the
+            # opening, with the answers that can actually lose marked.  Sorted
+            # widest first, since a big group is the harder thing to fix.
+            shown = []
+            for names, bad in sorted(groups, key=lambda g: (-len(g[0]), g[0])):
+                shown.append("              " + " ".join(
+                    w + "*" if w in bad else w for w in sorted(names)))
+            print("[%7.0fs] %-26s worst=%d  %2d of %d can lose  NEW BEST%s%s"
                   % (time.time() - t0, name, worst, losing, len(answers),
                      "  -- GUARANTEED" if guaranteed else "",
-                     " ".join(sorted(losers)) if losers else "(none)"),
-                  flush=True)
+                     ("\n" + "\n".join(shown)) if shown else ""), flush=True)
         if fh:
             fh.write("%s,%d,%d,%d,%.8f,%s,%s,%s\n"
                      % (name, worst, guaranteed, losing,
