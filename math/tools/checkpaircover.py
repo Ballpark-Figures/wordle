@@ -133,6 +133,39 @@ def main(argv):
                         "actually tested" % seq)
     print("branch is monotone in K (unsolved %s over k=1,2,3)" % seq)
 
+    # --- 5: the SEED is dropped after the first harvest --------------------
+    # End to end, through the real main(), because this is a property of the
+    # LOOP rather than of any function it calls: a round-1 file still holding
+    # the seeded pairs is the exact regression this pins.
+    import subprocess
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        stem = os.path.join(td, "gate")
+        out = subprocess.run(
+            [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                          "pair_cover.py"),
+             "--pool", "custom", "--words", "4", "--topk", "1", "--rounds", "1",
+             "--seed-from", SEED, "--seed-top", "600", "--out", stem],
+            capture_output=True, text=True)
+        pf = stem + "_pairs.csv"
+        rf = stem + "_rounds.csv"
+        if not os.path.exists(pf):
+            failures.append("a round wrote no pair file: %s" % out.stderr[-400:])
+        else:
+            rows = [l for l in open(pf) if l[0] != "#" and not l.startswith("word1")]
+            harvested = int(open(rf).read().strip().split("\n")[-1].split(",")[4])
+            if len(rows) != harvested:
+                failures.append(
+                    "after round 1 the pair file holds %d rows but the round "
+                    "harvested %d -- the seeded pairs were not dropped"
+                    % (len(rows), harvested))
+            elif any(int(l.rstrip().split(",")[2]) != 1 for l in rows):
+                failures.append("a round-1 pair has a count above 1, so "
+                                "something was carried in from the seed")
+            else:
+                print("seed dropped: after round 1 the file is exactly the %d "
+                      "harvested pairs, all at count 1" % harvested)
+
     if failures:
         print("\nFAIL")
         for f in failures:

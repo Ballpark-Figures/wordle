@@ -2718,6 +2718,23 @@ tee'd log, `--dry-run`. Exact and deterministic — no sampling, no seed.
   constraints found so far and each round adds the ones the last opening
   violated, so the search is steered by its own failures rather than by a fixed
   screen. That is the thing no opener-side ranking can do.
+- **THE SEED IS SCAFFOLDING FOR ROUND 1 ONLY** (user's call, 2026-09-18 — the
+  first build got this wrong and kept it). The first harvest REPLACES the seeded
+  pairs rather than joining them: the seed is the hardest-pairs PROXY and it
+  over-demands, while a harvested pair is by construction a set that ran out of
+  budget with company. Carrying the seed on keeps spending coverage on
+  constraints that may not exist. A RESUMED run is already past that point and
+  never re-seeds. Gated end to end through the real `main()` and
+  MUTATION-TESTED (merging instead of replacing leaves 754 rows where 158 were
+  harvested, and is caught).
+  - **KNOW WHAT THIS DOES TO THE EARLY ROUNDS.** The set restarts TINY — 34
+    pairs after a 1000-pair seed, measured — so coverage separates almost
+    nothing, the ssq tie-break does most of the work, and the objective wanders
+    before the set is big enough to bite: MEASURED at k=3, `29, 41, 25, 106`
+    over four rounds against `29, 25, 18` when the seed was (wrongly) retained.
+    It also costs TIME in exactly those rounds, since a huge tied group is what
+    ssq then has to price — 26 s against 1 s. Judge the loop on where it gets
+    to, not on round 2.
 - **TWO OBJECTIVES AND ONLY THE SECOND IS THE ANSWER.** Coverage picks the
   WORDS; `unsolved` ranks the finished openings. Never quote a coverage score as
   a result.

@@ -14,6 +14,14 @@ THE LOOP, one round at a time:
   5  add them to the set, incrementing the count of any already there;
   6  print, flush, and go again.
 
+THE SEED IS SCAFFOLDING FOR ROUND 1 ONLY (user's call, 2026-09-18).  The first
+harvest REPLACES the seeded pairs rather than joining them: the seed is the
+hardest-pairs PROXY and it over-demands -- a bucket of two is safe, so some of
+those pairs were never a problem -- while a harvested pair is by construction a
+set that ran out of budget with company.  Carrying the seed on would keep
+spending coverage on constraints that may not exist.  A RESUMED run is already
+past that point and never re-seeds.
+
 THE COUNT IS THE WEIGHT.  A pair that has failed five rounds counts five times
 in step 1, so the search is pushed hardest at whatever keeps beating it.
 
@@ -214,7 +222,11 @@ def main(argv):
 
     pairs = read_pairs(pair_path, ppos)
     resumed = len(pairs)
-    if not pairs:
+    # `seeded` says the CURRENT set is the proxy rather than real failures, so
+    # the first harvest must REPLACE it.  A resumed run is already past that
+    # point -- its file holds harvested pairs -- so it never re-seeds.
+    seeded = not resumed
+    if seeded:
         pairs = seed_pairs(a["seed_from"], a["seed_top"], ppos)
 
     print("pair cover: pool %s (%d)  answers %d  words %d  cap %d (budget %d)"
@@ -273,10 +285,22 @@ def main(argv):
                 "objective counts %d unsolved -- two routes to one number that "
                 "must agree" % (len(losers), uns))
         new = sum(1 for p in got if p not in pairs)
-        for p, n in got.items():
-            pairs[p] = pairs.get(p, 0) + 1
         print("  harvest  %d pair(s) from %d losing answer(s): %d new, %d repeat"
               % (len(got), len(losers), new, len(got) - new))
+        if seeded:
+            # THE SEED IS SCAFFOLDING FOR ROUND 1 ONLY (user's call): it is the
+            # hardest-pairs PROXY, which over-demands -- a bucket of two is safe
+            # -- so carrying it on would keep spending coverage on pairs that may
+            # never have been a problem.  From here the set is exactly what the
+            # openings have actually FAILED on, which has no such slack.
+            dropped = len(pairs)
+            pairs = {p: 1 for p in got}
+            seeded = False
+            print("  seed     dropped all %d seeded pairs -- the set is now the "
+                  "%d harvested" % (dropped, len(pairs)))
+        else:
+            for p in got:
+                pairs[p] = pairs.get(p, 0) + 1
         print("  tracked  %d pairs" % len(pairs))
         heavy = sorted(pairs.items(), key=lambda kv: (-kv[1], kv[0]))[:a["show"]]
         if heavy and heavy[0][1] > 1:
@@ -306,7 +330,16 @@ def main(argv):
                     fh.write("%s,%s,%d\n" % (pool[p[0]], pool[p[1]], n))
             os.replace(tmp, pair_path)     # atomic: a Ctrl-C never half-writes it
 
-    print("\nbest over %d round(s): %s" % (a["rounds"], " ".join(best_ever[2])))
+        if not pairs:
+            # Nothing left to cover.  With unsolved 0 that is the whole point of
+            # the exercise; otherwise the harvest found nothing to add and the
+            # loop has no constraint to work from, which is a result either way.
+            print("\n  no pairs left to cover -- %s"
+                  % ("THIS OPENING IS GUARANTEED" if uns == 0 else
+                     "the harvest added nothing, so the loop stops here"))
+            break
+
+    print("\nbest over %d round(s): %s" % (rnd, " ".join(best_ever[2])))
     print("  unsolved %d of %d,  ssq %d   (round %d)"
           % (best_ever[0], len(answers), best_ever[1], best_ever[3]))
     if rh:
