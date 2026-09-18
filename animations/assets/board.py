@@ -133,8 +133,17 @@ class WordleBoard(VGroup):
         The asset owns no sound policy; the scene does.
         """
         n = max(len(word), 1)
-        # Letters share the run_time evenly: with lag_ratio 1/n each pop starts as
-        # the previous one is a step along, and the last finishes exactly at the end.
+        # lag_ratio 1.0 — each pop starts as the previous one ENDS, so the letters
+        # land at i*run_time/n: evenly spaced across the word, the last one arriving
+        # at (n-1)/n of the way through.
+        #
+        # NOT a fraction. manim starts member i at `i * lag_ratio * d` and scales the
+        # group to run_time, so a small lag_ratio makes the pops OVERLAP and bunch
+        # toward the start: at 1/n the pops each ran 0.361s only 0.072s apart, and
+        # MEASURED the last letter of a 0.65s word began at 0.289s — 44% in, with the
+        # typing bed still playing for another third of a second after it. It also
+        # desynced the per-key cues, which are placed at i*run_time/n and so assume
+        # exactly the spacing this line now produces.
         for i, ch in enumerate(word):
             tile = self.tiles[row][i]
             letter = self._letter(ch, tile)
@@ -146,7 +155,7 @@ class WordleBoard(VGroup):
                 per_letter(i, ch, i * run_time / n)
         pops = [TilePop(self.tiles[row][i], self.letters[row][i])
                 for i in range(len(word))]
-        scene.play(LaggedStart(*pops, lag_ratio=1.0 / n), run_time=run_time)
+        scene.play(LaggedStart(*pops, lag_ratio=1.0), run_time=run_time)
 
     # ── scoring ───────────────────────────────────────────────────────────────
     def reveal(self, scene, row, code, run_time, lag_ratio=0.45):
