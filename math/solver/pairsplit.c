@@ -408,13 +408,67 @@ static uint64_t pkey(const int32_t *sorted, int k) {
     return key;
 }
 
+/* THE PARENT TABLE IS THE EXPENSIVE PART OF A BIG --extend, AND IT USED TO BE
+ * INVISIBLE.  It is a SERIAL open-addressed build -- no OpenMP, nothing to
+ * parallelise, since every insert scatters -- sized at four slots per parent,
+ * so 12 bytes x 4n of calloc and n random first-touches into it.
+ *
+ * MEASURED 2026-09-18 on 138953994 disjoint triples: bits = 30, so 8 GB of
+ * PSET plus 4 GB of PSET_RANK, and on a 25.8 GB machine with other jobs
+ * resident it thrashed at roughly fifty new pages a second -- days, not
+ * minutes.  It printed NOTHING while doing it, the parent file was already
+ * closed, and `lsof` showed no I/O, so the run looked wedged rather than busy.
+ * A stack sample was the only thing that said where it was.
+ *
+ * So it now REPORTS and it REFUSES.  The refusal names the way out, because
+ * there usually is one: the table exists only to deduplicate candidates reached
+ * through several parents, and `--parents-complete` replaces it with a rule
+ * (the canonical parent holds the smallest PARENTK words) that needs no memory
+ * at all.  What blocks that flag is the LETTER LADDER in run-singles.sh's
+ * parents_complete_flag, not this code. */
 static void pset_build(const Pair *parents, int n) {
     int bits = 1;
     while ((1 << bits) < n * 4) bits++;      /* keep it under 25% loaded */
     PSET_MASK = (1 << bits) - 1;
+    uint64_t need = ((uint64_t)PSET_MASK + 1) * (sizeof(uint64_t) + sizeof(int32_t));
+    uint64_t ram = phys_mem();
+    uint64_t cap = ram ? ram / 3 : (uint64_t)8 << 30;
+    fprintf(stderr, "parent table: %d parents -> %llu slots, %.1f GB\n",
+            n, (unsigned long long)PSET_MASK + 1, need / 1e9);
+    if (need > cap) {
+        fprintf(stderr,
+            "\nthat table needs %.1f GB of %.1f GB of RAM, and it is built"
+            " SERIALLY with\n"
+            "one random write per parent -- at this size it thrashes for days"
+            " rather than\nminutes.  It exists only to DEDUPLICATE candidates"
+            " reachable through several\nparents.\n\n"
+            "  --parents-complete replaces it with a rule that needs no memory,"
+            " but it is\n"
+            "  only sound when every sub-opener of a candidate is in the parent"
+            " file.\n"
+            "  run-singles.sh checks that (parents_complete_flag) and will say"
+            " so.\n\n"
+            "  --disjoint instead of --min-letters N is usually the fix: it"
+            " lines the\n"
+            "  letter demands up, so the shortcut applies and this table is"
+            " never built.\n",
+            need / 1e9, ram / 1e9);
+        exit(1);
+    }
     PSET = calloc((size_t)PSET_MASK + 1, sizeof(uint64_t));
     PSET_RANK = calloc((size_t)PSET_MASK + 1, sizeof(int32_t));
+    if (!PSET || !PSET_RANK) {
+        fprintf(stderr, "out of memory for the %.1f GB parent table\n", need / 1e9);
+        exit(1);
+    }
+    double tb = now_s();
     for (int i = 0; i < n; i++) {
+        if ((i & 0xFFFFF) == 0 && i && now_s() - tb >= 1.0) {
+            double fr = (double)i / n;
+            fprintf(stderr, "  parent table %d/%d  %.1f%%  (%.0fs, eta %.1f min)\n",
+                    i, n, 100.0 * fr, now_s() - tb,
+                    fr > 0 ? ((now_s() - tb) / fr - (now_s() - tb)) / 60.0 : 0.0);
+        }
         int32_t w[MAXW];
         for (int t = 0; t < PARENTK; t++) w[t] = parents[i].g[t];
         sortk(w, PARENTK);

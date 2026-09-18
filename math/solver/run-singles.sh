@@ -157,6 +157,7 @@ WORDS=""            # --words LIST: only that list's words may open
 BUCKETS=""          # --buckets LIST: score the SPLIT over this list, not the 2315
 BLIST=""
 BNAME=""
+METRIC=singles      # --metric: how a split is RANKED at every stage
 DISJOINT=0          # --disjoint: every word of the opener shares no letter
 MINLET=0            # --min-letters N: at least N distinct letters in the opener
 DISJTRI=0           # --disjoint-triples: disjoint PARENTS only, 4th word free
@@ -180,6 +181,7 @@ while [ $# -gt 0 ]; do
         --answers)    ANSWERS=1;     shift ;;
         --words)      WORDS="$2";    shift 2 ;;
         --buckets)    BUCKETS="$2";  shift 2 ;;
+        --metric)     METRIC="$2";   shift 2 ;;
         --disjoint)   DISJOINT=1;    shift ;;
         --min-letters) MINLET="$2";  shift 2 ;;
         --disjoint-triples) DISJTRI=1; shift ;;
@@ -259,6 +261,25 @@ fi
 # The bucket list joins the suffix HERE, with the others -- every output name is
 # derived below this point, and appending it later left the pair file (and only
 # the pair file) unmarked, which is exactly the collision the suffix prevents.
+# HOW A SPLIT IS RANKED, at every stage.  `singles` counts columns ALONE in their
+# bucket; `ssq` is the sum of squared bucket sizes, which divided by the column
+# count IS THE AVERAGE NUMBER OF WORDS REMAINING -- pick a uniformly random
+# column and its live count is its own bucket's size, so the mean is
+# `sum n_i^2 / N`.  They are different questions: singles rewards only buckets
+# that got all the way down to ONE, and is blind to whether the rest are 2s or
+# 20s, while ssq measures how much is left on average.  A screen for a GUARANTEE
+# wants the second, since a bucket of 2 is perfectly good and a bucket of 4 is
+# fatal.  The metric is in every filename, because a ranking is only meaningful
+# with respect to what it ranked on.
+case "$METRIC" in
+    singles|ssq) ;;
+    *) echo "--metric must be 'singles' or 'ssq'" >&2
+       echo "  singles: columns alone in their bucket (more is better)" >&2
+       echo "  ssq:     sum of squared bucket sizes; /N it is the AVERAGE" >&2
+       echo "           number of words remaining (less is better)" >&2
+       exit 1 ;;
+esac
+[ "$METRIC" = singles ] || SUF="${SUF}_$METRIC"
 if [ -n "$BUCKETS" ]; then
     case "$BUCKETS" in
         */*|*.txt) BLIST="$BUCKETS" ;;
@@ -337,6 +358,20 @@ parents_complete_flag() {
     # anything built by --extend does.
     grep -q "^complete=1$" "$_src.meta" || { echo ""; return; }
     if ! grep -q "^mode=pair$" "$_src.meta"; then
+        # A MISSING FIELD IS NOT A NEGATIVE ANSWER, but it is treated as one --
+        # deliberately.  pairsplit has written `parents_complete=` on every run
+        # since the field existed, so absence means an OLD sidecar whose run
+        # never recorded it, and guessing in the permissive direction would turn
+        # the canonical-parent shortcut on where it may be unsound, which drops
+        # results silently rather than failing.  BACKFILL the field on a file you
+        # can establish (its `_exhaustive` name means this same function fired
+        # for ITS parents) rather than loosening this test.
+        grep -q "^parents_complete=" "$_src.meta" || {
+            echo "" >&2
+            echo "  note: $_src.meta predates parents_complete= --" >&2
+            echo "  it cannot witness that its own parents were complete, so the" >&2
+            echo "  shortcut stays off.  Backfill the field if you can establish it." >&2
+            echo ""; return; }
         grep -q "^parents_complete=1$" "$_src.meta" || { echo ""; return; }
     fi
     # THE LETTER DEMANDS MUST LINE UP TOO.  The shortcut assumes every sub-opener
@@ -426,7 +461,7 @@ if [ "$STAGE" = pairs ] || [ "$STAGE" = both ] || [ "$STAGE" = all ]; then
     }
     TFLAG=""
     [ "$THREADS" -gt 0 ] && TFLAG="--threads $THREADS"
-    ./solver/pairsplit --metric singles --top "$PAIRKEEP" \
+    ./solver/pairsplit --metric "$METRIC" --top "$PAIRKEEP" \
         --out "$PAIROUT" $GLIST $PFLAG $DFLAG $TFLAG \
         2>&1 | tee -a "$LOC/singles.log"
 fi
@@ -519,7 +554,7 @@ if [ "$STAGE" = triples ] || [ "$STAGE" = all ]; then
         | tee -a "$LOC/singles.log"
     # --top bounds what is WRITTEN, never what is searched, so even an exhaustive
     # run emits a file that fits in the repo while still visiting every triple.
-    ./solver/pairsplit --metric singles --extend "$CUT" --top "$TOP" \
+    ./solver/pairsplit --metric "$METRIC" --extend "$CUT" --top "$TOP" \
         --out "$TRIOUT" $GLIST $PFLAG $DFLAG $PCFLAG --parent-count "$NPAR" $TFLAG \
         2>&1 | tee -a "$LOC/singles.log"
 fi
@@ -593,13 +628,29 @@ if [ "$STAGE" = quads ] || [ "$STAGE" = all ]; then
     QNAME="$SUF"
     [ "$DISJTRI" = 1 ] && QNAME="${SUF}_disjointtriples"
     QPCFLAG=$(parents_complete_flag "$TSRC" "$NTRI")
+    # SAY WHY THE SHORTCUT IS OFF.  Without it the run silently falls back to
+    # building a parent table, which at a big parent count is hours of serial
+    # thrashing that looks like a hang -- the flag's absence WAS the diagnosis
+    # and nothing printed it.  The letter ladder is the usual culprit: a target
+    # needing L letters has sub-openers of at least L-5, so a parent file
+    # demanding more than that cannot contain them all.
+    if [ -z "$QPCFLAG" ]; then
+        echo "no --parents-complete: building a parent table instead." \
+            | tee -a "$LOC/singles.log"
+        if [ "$MINLET" != 0 ]; then
+            echo "  --min-letters $MINLET needs parents at $((MINLET - 5)) letters or fewer;" \
+                "$(basename "$TSRC") holds more." | tee -a "$LOC/singles.log"
+            echo "  --disjoint lines the demands up and skips the table entirely." \
+                | tee -a "$LOC/singles.log"
+        fi
+    fi
     if [ -n "$QPCFLAG" ]; then QUADOUT="$SHARED/quad_singletons${QNAME}_exhaustive.csv"
     else QUADOUT="$SHARED/quad_singletons${QNAME}_t$NTRI.csv"; fi
     TFLAG=""
     [ "$THREADS" -gt 0 ] && TFLAG="--threads $THREADS"
     [ -n "$QPCFLAG" ] && echo "parents are complete: skipping the parent table" \
         | tee -a "$LOC/singles.log"
-    ./solver/pairsplit --metric singles --extend "$TCUT" --top "$TOP" \
+    ./solver/pairsplit --metric "$METRIC" --extend "$TCUT" --top "$TOP" \
         --out "$QUADOUT" $GLIST $PFLAG $QDFLAG $QPCFLAG --parent-count "$NTRI" $TFLAG \
         2>&1 | tee -a "$LOC/singles.log"
 fi
@@ -664,7 +715,7 @@ if [ "$STAGE" = quints ] || [ "$STAGE" = all ]; then
     [ "$THREADS" -gt 0 ] && TFLAG="--threads $THREADS"
     [ -n "$QQPCFLAG" ] && echo "parents are complete: skipping the parent table" \
         | tee -a "$LOC/singles.log"
-    ./solver/pairsplit --metric singles --extend "$QCUT" --top "$TOP" \
+    ./solver/pairsplit --metric "$METRIC" --extend "$QCUT" --top "$TOP" \
         --out "$QUINTOUT" $GLIST $PFLAG $QQDFLAG $QQPCFLAG --parent-count "$NQUAD" $TFLAG \
         2>&1 | tee -a "$LOC/singles.log"
 fi
@@ -723,7 +774,7 @@ if [ "$STAGE" = sextets ] || [ "$STAGE" = all ]; then
         | tee -a "$LOC/singles.log"
     TFLAG=""
     [ "$THREADS" -gt 0 ] && TFLAG="--threads $THREADS"
-    ./solver/pairsplit --metric singles --extend "$XCUT" --top "$TOP" \
+    ./solver/pairsplit --metric "$METRIC" --extend "$XCUT" --top "$TOP" \
         --out "$SXOUT" $GLIST $PFLAG $SXDFLAG $XPCFLAG --parent-count "$NQUINT" $TFLAG \
         2>&1 | tee -a "$LOC/singles.log"
 fi

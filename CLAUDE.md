@@ -1497,6 +1497,39 @@ Carlo, so its numbers carry a standard error and are not comparable with any
       and 10M ~30 h, per stage. The pair stage is minutes whatever `--top` says:
       it scores all 84129906 pairs regardless, and `--top` only changes what is
       kept.
+  - **`--extend` WITHOUT `--parents-complete` BUILDS A PARENT TABLE, AND AT A
+    BIG PARENT COUNT THAT IS RUINOUS** (diagnosed 2026-09-18). `pset_build` is
+    a SERIAL open-addressed hash at four slots per parent — 12 bytes x 4n of
+    `calloc` plus n random first-touches. MEASURED on the 138953994 disjoint
+    triples: **12.9 GB and roughly fifty new pages a second**, i.e. days.
+    - **IT USED TO BE INVISIBLE, WHICH IS WHAT MADE IT COST AN AFTERNOON.** No
+      output, no parallel section, and the parent file already CLOSED, so `lsof`
+      showed no I/O and `ps` showed one core — the run looked wedged rather than
+      busy. **A stack sample (`sample <pid>`) was the only thing that located
+      it**; reach for that before theorising about a silent C process. It now
+      prints its size, reports progress, and REFUSES above a third of RAM,
+      naming the way out.
+    - **THE WAY OUT IS THE LETTER LADDER, not more memory.** The table only
+      deduplicates candidates reachable through several parents, and
+      `--parents-complete` replaces it with a rule needing none. That flag is
+      sound only when every sub-opener of a candidate is in the parent file:
+      dropping a word loses at most 5 letters, so a target needing L needs
+      parents at `L-5` or fewer. **`--min-letters 19` over DISJOINT (15-letter)
+      triples fails this — 19-5 = 14 < 15 — so the refusal is CORRECT, not a
+      bug.** `--disjoint` (20) lines up exactly: 20-5 = 15 >= 15.
+    - **A MISSING `parents_complete=` IN A SIDECAR IS AN OLD FILE, NOT A "NO".**
+      `pairsplit` has written it on every run since the field existed, so
+      absence means the run predates it — and `parents_complete_flag` reads
+      absence as false, which silently sends a run down the table path. It now
+      SAYS so instead. `triple_singletons_disjoint_exhaustive.csv.meta` was
+      BACKFILLED with `min_letters=15` and `parents_complete=1`, which its own
+      `_exhaustive` name witnesses (this wrapper only assigns that suffix when
+      the same test fired for ITS parents).
+  - **EVERY DISJOINT QUAD IS ALREADY ON DISK, COMPLETE** —
+    `quad_singletons_disjoint_exhaustive.csv`, `scored=written=25456119`,
+    `complete=1`. So a question about 20-distinct-letter quads needs NO
+    regeneration; it is a guarantee sweep away. Check for a complete artifact
+    before proposing to rebuild one.
   - **WORDS AND PAIRS ARE EXHAUSTIVE; TRIPLES AND QUADS ARE GREEDY SCREENS**
     (`solver/run-singles.sh` says so). So `clint soare` IS the top pair, but a
     triple/quad head is "best of those screened" — never call such a run "the best
