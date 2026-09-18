@@ -47,6 +47,10 @@ from assets import game_data
 
 TYPING_SOUND = "sequence"
 KEY_SOUNDS = ["key1", "key2", "key3", "key4", "key5"]
+# Which keyboard the "sequence" bed is. Both are the same 0.65s slice from the same
+# offset of their sources, so swapping this string is a fair A/B of the KEYBOARD and
+# nothing else.  "typing-logitech" | "typing-razer"
+TYPING_BED = "typing-razer"
 
 # UNDER "sequence" THE BED'S LENGTH IS TIED TO THE TYPING run_time. The clip is one
 # fixed-length sound played once per word, so if the 0.65 below changes, re-slice it
@@ -81,7 +85,7 @@ class Scene97(WordleDarkScene):
                 # play now, so the call order alone would stack them all at its start.
                 self.sfx(KEY_SOUNDS[i % len(KEY_SOUNDS)], at=at)
         elif TYPING_SOUND == "sequence":
-            self.sfx("typing")
+            self.sfx(TYPING_BED)
         self.board.type_word(self, row, word, run_time, per_letter=per_letter)
 
     # a : TRACE typed into row 0 (the board is already up, from setup_scene)
