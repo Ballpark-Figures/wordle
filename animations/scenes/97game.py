@@ -47,10 +47,13 @@ from assets import game_data
 
 TYPING_SOUND = "sequence"
 KEY_SOUNDS = ["key1", "key2", "key3", "key4", "key5"]
-# Which keyboard the "sequence" bed is. All three are the same slice length and
-# level, so swapping this string is an A/B of the KEYBOARD alone.
-#   "typing-corsair" | "typing-logitech" | "typing-razer"
-TYPING_BED = "typing-corsair"
+# Which keyboard the "sequence" bed is. Same slice length and level throughout, so
+# swapping this string is an A/B of the KEYBOARD alone.
+#   "typing-classic" | "typing-corsair" | "typing-logitech" | "typing-razer"
+# typing-classic is the odd one: its source has DISCRETE keystrokes rather than
+# continuous texture, so its cut was chosen to contain exactly five hits, matching
+# the five letters. Change the typing run_time and that match is what breaks.
+TYPING_BED = "typing-classic"
 
 # UNDER "sequence" THE BED'S LENGTH IS TIED TO WHEN THE LAST LETTER LANDS — which is
 # NOT the typing run_time. The pops deliberately overlap, so a 5-letter word is fully
