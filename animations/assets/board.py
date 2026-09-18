@@ -133,17 +133,15 @@ class WordleBoard(VGroup):
         The asset owns no sound policy; the scene does.
         """
         n = max(len(word), 1)
-        # lag_ratio 1.0 — each pop starts as the previous one ENDS, so the letters
-        # land at i*run_time/n: evenly spaced across the word, the last one arriving
-        # at (n-1)/n of the way through.
+        # lag_ratio 1/n — the pops OVERLAP, which is the look: each letter starts
+        # while the previous is still springing, so a typed word reads as one quick
+        # gesture rather than five separate stamps. Deliberate, and NOT to be
+        # "fixed" into lag_ratio 1.0 (which spaces them evenly and reads stiffer).
         #
-        # NOT a fraction. manim starts member i at `i * lag_ratio * d` and scales the
-        # group to run_time, so a small lag_ratio makes the pops OVERLAP and bunch
-        # toward the start: at 1/n the pops each ran 0.361s only 0.072s apart, and
-        # MEASURED the last letter of a 0.65s word began at 0.289s — 44% in, with the
-        # typing bed still playing for another third of a second after it. It also
-        # desynced the per-key cues, which are placed at i*run_time/n and so assume
-        # exactly the spacing this line now produces.
+        # The consequence to keep in mind is that the letters finish EARLY: manim
+        # starts member i at i * lag_ratio * d, so with n=5 the last letter lands at
+        # roughly 0.44 of run_time, not at the end. A "sequence" typing bed must be
+        # cut to about that, or it plays on after the word already looks typed.
         for i, ch in enumerate(word):
             tile = self.tiles[row][i]
             letter = self._letter(ch, tile)
@@ -152,10 +150,15 @@ class WordleBoard(VGroup):
             self.add(letter)
             scene.add(letter)
             if per_letter is not None:
-                per_letter(i, ch, i * run_time / n)
+                # The letter's REAL landing time under the overlap, not run_time/n.
+                # manim gives each member d = run_time / (1 + (n-1)*lag_ratio) and
+                # starts member i at i*lag_ratio*d; at lag_ratio 1/n that reduces to
+                # i * run_time / (2n - 1). Using the even spacing instead fired every
+                # cue progressively later than the letter it belonged to.
+                per_letter(i, ch, i * run_time / (2 * n - 1))
         pops = [TilePop(self.tiles[row][i], self.letters[row][i])
                 for i in range(len(word))]
-        scene.play(LaggedStart(*pops, lag_ratio=1.0), run_time=run_time)
+        scene.play(LaggedStart(*pops, lag_ratio=1.0 / n), run_time=run_time)
 
     # ── scoring ───────────────────────────────────────────────────────────────
     def reveal(self, scene, row, code, run_time, lag_ratio=0.45):

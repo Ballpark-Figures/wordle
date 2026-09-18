@@ -47,16 +47,17 @@ from assets import game_data
 
 TYPING_SOUND = "sequence"
 KEY_SOUNDS = ["key1", "key2", "key3", "key4", "key5"]
-# Which keyboard the "sequence" bed is. Both are the same 0.65s slice from the same
-# offset of their sources, so swapping this string is a fair A/B of the KEYBOARD and
-# nothing else.  "typing-logitech" | "typing-razer"
-TYPING_BED = "typing-razer"
+# Which keyboard the "sequence" bed is. All three are the same slice position and
+# length, so swapping this string is a fair A/B of the KEYBOARD and nothing else.
+#   "typing-corsair" | "typing-logitech" | "typing-razer"
+TYPING_BED = "typing-corsair"
 
-# UNDER "sequence" THE BED'S LENGTH IS TIED TO THE TYPING run_time. The clip is one
-# fixed-length sound played once per word, so if the 0.65 below changes, re-slice it
-# to match or it runs on past the last letter:
-#   python -m bpkfigures.sfx_import "<source>" --name typing \
-#       --start 10.0 --duration <the new run_time> --fade 8 --force
+# UNDER "sequence" THE BED'S LENGTH IS TIED TO WHEN THE LAST LETTER LANDS — which is
+# NOT the typing run_time. The pops deliberately overlap, so a 5-letter word is fully
+# on screen at about 0.44 of the run_time (measured: 0.29s of a 0.65s type). Cut the
+# bed to roughly that plus a short tail, or it keeps typing after the word looks done:
+#   python -m bpkfigures.sfx_import "<source>" --name typing-<keyboard> \
+#       --start 10.0 --duration 0.33 --fade 8 --force
 # "keys" has no such coupling — a cue fires per letter, whatever the pace.
 
 GAME = game_data.load()
