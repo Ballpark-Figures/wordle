@@ -1,5 +1,8 @@
 """SCRATCH — a played game of Wordle — TRACE, LOINS, DUMPY, SNOWY against SNOWY. Dark mode.
 
+The empty board is up from frame 0 (setup_scene), so the scene opens on the grid and
+the first beat types into a board that is already there.
+
 BEAT MAP — one subscene per half-move, so the edit can hold a stretched still on a
 completed row before the reveal (the user's call: type and score separate).
 
@@ -59,7 +62,14 @@ CODES = [g["code"] for g in GAME["guesses"]]
 
 class Scene97(WordleDarkScene):
     def setup_scene(self):
-        pass
+        # The empty board is ON SCREEN FROM FRAME 0, which is what setup_scene is
+        # for. It used to be added inside subscene a, so the framework's leading
+        # hold showed an empty frame and then the board POPPED in at the very
+        # instant the first letter was typed — both the wrong first impression and
+        # the silent-add the continuity rule warns about. Built here it is simply
+        # there, the way the real game's grid is when you open it.
+        self.board = get_board()
+        self.add(self.board)
 
     # ── the two typing-sound approaches, so a beat just says _type(row) ───────
     def _type(self, row, run_time):
@@ -74,14 +84,9 @@ class Scene97(WordleDarkScene):
             self.sfx("typing")
         self.board.type_word(self, row, word, run_time, per_letter=per_letter)
 
-    def _setup_board(self):
-        self.board = get_board()
-        self.add(self.board)
-
-    # a : TRACE typed into row 0
+    # a : TRACE typed into row 0 (the board is already up, from setup_scene)
     @subscene
     def type_trace(self):
-        self._setup_board()
         self._type(0, 0.65)
 
     # b : row 0 flips — nothing in the word
