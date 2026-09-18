@@ -36,8 +36,8 @@ from guarantee import joint_keys, stop_levels, worst_case          # noqa: E402
 from opening_list import read_openings, resolve_word_set           # noqa: E402
 from wordle import load_words                                      # noqa: E402
 
-COLUMNS = ("word,worst_case,guaranteed,losing_answers,losing_share,"
-           "worst_answer,worst_line,losing_words")
+COLUMNS = ("word,worst_case,guaranteed,losing_answers,losing_groups,"
+           "losing_share,worst_answer,worst_line,losing_words")
 
 
 def worst_line(sub_rows, answer_pos, names):
@@ -183,6 +183,22 @@ def main(argv):
     # resumed run reported a tie list it had not actually searched for.
     done, best = set(), None
     if a["out"] and os.path.exists(a["out"]):
+        # A RESUME REFUSES A FILE THIS RUN DID NOT WRITE THE COLUMNS OF.
+        # Appending to a CSV whose header names different fields produces rows of
+        # two shapes under one header -- MEASURED, 2026-09-18: 4233 seven-field
+        # rows and 898 eight-field ones, after a column was added between a run
+        # and its restart.  Nothing downstream can tell those apart, and the
+        # resume had happily read the old rows as work already done.
+        with open(a["out"]) as f:
+            head = [ln for ln in f if ln.startswith("word,")]
+        if head and head[0].rstrip("\n") != COLUMNS:
+            raise SystemExit(
+                "%s was written with different columns:\n"
+                "  on file: %s\n"
+                "  now    : %s\n"
+                "Resuming would append rows of another shape under that header. "
+                "Delete it to start fresh, or keep it and write elsewhere."
+                % (a["out"], head[0].rstrip("\n"), COLUMNS))
         with open(a["out"]) as f:
             for ln in f:
                 if ln.startswith("#") or ln.startswith("word,"):
@@ -190,7 +206,7 @@ def main(argv):
                 c = ln.rstrip("\n").split(",")
                 done.add(c[0])
                 try:
-                    cand = (int(c[1]), int(c[3]))
+                    cand = (int(c[1]), int(c[3]), int(c[4]))
                 except (IndexError, ValueError):
                     continue
                 if best is None or cand < best[0]:
@@ -198,8 +214,8 @@ def main(argv):
         print("resuming: %d opening(s) already on file%s"
               % (len(done),
                  "" if best is None else
-                 ", best so far %s (worst %d, %d can lose)"
-                 % (best[1], best[0][0], best[0][1])))
+                 ", best so far %s (worst %d, %d can lose in %d groups)"
+                 % (best[1], best[0][0], best[0][1], best[0][2])))
     fh = None
     if a["out"]:
         os.makedirs(os.path.dirname(a["out"]) or ".", exist_ok=True)
@@ -230,7 +246,11 @@ def main(argv):
         # many answers can lose at all.  Both are exact, so a tie is a real tie
         # and only a STRICT improvement prints -- a plateau would otherwise
         # flood the log, which is why pairsplit's incumbent line does the same.
-        cand = (worst, losing)
+        # FEWEST GROUPS BREAKS A TIE, and it is the last key rather than the
+        # second because it measures a different thing: how many distinct
+        # buckets would have to be fixed, where the answer count measures how
+        # much is at stake.  Two openings level on both are genuinely level.
+        cand = (worst, losing, len(groups))
         if best is None or cand < best[0]:
             best = (cand, name)
             # One line per GROUP that can lose: the whole live set after the
@@ -240,13 +260,14 @@ def main(argv):
             for names, bad in sorted(groups, key=lambda g: (-len(g[0]), g[0])):
                 shown.append("              " + " ".join(
                     w + "*" if w in bad else w for w in sorted(names)))
-            print("[%7.0fs] %-26s worst=%d  %2d of %d can lose  NEW BEST%s%s"
+            print("[%7.0fs] %-26s worst=%d  %2d of %d can lose in %d group(s)"
+                  "  NEW BEST%s%s"
                   % (time.time() - t0, name, worst, losing, len(answers),
-                     "  -- GUARANTEED" if guaranteed else "",
+                     len(groups), "  -- GUARANTEED" if guaranteed else "",
                      ("\n" + "\n".join(shown)) if shown else ""), flush=True)
         if fh:
-            fh.write("%s,%d,%d,%d,%.8f,%s,%s,%s\n"
-                     % (name, worst, guaranteed, losing,
+            fh.write("%s,%d,%d,%d,%d,%.8f,%s,%s,%s\n"
+                     % (name, worst, guaranteed, losing, len(groups),
                         losing / len(answers), wans, " ".join(wline),
                         " ".join(sorted(losers))))
             fh.flush()
@@ -260,8 +281,9 @@ def main(argv):
     print("%d of %d examined openings guarantee a win within %d"
           % (nguar, ndone, a["cap"]))
     if best is not None:
-        print("best: %s -- worst case %d guesses, %d of %d answers can lose"
-              % (best[1], best[0][0], best[0][1], len(answers)))
+        print("best: %s -- worst case %d guesses, %d of %d answers can lose "
+              "in %d group(s)"
+              % (best[1], best[0][0], best[0][1], len(answers), best[0][2]))
     if a["out"]:
         print("wrote %s" % a["out"])
     return 0
