@@ -66,7 +66,7 @@ ROUND_COLUMNS = "round,opening,unsolved,ssq,harvested,new_pairs,total_pairs,secs
 def parse_args(argv):
     a = {"pool": None, "words": 4, "topk": None, "rounds": None, "cap": 6,
          "seed_from": None, "seed_top": 1000, "out": None, "max_pairs": 0,
-         "show": 8}
+         "show": 8, "final_top": 0}
     i = 0
     while i < len(argv):
         k = argv[i].lstrip("-").replace("-", "_")
@@ -80,7 +80,7 @@ def parse_args(argv):
             raise SystemExit("unknown argument: %s" % argv[i])
         v = argv[i + 1]
         a[k] = (int(v) if k in ("topk", "words", "rounds", "cap", "seed_top",
-                                "max_pairs", "show") else v)
+                                "max_pairs", "show", "final_top") else v)
         i += 2
     for req in ("pool", "topk", "rounds"):
         if a[req] is None:
@@ -166,9 +166,23 @@ def best_k(sc, k, M, chosen):
     return firm + [int(c) for c in grp]
 
 
-def build_opening(ctx, k, st):
-    """Recurse into the K best coverage choices; rank the leaves by UNSOLVED."""
+def build_opening(ctx, k, st, final_top=0):
+    """Recurse into the K best coverage choices; rank the leaves by UNSOLVED.
+
+    `final_top` WIDENS THE SHORTLIST AT THE LAST WORD ONLY, which is where
+    coverage is weakest: by then the remaining pair set is smallest, most
+    candidates are tied on it, and the tie-break is choosing the word.  Since
+    the leaves are already ranked by `(unsolved, ssq)`, a wider pick at that one
+    level IS "rank the last word by the real objective" -- no second ranking
+    rule, just more leaves reaching the one that exists.
+
+    MONOTONE BY CONSTRUCTION, exactly as K is: a larger `final_top` yields a
+    SUPERSET of leaves, so the minimum over them can only improve.  The gate
+    checks it rather than assuming it.  0 means "same as k", which is the
+    behaviour from before the flag and stays reachable.
+    """
     M, S, weights, nwords, memo = ctx["M"], ctx["S"], ctx["w"], ctx["nwords"], {}
+    wide = max(k, final_top)
 
     def rec(chosen, alive):
         if len(chosen) == nwords:
@@ -183,7 +197,7 @@ def build_opening(ctx, k, st):
         banned = np.zeros(S.shape[0], dtype=bool)
         banned[list(chosen)] = True
         sc = cover_scores(S, weights, alive, banned)
-        pick = best_k(sc, k, M, chosen)
+        pick = best_k(sc, wide if len(chosen) == nwords - 1 else k, M, chosen)
         best = None
         for c in pick:
             st["nodes"] += 1
@@ -238,6 +252,36 @@ def main(argv):
                                 % (a["seed_from"], a["seed_top"])))
     print("  rounds   %d" % a["rounds"])
 
+    # WHAT A ROUND WILL COST, MEASURED RATHER THAN ASSUMED.  The leaf evaluation
+    # dominates and its cost is machine-specific, so it is timed here (a tenth
+    # of a second) instead of carried as a literal.  The leaf count assumes the
+    # word-set memo collapses nothing, which is nearly true: unlike greedybuild,
+    # the candidates offered at each level DEPEND on the level above, so
+    # different paths reach different sets -- MEASURED 81 distinct openings from
+    # 81 paths at k=3.
+    rng = np.random.default_rng(0)
+    t0 = time.time()
+    for _ in range(10):
+        ch = tuple(int(x) for x in rng.integers(len(pool), size=a["words"]))
+        score(ch, (full, codes, cols, ans, [M[c] for c in ch]))
+    per_leaf = (time.time() - t0) / 10
+    wide = max(a["topk"], a["final_top"])
+    leaves = a["topk"] ** (a["words"] - 1) * wide
+    print("  last word %s"
+          % ("the %d best by coverage, ranked by UNSOLVED (--final-top)" % wide
+             if a["final_top"] > a["topk"] else
+             "the same %d as every other level" % a["topk"]))
+    # THE LEAF EVALUATION ONLY.  When the pair set is small almost every
+    # candidate ties on coverage and the ssq tie-break prices a huge group, which
+    # can exceed this -- MEASURED 20 s against a 4 s leaf projection on a 23-pair
+    # round.  So it is a FLOOR on a round, not an estimate of one, and it is
+    # labelled that way rather than quietly under-reporting.
+    print("  cost     %d leaves x %.1f ms = >=%.0f s per round, >=%.1f h for %d"
+          % (leaves, per_leaf * 1000, leaves * per_leaf,
+             leaves * per_leaf * a["rounds"] / 3600.0, a["rounds"]))
+    print("           (leaf evaluation only -- a SMALL pair set adds tie-break "
+          "time on top)")
+
     rh = None
     if round_path:
         fresh = not os.path.exists(round_path)
@@ -271,7 +315,7 @@ def main(argv):
         ctx = {"M": M, "S": S, "w": weights, "nwords": a["words"],
                "full": full, "codes": codes, "cols": cols, "ans": ans}
         st["nodes"] = st["leaves"] = 0
-        uns, ssq, chosen = build_opening(ctx, a["topk"], st)
+        uns, ssq, chosen = build_opening(ctx, a["topk"], st, a["final_top"])
         words = [pool[c] for c in chosen]
         print("  opening  %s" % " ".join(words))
         print("           unsolved %d of %d,  ssq %d   (%d nodes, %d complete, %.0fs)"

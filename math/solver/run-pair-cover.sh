@@ -23,6 +23,7 @@ CAP=6
 SEEDTOP=1000
 SEEDFROM=""
 MAXPAIRS=0
+FINALTOP=100
 SHOW=8
 DRYRUN=0
 
@@ -36,6 +37,7 @@ while [ $# -gt 0 ]; do
         --seed-top)   SEEDTOP="$2";  shift 2 ;;
         --seed-from)  SEEDFROM="$2"; shift 2 ;;
         --max-pairs)  MAXPAIRS="$2"; shift 2 ;;
+        --final-top)  FINALTOP="$2"; shift 2 ;;
         --show)       SHOW="$2";     shift 2 ;;
         --dry-run)    DRYRUN=1;      shift 1 ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
@@ -72,7 +74,7 @@ PY=../.venv/bin/python
     echo "or name one with --seed-from FILE" >&2
     exit 1; }
 
-STEM="cover_${POOL}_w${NWORDS}_k${TOPK}_s${SEEDTOP}"
+STEM="cover_${POOL}_w${NWORDS}_k${TOPK}_s${SEEDTOP}_f${FINALTOP}"
 [ "$CAP" = 6 ] || STEM="${STEM}_cap${CAP}"
 OUTDIR=data/shared/paircover
 LOC=data/local/paircover
@@ -80,6 +82,7 @@ OUT="$OUTDIR/$STEM"
 
 FLAGS="--pool $POOL --words $NWORDS --topk $TOPK --rounds $ROUNDS --cap $CAP"
 FLAGS="$FLAGS --seed-from $SEEDFROM --seed-top $SEEDTOP --show $SHOW"
+FLAGS="$FLAGS --final-top $FINALTOP"
 [ "$MAXPAIRS" = 0 ] || FLAGS="$FLAGS --max-pairs $MAXPAIRS"
 
 echo "pair cover"
@@ -87,6 +90,8 @@ echo "  pool       $POOL -- the words it builds from AND the follow-up's pool"
 echo "  opening    $NWORDS words, chosen by weighted pair coverage"
 echo "  objective  fewest answers UNSOLVED after the opening and the 5th draw"
 echo "  search     branch, k=$TOPK$([ "$TOPK" = 1 ] && echo " (plain greedy)")"
+echo "  last word  the $FINALTOP best by coverage, ranked by UNSOLVED"
+echo "             (coverage is weakest there: fewest pairs left, most ties)"
 echo "  seed       top $SEEDTOP of $SEEDFROM"
 echo "  rounds     $ROUNDS"
 echo "  pairs      ${OUT}_pairs.csv (resumed if it exists)"

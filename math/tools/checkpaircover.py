@@ -133,6 +133,21 @@ def main(argv):
                         "actually tested" % seq)
     print("branch is monotone in K (unsolved %s over k=1,2,3)" % seq)
 
+    # --- 4b: --final-top is monotone, and it actually does something -------
+    # A wider last-level shortlist yields a SUPERSET of leaves, so the minimum
+    # over them can only improve -- the same containment argument K rests on.
+    fseq = []
+    for f in (0, 20, 200):
+        st = {"nodes": 0, "leaves": 0}
+        u, _, _ = build_opening(ctx, 2, st, f)
+        fseq.append(u)
+    if not all(fseq[i] >= fseq[i + 1] for i in range(len(fseq) - 1)):
+        failures.append("--final-top is not monotone: unsolved went %s" % fseq)
+    if fseq[0] == fseq[-1]:
+        failures.append("--final-top changed nothing (%s), so its monotonicity "
+                        "was never actually tested" % fseq)
+    print("--final-top is monotone (unsolved %s over 0, 20, 200 at k=2)" % fseq)
+
     # --- 5: the SEED is dropped after the first harvest --------------------
     # End to end, through the real main(), because this is a property of the
     # LOOP rather than of any function it calls: a round-1 file still holding

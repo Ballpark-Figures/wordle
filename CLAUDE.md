@@ -2760,6 +2760,33 @@ tee'd log, `--dry-run`. Exact and deterministic — no sampling, no seed.
   Caught by the gate's monotonicity check on its first run. Ties break on ssq,
   priced only for the group STRADDLING the cut, so a decisive choice is free and
   a flat one still gets a real second key instead of the lowest index.
+- **`--final-top N` WIDENS THE SHORTLIST AT THE LAST WORD ONLY** (user's call,
+  2026-09-18), because that is where coverage is weakest: by then the remaining
+  pair set is smallest, most candidates tie on it, and the tie-break is choosing
+  the word. Since the leaves are ALREADY ranked by `(unsolved, ssq)`, a wider
+  pick at that one level IS "choose the last word by the real objective" — there
+  is no second ranking rule, just more leaves reaching the one that exists.
+  - **MONOTONE BY CONSTRUCTION, exactly as K is**: a larger `--final-top` gives
+    a SUPERSET of leaves, so the minimum can only improve. Gated, with coverage
+    asserted — MEASURED at k=2, unsolved `115, 54, 41` over final-top 0, 20, 200.
+  - **`0` means "same as k"**, which is the behaviour from before the flag, so
+    it stays reachable. The wrapper default is 100 and it is in the stem as
+    `_f<N>`.
+  - **COST: leaves are `k^(words-1) x max(k, final_top)`**, so it multiplies
+    what K alone would cost. Doing the last level EXHAUSTIVELY was priced and
+    rejected: one unsolved evaluation is **10.4 ms**, so all 4282 candidates is
+    45 s per level-3 state — 20 minutes a round at k=3 and unfinishable at k=10.
+- **ALMOST NOTHING COLLAPSES IN THE MEMO HERE, unlike `greedybuild`.** There the
+  order of placements does not matter, so paths converge; here the candidates
+  offered at each level DEPEND on the level above, so different paths reach
+  different sets. MEASURED: 81 paths gave 81 distinct openings at k=3. Price a
+  run as `k^(words-1) x final_top` leaves, not less.
+- **THE HEADER'S COST LINE IS A FLOOR, NOT AN ESTIMATE**, and says so: it times
+  the leaf evaluation at startup (a tenth of a second, so the constant is
+  measured per machine rather than carried as a literal) and multiplies by the
+  leaf count — but when the pair set is SMALL almost every candidate ties on
+  coverage and the ssq tie-break prices a huge group on top. MEASURED 20 s
+  against a 4 s leaf projection on a 23-pair round.
 - **MEASURED 2026-09-18**: at k=3, 4 words, 1000 seeded pairs, a round is **~1 s**
   (120 nodes, 81 complete openings) and three rounds ran 29 → 25 → **18**
   unsolved. Leaves are `k^4` before the word-set memo collapses orderings, so
