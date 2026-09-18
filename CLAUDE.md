@@ -2795,6 +2795,17 @@ tee'd log, `--dry-run`. Exact and deterministic — no sampling, no seed.
   - **THE TWO HAVE DIFFERENT LEAF COUNTS and the cost line must say which**:
     quoting branch's `k ** words` for a beam over-states it by orders of
     magnitude. MEASURED at k=20 with a real weight set: 13 s a round.
+- **A SEARCH NARRATES ONLY ONCE IT IS SLOW (`--progress`, default 15 s).** One
+  flag has to serve two very different shapes — a generator does thousands of
+  FAST rounds and a wide beam does a few SLOW ones — so nothing extra is printed
+  until a search has already run that long, and then at most one line per
+  interval. A quick round stays quiet; a long one explains itself. The BEAM
+  reports per level (pooled, kept, share of the weight covered) and then its
+  progress through the final scoring; BRANCH reports nodes, complete openings
+  and the best unsolved so far.
+  - **`st["tick"]` IS OPTIONAL, not required** — the gate constructs a minimal
+    `st` and is a legitimate caller, so the search defaults it to a no-op rather
+    than raising. It shipped required once and the gate died with `KeyError`.
 - **`--once` IS ONE SEARCH, AND IT IS A DIFFERENT JOB FROM THE LOOP** (user's
   call, 2026-09-18). The ROUNDS are constraint GENERATION — harvest, fold in,
   search again — and they only do anything because the harvest moves the

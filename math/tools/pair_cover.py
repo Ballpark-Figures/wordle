@@ -67,7 +67,8 @@ def parse_args(argv):
     a = {"pool": None, "words": 4, "topk": None, "rounds": None, "cap": 6,
          "seed_from": None, "seed_top": 1000, "out": None, "max_pairs": 0,
          "show": 8, "final_top": 0, "candidates": None,
-         "pairs_from": None, "search": "branch", "once": 0}
+         "pairs_from": None, "search": "branch", "once": 0,
+         "progress": 15}
     i = 0
     while i < len(argv):
         k = argv[i].lstrip("-").replace("-", "_")
@@ -85,7 +86,7 @@ def parse_args(argv):
         else:
             a[k] = (int(v) if k in ("topk", "words", "rounds", "cap", "seed_top",
                                     "max_pairs", "show", "final_top",
-                                    "once") else v)
+                                    "once", "progress") else v)
         i += 2
     # ONE SEARCH, NO FEEDBACK.  The rounds are the constraint-GENERATION loop --
     # harvest, fold in, search again -- and they only do anything because the
@@ -157,6 +158,28 @@ def seed_pairs(path, top, ppos):
     return pairs
 
 
+def make_tick(t0, every):
+    """Narrate a search that is taking a while; stay silent when it is not.
+
+    A generator run does thousands of FAST rounds and a wide beam does a few
+    SLOW ones, and the same flag has to serve both -- so nothing is printed
+    until a search has already been going `every` seconds, and then at most one
+    line per `every` after that.  A round that finishes quickly says nothing
+    extra; one that does not explains itself.
+    """
+    state = {"last": t0}
+
+    def tick(msg):
+        if every <= 0:
+            return
+        now = time.time()
+        if now - t0 < every or now - state["last"] < every:
+            return
+        state["last"] = now
+        print("    %s   (%.0fs)" % (msg, now - t0), flush=True)
+    return tick
+
+
 def best_k(sc, k, M, chosen):
     """The K best candidates under (coverage DESC, ssq ASC), as pool indices.
 
@@ -208,6 +231,8 @@ def build_opening(ctx, k, st, final_top=0):
     """
     M, S, weights, nwords, memo = ctx["M"], ctx["S"], ctx["w"], ctx["nwords"], {}
     big = np.iinfo(np.int32).max
+    st.setdefault("tick", lambda msg: None)
+    st.setdefault("seen_best", None)
 
     def rec(chosen, alive):
         if len(chosen) == nwords:
@@ -215,6 +240,10 @@ def build_opening(ctx, k, st, final_top=0):
             rows = [M[c] for c in chosen]
             uns, ssq = score(tuple(chosen), (ctx["full"], ctx["codes"],
                                              ctx["cols"], ctx["ans"], rows))
+            if st["seen_best"] is None or (uns, ssq) < st["seen_best"]:
+                st["seen_best"] = (uns, ssq)
+            st["tick"]("%d nodes, %d complete, best %d unsolved so far"
+                       % (st["nodes"], st["leaves"], st["seen_best"][0]))
             return (uns, ssq, tuple(chosen))
         key = tuple(sorted(chosen))
         if key in memo:
@@ -269,6 +298,7 @@ def run_beam(ctx, k, st, final_top=0):
     """
     M, S, weights, nwords = ctx["M"], ctx["S"], ctx["w"], ctx["nwords"]
     total_w = int(weights.sum())
+    st.setdefault("tick", lambda msg: None)
     beam = [((), np.ones(S.shape[1], dtype=bool))]
     for step in range(nwords):
         last = step == nwords - 1
@@ -297,6 +327,9 @@ def run_beam(ctx, k, st, final_top=0):
                                                  ctx["cols"], ctx["ans"], rows))
                 if best is None or (uns, ssq) < best[:2]:
                     best = (uns, ssq, tuple(chosen))
+                st["tick"]("level %d/%d  %d of %d openings scored, best %d "
+                           "unsolved" % (step + 1, nwords, st["leaves"],
+                                         len(pool_c), best[0]))
             return best
         covered = np.array([total_w - int(weights[al].sum())
                             for _, al, _ in pool_c])
@@ -310,6 +343,9 @@ def run_beam(ctx, k, st, final_top=0):
                     taken.add(int(idx))
                     break
         beam = [(pool_c[i][0], pool_c[i][1]) for i in picked]
+        st["tick"]("level %d/%d  %d pooled -> %d kept, %.0f%% of the weight "
+                   "covered" % (step + 1, nwords, len(pool_c), len(beam),
+                                100.0 * covered[picked[0]] / max(total_w, 1)))
     raise AssertionError("the loop returns at its last step")
 
 
@@ -461,6 +497,8 @@ def main(argv):
         ctx = {"M": M, "S": S, "w": weights, "nwords": a["words"],
                "full": full, "codes": codes, "cols": cols, "ans": ans}
         st["nodes"] = st["leaves"] = 0
+        st["seen_best"] = None
+        st["tick"] = make_tick(t0, a["progress"])
         go = run_beam if a["search"] == "beam" else build_opening
         uns, ssq, chosen = go(ctx, a["topk"], st, a["final_top"])
         words = [cands[c] for c in chosen]

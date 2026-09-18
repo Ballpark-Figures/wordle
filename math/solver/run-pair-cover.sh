@@ -20,6 +20,7 @@ CANDS=
 SEARCH=branch
 PAIRSFROM=
 ONCE=0
+PROGRESS=15
 NWORDS=4
 TOPK=""
 ROUNDS=10
@@ -38,6 +39,7 @@ while [ $# -gt 0 ]; do
         --search)     SEARCH="$2";   shift 2 ;;
         --pairs-from) PAIRSFROM="$2"; shift 2 ;;
         --once)       ONCE=1;        shift 1 ;;
+        --progress)   PROGRESS="$2"; shift 2 ;;
         --words)      NWORDS="$2";   shift 2 ;;
         -k|--topk)    TOPK="$2";     shift 2 ;;
         --rounds)     ROUNDS="$2";   shift 2 ;;
@@ -107,6 +109,7 @@ FLAGS="--pool $POOL --words $NWORDS --topk $TOPK --rounds $ROUNDS --cap $CAP"
 FLAGS="$FLAGS --seed-from $SEEDFROM --seed-top $SEEDTOP --show $SHOW"
 FLAGS="$FLAGS --final-top $FINALTOP --search $SEARCH"
 [ "$ONCE" = 0 ] || FLAGS="$FLAGS --once 1"
+FLAGS="$FLAGS --progress $PROGRESS"
 [ -z "$PAIRSFROM" ] || FLAGS="$FLAGS --pairs-from $PAIRSFROM"
 [ -z "$CANDS" ] || FLAGS="$FLAGS --candidates $CANDS"
 [ "$MAXPAIRS" = 0 ] || FLAGS="$FLAGS --max-pairs $MAXPAIRS"
@@ -136,6 +139,7 @@ else
 fi
 echo "  pairs      ${OUT}_pairs.csv (resumed if it exists)"
 echo "  rounds log ${OUT}_rounds.csv"
+echo "  progress   a search silent under ${PROGRESS}s, then a line every ${PROGRESS}s"
 echo "  log        $LOC/$STEM.log"
 
 if [ "$DRYRUN" = 1 ]; then
