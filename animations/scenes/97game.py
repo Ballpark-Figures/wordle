@@ -47,16 +47,10 @@ from assets import game_data
 
 TYPING_SOUND = "sequence"
 KEY_SOUNDS = ["key1", "key2", "key3", "key4", "key5"]
-# ONE BED PER WORD — TEMPORARY, to audition four sections of the same Corsair
-# source in a single render rather than four. Row order, so:
-#   TRACE 2s · LOINS 14s · DUMPY 18s · SNOWY 22s
-# All four are the same 0.33s cut, peak-normalised to the same level, so what
-# differs is the SECTION. The gain each needed says how hard it was pushed, and a
-# section that was quiet in the source brings more room tone up with it:
-#   2s +7.6dB · 14s +10.2dB · 18s +3.5dB (cleanest) · 22s +8.4dB
-# Once one wins this collapses back to a single name for every row.
-TYPING_BEDS = ["typing-corsair-2s", "typing-corsair-14s",
-               "typing-corsair-18s", "typing-corsair-22s"]
+# Which keyboard the "sequence" bed is. All three are the same slice length and
+# level, so swapping this string is an A/B of the KEYBOARD alone.
+#   "typing-corsair" | "typing-logitech" | "typing-razer"
+TYPING_BED = "typing-corsair"
 
 # UNDER "sequence" THE BED'S LENGTH IS TIED TO WHEN THE LAST LETTER LANDS — which is
 # NOT the typing run_time. The pops deliberately overlap, so a 5-letter word is fully
@@ -92,7 +86,7 @@ class Scene97(WordleDarkScene):
                 # play now, so the call order alone would stack them all at its start.
                 self.sfx(KEY_SOUNDS[i % len(KEY_SOUNDS)], at=at)
         elif TYPING_SOUND == "sequence":
-            self.sfx(TYPING_BEDS[row])
+            self.sfx(TYPING_BED)
         self.board.type_word(self, row, word, run_time, per_letter=per_letter)
 
     # a : TRACE typed into row 0 (the board is already up, from setup_scene)
