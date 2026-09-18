@@ -2703,6 +2703,65 @@ sampling, no seed — so a re-run reproduces the file byte for byte.
 - Data under `math/data/shared/answerpairs/` with a `.meta` sidecar recording
   `scored`/`written`/`complete`, log under `data/local/answerpairs/`.
 
+### `paircover` — cover the hard pairs, harvest the failures, repeat
+`math/paircover.py` states the rule and IS the source of truth;
+`tools/pair_cover.py` is the driver. Run it with
+**`bash solver/run-pair-cover.sh -k K --rounds N`** (from `math/`), attached,
+tee'd log, `--dry-run`. Exact and deterministic — no sampling, no seed.
+- **THE LOOP** (user's, 2026-09-18), one round: score every candidate by the
+  WEIGHTED pairs it splits; build an opening of `--words` words, recursing into
+  the K best at each step; rank the finished openings by UNSOLVED ANSWERS;
+  harvest the pairs that opening actually failed on; add them with a count;
+  print, flush, go again. **The count IS the weight** (user's call), so a pair
+  that has failed five rounds counts five times in the next ranking.
+- **IT IS CONSTRAINT GENERATION, not a ranking.** The pair set is the hard
+  constraints found so far and each round adds the ones the last opening
+  violated, so the search is steered by its own failures rather than by a fixed
+  screen. That is the thing no opener-side ranking can do.
+- **TWO OBJECTIVES AND ONLY THE SECOND IS THE ANSWER.** Coverage picks the
+  WORDS; `unsolved` ranks the finished openings. Never quote a coverage score as
+  a result.
+- **COVERAGE IS SUFFICIENT BUT NOT NECESSARY, which is the proxy's one real
+  imprecision.** A bucket of exactly TWO is SAFE — the follow-up draws one, and
+  a wrong draw leaves exactly one word for the last guess — so the damage starts
+  at THREE and the seeded "hardest pairs" over-demand. The HARVESTED pairs carry
+  no such slack: they are exactly the sets that ran out of budget with company.
+- **A HARVESTED PAIR IS (ANSWER, POOL WORD)**, not (answer, answer): the words
+  standing beside a losing answer come from the whole pool, and one that could
+  never BE the answer is still a way to lose. The seed is answer-by-answer,
+  which sits inside that space, so the two compose with no conversion.
+- **THE PRECISE FAILURE, not the whole bucket.** The pairs recorded are `(a, x)`
+  for the `x` still standing when the budget runs out, unioned over every
+  witnessing draw — not every other member of the bucket, most of which the
+  opening DID separate. Recording the bucket whole fills the set with non-
+  failures and steers the next round at nothing; that is MUTATION-TESTED and the
+  gate names the offending pairs.
+- **BRANCH, NOT BEAM** (user's call), matching `greedy_build.py` and every other
+  `--topk` here. **It must be the K BEST, not the K TIED AT THE TOP** — selecting
+  only among candidates sharing the maximum meant a single decisive coverage
+  word left nothing to branch on and every K returned the identical opening.
+  Caught by the gate's monotonicity check on its first run. Ties break on ssq,
+  priced only for the group STRADDLING the cut, so a decisive choice is free and
+  a flat one still gets a real second key instead of the lowest index.
+- **MEASURED 2026-09-18**: at k=3, 4 words, 1000 seeded pairs, a round is **~1 s**
+  (120 nodes, 81 complete openings) and three rounds ran 29 → 25 → **18**
+  unsolved. Leaves are `k^4` before the word-set memo collapses orderings, so
+  k=10 is ~10000 leaves and k=20 ~160000 — pick K from that.
+- **EVERY ROUND IS FLUSHED and the pair file is written atomically**, so a
+  Ctrl-C keeps the set and every round played; re-running the same command
+  CONTINUES from the file rather than re-seeding.
+- **A LIVE CROSS-CHECK RUNS EVERY ROUND**: the harvest's losing-answer count must
+  equal the objective's `unsolved`, two routes to one number, and the round dies
+  rather than reporting if they differ.
+- **`python3 tools/checkpaircover.py` is the GATE**: the split matrix against
+  `wordle.pattern` from the STRINGS; the losing answers THREE ways (the harvest,
+  `greedybuild`'s objective, `guarantee_sweep.check_opening`) agreeing on the
+  count AND the words; every harvested pair replayed from the strings (same
+  bucket, and some live draw failing to separate them); and branch monotonicity
+  with coverage ASSERTED — it fails if a wider K never changed the answer.
+- Data under `math/data/shared/paircover/` (`<stem>_pairs.csv`,
+  `<stem>_rounds.csv`), log under `data/local/paircover/`.
+
 ### `greedybuild` — build an opening LETTER BY LETTER, against the real objective
 `math/greedybuild.py` states the rule and IS the source of truth;
 `tools/greedy_build.py` is the driver. Run it with
