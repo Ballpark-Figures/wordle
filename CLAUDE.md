@@ -1441,6 +1441,34 @@ Carlo, so its numbers carry a standard error and are not comparable with any
       `--patterns`), and the run SAYS so. Nothing downstream reads that stage —
       the pair stage enumerates pairs itself — so it is a labelling matter, not
       a wrong parent.
+  - **`--top all` IS RIGHT FOR PAIRS AND RUINOUS ONE LEVEL DOWN, and `pairsplit`
+    now REFUSES rather than discovering it in hour five** (2026-09-17). Under
+    `--top all` every scored candidate is RETAINED — the per-thread heaps double
+    without bound — so the memory is the candidate count times `sizeof(Pair)`
+    (56 bytes), and that is knowable from numbers the run already prints.
+    - **MEASURED, which is why the guard exists**: a triples run extending
+      1000000 pairs by 4282 words = **4.28e9 candidates = 239.8 GB of kept rows**
+      on a **25.8 GB** machine with a 3 GB swap file. It estimated 50 minutes,
+      decayed from **372 parents/s to 2/s** as it swapped, and died at **62.8%
+      after 4.75 hours having WRITTEN NOTHING**. The program's own
+      out-of-memory check never fired: macOS overcommits, so `realloc` kept
+      succeeding while the machine drowned, and there is no crash report or
+      jetsam entry to find afterwards.
+    - **THE POINT IS NOT JUST THAT IT DIED — IT WAS POINTLESS WORK** (user,
+      2026-09-17): the quad stage only ever reads the top `--triples-top` of
+      that file, so nothing was ever going to store 4.28 billion rows. Keeping
+      them in memory bought nothing at any stage.
+    - **`--top N` is the bounded-memory mode**, since the heaps then cap at N:
+      `N x 56 bytes x 18 threads`, so 100000 costs ~101 MB and 1000000 ~1.0 GB.
+      Every committed triple ranking was made with `--top 100000` — their metas
+      say `scored=1288653393 written=100000`.
+    - The guard fires at the count the run announces, refuses only what could not
+      have worked (the pair sweep's 9165621 rows are 513 MB and still pass), and
+      is VERIFIED INERT — regenerating the custom pair ranking after it was added
+      gives a byte-identical file.
+    - **The cap is NOT defaulted away**, deliberately: how many rows survive IS
+      the experiment's coverage, the same reason `opening_list.py` requires
+      `--top`. The wrapper still defaults `TOP=all`; the refusal names the flag.
   - **WORDS AND PAIRS ARE EXHAUSTIVE; TRIPLES AND QUADS ARE GREEDY SCREENS**
     (`solver/run-singles.sh` says so). So `clint soare` IS the top pair, but a
     triple/quad head is "best of those screened" — never call such a run "the best

@@ -61,6 +61,10 @@
 #include <stdint.h>
 #include <ctype.h>
 #include <time.h>
+#include <unistd.h>
+#if defined(__APPLE__)
+#include <sys/sysctl.h>
+#endif
 #ifdef _OPENMP
 #include <omp.h>
 #endif
@@ -338,6 +342,59 @@ static int64_t   PARENT_COUNT = 0;
  * are running.  Everything downstream -- merge, sort, write -- is unchanged. */
 static int       TOP_ALL = 0;
 
+/* Physical RAM, or 0 when it cannot be read.  Both hosts this runs on are
+ * covered: sysctl on the Macs, sysconf on the WSL desktop. */
+static uint64_t phys_mem(void) {
+#if defined(__APPLE__)
+    uint64_t v = 0; size_t n = sizeof v;
+    if (sysctlbyname("hw.memsize", &v, &n, NULL, 0) == 0) return v;
+#elif defined(_SC_PHYS_PAGES) && defined(_SC_PAGE_SIZE)
+    long pages = sysconf(_SC_PHYS_PAGES), sz = sysconf(_SC_PAGE_SIZE);
+    if (pages > 0 && sz > 0) return (uint64_t)pages * (uint64_t)sz;
+#endif
+    return 0;
+}
+
+/* REFUSE A RUN WHOSE KEPT ROWS CANNOT FIT, BEFORE SCORING ANYTHING.
+ *
+ * Under `--top all` every scored candidate is RETAINED: the per-thread heaps
+ * double without bound, so the memory is the candidate count times sizeof(Pair)
+ * and it is knowable here, in the first second, from numbers already printed.
+ * Nothing downstream can save a run that gets this wrong -- the heap only grows,
+ * and on a machine that overcommits `realloc` keeps succeeding while the system
+ * thrashes, so the program's own out-of-memory check never fires.
+ *
+ * MEASURED, 2026-09-17, which is why this exists: a triples run extending
+ * 1000000 pairs by 4282 words = 4.28e9 candidates = 223 GB of kept rows, on a
+ * 25.8 GB machine with a 3 GB swap file.  It estimated 50 minutes, decayed from
+ * 372 parents/s to 2/s as it swapped, and died at 62.8% after 4.75 hours having
+ * WRITTEN NOTHING.  Every committed triple ranking was made with an explicit
+ * `--top 100000` (their metas say `scored=1288653393 written=100000`); this run
+ * inherited the wrapper's `TOP=all`, which is right for the pair stage and
+ * ruinous one level down.
+ *
+ * `--top all` stays legal wherever it fits -- the pair sweep's 9165621 rows are
+ * 477 MB and pass -- so this refuses only what could not have worked. */
+static void guard_kept_rows(int64_t candidates, const char *what) {
+    if (!TOP_ALL || candidates <= 0) return;
+    uint64_t need = (uint64_t)candidates * sizeof(Pair);
+    uint64_t ram  = phys_mem();
+    /* Half of RAM: the pattern matrix, the parent list and the OS also need
+     * room, and a run that merely fits would still swap.  A BOUND, not a
+     * finding -- it changes what is refused, never what is computed. */
+    uint64_t cap = ram ? ram / 2 : (uint64_t)8 << 30;
+    if (need <= cap) return;
+    fprintf(stderr,
+            "\n--top all would keep every one of the %lld %s: %.1f GB of rows\n"
+            "  (%zu bytes each), against %.1f GB of RAM.  REFUSING rather than\n"
+            "  scoring for hours and dying with nothing written.\n"
+            "  Pass --top N to keep the best N instead; every committed triple\n"
+            "  ranking here used --top 100000, which costs about %.0f MB.\n",
+            (long long)candidates, what, need / 1e9, sizeof(Pair), ram / 1e9,
+            100000.0 * sizeof(Pair) * 18 / 1e6);
+    exit(1);
+}
+
 static void sortk(int32_t *w, int k) {
     for (int i = 1; i < k; i++)              /* k <= 6; insertion is right */
         for (int j = i; j > 0 && w[j - 1] > w[j]; j--) {
@@ -570,6 +627,7 @@ int main(int argc, char **argv) {
     int64_t npairs = (int64_t)nsel * (nsel - 1) / 2;
     fprintf(stderr, "ranking %lld unordered pairs by %s, keeping the best %d\n",
             (long long)npairs, SINGLES ? "SINGLETON COUNT" : "ssq", top);
+    guard_kept_rows(npairs, "pairs");
 
 #ifdef _OPENMP
     if (threads > 0) omp_set_num_threads(threads);
@@ -737,6 +795,9 @@ int main(int argc, char **argv) {
                     nsel, (long long)npl * nsel,
                     PARENTK == 5 ? "sextets" : PARENTK == 4 ? "quints" :
                     PARENTK == 3 ? "quads" : "triples");
+        guard_kept_rows((int64_t)npl * nsel,
+                        PARENTK == 5 ? "sextets" : PARENTK == 4 ? "quints" :
+                        PARENTK == 3 ? "quads" : "triples");
 
       /* One pass over the whole list when it is resident; chunk after chunk when
        * it is streamed.  `pbase` is the running offset, so a parent's rank is
