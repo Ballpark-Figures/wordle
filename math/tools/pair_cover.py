@@ -79,8 +79,11 @@ def parse_args(argv):
         if k not in a:
             raise SystemExit("unknown argument: %s" % argv[i])
         v = argv[i + 1]
-        a[k] = (int(v) if k in ("topk", "words", "rounds", "cap", "seed_top",
-                                "max_pairs", "show", "final_top") else v)
+        if k == "final_top" and v == "all":
+            a[k] = -1                      # exhaustive; 0 still means "same as k"
+        else:
+            a[k] = (int(v) if k in ("topk", "words", "rounds", "cap", "seed_top",
+                                    "max_pairs", "show", "final_top") else v)
         i += 2
     for req in ("pool", "topk", "rounds"):
         if a[req] is None:
@@ -167,48 +170,53 @@ def best_k(sc, k, M, chosen):
 
 
 def build_opening(ctx, k, st, final_top=0):
-    """Recurse into the K best coverage choices; decide the LAST word exactly.
+    """Recurse into the K best coverage choices; rank the leaves by UNSOLVED.
 
-    THE LAST WORD IS RANKED BY THE REAL OBJECTIVE OVER EVERY CANDIDATE (user's
-    design), not shortlisted by coverage first.  `paircover.last_level_scores`
-    prices the whole pool in one pass -- MEASURED 0.9-2.2 s against 48 s one at
-    a time -- by grouping candidates on the PARTITION they induce rather than on
-    their replies, which is what made the exhaustive form affordable at all.
+    `final_top` sets how wide the LAST word's shortlist is, and it is the one
+    place the two costs trade off:
 
-    Coverage still chooses words 1..k-1, where it is informative and where a
-    full evaluation would multiply.  It chooses NOTHING at the last word, which
-    is where it was weakest: fewest pairs left, most candidates tied.
+      N   the N best by coverage, each priced on its own.  THE DEFAULT, and the
+          user's call (2026-09-18) after running both: the exhaustive level is
+          not worth its slowdown.
+      0   the same K as every other level -- the behaviour before the flag.
+      -1  (`--final-top all`) EXHAUSTIVE: every candidate ranked by the real
+          objective, via `paircover.last_level_scores`, which prices the whole
+          pool in one pass instead of one candidate at a time.
 
-    `final_top` N restores the old shortlist -- the N best by coverage, then
-    ranked -- for when the exhaustive level is not wanted.  0 means exhaustive.
+    MONOTONE ACROSS ALL THREE, since each is a superset of the one above it: a
+    wider shortlist can only find a better leaf.  The gate checks that rather
+    than assuming it.
     """
     M, S, weights, nwords, memo = ctx["M"], ctx["S"], ctx["w"], ctx["nwords"], {}
     big = np.iinfo(np.int32).max
 
     def rec(chosen, alive):
+        if len(chosen) == nwords:
+            st["leaves"] += 1
+            rows = [M[c] for c in chosen]
+            uns, ssq = score(tuple(chosen), (ctx["full"], ctx["codes"],
+                                             ctx["cols"], ctx["ans"], rows))
+            return (uns, ssq, tuple(chosen))
         key = tuple(sorted(chosen))
         if key in memo:
             return memo[key]
         banned = np.zeros(S.shape[0], dtype=bool)
         banned[list(chosen)] = True
-        if len(chosen) == nwords - 1:
+        if final_top < 0 and len(chosen) == nwords - 1:
+            # The whole pool at once: only worth it when EVERY candidate is
+            # wanted, since it prices all 4282 however few are asked for.
             uns, ssq = last_level_scores(ctx["full"], ctx["cols"], M,
                                          list(chosen), ctx["ans"])
             uns = uns.astype(np.int64)
-            if final_top:
-                sc = cover_scores(S, weights, alive, banned)
-                keep = np.zeros(len(uns), dtype=bool)
-                keep[best_k(sc, final_top, M, chosen)] = True
-                uns = np.where(keep, uns, big)
-            uns[banned] = big              # a word cannot be played twice
+            uns[banned] = big
             c = int(np.lexsort((ssq, uns))[0])
             st["leaves"] += int((uns < big).sum())
-            out = (int(uns[c]), int(ssq[c]), tuple(chosen) + (c,))
-            memo[key] = out
-            return out
+            memo[key] = (int(uns[c]), int(ssq[c]), tuple(chosen) + (c,))
+            return memo[key]
         sc = cover_scores(S, weights, alive, banned)
+        wide = max(k, final_top) if len(chosen) == nwords - 1 else k
         best = None
-        for c in best_k(sc, k, M, chosen):
+        for c in best_k(sc, wide, M, chosen):
             st["nodes"] += 1
             r = rec(chosen + (int(c),), alive & ~S[int(c)])
             if best is None or r[:2] < best[:2]:
@@ -262,34 +270,29 @@ def main(argv):
     print("  rounds   %d" % a["rounds"])
 
     # WHAT A ROUND WILL COST -- A ROUGH FIGURE, AND SAID TO BE.  The last level
-    # dominates and its cost is machine- AND prefix-specific, so it is timed
-    # here rather than carried as a literal.  But it is timed on a RANDOM
-    # prefix, and the search's own prefixes are far from random: they shatter
-    # the pool, which leaves fewer live buckets and a cheaper last level.
-    # MEASURED, three consecutive rounds at k=2 against a 104 s projection:
-    # 35 s, 8 s, 42 s.  So it is an order-of-magnitude guide, NOT a bound in
-    # either direction, and calling it one would be the wrong claim.  A round runs one last
-    # level per three-word state, and the memo collapses almost nothing (the
-    # candidates offered at each level depend on the level above), so the state
-    # count is k ** (words - 1).
-    t0 = time.time()
+    # dominates, and its cost is machine- and prefix-specific, so it is timed
+    # here rather than carried as a literal.  It is only ever an
+    # order-of-magnitude guide: MEASURED, three consecutive k=2 rounds against
+    # one projection came in at 35 s, 8 s and 42 s, and when the pair set is
+    # small the ssq tie-break adds more on top.  Not a bound in either direction.
     rng = np.random.default_rng(0)
-    pre = [int(x) for x in rng.integers(len(pool), size=a["words"] - 1)]
-    last_level_scores(full, cols, M, pre, ans)
-    per_level = time.time() - t0
+    t0 = time.time()
+    for _ in range(10):
+        ch = tuple(int(x) for x in rng.integers(len(pool), size=a["words"]))
+        score(ch, (full, codes, cols, ans, [M[c] for c in ch]))
+    per_leaf = (time.time() - t0) / 10
     states = a["topk"] ** (a["words"] - 1)
-    print("  last word %s"
-          % ("EXHAUSTIVE -- every candidate ranked by unsolved"
-             if not a["final_top"] else
-             "the %d best by coverage, then ranked by unsolved" % a["final_top"]))
-    print("  cost     %d three-word states x ~%.1f s = ~%.0f s per round, "
-          "~%.1f h for %d" % (states, per_level, states * per_level,
-                              states * per_level * a["rounds"] / 3600.0,
-                              a["rounds"]))
-    print("           (ROUGH: timed on a RANDOM prefix, and a real one varies "
-          "several-fold either way --")
-    print("            a greedy prefix shatters the pool better, so its last "
-          "level is cheaper)")
+    if a["final_top"] < 0:
+        print("  last word EXHAUSTIVE -- every candidate ranked by unsolved")
+        print("  cost     %d three-word states, whole pool each" % states)
+    else:
+        wide = max(a["topk"], a["final_top"])
+        leaves = states * wide
+        print("  last word the %d best by coverage, ranked by unsolved" % wide)
+        print("  cost     %d leaves x ~%.1f ms = ~%.0f s per round, ~%.1f h for %d"
+              % (leaves, per_leaf * 1000, leaves * per_leaf,
+                 leaves * per_leaf * a["rounds"] / 3600.0, a["rounds"]))
+    print("           (ROUGH -- timed on random openings; a real prefix varies)")
 
     rh = None
     if round_path:

@@ -2760,23 +2760,21 @@ tee'd log, `--dry-run`. Exact and deterministic — no sampling, no seed.
   Caught by the gate's monotonicity check on its first run. Ties break on ssq,
   priced only for the group STRADDLING the cut, so a decisive choice is free and
   a flat one still gets a real second key instead of the lowest index.
-- **THE LAST WORD IS RANKED BY THE REAL OBJECTIVE OVER EVERY CANDIDATE**
-  (user's design, 2026-09-18). Coverage chooses words 1..N-1, where it is
-  informative and where a full evaluation would multiply; it chooses NOTHING at
-  the last word, which is where it was weakest — fewest pairs left, most
-  candidates tied. `--final-top N` restores a coverage shortlist if the
-  exhaustive level is not wanted; **0, the default, is exhaustive** and lands in
-  the stem as `_fall`.
-  - **A SCAR: this was first shipped as a 100-word coverage shortlist and sold
-    as a "middle ground".** It was not one — it was `k = 100` at the last level,
-    with coverage still choosing the word. And the "too expensive to do it
-    properly" that justified it was **pricing the implementation, not the
-    design**: the quoted 45 s was `greedybuild.score` rebuilding the whole
-    4282-word partition once per candidate. Caught by the user. **Price the idea
-    against a fit implementation before calling it unaffordable.**
+- **`--final-top` SETS HOW WIDE THE LAST WORD'S SHORTLIST IS**, and it is the one
+  place the two costs trade off. `N` takes the N best by coverage and prices
+  each on its own (**the default is 100**); `0` uses the same K as every other
+  level; **`all` is EXHAUSTIVE** — every candidate ranked by the real objective.
+  Monotone across all four, each a superset of the one above, and gated as such:
+  MEASURED at k=2, unsolved `115, 54, 41, 18` over k, 20, 200, exhaustive.
+  - **THE EXHAUSTIVE LEVEL IS OPT-IN, and that is the USER'S CALL after running
+    both (2026-09-18): it is not worth its slowdown.** It finds strictly better
+    openings — that is what monotone means — but not enough better per second at
+    the K they work at. Do not quietly make it the default again.
 - **`last_level_scores` PRICES THE WHOLE POOL IN ONE PASS — MEASURED 0.9-2.2 s
-  against 48 s one at a time (22-52x), exact on unsolved AND ssq.** Two ideas do
-  it, and both are about work that does not depend on the candidate:
+  against 48 s one at a time (22-52x), exact on unsolved AND ssq.** It is what
+  `--final-top all` runs on, and it is worth reading before anyone prices a
+  last-level idea again, because two things in it are the reason the exhaustive
+  form is affordable at all:
   - **THE PREFIX IS FIXED, SO THE BUCKETS ARE.** A final word only REFINES the
     partition the first N-1 words made, so only buckets of size >= 3 holding an
     answer are in play — MEASURED 386 of 2296, holding 47% of the pool.
@@ -2787,18 +2785,22 @@ tee'd log, `--dry-run`. Exact and deterministic — no sampling, no seed.
     last word does.
   - **CANDIDATES GROUP BY THE PARTITION THEY INDUCE, NOT BY THEIR REPLIES.** The
     pattern codes are labels; what matters is which members a word puts
-    together. A bucket of three therefore has only **five** possible outcomes
-    (Bell(3)) however many candidates exist, so thousands collapse onto a
-    handful each priced once. Keying on the raw replies instead leaves most of
-    the saving on the table — measured 11x that way against 39x this way.
-    The key packs one bit per member PAIR, exact to size 11, with a raw-row
-    fallback above that.
-  - **GATED AGAINST `greedybuild.score`**, which prices a whole opening from
-    scratch and shares none of the bucket reuse — a real second route to both
-    numbers, checked on 120 candidates per run.
-- **MEASURED EFFECT OF DOING IT PROPERLY**: at k=1 the gate's instance goes from
-  **236** unsolved (coverage picking the last word) to **43** (exhaustive). In
-  the real loop at k=1 a round is ~3 s and lands on 18 unsolved.
+    together. A bucket of three has only **five** possible outcomes (Bell(3))
+    however many candidates exist, so thousands collapse onto a handful each
+    priced once. Keying on raw replies leaves most of the saving on the table —
+    measured 11x that way against 39x this way. The key packs one bit per member
+    PAIR, exact to size 11, with a raw-row fallback above.
+  - **GATED AGAINST `greedybuild.score`** on 120 candidates a run, which prices a
+    whole opening from scratch and shares none of the bucket reuse.
+- **A SCAR ABOUT PRICING, worth more than the flag it came from.** The shortlist
+  first shipped described as a "middle ground" between coverage and the real
+  objective. It was not one — it was `k = 100` at the last level, with coverage
+  still choosing the word — and the "too expensive to do it properly" that
+  justified it was **pricing the implementation, not the design**: the quoted
+  45 s was `greedybuild.score` rebuilding the whole 4282-word partition once per
+  candidate. Both caught by the user. **Price the idea against a fit
+  implementation before calling it unaffordable** — and then let the user decide,
+  which here went the other way anyway, on real numbers rather than on mine.
 - **ALMOST NOTHING COLLAPSES IN THE MEMO HERE, unlike `greedybuild`.** There the
   order of placements does not matter, so paths converge; here the candidates
   offered at each level DEPEND on the level above, so different paths reach

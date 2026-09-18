@@ -23,7 +23,7 @@ CAP=6
 SEEDTOP=1000
 SEEDFROM=""
 MAXPAIRS=0
-FINALTOP=0
+FINALTOP=100
 SHOW=8
 DRYRUN=0
 
@@ -74,8 +74,7 @@ PY=../.venv/bin/python
     echo "or name one with --seed-from FILE" >&2
     exit 1; }
 
-if [ "$FINALTOP" = 0 ]; then STEM="cover_${POOL}_w${NWORDS}_k${TOPK}_s${SEEDTOP}_fall"
-else STEM="cover_${POOL}_w${NWORDS}_k${TOPK}_s${SEEDTOP}_f${FINALTOP}"; fi
+STEM="cover_${POOL}_w${NWORDS}_k${TOPK}_s${SEEDTOP}_f${FINALTOP}"
 [ "$CAP" = 6 ] || STEM="${STEM}_cap${CAP}"
 OUTDIR=data/shared/paircover
 LOC=data/local/paircover
@@ -91,9 +90,8 @@ echo "  pool       $POOL -- the words it builds from AND the follow-up's pool"
 echo "  opening    $NWORDS words, chosen by weighted pair coverage"
 echo "  objective  fewest answers UNSOLVED after the opening and the 5th draw"
 echo "  search     branch, k=$TOPK$([ "$TOPK" = 1 ] && echo " (plain greedy)")"
-if [ "$FINALTOP" = 0 ]; then
+if [ "$FINALTOP" = all ]; then
     echo "  last word  EXHAUSTIVE -- every candidate ranked by UNSOLVED"
-    echo "             (coverage chooses words 1..N-1 only; it was weakest last)"
 else
     echo "  last word  the $FINALTOP best by coverage, then ranked by UNSOLVED"
 fi
