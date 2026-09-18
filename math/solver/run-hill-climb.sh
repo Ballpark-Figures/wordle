@@ -11,6 +11,9 @@
 # never tries that.  So a result is the best of --trials random starts, never
 # the best opening.
 #
+# Trials are independent and seeded by INDEX, so --workers changes only the
+# order lines appear in -- never the result.
+#
 # Every accepted swap prints.  Each (pool, candidates, words, cap, seed) is a
 # different experiment and gets its own file; trials APPEND, so a second run at
 # a later seed adds to the same record.
@@ -23,6 +26,7 @@ NWORDS=4
 TRIALS=""
 CAP=6
 SEED=0
+WORKERS=8
 DRYRUN=0
 
 while [ $# -gt 0 ]; do
@@ -33,6 +37,7 @@ while [ $# -gt 0 ]; do
         -t|--trials)  TRIALS="$2"; shift 2 ;;
         --cap)        CAP="$2";    shift 2 ;;
         --seed)       SEED="$2";   shift 2 ;;
+        --workers)    WORKERS="$2"; shift 2 ;;
         --dry-run)    DRYRUN=1;    shift 1 ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
     esac
@@ -63,6 +68,7 @@ LOC=data/local/hillclimb
 OUT="$OUTDIR/$STEM.csv"
 
 FLAGS="--pool $POOL --words $NWORDS --trials $TRIALS --cap $CAP --seed $SEED"
+FLAGS="$FLAGS --workers $WORKERS"
 [ -z "$CANDS" ] || FLAGS="$FLAGS --candidates $CANDS"
 
 echo "hill climb"
@@ -71,6 +77,9 @@ echo "  words      the $NWORDS come from ${CANDS:-$POOL}$([ -z "$CANDS" ] && ech
 echo "  objective  fewest answers UNSOLVED after the opening and the 5th draw"
 echo "  move       swap ONE word; steepest improvement; stop at a local optimum"
 echo "  trials     $TRIALS random restarts from seed $SEED"
+echo "  workers    $WORKERS -- whole TRIALS in parallel; each holds its own"
+echo "             168 MB matrix, and the seed is per trial so the RESULT does"
+echo "             not depend on this number"
 echo "  out        $OUT (appended)"
 echo "  log        $LOC/$STEM.log"
 

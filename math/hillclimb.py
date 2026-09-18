@@ -103,3 +103,124 @@ def climb(full, cols, M, words, ans, on_step=None):
         cur = mv[:2]
         if on_step:
             on_step(step, mv[2], old, mv[3], cur[0], cur[1])
+
+
+# ---------------------------------------------------------------------------
+# PAIR MOVES: swap TWO words at once for two whose letters are the same, or
+# nearly.  (The user's, 2026-09-18.)
+#
+# WHY A PAIR MOVE IS WORTH HAVING AT ALL.  A one-word climb stops where no
+# SINGLE swap helps, and the failures that survive are near-anagram families --
+# `odder/order/rodeo`, `brags/grabs/grass/grays`.  Separating those often needs
+# two words to change TOGETHER, which is exactly the move a one-word
+# neighbourhood cannot make.  Restricting the pair's replacement to the same
+# LETTERS keeps the neighbourhood small enough to enumerate while changing
+# precisely what a single swap cannot: where those letters sit.
+#
+# THE LETTERS ARE A MULTISET, not a set -- `grass` is two s's and it matters --
+# so everything below counts them.
+# ---------------------------------------------------------------------------
+
+def letter_counts(words):
+    """(n, 26) counts, one row per word."""
+    C = np.zeros((len(words), 26), dtype=np.int16)
+    for i, w in enumerate(words):
+        for ch in w:
+            C[i, ord(ch) - 97] += 1
+    return C
+
+
+def anagram_index(C):
+    """signature -> the candidates having exactly those letters."""
+    by = {}
+    for i in range(C.shape[0]):
+        by.setdefault(C[i].tobytes(), []).append(i)
+    return by
+
+
+def splits_of(C, by_sig, target):
+    """Every unordered candidate pair whose letters total exactly `target`.
+
+    The subset test is VECTORISED over all candidates at once -- `target` is a
+    (26,) vector and `C <= target` is one pass -- because the alternative, a
+    Python loop per target, is what makes the within-one-letter neighbourhood
+    (up to 260 targets per position pair) unaffordable.
+    """
+    out = []
+    ok = np.flatnonzero((C <= target).all(axis=1))
+    for x in ok:
+        comp = (target - C[x]).tobytes()
+        for y in by_sig.get(comp, ()):
+            if int(y) > int(x):
+                out.append((int(x), int(y)))
+    return out
+
+
+def near_targets(target, within):
+    """`target`, and every multiset one substitution away from it.
+
+    `within=0` is the exact anagram neighbourhood; `within=1` also allows one
+    letter to be traded for another, which is the second, wider section.
+    """
+    seen = {target.tobytes(): target}
+    if within >= 1:
+        for c in np.flatnonzero(target > 0):
+            for d in range(26):
+                if d == c:
+                    continue
+                t = target.copy()
+                t[c] -= 1
+                t[d] += 1
+                seen.setdefault(t.tobytes(), t)
+    return list(seen.values())
+
+
+def pair_moves(C, by_sig, words, within):
+    """Every (i, j, x, y): replace positions i and j with candidates x and y.
+
+    Excludes anything that would repeat a word already in the opening, and the
+    identity -- putting the same two words back is not a move.
+    """
+    k = len(words)
+    cur = set(int(w) for w in words)
+    out = []
+    for i in range(k):
+        for j in range(i + 1, k):
+            keep = cur - {int(words[i]), int(words[j])}
+            target = C[words[i]] + C[words[j]]
+            for t in near_targets(target, within):
+                for x, y in splits_of(C, by_sig, t):
+                    if {x, y} == {int(words[i]), int(words[j])}:
+                        continue
+                    if x in keep or y in keep:
+                        continue
+                    out.append((i, j, x, y))
+    return out
+
+
+def climb_pairs(score_fn, words, C, by_sig, within, current, on_step=None):
+    """Swap the best PAIR until nothing helps.  Steepest, as the one-word climb.
+
+    `score_fn(words) -> (unsolved, ssq)` is passed in rather than rebuilt here,
+    so this never grows a second copy of the objective.
+    """
+    words = [int(w) for w in words]
+    cur = tuple(current)
+    step = 0
+    while True:
+        best = None
+        for i, j, x, y in pair_moves(C, by_sig, words, within):
+            trial = list(words)
+            trial[i], trial[j] = x, y
+            val = score_fn(trial)
+            if val < cur and (best is None or val < best[0]):
+                best = (val, i, j, x, y)
+        if best is None:
+            return cur[0], cur[1], words, step
+        step += 1
+        val, i, j, x, y = best
+        old = (words[i], words[j])
+        words[i], words[j] = x, y
+        cur = val
+        if on_step:
+            on_step(step, old, (x, y), cur[0], cur[1])

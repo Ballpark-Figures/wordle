@@ -2760,6 +2760,40 @@ attached, tee'd log, `--dry-run`.
 - **STEEPEST, not first-improvement**: all k positions are scanned before
   moving, so a printed step means "the best move available" rather than "the
   first one found".
+- **THREE SECTIONS, IN ORDER, each run to exhaustion** (user's, 2026-09-18):
+  single-word swaps; then PAIR swaps for a pair with the SAME letters; then
+  pair swaps for a pair within ONE LETTER of the same letters. Each later
+  section can only move where the earlier one is stuck, which is the point —
+  **the survivors of a one-word climb are near-anagram families** (`odder /
+  order / rodeo`, `brags / grabs / grass / grays`) and separating those needs
+  two words to change TOGETHER, which no one-word neighbourhood can do.
+  - **MEASURED and it earns its keep**: a trial that stalled at **15** unsolved
+    after 3 single-word swaps went to **10** and then **8** on two `anagram+1`
+    moves. The exact-anagram section found nothing on that trial (`swap 3,
+    anagram 0, anagram+1 2`) — within `custom` an exact pair anagram is rare.
+  - **COST: ~350 s a trial against ~70 s for swaps alone**, so the pair
+    sections are most of the time. The `steps` column records the breakdown per
+    section rather than one number, which is what says whether a section is
+    earning it.
+  - **The letters are a MULTISET** (`grass` is two s's), and the subset test is
+    vectorised over all candidates at once — a Python loop per target is what
+    makes the within-one neighbourhood (up to 260 targets per position pair)
+    unaffordable.
+- **`--workers N` RUNS WHOLE TRIALS IN PARALLEL, and changes NOTHING but the
+  order lines appear in.** Trials are seeded by INDEX (`seed + trial`), so the
+  result is independent of the worker count — which is what makes the parallel
+  path checkable rather than merely faster. Step lines still print live,
+  through a queue, each tagged with its trial.
+  - **SPAWN, NOT FORK** (macOS default): each worker builds its own state in an
+    initializer and holds its own 168 MB matrix. Budget for that before raising
+    the count.
+- **`python3 tools/checkhillclimb.py` is the GATE**, and it runs on a SMALL
+  candidate list so a whole trial is seconds — what it checks does not depend on
+  the candidate count, and a gate nobody can afford to run is not a gate. It
+  verifies every pair move's letter relationship FROM THE STRINGS (exact at
+  `within=0`, one substitution at `within=1`), with **coverage asserted** for
+  both, and that `--workers 1` and `--workers 3` agree trial for trial on the
+  opening AND the score.
 - **THE GATE RUNS ON EVERY TRIAL and both halves are free**: the climb must END
   at a local optimum (the stopping scan is re-checked), and the reported
   unsolved must equal `guarantee_sweep.check_opening`'s losing count for the
