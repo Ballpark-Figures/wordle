@@ -28,7 +28,8 @@ from build_patterns import load_patterns                                  # noqa
 from greedybuild import score                                             # noqa: E402
 from guarantee import stop_levels                                         # noqa: E402
 from opening_list import resolve_word_set                                 # noqa: E402
-from paircover import harvest, joint_key, pool_matrix, split_matrix       # noqa: E402
+from paircover import (cand_matrix, harvest, joint_key,               # noqa: E402
+                       pool_matrix, split_matrix)
 from wordle import load_words, pattern, to_codes                          # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -88,7 +89,7 @@ def main(argv):
     print("opening at k=1: %s (unsolved %d)" % (" ".join(words), uns))
 
     # --- 2: the losing answers, three ways ---------------------------------
-    got, losers = harvest(M, chosen, ans, 2)
+    got, losers = harvest(M, M, chosen, ans, 2)
     rows = [M[c] for c in chosen]
     obj, _ = score(tuple(chosen), (full, codes, cols, ans, rows))
     gctx = (full, cols, pool, ans, answers, 2, 6, gpos)
@@ -168,6 +169,41 @@ def main(argv):
         failures.append("the batched last level disagrees with score() on %d "
                         "of 120 candidates" % wrong)
     print("batched last level: 120 candidates match score() on unsolved AND ssq")
+
+    # --- 6: a WIDER CANDIDATE LIST than the pool ---------------------------
+    # The pool is what the opening partitions and what the fifth guess draws
+    # from; the candidates are only what the four are built from.  Letting them
+    # differ is where an index-space slip would live -- a candidate index used
+    # as a pool index names the wrong word and buckets the wrong set -- so the
+    # three-way agreement on LOSING ANSWERS is re-run with candidates that are
+    # NOT in the pool, which is the case the equal-lists version cannot reach.
+    cands = sorted(guesses)
+    ccols = np.array([gpos[w] for w in cands])
+    C = cand_matrix(full, ccols, cols)
+    outside = [w for w in cands if w not in ppos]
+    if not outside:
+        failures.append("the wide candidate list adds nothing outside the pool, "
+                        "so check 6 proved nothing")
+    S_w = split_matrix(C, np.array([p[0] for p in keys]),
+                       np.array([p[1] for p in keys]))
+    ctxw = {"M": C, "S": S_w, "w": w, "nwords": 4, "full": full,
+            "codes": codes, "cols": cols, "ans": ans}
+    stw = {"nodes": 0, "leaves": 0}
+    uw, _, chw = build_opening(ctxw, 2, stw, 100)
+    wordsw = [cands[c] for c in chw]
+    gotw, losersw = harvest(C, M, chw, ans, 2)
+    _, glw, _, _, _ = check_opening(wordsw, gctx)
+    if not (len(losersw) == uw == len(glw)):
+        failures.append("with a wider candidate list the losing answers "
+                        "disagree: harvest %d, search %d, guarantee_sweep %d"
+                        % (len(losersw), uw, len(glw)))
+    if set(pool[i] for i in losersw) != set(glw):
+        failures.append("with a wider candidate list the harvest and "
+                        "guarantee_sweep name DIFFERENT losing answers")
+    used_outside = [x for x in wordsw if x not in ppos]
+    print("wide candidates: %s (unsolved %d), %d of its words outside the pool, "
+          "losing answers agree 3 ways"
+          % (" ".join(wordsw), uw, len(used_outside)))
 
     # --- 5: the SEED is dropped after the first harvest --------------------
     # End to end, through the real main(), because this is a property of the

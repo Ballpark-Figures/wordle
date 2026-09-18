@@ -55,6 +55,23 @@ def pool_matrix(full, cols):
     return np.ascontiguousarray(full[np.ix_(cols, cols)])
 
 
+def cand_matrix(full, cand_cols, pool_cols):
+    """Reply of every CANDIDATE against every POOL word, (ncand, npool).
+
+    THE TWO LISTS HAVE DIFFERENT JOBS AND NEED NOT BE THE SAME (user's call,
+    2026-09-18).  The POOL is what the opening partitions and what the random
+    fifth guess draws from, so it is what "unsolved" is measured over; the
+    CANDIDATES are merely the words the four may be built from, and widening
+    them costs nothing in the objective's meaning.  This is the rectangle that
+    lets them differ -- rows indexed by candidate, columns by pool word.
+
+    Everything scored against a bucket still goes through the POOL-vs-POOL
+    matrix, because a live set is a set of pool words: a candidate outside the
+    pool can SPLIT a bucket but can never BE in one.
+    """
+    return np.ascontiguousarray(full[np.ix_(cand_cols, pool_cols)])
+
+
 def split_matrix(M, ia, ib):
     """`S[c, p]` -- does pool word c separate pair p?
 
@@ -113,15 +130,20 @@ def failing_sets(sub, idx, pos, budget, out):
             failing_sets(s2, idx[keep], p, budget - 1, out)
 
 
-def harvest(M, chosen, ans_pool_idx, budget):
+def harvest(C, Mpool, chosen, ans_pool_idx, budget):
     """The pairs an opening actually fails on: {(i, j) sorted} -> times seen.
 
     Buckets the POOL by the opening's joint reply, then walks each bucket that
     holds an answer.  Returns the losing answers as well, so a caller can check
     them against an independently computed unsolved count rather than trusting
     this walk.
+
+    TWO MATRICES, and they are not interchangeable: `C` is candidate-by-pool and
+    says how the opening SPLITS the pool, while `Mpool` is pool-by-pool and says
+    what the follow-up sees once it is inside a bucket.  The recursion lives
+    entirely in the second, since every word of a live set is a pool word.
     """
-    key = joint_key(M, chosen)
+    key = joint_key(C, chosen)
     order = np.argsort(key, kind="stable")
     skey = key[order]
     pairs, losers = {}, []
@@ -129,7 +151,7 @@ def harvest(M, chosen, ans_pool_idx, budget):
         lo = int(np.searchsorted(skey, akey, "left"))
         hi = int(np.searchsorted(skey, akey, "right"))
         members = order[lo:hi]
-        sub = M[np.ix_(members, members)]
+        sub = Mpool[np.ix_(members, members)]
         where = {int(m): p for p, m in enumerate(members)}
         for a in ans_pool_idx[key[ans_pool_idx] == akey]:
             pos = where[int(a)]

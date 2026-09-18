@@ -55,7 +55,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from build_patterns import load_patterns                                  # noqa: E402
 from greedybuild import score                                             # noqa: E402
 from opening_list import resolve_word_set                                 # noqa: E402
-from paircover import (cover_scores, harvest, joint_key,               # noqa: E402
+from paircover import (cand_matrix, cover_scores, harvest, joint_key,  # noqa: E402
                        last_level_scores, pool_matrix, split_matrix, ssq_of)
 from wordle import load_words, pattern_row, to_codes                      # noqa: E402
 
@@ -66,7 +66,7 @@ ROUND_COLUMNS = "round,opening,unsolved,ssq,harvested,new_pairs,total_pairs,secs
 def parse_args(argv):
     a = {"pool": None, "words": 4, "topk": None, "rounds": None, "cap": 6,
          "seed_from": None, "seed_top": 1000, "out": None, "max_pairs": 0,
-         "show": 8, "final_top": 0}
+         "show": 8, "final_top": 0, "candidates": None}
     i = 0
     while i < len(argv):
         k = argv[i].lstrip("-").replace("-", "_")
@@ -238,11 +238,26 @@ def main(argv):
                          % (len(missing), ", ".join(missing[:5])))
     ppos = {w: i for i, w in enumerate(pool)}
 
+    # THE CANDIDATES ARE A SEPARATE LIST FROM THE POOL.  The pool is what the
+    # opening partitions and what the fifth guess draws from, so it is what
+    # `unsolved` is measured over; the candidates are only the words the four
+    # may be built from.  They default to the pool, which is how this ran before
+    # the split, and they need not contain the answers.
+    cands = pool if a["candidates"] is None else sorted(
+        resolve_word_set(a["candidates"]))
+    bad = [w for w in cands if w not in gpos]
+    if bad:
+        raise SystemExit("--candidates has %d word(s) that are not legal "
+                         "guesses: %s" % (len(bad), ", ".join(bad[:5])))
+
     full = np.array(load_patterns(full=True))
     cols = np.array([gpos[w] for w in pool])
+    ccols = np.array([gpos[w] for w in cands])
     codes = to_codes(pool)
     ans = np.array([ppos[w] for w in answers])
-    M = pool_matrix(full, cols)
+    Mpool = pool_matrix(full, cols)
+    same = cands == pool
+    M = Mpool if same else cand_matrix(full, ccols, cols)
     budget = a["cap"] - a["words"]
 
     pair_path = round_path = None
@@ -262,6 +277,9 @@ def main(argv):
 
     print("pair cover: pool %s (%d)  answers %d  words %d  cap %d (budget %d)"
           % (a["pool"], len(pool), len(answers), a["words"], a["cap"], budget))
+    print("  words    the 4 come from %s (%d)%s"
+          % (a["candidates"] or a["pool"], len(cands),
+             "" if same else "  -- a DIFFERENT list from the pool"))
     print("  search   branch, k=%d -- recurse into the K best coverage choices"
           % a["topk"])
     print("  pairs    %d %s" % (len(pairs), "resumed from %s" % pair_path
@@ -278,7 +296,7 @@ def main(argv):
     rng = np.random.default_rng(0)
     t0 = time.time()
     for _ in range(10):
-        ch = tuple(int(x) for x in rng.integers(len(pool), size=a["words"]))
+        ch = tuple(int(x) for x in rng.integers(len(cands), size=a["words"]))
         score(ch, (full, codes, cols, ans, [M[c] for c in ch]))
     per_leaf = (time.time() - t0) / 10
     states = a["topk"] ** (a["words"] - 1)
@@ -328,13 +346,13 @@ def main(argv):
                "full": full, "codes": codes, "cols": cols, "ans": ans}
         st["nodes"] = st["leaves"] = 0
         uns, ssq, chosen = build_opening(ctx, a["topk"], st, a["final_top"])
-        words = [pool[c] for c in chosen]
+        words = [cands[c] for c in chosen]
         print("  opening  %s" % " ".join(words))
         print("           unsolved %d of %d,  ssq %d   (%d nodes, %d complete, %.0fs)"
               % (uns, len(answers), ssq, st["nodes"], st["leaves"],
                  time.time() - t0))
 
-        got, losers = harvest(M, chosen, ans, budget)
+        got, losers = harvest(M, Mpool, chosen, ans, budget)
         if len(losers) != uns:
             raise SystemExit(
                 "GATE FAILED: the harvest found %d losing answers and the "

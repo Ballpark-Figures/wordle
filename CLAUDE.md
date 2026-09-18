@@ -2708,6 +2708,30 @@ sampling, no seed — so a re-run reproduces the file byte for byte.
 `tools/pair_cover.py` is the driver. Run it with
 **`bash solver/run-pair-cover.sh -k K --rounds N`** (from `math/`), attached,
 tee'd log, `--dry-run`. Exact and deterministic — no sampling, no seed.
+- **THE POOL AND THE CANDIDATES ARE TWO DIFFERENT LISTS** (user's call,
+  2026-09-18). `--pool` is what the opening PARTITIONS and what the random fifth
+  guess DRAWS FROM, so it is what `unsolved` is measured over and it must
+  contain every answer. `--candidates` is only which words the four may be BUILT
+  FROM: it need not contain the answers, need not be the pool, and widening it
+  cannot change what the objective MEANS. It defaults to the pool, which is how
+  this ran before the split, and both are in the filename
+  (`cover_<pool>-from-<candidates>_...`).
+  - **`--candidates guess` is the interesting one**, because the same asymmetry
+    showed up in the quad screens: the all-words L19 quads reached **1** losing
+    answer where the custom-restricted ones bottomed out at **5** over a million
+    openings.
+  - **TWO MATRICES, AND THEY ARE NOT INTERCHANGEABLE.** `cand_matrix` is
+    candidate-by-pool and says how an opening SPLITS the pool; `pool_matrix` is
+    pool-by-pool and says what the follow-up sees once it is INSIDE a bucket.
+    The `harvest` recursion lives entirely in the second, because every word of
+    a live set is a pool word — a candidate outside the pool can split a bucket
+    but can never be in one.
+  - **VERIFIED INERT when the lists match**: with `--candidates custom` against
+    the same pool, round 1 reproduces `chomp fudge blink warts` / 27 unsolved
+    byte for byte. And the gate re-runs the three-way losing-answer agreement
+    with a WIDE candidate list, asserting that it actually used words outside
+    the pool — an index-space slip between the two lists is exactly what that
+    catches, and the equal-lists case cannot reach it.
 - **THE LOOP** (user's, 2026-09-18), one round: score every candidate by the
   WEIGHTED pairs it splits; build an opening of `--words` words, recursing into
   the K best at each step; rank the finished openings by UNSOLVED ANSWERS;

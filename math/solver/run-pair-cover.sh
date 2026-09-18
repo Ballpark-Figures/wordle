@@ -16,6 +16,7 @@ set -u
 MATH=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 
 POOL=custom
+CANDS=
 NWORDS=4
 TOPK=""
 ROUNDS=10
@@ -30,6 +31,7 @@ DRYRUN=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --pool)       POOL="$2";     shift 2 ;;
+        --candidates) CANDS="$2";    shift 2 ;;
         --words)      NWORDS="$2";   shift 2 ;;
         -k|--topk)    TOPK="$2";     shift 2 ;;
         --rounds)     ROUNDS="$2";   shift 2 ;;
@@ -74,7 +76,9 @@ PY=../.venv/bin/python
     echo "or name one with --seed-from FILE" >&2
     exit 1; }
 
-STEM="cover_${POOL}_w${NWORDS}_k${TOPK}_s${SEEDTOP}_f${FINALTOP}"
+STEM="cover_${POOL}"
+[ -z "$CANDS" ] || STEM="${STEM}-from-${CANDS}"
+STEM="${STEM}_w${NWORDS}_k${TOPK}_s${SEEDTOP}_f${FINALTOP}"
 [ "$CAP" = 6 ] || STEM="${STEM}_cap${CAP}"
 OUTDIR=data/shared/paircover
 LOC=data/local/paircover
@@ -83,10 +87,12 @@ OUT="$OUTDIR/$STEM"
 FLAGS="--pool $POOL --words $NWORDS --topk $TOPK --rounds $ROUNDS --cap $CAP"
 FLAGS="$FLAGS --seed-from $SEEDFROM --seed-top $SEEDTOP --show $SHOW"
 FLAGS="$FLAGS --final-top $FINALTOP"
+[ -z "$CANDS" ] || FLAGS="$FLAGS --candidates $CANDS"
 [ "$MAXPAIRS" = 0 ] || FLAGS="$FLAGS --max-pairs $MAXPAIRS"
 
 echo "pair cover"
-echo "  pool       $POOL -- the words it builds from AND the follow-up's pool"
+echo "  pool       $POOL -- what the opening partitions AND what the 5th guess draws"
+echo "  words      the 4 come from ${CANDS:-$POOL}$([ -z "$CANDS" ] && echo " (the pool itself)" || echo " -- a DIFFERENT list")"
 echo "  opening    $NWORDS words, chosen by weighted pair coverage"
 echo "  objective  fewest answers UNSOLVED after the opening and the 5th draw"
 echo "  search     branch, k=$TOPK$([ "$TOPK" = 1 ] && echo " (plain greedy)")"
