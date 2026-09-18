@@ -2760,7 +2760,8 @@ attached, tee'd log, `--dry-run`.
 - **STEEPEST, not first-improvement**: all k positions are scanned before
   moving, so a printed step means "the best move available" rather than "the
   first one found".
-- **THREE SECTIONS, IN ORDER, each run to exhaustion** (user's, 2026-09-18):
+- **THREE SECTIONS, IN ORDER, each run to exhaustion, AND THEN ROUND AGAIN
+  FROM THE FIRST until a WHOLE PASS moves nothing** (user's, 2026-09-18):
   single-word swaps; then PAIR swaps for a pair with the SAME letters; then
   pair swaps for a pair within ONE LETTER of the same letters. Each later
   section can only move where the earlier one is stuck, which is the point —
@@ -2771,6 +2772,22 @@ attached, tee'd log, `--dry-run`.
     after 3 single-word swaps went to **10** and then **8** on two `anagram+1`
     moves. The exact-anagram section found nothing on that trial (`swap 3,
     anagram 0, anagram+1 2`) — within `custom` an exact pair anagram is rare.
+  - **THE LOOP IS WHY THE SECTIONS ARE NOT ENOUGH ON THEIR OWN, and it is a
+    scar.** A pair move REOPENS single-word swaps, so running each section once
+    leaves improvements on the table BY CONSTRUCTION — measured on a real
+    trial, a one-pass climb stopped at `payed tombs flung wreck` / 11 unsolved
+    with `payed -> vapid` (10) sitting one swap away. It also made the per-trial
+    gate below assert something false, and **the fix was the loop, not the
+    check**. A section that moves invalidates every earlier section's "nothing
+    helps", so the only sound stopping rule is a full barren pass.
+  - The `steps` column now leads with `rounds N` and its per-section counts are
+    SUMMED over rounds; every printed move is tagged `r<N>` and its section.
+  - **`climb_all` OWNS the loop** (in `hillclimb.py`, the source of truth) and
+    takes the pair widths as a tuple, so a new section is an extra width rather
+    than an edit to the loop. It also cross-checks each round for free: the
+    swap section re-derives the opening's score with `last_level_scores` and
+    REFUSES to continue if it disagrees with what the pair sections reported
+    through `greedybuild.score` — two implementations, one integer.
   - **COST: ~350 s a trial against ~70 s for swaps alone**, so the pair
     sections are most of the time. The `steps` column records the breakdown per
     section rather than one number, which is what says whether a section is
@@ -2795,9 +2812,13 @@ attached, tee'd log, `--dry-run`.
   both, and that `--workers 1` and `--workers 3` agree trial for trial on the
   opening AND the score.
 - **THE GATE RUNS ON EVERY TRIAL and both halves are free**: the climb must END
-  at a local optimum (the stopping scan is re-checked), and the reported
-  unsolved must equal `guarantee_sweep.check_opening`'s losing count for the
-  same opening — a different implementation reached a different way, at 0.06 s.
+  at a local optimum of the SINGLE-WORD neighbourhood (the stopping scan is
+  re-checked), and the reported unsolved must equal
+  `guarantee_sweep.check_opening`'s losing count for the same opening — a
+  different implementation reached a different way, at 0.06 s. **The first half
+  is a real assertion ONLY BECAUSE the sections loop** — without the loop the
+  last section run is a pair section, so a one-word swap can legitimately be
+  available at the end and the check fires on a correct climb.
   - **IT CAUGHT A REAL DEFECT ON ITS FIRST RUN, and the defect was a LOOSE
     CONTRACT.** `neighbourhood` returned the best swap whether or not it
     improved, so "not None" did not mean "can still improve". The climb compared

@@ -16,12 +16,25 @@ therefore k calls to it, not `k * ncand` separate evaluations.
   MEASURED: a full 4-position scan over the 4282-word custom pool is a few
   seconds, against roughly 12 hours if each candidate were scored on its own.
 
+SECTIONS, AND THE LOOP (the user's, 2026-09-18).  Single-word swaps run to
+exhaustion; then PAIR swaps for two words with the same letters; then pair swaps
+for two words within ONE LETTER of the same letters.  Each widens the
+neighbourhood, so each can only move where the one before it is stuck.  Then it
+STARTS OVER AT THE FIRST SECTION and keeps cycling until a WHOLE PASS through
+all three moves nothing.
+
+  THE LOOP IS NOT TIDINESS, IT IS THE POINT: a pair move REOPENS single-word
+  swaps.  Measured on a real trial, a climb that ran the three sections once
+  stopped at `payed tombs flung wreck` with 11 unsolved -- and a single swap,
+  `payed` to `vapid`, took it to 10.  Running each section once leaves that on
+  the table by construction.
+
 IT IS A LOCAL OPTIMUM, NOT AN OPTIMUM, and the distinction is the whole claim.
-A climb stops where no SINGLE swap helps; two words might have to change
-together to get past it, and this never tries that.  So a result is "the best of
-`--trials` random starts, each climbed to where one-word moves run out" -- never
-"the best opening".  The restarts are the only thing exploring; the climb itself
-is greedy and deterministic given its start.
+The loop stops where no move of ANY of the three kinds helps; three words might
+have to change together to get past it, and nothing here tries that.  So a
+result is "the best of `--trials` random starts, each climbed to where these
+neighbourhoods run out" -- never "the best opening".  The restarts are the only
+thing exploring; every climb is greedy and deterministic given its start.
 
 THE OBJECTIVE IS THE GUARANTEE CONDITION, the same number `greedybuild`,
 `paircover` and `guarantee_sweep` all compute: how many of the 2315 answers can
@@ -81,7 +94,7 @@ def neighbourhood(full, cols, M, words, ans, current, banned_extra=()):
     return best
 
 
-def climb(full, cols, M, words, ans, on_step=None):
+def climb(full, cols, M, words, ans, on_step=None, current=None):
     """Swap the best single word until nothing helps.  Returns the local optimum.
 
     `on_step(step, pos, old, new, uns, ssq)` fires on every accepted swap, which
@@ -92,6 +105,14 @@ def climb(full, cols, M, words, ans, on_step=None):
     prefix = words[:-1]
     uns, ssq = last_level_scores(full, cols, M, prefix, ans)
     cur = (int(uns[words[-1]]), int(ssq[words[-1]]))
+    if current is not None and tuple(current) != cur:
+        # A FREE DIFFERENTIAL, fired once per round by `climb_all` below: the
+        # pair sections price an opening with `greedybuild.score`, this one with
+        # `last_level_scores`.  Two implementations, one integer -- a
+        # disagreement is a real defect and must stop the run, not be averaged.
+        raise SystemExit("hillclimb: last_level_scores scores this opening %s "
+                         "but the section before it reported %s"
+                         % (cur, tuple(current)))
     step = 0
     while True:
         mv = neighbourhood(full, cols, M, words, ans, cur)
@@ -224,3 +245,45 @@ def climb_pairs(score_fn, words, C, by_sig, within, current, on_step=None):
         cur = val
         if on_step:
             on_step(step, old, (x, y), cur[0], cur[1])
+
+
+def climb_all(full, cols, M, ans, score_fn, C, by_sig, words, widths=(0, 1),
+              on_swap=None, on_pair=None):
+    """Every section in turn, ROUND AND ROUND until a whole pass moves nothing.
+
+    Returns `(unsolved, ssq, words, rounds, totals)`, where `totals` is a list
+    of `(label, steps)` in section order SUMMED OVER ROUNDS -- which is the
+    number worth reporting, since it says which neighbourhood earned its time.
+
+    `widths` names the pair sections (0 = exact anagram, 1 = within one letter),
+    so a section is added by extending a tuple rather than by editing the loop.
+
+    THE STOPPING RULE IS A FULL BARREN PASS, not a barren section.  A section
+    that moves invalidates every earlier section's "nothing helps" -- widening
+    the neighbourhood is exactly what lets the narrow ones find something again
+    -- so the only sound place to stop is after all of them fail in a row.
+    """
+    words = [int(w) for w in words]
+    order = ["swap"] + ["anagram" if w == 0 else "anagram+%d" % w
+                        for w in widths]
+    totals = dict.fromkeys(order, 0)
+    uns = ssq = None
+    rounds = 0
+    while True:
+        rounds += 1
+        moved = 0
+        cb = None if on_swap is None else (
+            lambda *a, _r=rounds: on_swap(_r, *a))
+        uns, ssq, words, n = climb(full, cols, M, words, ans, cb,
+                                   current=None if uns is None else (uns, ssq))
+        totals["swap"] += n
+        moved += n
+        for width, label in zip(widths, order[1:]):
+            pb = None if on_pair is None else (
+                lambda *a, _r=rounds, _l=label: on_pair(_r, _l, *a))
+            uns, ssq, words, n = climb_pairs(score_fn, words, C, by_sig, width,
+                                             (uns, ssq), pb)
+            totals[label] += n
+            moved += n
+        if not moved:
+            return uns, ssq, words, rounds, [(l, totals[l]) for l in order]
