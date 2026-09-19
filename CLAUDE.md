@@ -2886,8 +2886,22 @@ attached, tee'd log, `--dry-run`.
     that had stopped correctly. `current` is now a PARAMETER and the function
     returns None when nothing beats it. **One caller compensating for a loose
     contract is how the next caller gets it wrong.**
-- Data under `math/data/shared/hillclimb/` (trials APPEND, so a later seed adds
-  to the same record), log under `data/local/hillclimb/`.
+- Data under `math/data/shared/hillclimb/`, log under `data/local/hillclimb/`.
+  Each (pool, candidates, words, cap, seed) is a different experiment with its
+  own file, and **the SEED IS IN THE FILENAME — advance it for a new batch**,
+  or the same trial INDEXES are replayed and appended a second time.
+- **THE CSV STAMPS ITS SECTIONS (`sections=swap;2x0;2x1;3x0`) AND A MISMATCHED
+  APPEND IS REFUSED** (added 2026-09-18 with `anagram3`). A row's `unsolved` is
+  exact and search-independent — `guarantee_sweep` agrees with it — but a FILE
+  is a record of what a search FINDS, so two searches in one file make it a
+  record of neither. The stamp is `(size, within)` per section, which IS the
+  definition, so it cannot drift from the labels.
+  - **A MISSING `sections=` IS AN OLD FILE, NOT A MATCH**, and is refused with
+    that said explicitly — the same lesson as `parents_complete=`. The two
+    committed seed-0 files (`climb_custom_w4_s0.csv`, 171 trials, and
+    `climb_custom-from-guess_w4_s0.csv`, 82) predate the field and are
+    therefore refused rather than silently extended. **They hold the
+    all-words `calmy pownd verbs fight` at 1 unsolved**, which is worth keeping.
 
 ### `paircover` — cover the hard pairs, harvest the failures, repeat
 `math/paircover.py` states the rule and IS the source of truth;

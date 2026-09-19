@@ -14,9 +14,10 @@
 # Trials are independent and seeded by INDEX, so --workers changes only the
 # order lines appear in -- never the result.
 #
-# Every accepted swap prints.  Each (pool, candidates, words, cap, seed) is a
+# Every accepted move prints.  Each (pool, candidates, words, cap, seed) is a
 # different experiment and gets its own file; trials APPEND, so a second run at
-# a later seed adds to the same record.
+# the SAME seed would repeat trial numbers -- advance --seed for a new batch.
+# A file written by a different SET OF SECTIONS is refused, not appended to.
 set -u
 MATH=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 
@@ -75,7 +76,9 @@ echo "hill climb"
 echo "  pool       $POOL -- what the opening partitions AND what the 5th guess draws"
 echo "  words      the $NWORDS come from ${CANDS:-$POOL}$([ -z "$CANDS" ] && echo " (the pool itself)")"
 echo "  objective  fewest answers UNSOLVED after the opening and the 5th draw"
-echo "  move       swap ONE word; steepest improvement; stop at a local optimum"
+echo "  moves      one word, then anagram PAIRS, then pairs within one letter,"
+echo "             then anagram TRIPLES -- each to exhaustion, then round again"
+echo "             until a whole pass moves nothing.  Steepest within a section."
 echo "  trials     $TRIALS random restarts from seed $SEED"
 echo "  workers    $WORKERS -- whole TRIALS in parallel; each holds its own"
 echo "             168 MB matrix, and the seed is per trial so the RESULT does"

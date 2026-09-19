@@ -47,6 +47,52 @@ COLUMNS = "trial,opening,unsolved,ssq,steps,secs"
 # its time.  Steps are SUMMED over rounds.
 
 
+def sections_stamp():
+    """The SEARCH, as a short canonical string for the CSV's settings line.
+
+    `(size, within)` per section, which IS the definition -- the labels are
+    derived from it -- so the stamp cannot drift from what actually ran.
+    """
+    return ";".join(["swap"] + ["%dx%d" % (size, within)
+                                for _, size, within in SECTIONS])
+
+
+def check_stamp(path):
+    """REFUSE to append to a file written by a DIFFERENT search.
+
+    A row's `unsolved` is exact and search-independent, but a FILE is a record
+    of what the search FINDS, so mixing two searches into one makes it a record
+    of neither.  The greens scar in one sentence: a filename cannot check
+    itself, so the stamp does.
+
+    **A MISSING `sections=` IS AN OLD FILE, NOT A MATCH.**  Every run since the
+    field existed writes it, so absence means the run predates the field -- and
+    reading absence as "fine" is exactly how the two get mixed silently.
+    """
+    want = sections_stamp()
+    with open(path) as fh:
+        for line in fh:
+            if not line.startswith("#"):
+                break
+            if not line.startswith("# settings"):
+                continue
+            got = None
+            for tok in line[len("# settings"):].split():
+                if tok.startswith("sections="):
+                    got = tok[len("sections="):]
+            if got == want:
+                return
+            raise SystemExit(
+                "%s was written by a %s search (sections=%s), and this one is "
+                "sections=%s.\n  A file is a record of what a search FINDS, so "
+                "appending would make it a record of neither.\n  Use a fresh "
+                "--seed (the seed is in the filename), or move that file aside."
+                % (path, "DIFFERENT" if got else "PRE-sections",
+                   got or "<absent>", want))
+    raise SystemExit("%s has no '# settings' line at all -- it was not written "
+                     "by this tool" % path)
+
+
 def parse_args(argv):
     a = {"pool": None, "candidates": None, "words": 4, "trials": None,
          "cap": 6, "seed": 0, "out": None, "workers": 1}
@@ -225,13 +271,16 @@ def main(argv):
     if a["out"]:
         os.makedirs(os.path.dirname(a["out"]) or ".", exist_ok=True)
         fresh = not os.path.exists(a["out"])
+        if not fresh:
+            check_stamp(a["out"])
         fh = open(a["out"], "a")
         if fresh:
             fh.write("# hill climb (see math/hillclimb.py): random starts, "
                      "one-word swaps\n")
-            fh.write("# settings pool=%s candidates=%s words=%d cap=%d seed=%d\n"
+            fh.write("# settings pool=%s candidates=%s words=%d cap=%d "
+                     "seed=%d sections=%s\n"
                      % (a["pool"], a["candidates"] or a["pool"], a["words"],
-                        a["cap"], a["seed"]))
+                        a["cap"], a["seed"], sections_stamp()))
             fh.write(COLUMNS + "\n")
 
     gctx = (full, cols, pool, ans, answers, 2, a["cap"], gpos)
