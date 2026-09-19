@@ -245,6 +245,45 @@ def prefix_buckets(M, prefix, ans_pool_idx, budget=2):
 SMALL_BUCKET = 64
 
 
+# The budget-3 vectorised form is O(s^4) in TIME and O(s^3) in memory, so it
+# needs a tighter ceiling than the budget-2 one.  MEASURED on a real 2-word
+# prefix the parts needing the predicate have mean size 9.9 and a maximum of
+# 136, so almost everything lands well inside this and the tail falls back to
+# the recursion.
+SMALL_BUCKET3 = 32
+
+
+def _unsolved3(sub, flags):
+    """Budget-3 unsolved count for one part, as array ops rather than recursion.
+
+    THE SAME SHAPE AS THE BUDGET-2 FORM, one ply deeper.  Write `P_g` for the
+    words still live after drawing `g` (those replying to `g` as the answer `p`
+    does, `p` itself dropped).  Then
+
+        p is UNSOLVED  iff  some draw `g` leaves an `h` in `P_g` whose own
+                            reply class inside `P_g` still holds someone else
+
+    and "still holds someone else" is a COUNT OF SHARED MEMBERS, which is a
+    matrix product: with `A[g, h] = h is in P_g`, the count for `(g, h)` is
+    `(A @ A.T)[g, h]`.  So the whole two-ply question is one einsum over every
+    answer at once, instead of a Python recursion per answer.
+
+    Dropping `p` from every `P` is what lets the test be `>= 1` rather than
+    `>= 2`: `p` is in every class by construction and is not company.
+
+    `g == p` needs no special case -- drawing the answer wins, and the row for
+    it is empty once `p` is dropped, since a word replies all-green only to
+    itself.  Gated against `guarantee.solved_within`, which states the rule.
+    """
+    n = sub.shape[0]
+    eq = sub[:, :, None] == sub[:, None, :]      # eq[g, h, p]: h is in P_g(p)
+    idx = np.arange(n)
+    eq[:, idx, idx] = False                      # drop p itself from every P
+    shared = np.einsum("gjp,hjp->ghp", eq, eq)   # |P_g ∩ P_h| , p excluded
+    bad = eq & (shared >= 1)
+    return int(bad.any(axis=(0, 1))[flags].sum())
+
+
 def unsolved_in_bucket(sub, flags, budget=2):
     """How many of this bucket's answers are UNSOLVED, in one pass.
 
@@ -266,6 +305,8 @@ def unsolved_in_bucket(sub, flags, budget=2):
     `g != p` leaves any.  The `g == p` diagonal is dropped because drawing the
     answer ends the game -- the same exemption `worst_case` makes.
     """
+    if budget == 3 and sub.shape[0] <= SMALL_BUCKET3:
+        return _unsolved3(sub, flags)
     if budget != 2:
         return sum(1 for p in np.flatnonzero(flags)
                    if not solved_within(sub, int(p), budget))

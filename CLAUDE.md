@@ -2873,14 +2873,29 @@ attached, tee'd log, `--dry-run`.
     least the word drawn. Worth ~15% here; the size bound at the TOP is worth
     far more.
   - **MEASURED COST, AND IT IS THE SWAP SECTION THAT HURTS**: a whole-opening
-    score is 0.01 s at budget 2 and 0.02-0.04 s at budget 3, so the pair and
-    triple sections barely move — but ONE whole-pool pass goes from **0.8 s to
-    141 s**. A 3-word opening fixes only two words, so the live buckets go from
+    score is 0.01 s at budget 2 and 0.02-0.08 s at budget 3, so the pair and
+    triple sections barely move — but ONE whole-pool pass is **0.8 s against
+    73 s**. A 3-word opening fixes only two words, so the live buckets go from
     max 16 to **max 136** (207 buckets holding 2860 pool words, median 8), and
     the candidate-grouping collapse that makes the quad pass cheap stops
-    collapsing. A swap scan is `k` passes, so ~7 minutes, and a trial is tens of
-    minutes against ~6 for a quad. **The outstanding optimisation is a
-    vectorised 2-ply predicate**, mirroring the one-pass budget-2 form.
+    collapsing. A swap scan is `k` passes, so ~3.6 minutes, and a trial is tens
+    of minutes against ~6 for a quad.
+  - **PROFILE FIRST: the cost was the PREDICATE, not the grouping.** Counting
+    rather than guessing gave 20904 distinct candidate partitions and 23406
+    predicate calls at budget 2, against **187568 and 358459** at budget 3 —
+    9x and 15x more — while the grouping and splitting itself is only 2.1 s of
+    the pass. So it is both more calls AND, at 390 us against 34 us, slower
+    ones.
+  - **`_unsolved3` VECTORISES THE TWO-PLY PREDICATE, and it is worth 2x, not the
+    10x first guessed.** Same shape as the budget-2 form one ply deeper: with
+    `A[g, h] = h is still live after drawing g`, the company left for `(g, h)`
+    is `(A @ A.T)[g, h]`, so the whole question is one einsum over every answer
+    at once. 141 s to 73 s. **It stops there because the remaining cost is
+    per-call numpy OVERHEAD across 358459 calls of mean size 9.9**, not
+    arithmetic — beating that needs batching across parts, which is a real
+    rewrite of `last_level_scores`. Gated against `solved_within` on 597 real
+    parts with both outcomes asserted; `SMALL_BUCKET3 = 32` caps the O(s^4)
+    form and the tail falls back to the recursion.
 - **`--workers N` RUNS WHOLE TRIALS IN PARALLEL, and changes NOTHING but the
   order lines appear in.** Trials are seeded by INDEX (`seed + trial`), so the
   result is independent of the worker count — which is what makes the parallel
