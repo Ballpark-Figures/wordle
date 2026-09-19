@@ -2786,10 +2786,11 @@ attached, tee'd log, `--dry-run`.
 - **STEEPEST, not first-improvement**: all k positions are scanned before
   moving, so a printed step means "the best move available" rather than "the
   first one found".
-- **THREE SECTIONS, IN ORDER, each run to exhaustion, AND THEN ROUND AGAIN
+- **FOUR SECTIONS, IN ORDER, each run to exhaustion, AND THEN ROUND AGAIN
   FROM THE FIRST until a WHOLE PASS moves nothing** (user's, 2026-09-18):
   single-word swaps; then PAIR swaps for a pair with the SAME letters; then
-  pair swaps for a pair within ONE LETTER of the same letters. Each later
+  pair swaps for a pair within ONE LETTER of the same letters; then TRIPLE
+  swaps for three words with the same letters. Each later
   section can only move where the earlier one is stuck, which is the point —
   **the survivors of a one-word climb are near-anagram families** (`odder /
   order / rodeo`, `brags / grabs / grass / grays`) and separating those needs
@@ -2808,6 +2809,27 @@ attached, tee'd log, `--dry-run`.
     helps", so the only sound stopping rule is a full barren pass.
   - The `steps` column now leads with `rounds N` and its per-section counts are
     SUMMED over rounds; every printed move is tagged `r<N>` and its section.
+  - **`anagram3` IS CHEAPER THAN `anagram+1`, which the names do not suggest**
+    (measured on custom's 4282, per scan): **372-2160 triple-exact moves
+    against 1680-5775 pair-within-one**, so **1.6-9.4 s against 7.3-25 s** at
+    4.3 ms a score. ENUMERATION is free either way (0.02-0.04 s) — what a
+    section costs is what it SCORES, which is the number to price a new one by.
+  - **Triple-exact CONTAINS pair-exact** (leave one of the three unchanged and
+    the other two are an exact pair anagram), so `anagram` is redundant once
+    `anagram3` exists. It stays because at 9-44 moves it is free and it fires
+    first, which keeps the cheap move cheap.
+  - **ONE GENERATOR AND ONE DESCENT FOR EVERY NON-SWAP SECTION**: `set_moves`
+    (any size, any width) and `climb_moves`. `pair_moves`/`climb_pairs` are the
+    size-2 front ends, kept because that is the shape the gate reads. A new
+    section is a row in `SECTIONS` — `(label, size, within)` — not an edit to
+    the loop.
+  - **THE TARGET MUST STAY int16, AND GETTING THIS WRONG IS SILENT.**
+    `anagram_index` keys on `C[i].tobytes()`, so a target promoted to int64 —
+    which `C[rows].sum(axis=0)` does BY DEFAULT — hashes to a signature nothing
+    matches and the section finds **NOTHING** while still passing every check
+    that only looks at the moves it did emit. `set_moves` adds the rows one at
+    a time for that reason. MUTATION-TESTED: the promotion takes `anagram3`
+    from 398 moves to 0 and is caught by the completeness oracle below.
   - **`climb_all` OWNS the loop** (in `hillclimb.py`, the source of truth) and
     takes the pair widths as a tuple, so a new section is an extra width rather
     than an edit to the loop. It also cross-checks each round for free: the
@@ -2833,10 +2855,21 @@ attached, tee'd log, `--dry-run`.
 - **`python3 tools/checkhillclimb.py` is the GATE**, and it runs on a SMALL
   candidate list so a whole trial is seconds — what it checks does not depend on
   the candidate count, and a gate nobody can afford to run is not a gate. It
-  verifies every pair move's letter relationship FROM THE STRINGS (exact at
-  `within=0`, one substitution at `within=1`), with **coverage asserted** for
-  both, and that `--workers 1` and `--workers 3` agree trial for trial on the
-  opening AND the score.
+  verifies every move's letter relationship FROM THE STRINGS (exact at
+  `within=0`, one substitution at `within=1`, pairs AND triples), with
+  **coverage asserted per section**, and that `--workers 1` and `--workers 3`
+  agree trial for trial on the opening AND the score.
+  - **THE COMPLETENESS ORACLE IS THE OTHER HALF, and it is the one that catches
+    a MISSING move.** The letter check can only fault a move that was emitted;
+    this diffs `set_moves` against a BRUTE FORCE over every tuple of candidates,
+    keeping those whose letters are within the bar — `collections.Counter` over
+    the word STRINGS, no letter matrix, no `near_targets`, no `splits_into`.
+    Exact agreement is required, and **coverage is asserted** because two empty
+    sets agree trivially. Sizes are priced separately (`C(n, 3)` per
+    position-triple), so the triple oracle runs on 100 candidates and the pair
+    ones on 300.
+  - **It iterates `SECTIONS`**, so a section added there is covered by existing
+    rather than by anybody remembering to extend a list in the gate.
 - **THE GATE RUNS ON EVERY TRIAL and both halves are free**: the climb must END
   at a local optimum of the SINGLE-WORD neighbourhood (the stopping scan is
   re-checked), and the reported unsolved must equal

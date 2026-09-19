@@ -18,10 +18,18 @@ therefore k calls to it, not `k * ncand` separate evaluations.
 
 SECTIONS, AND THE LOOP (the user's, 2026-09-18).  Single-word swaps run to
 exhaustion; then PAIR swaps for two words with the same letters; then pair swaps
-for two words within ONE LETTER of the same letters.  Each widens the
-neighbourhood, so each can only move where the one before it is stuck.  Then it
-STARTS OVER AT THE FIRST SECTION and keeps cycling until a WHOLE PASS through
-all three moves nothing.
+for two words within ONE LETTER of the same letters; then TRIPLE swaps for three
+words with the same letters.  Each widens the neighbourhood, so each can only
+move where the one before it is stuck.  Then it STARTS OVER AT THE FIRST SECTION
+and keeps cycling until a WHOLE PASS through every section moves nothing.
+
+  THE TRIPLE SECTION IS CHEAPER THAN THE PAIR-WITHIN-ONE ONE, which is not the
+  order of the names.  MEASURED on custom (4282 candidates), per scan: 372-2160
+  triple-exact moves against 1680-5775 pair-within-one, so 1.6-9.4 s against
+  7.3-25 s at 4.3 ms a score.  Enumeration is 0.02-0.04 s either way -- a
+  section costs what it SCORES.  Note triple-exact CONTAINS pair-exact (leave
+  one of the three unchanged), so that section is redundant once this exists;
+  it stays because at 9-44 moves it is free and it fires first.
 
   THE LOOP IS NOT TIDINESS, IT IS THE POINT: a pair move REOPENS single-word
   swaps.  Measured on a real trial, a climb that ran the three sections once
@@ -46,6 +54,8 @@ the random fifth guess draws from, so it is what `unsolved` counts over and it
 must hold every answer.  The CANDIDATES are only what the k words may be drawn
 from, and need not contain the answers.
 """
+
+import itertools
 
 import numpy as np
 
@@ -196,67 +206,130 @@ def near_targets(target, within):
     return list(seen.values())
 
 
-def pair_moves(C, by_sig, words, within):
-    """Every (i, j, x, y): replace positions i and j with candidates x and y.
+def splits_into(C, by_sig, target, size):
+    """Every unordered SIZE-tuple of DISTINCT candidates totalling `target`.
 
-    Excludes anything that would repeat a word already in the opening, and the
-    identity -- putting the same two words back is not a move.
+    `size == 2` is `splits_of` and delegates to it, so there is one subset scan
+    and one order, not two.  Above that it recurses: fix the smallest member,
+    split the residual into `size - 1`.  **Requiring `rest[0] > x` is what makes
+    each unordered tuple come out ONCE** -- without it a triple appears three
+    times, once per member taking the outer slot -- and it also forces the three
+    to be distinct, so a "triple" can never be one word used twice.
+
+    MEASURED at size 3 on custom's 4282: ~139 subset-candidates per 15-letter
+    target and ~174 triples, 0.01 s per position-triple.  The ENUMERATION is
+    free; what a section costs is SCORING what comes out of it.
     """
-    k = len(words)
-    cur = set(int(w) for w in words)
+    if size == 1:
+        return [(int(y),) for y in by_sig.get(target.tobytes(), ())]
+    if size == 2:
+        return splits_of(C, by_sig, target)
     out = []
-    for i in range(k):
-        for j in range(i + 1, k):
-            keep = cur - {int(words[i]), int(words[j])}
-            target = C[words[i]] + C[words[j]]
-            for t in near_targets(target, within):
-                for x, y in splits_of(C, by_sig, t):
-                    if {x, y} == {int(words[i]), int(words[j])}:
-                        continue
-                    if x in keep or y in keep:
-                        continue
-                    out.append((i, j, x, y))
+    for x in np.flatnonzero((C <= target).all(axis=1)):
+        x = int(x)
+        for rest in splits_into(C, by_sig, target - C[x], size - 1):
+            if rest[0] > x:
+                out.append((x,) + rest)
     return out
 
 
-def climb_pairs(score_fn, words, C, by_sig, within, current, on_step=None):
-    """Swap the best PAIR until nothing helps.  Steepest, as the one-word climb.
+def set_moves(C, by_sig, words, size, within):
+    """Every `(positions, replacements)`: swap `size` words for `size` others.
 
-    `score_fn(words) -> (unsolved, ssq)` is passed in rather than rebuilt here,
-    so this never grows a second copy of the objective.
+    The one generator every non-swap section uses, so the pair and triple
+    sections cannot drift apart in what they exclude -- a word already in the
+    opening (that would shorten it), and the identity, which is not a move.
+
+    **THE TARGET MUST STAY int16.**  `anagram_index` keys on `C[i].tobytes()`,
+    so a target promoted to int64 -- which `C[rows].sum(axis=0)` does by
+    default -- hashes to a signature nothing matches and the section silently
+    finds NOTHING.  Adding the rows one at a time keeps the dtype.
+    """
+    cur = set(int(w) for w in words)
+    out = []
+    for pos in itertools.combinations(range(len(words)), size):
+        old = tuple(int(words[i]) for i in pos)
+        keep = cur - set(old)
+        target = C[old[0]].copy()
+        for w in old[1:]:
+            target = target + C[w]        # NOT .sum(axis=0): see the note above
+        for t in near_targets(target, within):
+            for repl in splits_into(C, by_sig, t, size):
+                if set(repl) == set(old):
+                    continue
+                if any(w in keep for w in repl):
+                    continue
+                out.append((pos, repl))
+    return out
+
+
+def pair_moves(C, by_sig, words, within):
+    """Every (i, j, x, y): replace positions i and j with candidates x and y.
+
+    The size-2 case of `set_moves`, flattened -- kept because it is the shape
+    the gate reads moves in.
+    """
+    return [(pos[0], pos[1], repl[0], repl[1])
+            for pos, repl in set_moves(C, by_sig, words, 2, within)]
+
+
+def climb_moves(score_fn, words, C, by_sig, size, within, current, on_step=None):
+    """Take the best improving SIZE-word move until none helps.  Steepest.
+
+    ONE loop for every multi-word section: a pair section and a triple section
+    differ only in `size`, so they share the descent rather than each carrying a
+    copy of it.  `score_fn(words) -> (unsolved, ssq)` is passed in rather than
+    rebuilt here, so this never grows a second copy of the objective either.
+
+    `on_step(step, old_words, new_words, unsolved, ssq)` gets TUPLES of `size`
+    indices, so a printer handles any section by joining them.
     """
     words = [int(w) for w in words]
     cur = tuple(current)
     step = 0
     while True:
         best = None
-        for i, j, x, y in pair_moves(C, by_sig, words, within):
+        for pos, repl in set_moves(C, by_sig, words, size, within):
             trial = list(words)
-            trial[i], trial[j] = x, y
+            for p, w in zip(pos, repl):
+                trial[p] = w
             val = score_fn(trial)
             if val < cur and (best is None or val < best[0]):
-                best = (val, i, j, x, y)
+                best = (val, pos, repl)
         if best is None:
             return cur[0], cur[1], words, step
         step += 1
-        val, i, j, x, y = best
-        old = (words[i], words[j])
-        words[i], words[j] = x, y
+        val, pos, repl = best
+        old = tuple(words[p] for p in pos)
+        for p, w in zip(pos, repl):
+            words[p] = w
         cur = val
         if on_step:
-            on_step(step, old, (x, y), cur[0], cur[1])
+            on_step(step, old, tuple(repl), cur[0], cur[1])
 
 
-def climb_all(full, cols, M, ans, score_fn, C, by_sig, words, widths=(0, 1),
-              on_swap=None, on_pair=None):
+def climb_pairs(score_fn, words, C, by_sig, within, current, on_step=None):
+    """The size-2 case of `climb_moves`."""
+    return climb_moves(score_fn, words, C, by_sig, 2, within, current, on_step)
+
+
+# THE SECTIONS AFTER THE SWAP, in order: `(label, size, within)`.  Adding one is
+# adding a row here -- the generator and the descent are already size-general --
+# and the ORDER is widest last, so each can only move where the one before it is
+# stuck.  `anagram3` is the user's, 2026-09-18.
+SECTIONS = (("anagram", 2, 0), ("anagram+1", 2, 1), ("anagram3", 3, 0))
+
+
+def climb_all(full, cols, M, ans, score_fn, C, by_sig, words,
+              sections=SECTIONS, on_swap=None, on_move=None):
     """Every section in turn, ROUND AND ROUND until a whole pass moves nothing.
 
     Returns `(unsolved, ssq, words, rounds, totals)`, where `totals` is a list
     of `(label, steps)` in section order SUMMED OVER ROUNDS -- which is the
     number worth reporting, since it says which neighbourhood earned its time.
 
-    `widths` names the pair sections (0 = exact anagram, 1 = within one letter),
-    so a section is added by extending a tuple rather than by editing the loop.
+    `sections` is `(label, size, within)` per section, so one is added by
+    extending `SECTIONS` rather than by editing this loop.
 
     THE STOPPING RULE IS A FULL BARREN PASS, not a barren section.  A section
     that moves invalidates every earlier section's "nothing helps" -- widening
@@ -264,8 +337,7 @@ def climb_all(full, cols, M, ans, score_fn, C, by_sig, words, widths=(0, 1),
     -- so the only sound place to stop is after all of them fail in a row.
     """
     words = [int(w) for w in words]
-    order = ["swap"] + ["anagram" if w == 0 else "anagram+%d" % w
-                        for w in widths]
+    order = ["swap"] + [lab for lab, _, _ in sections]
     totals = dict.fromkeys(order, 0)
     uns = ssq = None
     rounds = 0
@@ -278,11 +350,11 @@ def climb_all(full, cols, M, ans, score_fn, C, by_sig, words, widths=(0, 1),
                                    current=None if uns is None else (uns, ssq))
         totals["swap"] += n
         moved += n
-        for width, label in zip(widths, order[1:]):
-            pb = None if on_pair is None else (
-                lambda *a, _r=rounds, _l=label: on_pair(_r, _l, *a))
-            uns, ssq, words, n = climb_pairs(score_fn, words, C, by_sig, width,
-                                             (uns, ssq), pb)
+        for label, size, within in sections:
+            mb = None if on_move is None else (
+                lambda *a, _r=rounds, _l=label: on_move(_r, _l, *a))
+            uns, ssq, words, n = climb_moves(score_fn, words, C, by_sig, size,
+                                             within, (uns, ssq), mb)
             totals[label] += n
             moved += n
         if not moved:

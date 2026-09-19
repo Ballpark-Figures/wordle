@@ -34,15 +34,15 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from build_patterns import load_patterns                                  # noqa: E402
 from greedybuild import score                                             # noqa: E402
 from guarantee_sweep import check_opening                                 # noqa: E402
-from hillclimb import (anagram_index, climb_all, letter_counts,       # noqa: E402
-                       neighbourhood)
+from hillclimb import (SECTIONS, anagram_index, climb_all,            # noqa: E402
+                       letter_counts, neighbourhood)
 from opening_list import resolve_word_set                                 # noqa: E402
 from paircover import cand_matrix, pool_matrix                            # noqa: E402
 from wordle import load_words, to_codes                                   # noqa: E402
 
 COLUMNS = "trial,opening,unsolved,ssq,steps,secs"
 # `steps` is the round count plus a per-SECTION breakdown ("rounds 3; swap 6,
-# anagram 1, anagram+1 0"), not one number: which neighbourhood actually moved,
+# anagram 1, anagram+1 0, anagram3 2"), not one number: which neighbourhood moved,
 # and how many passes it took to settle, are what say whether a section earns
 # its time.  Steps are SUMMED over rounds.
 
@@ -136,12 +136,15 @@ def _trial(args):
             % (trial, rnd, W["cands"][old], W["cands"][new], uns, ssq,
                time.time() - t0))
 
-    def on_pair(rnd, label, step, old_pair, new_pair, u, q2):
-        say("  trial %-4d r%-2d %-9s %-7s %-7s -> %-7s %-7s   unsolved %5d  "
+    def on_move(rnd, label, step, old_words, new_words, u, q2):
+        # Joined rather than per-slot, because a section may move two words or
+        # three and one printer has to read for both.
+        say("  trial %-4d r%-2d %-9s %-23s -> %-23s   unsolved %5d  "
             "ssq %7d   (%.0fs)"
-            % (trial, rnd, label, W["cands"][old_pair[0]],
-               W["cands"][old_pair[1]], W["cands"][new_pair[0]],
-               W["cands"][new_pair[1]], u, q2, time.time() - t0))
+            % (trial, rnd, label,
+               " ".join(W["cands"][c] for c in old_words),
+               " ".join(W["cands"][c] for c in new_words),
+               u, q2, time.time() - t0))
 
     def score_fn(wl):
         """The objective for a whole opening -- the one in greedybuild."""
@@ -154,7 +157,7 @@ def _trial(args):
     # nothing -- because a pair move reopens single-word swaps.
     uns, ssq, wds, rounds, phases = climb_all(
         W["full"], W["cols"], W["M"], W["ans"], score_fn, W["C"], W["by_sig"],
-        start, on_swap=on_swap, on_pair=on_pair)
+        start, on_swap=on_swap, on_move=on_move)
     names = [W["cands"][c] for c in wds]
     if neighbourhood(W["full"], W["cols"], W["M"], wds, W["ans"],
                      (uns, ssq)) is not None:
@@ -202,10 +205,14 @@ def main(argv):
           % (a["words"], a["candidates"] or a["pool"], len(cands),
              "" if same else "  -- a DIFFERENT list from the pool"))
     print("  trials   %d random restarts, seed %d" % (a["trials"], a["seed"]))
-    print("  sections single-word swaps, then ANAGRAM pair swaps, then pair")
-    print("           swaps within ONE LETTER of an anagram -- each to exhaustion,")
+    print("  sections %s -- each to exhaustion,"
+          % ", ".join(["single-word swaps"]
+                      + ["%s (%d words%s)"
+                         % (lab, size, "" if within == 0
+                            else ", within %d letter" % within)
+                         for lab, size, within in SECTIONS]))
     print("           then ROUND AGAIN from the first until a WHOLE PASS moves")
-    print("           nothing (a pair move reopens single-word swaps)")
+    print("           nothing (a wider move reopens the narrower sections)")
     print("  workers  %d%s" % (a["workers"], "" if a["workers"] > 1 else
                                "  (serial)"))
     if a["workers"] > 1:
