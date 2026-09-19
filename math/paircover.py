@@ -45,7 +45,7 @@ not failures and steer the next round at them.
 
 import numpy as np
 
-from guarantee import worst_case
+from guarantee import solved_within, worst_case
 
 _RADIX = 243
 
@@ -206,8 +206,14 @@ def cover_scores(S, weights, alive, banned):
 # MEASURED on a real 3-word prefix: 386 of 2296 buckets, holding 47% of the pool.
 # ---------------------------------------------------------------------------
 
-def prefix_buckets(M, prefix, ans_pool_idx):
-    """The only buckets a final word can change: size >= 3 and holding an answer.
+def prefix_buckets(M, prefix, ans_pool_idx, budget=2):
+    """The only buckets a final word can change: bigger than `budget`, with an answer.
+
+    **A BUCKET OF `budget` OR FEWER IS ALWAYS SOLVED**, which generalises the
+    bucket-of-two proof above: every wrong draw eliminates at least the word
+    drawn, so `worst_case(S, a) <= |S|`, and a set no bigger than the budget is
+    finished inside it whatever the last word does.  At `budget == 2` that is
+    the "size >= 3" threshold this has always used.
 
     Returns (members, is_answer) per bucket, with members as POOL indices and
     `is_answer` a boolean over them, computed ONCE for a fixed prefix.
@@ -223,7 +229,7 @@ def prefix_buckets(M, prefix, ans_pool_idx):
     cuts = np.flatnonzero(np.r_[True, skey[1:] != skey[:-1], True])
     out = []
     for lo, hi in zip(cuts[:-1], cuts[1:]):
-        if hi - lo < 3:
+        if hi - lo <= budget:
             continue
         members = order[lo:hi]
         flags = is_ans[members]
@@ -239,8 +245,15 @@ def prefix_buckets(M, prefix, ans_pool_idx):
 SMALL_BUCKET = 64
 
 
-def unsolved_in_bucket(sub, flags):
+def unsolved_in_bucket(sub, flags, budget=2):
     """How many of this bucket's answers are UNSOLVED, in one pass.
+
+    **THE ONE PASS IS THE budget == 2 CASE**: "some other live word leaves
+    company behind" is exactly one look-ahead, and no rearrangement of it
+    expresses two.  Any other budget goes to `guarantee.worst_case`, so the rule
+    lives in one place and the fast path stays a specialisation rather than a
+    second definition.  At 2 nothing changed, so every committed quad result is
+    reproducible bit for bit.
 
     `greedybuild.solved_in_bucket` walks the live words and exits as soon as the
     candidate list empties, which is the right shape for a wide bucket.  At the
@@ -253,13 +266,16 @@ def unsolved_in_bucket(sub, flags):
     `g != p` leaves any.  The `g == p` diagonal is dropped because drawing the
     answer ends the game -- the same exemption `worst_case` makes.
     """
+    if budget != 2:
+        return sum(1 for p in np.flatnonzero(flags)
+                   if not solved_within(sub, int(p), budget))
     eq = sub[:, :, None] == sub[:, None, :]
     bad = (eq.sum(axis=2) - 1) > 0
     np.fill_diagonal(bad, False)
     return int(bad[:, flags].any(axis=0).sum())
 
 
-def last_level_unsolved(full, cols, buckets, row):
+def last_level_unsolved(full, cols, buckets, row, budget=2):
     """Unsolved answers for one final word, given the prefix's live buckets.
 
     `row` is that word's reply against every pool word.  Each live bucket is
@@ -273,8 +289,8 @@ def last_level_unsolved(full, cols, buckets, row):
         srep = rep[o]
         cuts = np.flatnonzero(np.r_[True, srep[1:] != srep[:-1], True])
         for lo, hi in zip(cuts[:-1], cuts[1:]):
-            if hi - lo < 3:
-                continue                  # one or two words: solved, proved above
+            if hi - lo <= budget:
+                continue                  # no bigger than the budget: solved
             loc = o[lo:hi]
             fl = flags[loc]
             if not fl.any():
@@ -282,12 +298,13 @@ def last_level_unsolved(full, cols, buckets, row):
             sub_idx = cols[members[loc]]
             sub = full[np.ix_(sub_idx, sub_idx)]
             if hi - lo <= SMALL_BUCKET:
-                uns += unsolved_in_bucket(sub, fl)
+                uns += unsolved_in_bucket(sub, fl, budget)
             else:
                 from greedybuild import solved_in_bucket
                 apos = list(np.flatnonzero(fl))
                 uns += len(apos) - len(solved_in_bucket(full, cols,
-                                                        members[loc], apos))
+                                                        members[loc], apos,
+                                                        budget))
     return uns
 
 
@@ -343,7 +360,7 @@ def _rep_rows(blk):
     return uniq.view(blk.dtype).reshape(len(uniq), blk.shape[1]), inv
 
 
-def last_level_scores(full, cols, M, prefix, ans_pool_idx):
+def last_level_scores(full, cols, M, prefix, ans_pool_idx, budget=2):
     """(unsolved, ssq) for EVERY candidate as the final word, in one pass.
 
     THIS IS THE WHOLE LAST LEVEL AT ONCE, and it is what makes ranking the final
@@ -378,6 +395,8 @@ def last_level_scores(full, cols, M, prefix, ans_pool_idx):
             singles += 1
             continue
         if n == 2:
+            # Sound at EVERY budget >= 2, not just 2: one and two are solved
+            # under any of them, so only the ssq contribution is owed.
             same = M[:, members[0]] == M[:, members[1]]
             ssq += np.where(same, 4, 2)
             continue
@@ -390,11 +409,11 @@ def last_level_scores(full, cols, M, prefix, ans_pool_idx):
             u = s2 = 0
             for loc in _parts(rep):
                 s2 += len(loc) * len(loc)
-                if len(loc) < 3:
-                    continue           # one or two words: solved, proved above
+                if len(loc) <= budget:
+                    continue           # no bigger than the budget: solved
                 fl = flags[loc]
                 if fl.any():
-                    u += unsolved_in_bucket(sub[np.ix_(loc, loc)], fl)
+                    u += unsolved_in_bucket(sub[np.ix_(loc, loc)], fl, budget)
             cu[r], cs[r] = u, s2
         uns += cu[inv]
         ssq += cs[inv]

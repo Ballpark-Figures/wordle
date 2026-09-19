@@ -2844,6 +2844,43 @@ attached, tee'd log, `--dry-run`.
     vectorised over all candidates at once — a Python loop per target is what
     makes the within-one neighbourhood (up to 260 targets per position pair)
     unaffordable.
+- **THE BUDGET IS `cap - words`, WHICH IS WHAT MAKES `--words 3` A DIFFERENT
+  QUESTION RATHER THAN A FLAG** (2026-09-18). Four blind words in a six-guess
+  game leave TWO guesses, and every fast predicate here was written for exactly
+  that: "every live word isolates the answer" IS one look-ahead. Three words
+  leave THREE, so solved means `worst_case(S, a) <= 3`, which no rearrangement
+  of the one-pass form expresses.
+  - **THE GATE CAUGHT THIS RATHER THAN THE TOOL REPORTING A WRONG NUMBER.** Run
+    at `--words 3` before the fix, the climb scored 551 unsolved where
+    `guarantee_sweep` said 214 losing, and the per-trial cross-check refused the
+    trial. Two implementations of one number, and that is the whole reason the
+    cheap one is checked against the slow one every trial.
+  - The budget threads through `greedybuild.solved_in_bucket`,
+    `paircover.unsolved_in_bucket`/`prefix_buckets`/`last_level_scores` and the
+    climb. **At budget 2 the fast paths still run**, so every committed quad
+    result is reproducible bit for bit — VERIFIED on `craps until often fjord`
+    385, `chubs delft grown vampy` 0, `caved forms plunk wight` 3 and
+    `ledge pawns rocky thumb` 1.
+  - **`guarantee.solved_within` IS THE DECISION FORM, AND ASKING FOR THE VALUE
+    INSTEAD WAS THE MISTAKE.** `worst_case` returns the exact number, so it
+    recurses until every branch bottoms out; nothing here ever wanted more than
+    "does it exceed the budget". MEASURED: the exact walk did **not finish in
+    eight minutes** on one whole-pool pass at budget 3, against 141 s for the
+    capped one. Gated as `solved_within(S, a, b) == (worst_case(S, a) <= b)`
+    over 4210 checks on reachable buckets, both outcomes asserted.
+  - **`|S| <= budget` IS AN EARLY EXIT AT EVERY LEVEL, not just the top** — the
+    same bound `prefix_buckets` prunes on, since every wrong draw eliminates at
+    least the word drawn. Worth ~15% here; the size bound at the TOP is worth
+    far more.
+  - **MEASURED COST, AND IT IS THE SWAP SECTION THAT HURTS**: a whole-opening
+    score is 0.01 s at budget 2 and 0.02-0.04 s at budget 3, so the pair and
+    triple sections barely move — but ONE whole-pool pass goes from **0.8 s to
+    141 s**. A 3-word opening fixes only two words, so the live buckets go from
+    max 16 to **max 136** (207 buckets holding 2860 pool words, median 8), and
+    the candidate-grouping collapse that makes the quad pass cheap stops
+    collapsing. A swap scan is `k` passes, so ~7 minutes, and a trial is tens of
+    minutes against ~6 for a quad. **The outstanding optimisation is a
+    vectorised 2-ply predicate**, mirroring the one-pass budget-2 form.
 - **`--workers N` RUNS WHOLE TRIALS IN PARALLEL, and changes NOTHING but the
   order lines appear in.** Trials are seeded by INDEX (`seed + trial`), so the
   result is independent of the worker count — which is what makes the parallel

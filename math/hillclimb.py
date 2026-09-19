@@ -50,9 +50,17 @@ be made to lose, with the follow-up drawing from the pool.  Ties break on ssq,
 the repo's standing second key.
 
 TWO LISTS, AS EVERYWHERE HERE.  The POOL is what the opening partitions and what
-the random fifth guess draws from, so it is what `unsolved` counts over and it
-must hold every answer.  The CANDIDATES are only what the k words may be drawn
-from, and need not contain the answers.
+the random tail draws from, so it is what `unsolved` counts over and it must
+hold every answer.  The CANDIDATES are only what the k words may be drawn from,
+and need not contain the answers.
+
+THE BUDGET IS `cap - words`, NOT 2, and that is the whole difference between a
+quad and a triple.  Four blind words in a six-guess game leave TWO, which is the
+case every fast path here was written for; three blind words leave THREE, and
+"solved" then means `worst_case(S, a) <= 3` rather than the one-look-ahead form.
+It is threaded from the caller rather than assumed, and `guarantee.worst_case`
+states the rule for any budget -- the one-pass predicates stay as the budget-2
+specialisation, so every quad result is reproducible bit for bit.
 """
 
 import itertools
@@ -62,7 +70,8 @@ import numpy as np
 from paircover import last_level_scores   # the one slot-scorer; see the note above
 
 
-def neighbourhood(full, cols, M, words, ans, current, banned_extra=()):
+def neighbourhood(full, cols, M, words, ans, current, banned_extra=(),
+                  budget=2):
     """The best IMPROVING single-word swap, or None if this is a local optimum.
 
     Returns `(unsolved, ssq, position, candidate)` for the best swap over EVERY
@@ -84,7 +93,7 @@ def neighbourhood(full, cols, M, words, ans, current, banned_extra=()):
     best = None
     for i in range(len(words)):
         prefix = [int(w) for j, w in enumerate(words) if j != i]
-        uns, ssq = last_level_scores(full, cols, M, prefix, ans)
+        uns, ssq = last_level_scores(full, cols, M, prefix, ans, budget)
         uns = uns.astype(np.int64)
         big = np.iinfo(np.int32).max
         # A word already in the opening cannot be swapped IN -- that would make
@@ -104,7 +113,7 @@ def neighbourhood(full, cols, M, words, ans, current, banned_extra=()):
     return best
 
 
-def climb(full, cols, M, words, ans, on_step=None, current=None):
+def climb(full, cols, M, words, ans, on_step=None, current=None, budget=2):
     """Swap the best single word until nothing helps.  Returns the local optimum.
 
     `on_step(step, pos, old, new, uns, ssq)` fires on every accepted swap, which
@@ -113,7 +122,7 @@ def climb(full, cols, M, words, ans, on_step=None, current=None):
     """
     words = [int(w) for w in words]
     prefix = words[:-1]
-    uns, ssq = last_level_scores(full, cols, M, prefix, ans)
+    uns, ssq = last_level_scores(full, cols, M, prefix, ans, budget)
     cur = (int(uns[words[-1]]), int(ssq[words[-1]]))
     if current is not None and tuple(current) != cur:
         # A FREE DIFFERENTIAL, fired once per round by `climb_all` below: the
@@ -125,7 +134,7 @@ def climb(full, cols, M, words, ans, on_step=None, current=None):
                          % (cur, tuple(current)))
     step = 0
     while True:
-        mv = neighbourhood(full, cols, M, words, ans, cur)
+        mv = neighbourhood(full, cols, M, words, ans, cur, budget=budget)
         if mv is None:
             return cur[0], cur[1], words, step
         step += 1
@@ -321,7 +330,7 @@ SECTIONS = (("anagram", 2, 0), ("anagram+1", 2, 1), ("anagram3", 3, 0))
 
 
 def climb_all(full, cols, M, ans, score_fn, C, by_sig, words,
-              sections=SECTIONS, on_swap=None, on_move=None):
+              sections=SECTIONS, on_swap=None, on_move=None, budget=2):
     """Every section in turn, ROUND AND ROUND until a whole pass moves nothing.
 
     Returns `(unsolved, ssq, words, rounds, totals)`, where `totals` is a list
@@ -347,7 +356,8 @@ def climb_all(full, cols, M, ans, score_fn, C, by_sig, words,
         cb = None if on_swap is None else (
             lambda *a, _r=rounds: on_swap(_r, *a))
         uns, ssq, words, n = climb(full, cols, M, words, ans, cb,
-                                   current=None if uns is None else (uns, ssq))
+                                   current=None if uns is None else (uns, ssq),
+                                   budget=budget)
         totals["swap"] += n
         moved += n
         for label, size, within in sections:

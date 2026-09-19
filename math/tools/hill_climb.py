@@ -154,8 +154,14 @@ def _init(pool_name, cand_name, words, cap, q):
     M = (pool_matrix(full, cols) if cands == pool else
          cand_matrix(full, np.array([gpos[w] for w in cands]), cols))
     C = letter_counts(cands)
+    # THE BUDGET IS WHAT IS LEFT AFTER THE BLIND OPENING, so it follows --words
+    # and --cap rather than sitting at 2: four words in a six-guess game leave
+    # two, three words leave three.  `check_opening` derives the same thing from
+    # `cap`, and the per-trial gate compares the two, so a mismatch here fails
+    # loudly instead of scoring a different question.
     _W.update(full=full, cols=cols, ans=ans, M=M, cands=cands, words=words,
               q=q, C=C, by_sig=anagram_index(C), codes=to_codes(pool),
+              budget=cap - words,
               gctx=(full, cols, pool, ans, answers, 2, cap, gpos))
 
 
@@ -195,7 +201,8 @@ def _trial(args):
     def score_fn(wl):
         """The objective for a whole opening -- the one in greedybuild."""
         return score(tuple(wl), (W["full"], W["codes"], W["cols"], W["ans"],
-                                 [W["M"][c] for c in wl]))
+                                 [W["M"][c] for c in wl]),
+                     budget=W["budget"])
 
     # THE SECTIONS AND THE LOOP LIVE IN hillclimb.climb_all, which states the
     # rule; this only prints.  Three widening neighbourhoods run in order, each
@@ -203,10 +210,10 @@ def _trial(args):
     # nothing -- because a pair move reopens single-word swaps.
     uns, ssq, wds, rounds, phases = climb_all(
         W["full"], W["cols"], W["M"], W["ans"], score_fn, W["C"], W["by_sig"],
-        start, on_swap=on_swap, on_move=on_move)
+        start, on_swap=on_swap, on_move=on_move, budget=W["budget"])
     names = [W["cands"][c] for c in wds]
     if neighbourhood(W["full"], W["cols"], W["M"], wds, W["ans"],
-                     (uns, ssq)) is not None:
+                     (uns, ssq), budget=W["budget"]) is not None:
         raise SystemExit("GATE FAILED: the climb stopped at %s but a swap "
                          "still improves it" % " ".join(names))
     _, losing, _, _, _ = check_opening(names, W["gctx"])
@@ -245,8 +252,12 @@ def main(argv):
     M = Mpool if same else cand_matrix(
         full, np.array([gpos[w] for w in cands]), cols)
 
-    print("hill climb: pool %s (%d)  answers %d  words %d  cap %d"
-          % (a["pool"], len(pool), len(answers), a["words"], a["cap"]))
+    print("hill climb: pool %s (%d)  answers %d  words %d  cap %d  budget %d"
+          % (a["pool"], len(pool), len(answers), a["words"], a["cap"],
+             a["cap"] - a["words"]))
+    print("  budget   the %d guesses left after the blind opening -- an answer is"
+          % (a["cap"] - a["words"]))
+    print("           SOLVED when the random tail always finishes inside them")
     print("  words    the %d come from %s (%d)%s"
           % (a["words"], a["candidates"] or a["pool"], len(cands),
              "" if same else "  -- a DIFFERENT list from the pool"))

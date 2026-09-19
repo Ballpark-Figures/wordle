@@ -95,6 +95,52 @@ def stop_levels(pool_rows, ans_rows, adapt):
     return level, counts
 
 
+def solved_within(sub_rows, answer_pos, budget):
+    """Is `worst_case(sub_rows, answer_pos) <= budget`?  The DECISION problem.
+
+    THE SAME RULE, ASKED AS A YES/NO, and that is the whole point: `worst_case`
+    computes the exact value, so it recurses until every branch bottoms out at a
+    singleton however deep that is.  Here the recursion stops at `budget`, and
+    one losing draw settles the answer immediately.
+
+    **WHY IT EXISTS: a value is unaffordable where a verdict is cheap.**  With a
+    4-word opening the live sets are tiny (max 16 measured) and the difference
+    does not show.  With THREE words they are not -- measured on `ledge pawns`,
+    207 live buckets holding 2860 pool words with a maximum of 136 -- and the
+    exact walk on a 136-word set did not finish in EIGHT MINUTES for a single
+    whole-pool pass, while the capped one answers in milliseconds.  Nothing here
+    ever needed the value; `unsolved` only ever asked whether it exceeded the
+    budget.
+
+    `budget <= 1` with more than one word left is the early exit that does the
+    work: one guess cannot both separate and name.
+
+    Gated against `worst_case` directly -- `solved_within(S, a, b)` must equal
+    `worst_case(S, a) <= b` for every b -- so the fast form cannot drift from
+    the definition.
+    """
+    n = sub_rows.shape[0]
+    if n <= budget:
+        # `worst_case(S, a) <= |S|`: every wrong draw eliminates at least the
+        # word drawn, so a set no bigger than the budget is always finished
+        # inside it.  The SAME bound `prefix_buckets` prunes on, applied at
+        # every level rather than only the top -- which is most of the speed,
+        # because the parts below the first draw are nearly all small.
+        return True
+    if budget <= 1:
+        return False
+    for g in range(n):
+        if g == answer_pos:
+            continue                       # drawing the answer ends it; see below
+        keep = np.flatnonzero(sub_rows[g] == sub_rows[g][answer_pos])
+        if len(keep) == n:
+            raise AssertionError("a guess failed to eliminate itself")
+        pos = int(np.searchsorted(keep, answer_pos))
+        if not solved_within(sub_rows[np.ix_(keep, keep)], pos, budget - 1):
+            return False                   # one bad draw is enough to lose
+    return True
+
+
 def worst_case(sub_rows, answer_pos):
     """L(S, a) for one small live set, given its own reply sub-matrix.
 

@@ -45,6 +45,8 @@ column that cannot affect a partition.  VERIFIED against `pattern` directly.
 
 import numpy as np
 
+from guarantee import solved_within
+
 from wordle import pattern_row, to_codes
 
 BLANK = "_"
@@ -72,11 +74,18 @@ def joint_key(rows):
     return key
 
 
-def solved_in_bucket(full, cols, members, answer_pos):
-    """Which of this bucket's answers EVERY live word fully splits.
+def solved_in_bucket(full, cols, members, answer_pos, budget=2):
+    """Which of this bucket's answers the follow-up can always finish in `budget`.
 
     `members` are pool indices in the bucket, `answer_pos` their positions
     within it that are answers.  Returns the positions still solved.
+
+    **THE ONE-PASS FORM BELOW IS THE budget == 2 CASE AND ONLY THAT**, because
+    "every live word isolates the answer" is exactly one look-ahead.  A 3-word
+    opening in the same 6-guess game leaves THREE, and that needs the real
+    recursion -- so any other budget goes to `guarantee.worst_case`, which is
+    where the rule is stated once.  At 2 the fast path runs, so every result
+    computed before this parameter existed is bit-identical.
 
     IT WALKS THE LIVE WORDS AND STOPS WHEN NOTHING IS LEFT, which is what makes
     the early steps affordable: a solved answer must be isolated by EVERY `g`,
@@ -84,6 +93,10 @@ def solved_in_bucket(full, cols, members, answer_pos):
     `g` eliminates nearly everything, so the cost is a couple of passes over the
     bucket rather than the |S|^2 the definition reads like.
     """
+    if budget != 2:
+        idx = cols[np.asarray(members)]
+        sub = full[np.ix_(idx, idx)]
+        return [a for a in answer_pos if solved_within(sub, int(a), budget)]
     cand = list(answer_pos)
     for g in range(len(members)):
         if not cand:
@@ -96,7 +109,7 @@ def solved_in_bucket(full, cols, members, answer_pos):
     return cand
 
 
-def score(state, ctx, want_unsolved=True):
+def score(state, ctx, want_unsolved=True, budget=2):
     """(unsolved answers, sum of squared bucket sizes) for a partial opening.
 
     `want_unsolved` False returns `None` for the first field and skips the walk
@@ -125,5 +138,5 @@ def score(state, ctx, want_unsolved=True):
         members = order[starts[b]:ends[b]]
         where = {int(m): p for p, m in enumerate(members)}
         apos = [where[int(i)] for i in ans_pool_idx[abucket == b]]
-        solved += len(solved_in_bucket(full, cols, members, apos))
+        solved += len(solved_in_bucket(full, cols, members, apos, budget))
     return len(ans_pool_idx) - solved, ssq
