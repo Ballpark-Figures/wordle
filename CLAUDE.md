@@ -2785,11 +2785,55 @@ sampling, no seed — so a re-run reproduces the file byte for byte.
 - Data under `math/data/shared/answerpairs/` with a `.meta` sidecar recording
   `scored`/`written`/`complete`, log under `data/local/answerpairs/`.
 
-### `hillclimb` — random 4-word starts, improved by SWAPPING ONE WORD
+### `hillclimb` — random starts, improved by SWAPPING WORDS
 `math/hillclimb.py` states the rule and IS the source of truth;
 `tools/hill_climb.py` is the driver. Run it with
 **`bash solver/run-hill-climb.sh -t N [--candidates L]`** (from `math/`),
 attached, tee'd log, `--dry-run`.
+- **TWO OBJECTIVES, AND THEY ARE DIFFERENT QUANTITIES over the same openings —
+  never put their numbers in one table** (`--objective`, user's call,
+  2026-09-19). **`guarantee`** minimises the answers a random tail can be made
+  to LOSE and wants zero; **`singles`** maximises the answers a reply names
+  OUTRIGHT, which is what `data/shared/singletons/` ranks by. A guaranteed
+  opening need not be singleton-rich, or the reverse.
+  - **THE CLIMB IS OBJECTIVE-AGNOSTIC**: it takes `last_level(prefix)` as an
+    injected callable returning two arrays over the candidates, both MINIMISED
+    lexicographically. `guarantee` passes `(unsolved, ssq)`; `singles` passes
+    **`(-singles, ssq)`**, negated because the climb only knows how to go down,
+    and only the printout and the CSV turn it back the right way up. Nothing in
+    the climb knows which is running, which is what keeps one climb and not two.
+  - **THE OBJECTIVE IS REQUIRED BY THE TOOL AND DEFAULTED ONLY IN THE WRAPPER**
+    (`guarantee`, a default a human reads — the greens scar). It LEADS the
+    filename (`climb_…` keeps the historical name, `singles_…` is the new one,
+    so no committed file is renamed), it is in the `# settings` stamp, **the
+    value column is NAMED after it**, and a run REFUSES a file written under
+    the other one.
+  - **`--cap` APPLIES ONLY TO `guarantee`.** A singleton is a property of the
+    partition with no tail to budget, so the "cap leaves no guesses" refusal is
+    gated on the objective — otherwise a SIX-word opening in a six-guess game,
+    a perfectly ordinary singles question, would be refused.
+  - **`last_level_singles` REPRODUCES THE COMMITTED RANKINGS EXACTLY**, which is
+    the oracle that matters: `laten` 41, `clint soare` 642 / ssq 10115,
+    `blind chapt morse` 1725 / 3343, `bandy chimp fogle wurst` 2210 / 2437 —
+    and each also matches a recount FROM THE STRINGS. Buckets are over the
+    POOL and the count over the ANSWERS, so `--pool mystery` is the classic
+    metric and `--pool custom` asks what `--buckets custom` asks.
+  - **IT IS MUCH CHEAPER THAN `guarantee`** — no budget, no look-ahead, no
+    recursion — so it runs at any opening size where the other does not.
+  - **`singles_of` PRICES ONE OPENING; `last_level_singles` PRICES THE WHOLE
+    POOL. Using the second for the first is a defect, not a slow path**: the
+    pair and triple sections score thousands of moves per scan, and the
+    whole-pool pass costs **21000x** what the single bucketing does (5.0 s
+    against 0.24 ms, measured). Same numbers, verified against both the pass
+    and the committed values.
+  - **A SECTION WIDER THAN THE OPENING IS DROPPED, not run empty** —
+    `anagram3` on a 2-word opening has no position triple to pick, and a
+    totals line claiming it ran would be a lie. The banner filters the same way.
+  - **The per-trial gate is PER OBJECTIVE**, since each needs an oracle sharing
+    no machinery with the fast path: `guarantee` against
+    `guarantee_sweep.check_opening`, `singles` against a recount from the
+    STRINGS that buckets every answer by its tuple of replies with no matrix,
+    no joint key and no candidate grouping (~14000 `pattern` calls, so free).
 - **THE SEARCH** (user's, 2026-09-18): draw `k` random words; repeatedly take
   the single-word swap that lowers UNSOLVED the most; stop when none does; do
   that `-t` times from fresh random draws. Every accepted swap PRINTS, because

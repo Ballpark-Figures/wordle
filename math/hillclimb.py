@@ -68,7 +68,7 @@ import itertools
 import numpy as np
 
 from paircover import (last_level_scores,   # the two slot-scorers; see above
-                       last_level_singles)
+                       last_level_singles, singles_of)
 
 
 def neighbourhood(last_level, words, current, banned_extra=()):
@@ -366,8 +366,8 @@ def singles_objective(M, ans):
         sg, ssq = last_level_singles(M, prefix, ans)
         return -sg.astype(np.int64), ssq
     def score_one(words):
-        sg, ssq = last_level_singles(M, list(words[:-1]), ans)
-        return int(-sg[words[-1]]), int(ssq[words[-1]])
+        sg, ssq = singles_of(M, list(words), ans)
+        return -sg, ssq
     return last_level, score_one
 
 

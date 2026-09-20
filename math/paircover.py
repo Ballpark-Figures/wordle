@@ -90,6 +90,22 @@ def joint_key(M, chosen):
     return key
 
 
+def singles_of(M, chosen, ans_pool_idx):
+    """(singles, ssq) for ONE whole opening -- no last-level pass.
+
+    **THE WHOLE-POOL PASS IS THE WRONG TOOL FOR ONE OPENING**, and reaching for
+    it here would have been a real defect rather than a slow path: the pair and
+    triple sections score thousands of candidate moves per scan, and
+    `last_level_singles` prices every one of the 12972 candidates to answer
+    about a single word.  This buckets once and counts.
+    """
+    key = joint_key(M, chosen)
+    _, inv = np.unique(key, return_inverse=True)
+    sizes = np.bincount(inv)
+    return (int((sizes[inv[ans_pool_idx]] == 1).sum()),
+            int((sizes.astype(np.int64) ** 2).sum()))
+
+
 def ssq_of(key):
     """Sum of squared bucket sizes for a joint key -- the repo's tie-break."""
     _, inv = np.unique(key, return_inverse=True)
