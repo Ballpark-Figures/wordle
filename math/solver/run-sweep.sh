@@ -43,14 +43,16 @@ cd "$MATH" || exit 1
 DEPTH=6          # optturns' own default; the historic sweep's cap
 DEPTHMAX=-1      # -1 means "leave it to the binary", which pins it to DEPTH
 DRYRUN=0
+TOPK=0           # 0 is the exact search; >0 is a one-sided FEASIBILITY SCREEN
 
 while [ $# -gt 0 ]; do
     case "$1" in
         --depth)     DEPTH=$2;    shift 2 ;;
         --depth-max) DEPTHMAX=$2; shift 2 ;;
+        --topk|-k)   TOPK=$2;     shift 2 ;;
         --dry-run)   DRYRUN=1;    shift ;;
         *) echo "unknown arg: $1" >&2
-           echo "usage: bash solver/run-sweep.sh [--depth N] [--depth-max N] [--dry-run]" >&2
+           echo "usage: bash solver/run-sweep.sh [--depth N] [--depth-max N] [-k K] [--dry-run]" >&2
            exit 1 ;;
     esac
 done
@@ -74,12 +76,21 @@ done
 # sweep.log is deliberately NOT stamped -- tools/paths.py hardcodes LOG, so a
 # per-depth log would make report.py read the wrong run.  The CSV and trees are
 # reachable with the overrides paths.py already provides, printed below.
-if [ "$DEPTH" = 6 ] && [ "$DEPTHMAX" = 6 ]; then
+#
+# -k K IS PART OF THE OBJECTIVE, so it joins the stem exactly as every other
+# beamed sweep here does (wturns' optimal_<stem>_d<D>_k<K>.csv, mmturns' one
+# file set per (depth, K)).  Without it a screen and the exact run would share
+# a CSV at the same depth -- and since one holds upper bounds and the other
+# optima, resume would read each as the other's finished work.
+SUF=""
+[ "$DEPTH" = 6 ] && [ "$DEPTHMAX" = 6 ] || SUF="_d$DEPTH"
+[ "$TOPK" -gt 0 ] && SUF="${SUF}_k$TOPK"
+if [ -z "$SUF" ]; then
     OUT="$SHR/opener_totals.csv"
     TRE="$LOC/trees"
 else
-    OUT="$SHR/opener_totals_d$DEPTH.csv"
-    TRE="$LOC/trees_d$DEPTH"
+    OUT="$SHR/opener_totals$SUF.csv"
+    TRE="$LOC/trees$SUF"
 fi
 
 if pgrep -x optturns >/dev/null; then
@@ -97,9 +108,18 @@ if [ "$OUT" = "$SHR/opener_totals.csv" ]; then
     [ -f "$OUT" ] || { echo "no $OUT to resume from" >&2; exit 1; }
 fi
 
-# reuse a table snapshot if present, so we resume warm rather than cold
+# reuse a table snapshot if present, so we resume warm rather than cold.
+#
+# NOT UNDER -k: TOPK is in the TT salt (optturns.c:3149), so every key a beamed
+# run computes differs from every key in the exact tt.bin.  Loading it would
+# spend 24s and 17.18 GB to achieve a 0% hit rate, which reads as "the warm
+# start stopped working" rather than as the salt doing its job.
 WARM=""
-[ -f "$LOC/tt.bin" ] && WARM="--tt-load $LOC/tt.bin"
+if [ "$TOPK" -gt 0 ]; then
+    [ -f "$LOC/tt.bin" ] && echo "note: skipping $LOC/tt.bin -- -k salts the TT, so it could not hit"
+else
+    [ -f "$LOC/tt.bin" ] && WARM="--tt-load $LOC/tt.bin"
+fi
 
 echo "writing  csv:   $MATH/$OUT"
 echo "         trees: $MATH/$TRE"
@@ -108,15 +128,24 @@ if [ "$OUT" != "$SHR/opener_totals.csv" ]; then
     echo "cap PINNED at $DEPTH -- INFEASIBLE is an expected result, not a failure."
     echo "read it with:  WORDLE_CSV=$OUT WORDLE_TREES=$TRE python3 tools/report.py"
 fi
+if [ "$TOPK" -gt 0 ]; then
+    echo "-k $TOPK: ONE-SIDED FEASIBILITY SCREEN."
+    echo "  a row WITH a total   = a strategy was found -> PROVEN solvable in $DEPTH"
+    echo "  INFEASIBLE           = the beam failed -> NO EVIDENCE, needs the exact run"
+    echo "  totals are UPPER BOUNDS, not optima -- do not read them as depth-$DEPTH minima"
+fi
 
 # --dry-run resolves everything and stops BEFORE the solver starts and before
 # anything is appended to sweep.log.  Checking this wrapper's plumbing must not
 # cost a sweep: a partial CSV from a "quick check" is indistinguishable from a
 # real result that died, and the log header would move the run boundary that
 # inflight.py reads.
+KFLAG=""
+[ "$TOPK" -gt 0 ] && KFLAG="--topk $TOPK"
+
 if [ "$DRYRUN" = 1 ]; then
     echo "would run: ./solver/optturns --sweep --out $OUT --trees $TRE" \
-         "--depth $DEPTH --depth-max $DEPTHMAX --tt-bits 29 --threads 20 $WARM"
+         "--depth $DEPTH --depth-max $DEPTHMAX $KFLAG --tt-bits 29 --threads 20 $WARM"
     echo "(--dry-run: nothing started, nothing written)"
     exit 0
 fi
@@ -137,9 +166,12 @@ mkdir -p "$(dirname "$OUT")" "$TRE"
 echo "[$(date +%Y-%m-%dT%H:%M:%S%z)] resuming wordle sweep (depth=$DEPTH..$DEPTHMAX) $WARM" \
     | tee -a "$LOC/sweep.log"
 
+# --trees stays on under -k: a witness tree is what makes "proven feasible"
+# CHECKABLE (tools/checktrees.py replays it) rather than asserted, and one
+# gzip write is nothing beside the search that produced it.
 ./solver/optturns --sweep \
     --out "$OUT" \
     --trees "$TRE" \
-    --depth "$DEPTH" --depth-max "$DEPTHMAX" \
+    --depth "$DEPTH" --depth-max "$DEPTHMAX" $KFLAG \
     --tt-bits 29 --threads 20 $WARM \
     2>&1 | tee -a "$LOC/sweep.log"
