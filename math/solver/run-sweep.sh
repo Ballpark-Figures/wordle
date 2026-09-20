@@ -44,18 +44,26 @@ DEPTH=6          # optturns' own default; the historic sweep's cap
 DEPTHMAX=-1      # -1 means "leave it to the binary", which pins it to DEPTH
 DRYRUN=0
 TOPK=0           # 0 is the exact search; >0 is a one-sided FEASIBILITY SCREEN
+FEAS=0           # decide "can it solve in --depth", exactly, instead of minimising
 
 while [ $# -gt 0 ]; do
     case "$1" in
         --depth)     DEPTH=$2;    shift 2 ;;
         --depth-max) DEPTHMAX=$2; shift 2 ;;
         --topk|-k)   TOPK=$2;     shift 2 ;;
+        --feasible)  FEAS=1;      shift ;;
         --dry-run)   DRYRUN=1;    shift ;;
         *) echo "unknown arg: $1" >&2
-           echo "usage: bash solver/run-sweep.sh [--depth N] [--depth-max N] [-k K] [--dry-run]" >&2
+           echo "usage: bash solver/run-sweep.sh [--depth N] [--depth-max N]" \
+                "[-k K | --feasible] [--dry-run]" >&2
            exit 1 ;;
     esac
 done
+if [ "$FEAS" = 1 ] && [ "$TOPK" -gt 0 ]; then
+    echo "--feasible and -k are two different questions; --feasible is already" >&2
+    echo "exact in both directions, so a beam would only take that away." >&2
+    exit 1
+fi
 [ "$DEPTHMAX" = "-1" ] && DEPTHMAX=$DEPTH
 
 # WHERE THE RESULTS GO, and why a PINNED cap gets its own files.  This is
@@ -85,6 +93,7 @@ done
 SUF=""
 [ "$DEPTH" = 6 ] && [ "$DEPTHMAX" = 6 ] || SUF="_d$DEPTH"
 [ "$TOPK" -gt 0 ] && SUF="${SUF}_k$TOPK"
+[ "$FEAS" = 1 ] && SUF="${SUF}_feas"
 if [ -z "$SUF" ]; then
     OUT="$SHR/opener_totals.csv"
     TRE="$LOC/trees"
@@ -93,7 +102,9 @@ else
     TRE="$LOC/trees$SUF"
 fi
 
-if pgrep -x optturns >/dev/null; then
+# --dry-run starts nothing, so it is exempt: checking the plumbing is most
+# useful precisely while a sweep is live and you are planning the next one.
+if [ "$DRYRUN" = 0 ] && pgrep -x optturns >/dev/null; then
     echo "optturns is already running (pid $(pgrep -x optturns | tr '\n' ' '))." >&2
     echo "Attach to its output instead:  tail -F $MATH/$LOC/sweep.log" >&2
     exit 1
@@ -115,8 +126,8 @@ fi
 # spend 24s and 17.18 GB to achieve a 0% hit rate, which reads as "the warm
 # start stopped working" rather than as the salt doing its job.
 WARM=""
-if [ "$TOPK" -gt 0 ]; then
-    [ -f "$LOC/tt.bin" ] && echo "note: skipping $LOC/tt.bin -- -k salts the TT, so it could not hit"
+if [ "$TOPK" -gt 0 ] || [ "$FEAS" = 1 ]; then
+    [ -f "$LOC/tt.bin" ] && echo "note: skipping $LOC/tt.bin -- this mode salts the TT, so it could not hit"
 else
     [ -f "$LOC/tt.bin" ] && WARM="--tt-load $LOC/tt.bin"
 fi
@@ -127,6 +138,13 @@ echo "         log:   $MATH/$LOC/sweep.log"
 if [ "$OUT" != "$SHR/opener_totals.csv" ]; then
     echo "cap PINNED at $DEPTH -- INFEASIBLE is an expected result, not a failure."
     echo "read it with:  WORDLE_CSV=$OUT WORDLE_TREES=$TRE python3 tools/report.py"
+fi
+if [ "$FEAS" = 1 ]; then
+    echo "--feasible: DECIDING solvable-in-$DEPTH, not minimising. EXACT BOTH WAYS."
+    echo "  a row WITH a total   = solvable in $DEPTH, proven"
+    echo "  INFEASIBLE           = NOT solvable in $DEPTH, proven (every guess tried)"
+    echo "  the total is the FIRST WITNESS found, an UPPER BOUND -- not the optimum"
+    echo "  count the answer with:  awk -F, 'NR>1 && \$2!=\"\"' $OUT | wc -l"
 fi
 if [ "$TOPK" -gt 0 ]; then
     echo "-k $TOPK: ONE-SIDED FEASIBILITY SCREEN."
@@ -142,9 +160,17 @@ fi
 # inflight.py reads.
 KFLAG=""
 [ "$TOPK" -gt 0 ] && KFLAG="--topk $TOPK"
+[ "$FEAS" = 1 ] && KFLAG="--feasible"
+
+# NO TREES under --feasible.  The emitted tree would be the WITNESS strategy,
+# not an optimal one, so filing it beside the depth-6 optimal trees would put
+# two different objects under one name -- and the question here is a yes/no,
+# which the search settles on its own.
+TREEFLAG="--trees $TRE"
+[ "$FEAS" = 1 ] && TREEFLAG=""
 
 if [ "$DRYRUN" = 1 ]; then
-    echo "would run: ./solver/optturns --sweep --out $OUT --trees $TRE" \
+    echo "would run: ./solver/optturns --sweep --out $OUT $TREEFLAG" \
          "--depth $DEPTH --depth-max $DEPTHMAX $KFLAG --tt-bits 29 --threads 20 $WARM"
     echo "(--dry-run: nothing started, nothing written)"
     exit 0
@@ -170,8 +196,7 @@ echo "[$(date +%Y-%m-%dT%H:%M:%S%z)] resuming wordle sweep (depth=$DEPTH..$DEPTH
 # CHECKABLE (tools/checktrees.py replays it) rather than asserted, and one
 # gzip write is nothing beside the search that produced it.
 ./solver/optturns --sweep \
-    --out "$OUT" \
-    --trees "$TRE" \
+    --out "$OUT" $TREEFLAG \
     --depth "$DEPTH" --depth-max "$DEPTHMAX" $KFLAG \
     --tt-bits 29 --threads 20 $WARM \
     2>&1 | tee -a "$LOC/sweep.log"

@@ -308,6 +308,28 @@ static int PHANTOM = 0;
  * always playable in a small state and a tight K degrades the total gracefully
  * rather than manufacturing spurious infeasibility. */
 static int TOPK = 0;
+
+/* --feasible: DECIDE "is this state solvable within d", do not MINIMISE it.
+ *
+ * The recursion, the partition, the bounds and the table are untouched; the
+ * only change is when the guess loop stops.  Minimising must keep going until
+ * no unexplored guess can beat the incumbent (best <= lb0, "provably optimal").
+ * Deciding needs one WITNESS: the first guess that returns anything finite has
+ * exhibited a strategy inside the cap, and nothing later can change the answer
+ * from yes to no.  An INFEASIBLE verdict is still exhaustive -- every guess was
+ * tried and every one failed -- so this is EXACT in both directions, unlike
+ * --topk, which can only ever prove the yes.
+ *
+ * The value it reports is therefore the first witness's total, NOT the minimum:
+ * an UPPER BOUND.  That is why FEAS is in the TT salt.  Within a run the table
+ * is consistent (every probe asks only "< INF"), but an exact run reading these
+ * entries would take a witness total for an optimum, so the two key spaces must
+ * never meet. */
+static int FEAS = 0;
+
+/* Stop the guess loop.  Minimising: nothing left can beat the bound.  Deciding:
+ * a witness exists.  Identical code when FEAS is 0. */
+#define SETTLED(best, lb0)  (FEAS ? (best) < INF : (best) <= (lb0))
 static pat_t   *PAT;             /* NG * NA, row-major: PAT[g*NA + a] */
 static uint64_t ZOB0[MAXA], ZOB1[MAXA];
 static int      ANS2G[MAXA];
@@ -1428,13 +1450,13 @@ static int solve(const uint16_t *S, int n, int d, const Cons *C, Ctx *ctx) {
         int seed = (int)(ssq[0] & 0xFFFFF);
         int v0 = eval_guess(S, n, d, seed, INF, C, ctx);
         if (v0 < best) { best = v0; bestg = seed; }
-        if (best > lb0)
+        if (!SETTLED(best, lb0))
             for (int i = 1; i < K; i++) {
                 if ((int)(ssq[i] >> 20) >= best) break;   /* sorted: none left can win */
                 int g = (int)(ssq[i] & 0xFFFFF);
                 int v = eval_guess(S, n, d, g, best, C, ctx);
                 if (v < best) { best = v; bestg = g; }
-                if (best <= lb0) break;                   /* provably optimal */
+                if (SETTLED(best, lb0)) break;            /* optimal, or a witness */
             }
         long long workk = ctx->nodes - nodes0;
         tt_put(h0, h1, d, best, bestg,
@@ -1447,7 +1469,7 @@ static int solve(const uint16_t *S, int n, int d, const Cons *C, Ctx *ctx) {
     int v0 = eval_guess(S, n, d, bestlb_g, INF, C, ctx);
     if (v0 < best) { best = v0; bestg = bestlb_g; }
 
-    if (best > lb0) {
+    if (!SETTLED(best, lb0)) {
         int64_t *ord = ctx->ord[d];
         int m = 0;
         /* iterate the legal list, not 0..NG: lbg[] was only written for legal
@@ -1464,7 +1486,7 @@ static int solve(const uint16_t *S, int n, int d, const Cons *C, Ctx *ctx) {
             int g = (int)(ord[i] & 0xFFFFF);
             int v = eval_guess(S, n, d, g, best, C, ctx);
             if (v < best) { best = v; bestg = g; }
-            if (best <= lb0) break;                   /* provably optimal */
+            if (SETTLED(best, lb0)) break;            /* optimal, or a witness */
         }
     }
 
@@ -2836,6 +2858,7 @@ int main(int argc, char **argv) {
         }
         else if ((!strcmp(argv[i], "--topk") || !strcmp(argv[i], "-k")) && i + 1 < argc)
             TOPK = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--feasible")) FEAS = 1;
         else { fprintf(stderr, "unknown arg: %s\n", argv[i]); return 1; }
     }
 
@@ -3142,11 +3165,30 @@ int main(int argc, char **argv) {
     if (load_weights(weightsfile)) return 1;
 #endif
 
-    if (guesslist || answerlist || TOPK > 0 || MM) {
+    /* --feasible answers a DECISION question, so anything that reads the value
+     * as a cost is refused rather than quietly given a witness total. */
+    if (FEAS && TOPK > 0) {
+        fprintf(stderr, "--feasible cannot be combined with --topk: --feasible is "
+                "already exact in both directions, and a beam would make its "
+                "INFEASIBLE verdicts meaningless again\n");
+        return 1;
+    }
+    if (FEAS && !depth_set) {
+        fprintf(stderr, "--feasible: --depth is required -- the cap IS the question "
+                "being decided, and inheriting a default would decide a different "
+                "one silently\n");
+        return 1;
+    }
+
+    /* FEAS joins the salt for the same reason TOPK does, and it is the more
+     * dangerous of the two: a decided state stores its WITNESS total, which is
+     * a perfectly plausible number an exact run would read as an optimum. */
+    if (guesslist || answerlist || TOPK > 0 || MM || FEAS) {
         GSALT = 0xCBF29CE484222325ULL
               ^ ((uint64_t)NG * 0xD6E8FEB86659FD93ULL)
               ^ ((uint64_t)NA * 0x9E3779B97F4A7C15ULL)
               ^ ((uint64_t)(unsigned)TOPK * 0xA24BAED4963EE407ULL)
+              ^ ((uint64_t)(unsigned)FEAS * 0xB5026F5AA96619E9ULL)
               ^ ((uint64_t)MM * 0xF1EA5EED7A9C1B4DULL);
         for (int i = 0; i < NG; i++)
             for (int j = 0; GWORD[i][j]; j++)
