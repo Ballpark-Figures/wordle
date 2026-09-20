@@ -101,6 +101,29 @@ loading" for the measurements and the full cross-machine history.
   substitute a detached launch, and do NOT hand-roll the `optturns` command line
   -- both wrappers already carry the right flags, and a bare run that misses
   `sweep.log` makes `report.py`/`inflight.py` report the PREVIOUS run's numbers.
+- **A PINNED CAP IS A DIFFERENT QUANTITY AND GETS ITS OWN FILES:
+  `bash solver/run-sweep.sh --depth 5 --depth-max 5`** (added 2026-09-19, the
+  hard wrapper's rule ported verbatim). `opener_totals_d<D>.csv` +
+  `trees_d<D>`, read with `WORDLE_CSV=`/`WORDLE_TREES=`; depth 6 keeps the
+  historic unsuffixed names, so every earlier run and resume is untouched.
+  - **THE ROUTING IS LOAD-BEARING BECAUSE THE DEPTH-6 SWEEP IS FINISHED.**
+    Resume reads the CSV to skip openers already done, so a pinned run pointed
+    at `opener_totals.csv` would find all 12972 present, skip every one and
+    exit having measured NOTHING — while its trees overwrote the committed
+    depth-6 set. That is why the wrapper needed changing rather than the
+    command line being hand-rolled.
+  - **NORMAL MODE DOES NOT ESCALATE, so `--depth 5` alone already pins it** —
+    `optturns.c`: `if (depthmax < 0) depthmax = HARD ? MAXD - 1 : depth;`.
+    `--depth-max` is accepted and forwarded only so the command reads the same
+    as the hard-mode one. **The BINARY needed no change**: the sweep loop's
+    `INFEASIBLE` path has no hard-mode guard and writes the same `word,,,,secs`
+    rows. INFEASIBLE is an expected result at a pinned cap.
+  - **`--dry-run` resolves everything and stops**, before the solver and before
+    the log header (which would move the run boundary `inflight.py` reads). Use
+    it for every wrapper change here. The `mkdir` sits AFTER it — placed before,
+    it silently created `trees_d5` under a "nothing written" banner.
+  - The GNU-only `date -Is` is fixed here too (`%z`, matching
+    `run-hard-sweep.sh`); `run-ans-sweep.sh` still carries the broken form.
 - `bash ~/bin/resume-jobs.sh` is the UNATTENDED path only: same flags, detached
   via `nohup`, wired to a Windows Scheduled Task so a forced Windows Update
   restart self-recovers. Watch it with `tail -F` on `sweep.log`.
