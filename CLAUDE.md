@@ -29,8 +29,32 @@ loading" for the measurements and the full cross-machine history.
 > missing. The tokens only mean anything when they come from the imports.
 
 ## Script
-- `animations/Script.md` is the video script. Scenes become
-  `scenes/NN<name>.py`. (Fill in this video's script/scene conventions.)
+- **`animations/Script.md` is GENERATED from a Google Doc and is NEVER
+  hand-edited.** The Doc is canonical; `animations/script.source` names it.
+  Regenerate with **`fetch-script.sh`** (from this repo); `/fetch-script` has
+  the detail. An edit made here is destroyed by the next fetch.
+- **RUN `fetch-script.sh` BEFORE STARTING A SCENE, and whenever the user says
+  they have changed the script.** A SessionStart hook refreshes it at the start
+  of a session and reports what changed, so a session cannot BEGIN stale -- but
+  it cannot see the Doc being edited WHILE a session runs, which is exactly when
+  a script changes. That gap is this rule.
+  - **A stale generated file is invisible, which is why this is a rule and not a
+    habit.** It looks identical whether it was fetched a minute or six weeks ago.
+    `hangman/animations/Script.md` was committed ONCE, on 2026-08-08, and never
+    re-exported -- so an agent reading it in September was reading a six-week-old
+    script and had no way to tell. It even concluded the author had stopped
+    numbering scenes, which was false and was a fact about the stale file.
+- **The structure is real, not delimiter-guessing.** Each beat is a
+  `### NN<letter>` heading whose address is the same string `render NN<letter>`
+  takes; voiceover is `> `-quoted (so `grep '^>'` is narration and `grep -v '^>'`
+  is animation direction); each beat names the voiceover section it pairs with,
+  `(cont.)` marking a `--` beat sharing the section above it. A beat with no
+  animation is marked `no subscene` and correctly takes no letter.
+- **A `[FAIL]` from the fetch means Script.md was NOT written and is stale.**
+  The Doc has a delimiter mismatch that makes the pairing unrecoverable. Report
+  the row it names; never "fix" it by editing the generated file.
+- Scenes become `scenes/NN<name>.py`. (Fill in this video's other script/scene
+  conventions.)
 
 ## Math / data
 - `math/data/` holds source data & pipeline outputs; `math/notebooks/` holds
