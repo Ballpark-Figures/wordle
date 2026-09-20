@@ -53,6 +53,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from build_patterns import load_patterns                                  # noqa: E402
+from csvout import fresh_file                                             # noqa: E402
 from greedybuild import score                                             # noqa: E402
 from opening_list import resolve_word_set                                 # noqa: E402
 from paircover import (cand_matrix, cover_scores, harvest, joint_key,  # noqa: E402
@@ -463,7 +464,7 @@ def main(argv):
 
     rh = None
     if round_path:
-        fresh = not os.path.exists(round_path)
+        fresh = fresh_file(round_path)
         rh = open(round_path, "a")
         if fresh:
             rh.write("# pair-cover loop (see math/paircover.py)\n")
@@ -473,6 +474,7 @@ def main(argv):
                         a["topk"], a["cap"], a["search"], a["final_top"],
                         a["pairs_from"] or a["seed_from"]))
             rh.write(ROUND_COLUMNS + "\n")
+            rh.flush()
 
     st = {"nodes": 0, "leaves": 0}
     best_ever = None

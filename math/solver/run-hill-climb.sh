@@ -37,7 +37,7 @@ NWORDS=4
 TRIALS=""
 CAP=6
 SEED=0
-WORKERS=8
+WORKERS=18          # 18 cores here; --workers overrides
 DRYRUN=0
 
 while [ $# -gt 0 ]; do

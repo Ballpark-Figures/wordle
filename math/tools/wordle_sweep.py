@@ -85,6 +85,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from build_patterns import load_patterns  # noqa: E402
+from csvout import fresh_file                                             # noqa: E402
 from wordle import load_words  # noqa: E402
 from wordle_sim import summarise  # noqa: E402
 from secondword import read_table  # noqa: E402
@@ -283,7 +284,7 @@ def main(argv):
     fh = None
     if out:
         os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
-        fresh = not os.path.exists(out)
+        fresh = fresh_file(out)
         fh = open(out, "a")
         if fresh:
             fh.write("# wordle opener sweep: %d trials per word, follow-up %s, "
@@ -334,6 +335,7 @@ def main(argv):
             fh.write("# the head is a SHORTLIST, not a winner -- see the "
                      "winner's-curse note in tools/wordle_sweep.py\n")
             fh.write(COLUMNS + "\n")
+            fh.flush()      # on disk BEFORE any work: see tools/csvout.py
         fh.flush()
 
     print("ranking on %s" % ("WIN RATE" if rank == "win_rate" else "mean guesses"))

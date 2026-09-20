@@ -45,6 +45,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
+from csvout import fresh_file                                             # noqa: E402
 from absurdle import respond, sizes_all  # noqa: E402
 from build_patterns import load_patterns  # noqa: E402
 from wordle import load_words  # noqa: E402
@@ -138,7 +139,7 @@ def run(pat, guesses, answers, out, limit):
         order0 = order0[:limit]
 
     done = load_done(out)
-    fresh = out and not os.path.exists(out)
+    fresh = out and fresh_file(out)
     f = open(out, "a") if out else None
     if f and fresh:
         f.write("# Openers admitting a SHORTEST (4-guess) win against Absurdle.\n")
@@ -151,6 +152,7 @@ def run(pat, guesses, answers, out, limit):
         f.write("# tried against all %d 3rd guesses. One witness per opener.\n" % ng)
         f.write("# Visit order: ascending candidates-left after the opener.\n")
         f.write(COLUMNS + "\n")
+        f.flush()
         f.flush()
 
     memo1, memo2 = {}, {}

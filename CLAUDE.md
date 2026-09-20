@@ -3005,6 +3005,27 @@ attached, tee'd log, `--dry-run`.
     that had stopped correctly. `current` is now a PARAMETER and the function
     returns None when nothing beats it. **One caller compensating for a loose
     contract is how the next caller gets it wrong.**
+- **A KILLED RUN USED TO LEAVE A ZERO-BYTE FILE THAT THEN BLOCKED THE RESTART,
+  and the fix is `tools/csvout.fresh_file`** (2026-09-19). Every tool here
+  writes its header to a BUFFERED handle and flushes only per ROW, so a run
+  killed before its first row finishes leaves an EMPTY file — and the next run
+  sees a file that exists, decides it is not fresh, and refuses. MEASURED: nine
+  of fourteen halted singles runs left an empty file each, and the restart
+  reported them as holding `PRE-objective (so: guarantee)` results when they
+  held nothing at all. **The misleading message was the second half of the bug**:
+  an absent stamp meant "old file" and an empty file has no stamp either.
+  - **TWO RULES, AND EITHER ALONE STILL FAILS**: a header is FLUSHED the moment
+    it is written, and a file that exists but is EMPTY counts as FRESH. The
+    second also repairs every empty file already on disk, with nothing deleted.
+  - **IT WAS NEVER ONE TOOL'S BUG**: the same pattern is in `hill_climb`,
+    `wordle_sweep`, `multiwordle_sweep`, `multiwordle_exact`, `pair_cover`,
+    `absurdle_openers` and `guarantee_sweep`. `fresh_file` is the rule in ONE
+    place; the flush is one line per tool. It is deliberately NOT a whole
+    open-and-write-the-header helper — the seven headers differ in shape and
+    rewriting them all would be a far larger diff for no more safety.
+  - `guarantee_sweep` was already immune to the blocker (it derives freshness
+    from the rows it parsed, not from the file's existence) and took the flush
+    anyway.
 - Data under `math/data/shared/hillclimb/`, log under `data/local/hillclimb/`.
   Each (pool, candidates, words, cap, seed) is a different experiment with its
   own file, and **the SEED IS IN THE FILENAME — advance it for a new batch**,

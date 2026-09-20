@@ -36,6 +36,7 @@ from guarantee_sweep import check_opening                                 # noqa
 from hillclimb import (SECTIONS, anagram_index, climb_all,            # noqa: E402
                        guarantee_objective, letter_counts, neighbourhood,
                        singles_objective)
+from csvout import fresh_file                                             # noqa: E402
 from opening_list import resolve_word_set                                 # noqa: E402
 from paircover import cand_matrix, pool_matrix                            # noqa: E402
 from wordle import load_words, pattern, to_codes                          # noqa: E402
@@ -356,7 +357,7 @@ def main(argv):
     fh = None
     if a["out"]:
         os.makedirs(os.path.dirname(a["out"]) or ".", exist_ok=True)
-        fresh = not os.path.exists(a["out"])
+        fresh = fresh_file(a["out"])
         if not fresh:
             check_stamp(a["out"], a["objective"])
         fh = open(a["out"], "a")
@@ -368,6 +369,7 @@ def main(argv):
                      % (a["objective"], a["pool"], a["candidates"] or a["pool"],
                         a["words"], a["cap"], a["seed"], sections_stamp()))
             fh.write(columns(a["objective"]) + "\n")
+            fh.flush()      # on disk BEFORE any work: see tools/csvout.py
 
     gctx = (full, cols, pool, ans, answers, 2, a["cap"], gpos)
     best_ever = None

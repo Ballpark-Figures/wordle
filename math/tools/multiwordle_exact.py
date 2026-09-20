@@ -55,6 +55,7 @@ import multiwordle_fast as mf                                   # noqa: E402
 from build_patterns import load_patterns                        # noqa: E402
 from multiwordle_race import load_openings, list_name           # noqa: E402
 from multiwordle_sweep import load_done                         # noqa: E402
+from csvout import fresh_file                                             # noqa: E402
 from wordle import load_words                                   # noqa: E402
 
 COLUMNS = "word,answers,total,mean,min,max,is_answer,seconds"
@@ -188,7 +189,7 @@ def main(argv):
     fh = None
     if a["out"]:
         os.makedirs(os.path.dirname(a["out"]) or ".", exist_ok=True)
-        fresh = not os.path.exists(a["out"])
+        fresh = fresh_file(a["out"])
         fh = open(a["out"], "a")
         if fresh:
             fh.write("# multiwordle EXACT expected guesses, %s at k=1\n"
@@ -201,6 +202,7 @@ def main(argv):
                      "and the best row is the best opener rather than a screen\n"
                      % na)
             fh.write(COLUMNS + "\n")
+            fh.flush()
         fh.flush()
     if done:
         print("  resuming: %d openers already in the file" % len(done))

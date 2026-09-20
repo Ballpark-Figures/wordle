@@ -229,6 +229,7 @@ def main(argv):
                      % (a["pool"], a["adapt"], a["cap"], len(field),
                         a["openings_from"] or a["words"]))
             fh.write(COLUMNS + "\n")
+            fh.flush()      # on disk BEFORE any work: see tools/csvout.py
 
     print("guarantee: %d openings of %d words, pool %s (%d), adapt %d, cap %d"
           % (len(field), len(field[0]), a["pool"], len(pool), a["adapt"], a["cap"]))

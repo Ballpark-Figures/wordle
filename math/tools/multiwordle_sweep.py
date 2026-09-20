@@ -55,6 +55,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from build_patterns import load_patterns  # noqa: E402
 from multiwordle import answer_to_guess, draw_answers, play_game  # noqa: E402
 from multiwordle_sim import summarise  # noqa: E402
+from csvout import fresh_file                                             # noqa: E402
 from wordle import load_words  # noqa: E402
 
 COLUMNS = "word,trials,mean,stderr,sd,min,median,max,seconds"
@@ -162,7 +163,7 @@ def main(argv):
     fh = None
     if out:
         os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
-        fresh = not os.path.exists(out)
+        fresh = fresh_file(out)
         fh = open(out, "a")
         if fresh:
             fh.write("# multiwordle opener sweep: %d trials per word at k=%d, "
@@ -175,6 +176,7 @@ def main(argv):
             fh.write("# the head is a SHORTLIST, not a winner -- see the "
                      "winner's-curse note in tools/multiwordle_sweep.py\n")
             fh.write(COLUMNS + "\n")
+            fh.flush()
         fh.flush()
 
     print("sweep: %d words x %d trials at k=%d, seed %d%s"
