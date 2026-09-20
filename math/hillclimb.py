@@ -67,15 +67,23 @@ import itertools
 
 import numpy as np
 
-from paircover import last_level_scores   # the one slot-scorer; see the note above
+from paircover import (last_level_scores,   # the two slot-scorers; see above
+                       last_level_singles)
 
 
-def neighbourhood(full, cols, M, words, ans, current, banned_extra=(),
-                  budget=2):
+def neighbourhood(last_level, words, current, banned_extra=()):
     """The best IMPROVING single-word swap, or None if this is a local optimum.
 
-    Returns `(unsolved, ssq, position, candidate)` for the best swap over EVERY
-    position and EVERY candidate that beats `current`, or None when none does.
+    Returns `(primary, secondary, position, candidate)` for the best swap over
+    EVERY position and EVERY candidate that beats `current`, or None when none
+    does.
+
+    **`last_level(prefix)` IS THE OBJECTIVE, injected rather than hardcoded**:
+    it returns two arrays over the candidates, both MINIMISED lexicographically.
+    The guarantee objective passes `(unsolved, ssq)`; the singleton one passes
+    `(-singles, ssq)`, since more singles is better and the climb only knows how
+    to go down.  Nothing else here knows which is running, which is what keeps
+    one climb rather than two.
 
     `current` IS A PARAMETER RATHER THAN A DERIVED VALUE, and that is the fix
     for a real defect: this used to return the best swap whether or not it
@@ -93,19 +101,19 @@ def neighbourhood(full, cols, M, words, ans, current, banned_extra=(),
     best = None
     for i in range(len(words)):
         prefix = [int(w) for j, w in enumerate(words) if j != i]
-        uns, ssq = last_level_scores(full, cols, M, prefix, ans, budget)
-        uns = uns.astype(np.int64)
+        pri, sec = last_level(prefix)
+        pri = pri.astype(np.int64)
         big = np.iinfo(np.int32).max
         # A word already in the opening cannot be swapped IN -- that would make
         # a k-1 word opening wearing a k-word name.
         for w in prefix:
-            uns[w] = big
+            pri[w] = big
         for w in banned_extra:
-            uns[int(w)] = big
-        c = int(np.lexsort((ssq, uns))[0])
-        if uns[c] >= big:
+            pri[int(w)] = big
+        c = int(np.lexsort((sec, pri))[0])
+        if pri[c] >= big:
             continue
-        cand = (int(uns[c]), int(ssq[c]), i, c)
+        cand = (int(pri[c]), int(sec[c]), i, c)
         if cand[:2] >= tuple(current):
             continue                       # this position offers no improvement
         if best is None or cand[:2] < best[:2]:
@@ -113,7 +121,7 @@ def neighbourhood(full, cols, M, words, ans, current, banned_extra=(),
     return best
 
 
-def climb(full, cols, M, words, ans, on_step=None, current=None, budget=2):
+def climb(last_level, words, on_step=None, current=None):
     """Swap the best single word until nothing helps.  Returns the local optimum.
 
     `on_step(step, pos, old, new, uns, ssq)` fires on every accepted swap, which
@@ -121,20 +129,19 @@ def climb(full, cols, M, words, ans, on_step=None, current=None, budget=2):
     silent and takes seconds.
     """
     words = [int(w) for w in words]
-    prefix = words[:-1]
-    uns, ssq = last_level_scores(full, cols, M, prefix, ans, budget)
-    cur = (int(uns[words[-1]]), int(ssq[words[-1]]))
+    pri, sec = last_level(words[:-1])
+    cur = (int(pri[words[-1]]), int(sec[words[-1]]))
     if current is not None and tuple(current) != cur:
         # A FREE DIFFERENTIAL, fired once per round by `climb_all` below: the
         # pair sections price an opening with `greedybuild.score`, this one with
         # `last_level_scores`.  Two implementations, one integer -- a
         # disagreement is a real defect and must stop the run, not be averaged.
-        raise SystemExit("hillclimb: last_level_scores scores this opening %s "
+        raise SystemExit("hillclimb: the last-level pass scores this opening %s "
                          "but the section before it reported %s"
                          % (cur, tuple(current)))
     step = 0
     while True:
-        mv = neighbourhood(full, cols, M, words, ans, cur, budget=budget)
+        mv = neighbourhood(last_level, words, cur)
         if mv is None:
             return cur[0], cur[1], words, step
         step += 1
@@ -322,6 +329,48 @@ def climb_pairs(score_fn, words, C, by_sig, within, current, on_step=None):
     return climb_moves(score_fn, words, C, by_sig, 2, within, current, on_step)
 
 
+# ---------------------------------------------------------------------------
+# THE TWO OBJECTIVES.  Each returns the pair of callables the climb needs:
+# `last_level(prefix)` over every candidate, and `score_one(words)` for a whole
+# opening -- both giving keys that are MINIMISED lexicographically.
+#
+# They are DIFFERENT QUANTITIES over the same openings and their numbers never
+# share a table.  `guarantee` counts answers the random tail can be made to LOSE
+# and wants it at zero; `singles` counts answers a reply names OUTRIGHT and
+# wants it as large as possible.  A guaranteed opening need not have many
+# singletons, and a singleton-rich one need not be guaranteed.
+# ---------------------------------------------------------------------------
+
+def guarantee_objective(full, cols, M, ans, codes, budget):
+    """Fewest answers the follow-up can be made to lose, ties on ssq."""
+    from greedybuild import score                     # local: avoids a cycle
+    def last_level(prefix):
+        uns, ssq = last_level_scores(full, cols, M, prefix, ans, budget)
+        return uns, ssq
+    def score_one(words):
+        return score(tuple(words), (full, codes, cols, ans, [M[c] for c in words]),
+                     budget=budget)
+    return last_level, score_one
+
+
+def singles_objective(M, ans):
+    """MOST answers alone in their bucket, ties on ssq.
+
+    **NEGATED, because the climb minimises.**  Everything downstream reports
+    `-primary`, so a step that lowers the key raises the singleton count.  It
+    needs no `full`, no codes and no budget -- a singleton is a fact about the
+    partition, with no look-ahead -- which is why this objective is cheap at
+    every opening size where the other is not.
+    """
+    def last_level(prefix):
+        sg, ssq = last_level_singles(M, prefix, ans)
+        return -sg.astype(np.int64), ssq
+    def score_one(words):
+        sg, ssq = last_level_singles(M, list(words[:-1]), ans)
+        return int(-sg[words[-1]]), int(ssq[words[-1]])
+    return last_level, score_one
+
+
 # THE SECTIONS AFTER THE SWAP, in order: `(label, size, within)`.  Adding one is
 # adding a row here -- the generator and the descent are already size-general --
 # and the ORDER is widest last, so each can only move where the one before it is
@@ -329,8 +378,8 @@ def climb_pairs(score_fn, words, C, by_sig, within, current, on_step=None):
 SECTIONS = (("anagram", 2, 0), ("anagram+1", 2, 1), ("anagram3", 3, 0))
 
 
-def climb_all(full, cols, M, ans, score_fn, C, by_sig, words,
-              sections=SECTIONS, on_swap=None, on_move=None, budget=2):
+def climb_all(last_level, score_fn, C, by_sig, words,
+              sections=SECTIONS, on_swap=None, on_move=None):
     """Every section in turn, ROUND AND ROUND until a whole pass moves nothing.
 
     Returns `(unsolved, ssq, words, rounds, totals)`, where `totals` is a list
@@ -346,6 +395,10 @@ def climb_all(full, cols, M, ans, score_fn, C, by_sig, words,
     -- so the only sound place to stop is after all of them fail in a row.
     """
     words = [int(w) for w in words]
+    # A section that would move more words than the opening HAS is dropped
+    # rather than run empty: `anagram3` on a 2-word opening has no position
+    # triple to pick, and a totals line claiming it ran would be a lie.
+    sections = [t for t in sections if t[1] <= len(words)]
     order = ["swap"] + [lab for lab, _, _ in sections]
     totals = dict.fromkeys(order, 0)
     uns = ssq = None
@@ -355,9 +408,8 @@ def climb_all(full, cols, M, ans, score_fn, C, by_sig, words,
         moved = 0
         cb = None if on_swap is None else (
             lambda *a, _r=rounds: on_swap(_r, *a))
-        uns, ssq, words, n = climb(full, cols, M, words, ans, cb,
-                                   current=None if uns is None else (uns, ssq),
-                                   budget=budget)
+        uns, ssq, words, n = climb(last_level, words, cb,
+                                   current=None if uns is None else (uns, ssq))
         totals["swap"] += n
         moved += n
         for label, size, within in sections:

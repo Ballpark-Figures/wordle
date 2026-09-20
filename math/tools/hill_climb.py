@@ -32,19 +32,41 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from build_patterns import load_patterns                                  # noqa: E402
-from greedybuild import score                                             # noqa: E402
 from guarantee_sweep import check_opening                                 # noqa: E402
 from hillclimb import (SECTIONS, anagram_index, climb_all,            # noqa: E402
-                       letter_counts, neighbourhood)
+                       guarantee_objective, letter_counts, neighbourhood,
+                       singles_objective)
 from opening_list import resolve_word_set                                 # noqa: E402
 from paircover import cand_matrix, pool_matrix                            # noqa: E402
-from wordle import load_words, to_codes                                   # noqa: E402
+from wordle import load_words, pattern, to_codes                          # noqa: E402
 
-COLUMNS = "trial,opening,unsolved,ssq,steps,secs"
+# THE VALUE COLUMN IS NAMED AFTER THE OBJECTIVE, so a file can never be read as
+# the other one's -- the same reason the race names its column after its ranking.
+# `sign` turns the climb's MINIMISED key back into the reported number.
+OBJECTIVES = {"guarantee": ("unsolved", 1), "singles": ("singles", -1)}
+
+
+def columns(objective):
+    return "trial,opening,%s,ssq,steps,secs" % OBJECTIVES[objective][0]
 # `steps` is the round count plus a per-SECTION breakdown ("rounds 3; swap 6,
 # anagram 1, anagram+1 0, anagram3 2"), not one number: which neighbourhood moved,
 # and how many passes it took to settle, are what say whether a section earns
 # its time.  Steps are SUMMED over rounds.
+
+
+def stamp_field(path, field):
+    """One `# settings` value from a CSV, or None when the file predates it."""
+    with open(path) as fh:
+        for line in fh:
+            if not line.startswith("#"):
+                return None
+            if not line.startswith("# settings"):
+                continue
+            for tok in line[len("# settings"):].split():
+                if tok.startswith(field + "="):
+                    return tok[len(field) + 1:]
+            return None
+    return None
 
 
 def sections_stamp():
@@ -57,7 +79,7 @@ def sections_stamp():
                                 for _, size, within in SECTIONS])
 
 
-def check_stamp(path):
+def check_stamp(path, objective):
     """REFUSE to append to a file written by a DIFFERENT search.
 
     A row's `unsolved` is exact and search-independent, but a FILE is a record
@@ -69,6 +91,16 @@ def check_stamp(path):
     field existed writes it, so absence means the run predates the field -- and
     reading absence as "fine" is exactly how the two get mixed silently.
     """
+    got_obj = stamp_field(path, "objective")
+    if got_obj != objective:
+        # A file holds one objective's results or the other's; the value column
+        # is even NAMED after it.  Absence means the file predates the field,
+        # which for this tool means guarantee -- said, not assumed.
+        raise SystemExit(
+            "%s holds %s results and this run is %s.\n  They are different "
+            "quantities over the same openings and must not share a file.\n"
+            "  Use a fresh --seed, or move that file aside."
+            % (path, got_obj or "PRE-objective (so: guarantee)", objective))
     want = sections_stamp()
     with open(path) as fh:
         for line in fh:
@@ -95,7 +127,7 @@ def check_stamp(path):
 
 def parse_args(argv):
     a = {"pool": None, "candidates": None, "words": 4, "trials": None,
-         "cap": 6, "seed": 0, "out": None, "workers": 1}
+         "cap": 6, "seed": 0, "out": None, "workers": 1, "objective": None}
     i = 0
     while i < len(argv):
         k = argv[i].lstrip("-").replace("-", "_")
@@ -110,14 +142,23 @@ def parse_args(argv):
         v = argv[i + 1]
         a[k] = (int(v) if k in ("words", "trials", "cap", "seed", "workers")
                 else v)
+        if k == "objective" and a[k] not in OBJECTIVES:
+            raise SystemExit("--objective must be one of: %s"
+                             % ", ".join(sorted(OBJECTIVES)))
         i += 2
-    for req in ("pool", "trials"):
+    for req in ("pool", "trials", "objective"):
         if a[req] is None:
+            # The objective is a domain ANSWER, not configuration, so it is
+            # never defaulted here -- the WRAPPER carries a default a human
+            # reads and forwards it explicitly.  (The greens scar.)
             raise SystemExit("--%s is required" % req)
     if a["out"] is None:
         raise SystemExit("--out is required (or --no-out).  Use the wrapper: "
                          "bash solver/run-hill-climb.sh")
-    if a["cap"] - a["words"] < 1:
+    if a["objective"] == "guarantee" and a["cap"] - a["words"] < 1:
+        # Only the guarantee objective has a tail to budget.  A singleton is a
+        # property of the partition, so a 6-word opening in a 6-guess game is a
+        # perfectly ordinary question there and must not be refused.
         raise SystemExit("--cap %d leaves no guesses after %d words"
                          % (a["cap"], a["words"]))
     return a
@@ -142,7 +183,7 @@ def parse_args(argv):
 _W = {}
 
 
-def _init(pool_name, cand_name, words, cap, q):
+def _init(pool_name, cand_name, words, cap, q, objective):
     guesses, answers = load_words("guess"), load_words("mystery")
     pool = sorted(resolve_word_set(pool_name))
     gpos = {w: i for i, w in enumerate(guesses)}
@@ -159,9 +200,16 @@ def _init(pool_name, cand_name, words, cap, q):
     # two, three words leave three.  `check_opening` derives the same thing from
     # `cap`, and the per-trial gate compares the two, so a mismatch here fails
     # loudly instead of scoring a different question.
+    codes = to_codes(pool)
+    if objective == "guarantee":
+        last_level, score_fn = guarantee_objective(full, cols, M, ans, codes,
+                                                   cap - words)
+    else:
+        last_level, score_fn = singles_objective(M, ans)
     _W.update(full=full, cols=cols, ans=ans, M=M, cands=cands, words=words,
-              q=q, C=C, by_sig=anagram_index(C), codes=to_codes(pool),
-              budget=cap - words,
+              q=q, C=C, by_sig=anagram_index(C), codes=codes, pool=pool,
+              answers=answers, objective=objective, budget=cap - words,
+              last_level=last_level, score_fn=score_fn,
               gctx=(full, cols, pool, ans, answers, 2, cap, gpos))
 
 
@@ -182,45 +230,61 @@ def _trial(args):
     say("trial %d   start %s"
         % (trial, " ".join(W["cands"][c] for c in start)))
 
-    def on_swap(rnd, step, pos, old, new, uns, ssq):
-        say("  trial %-4d r%-2d swap      %-7s -> %-7s   unsolved %5d  "
-            "ssq %7d   (%.0fs)"
-            % (trial, rnd, W["cands"][old], W["cands"][new], uns, ssq,
-               time.time() - t0))
+    vname, sign = OBJECTIVES[W["objective"]]
 
-    def on_move(rnd, label, step, old_words, new_words, u, q2):
+    def on_swap(rnd, step, pos, old, new, key, ssq):
+        # `sign * key` is the number a human reads: the climb minimises, so the
+        # singleton objective carries a negated key internally and only the
+        # printout and the CSV turn it back the right way up.
+        say("  trial %-4d r%-2d swap      %-7s -> %-7s   %s %5d  "
+            "ssq %7d   (%.0fs)"
+            % (trial, rnd, W["cands"][old], W["cands"][new], vname,
+               sign * key, ssq, time.time() - t0))
+
+    def on_move(rnd, label, step, old_words, new_words, key, q2):
         # Joined rather than per-slot, because a section may move two words or
         # three and one printer has to read for both.
-        say("  trial %-4d r%-2d %-9s %-23s -> %-23s   unsolved %5d  "
+        say("  trial %-4d r%-2d %-9s %-23s -> %-23s   %s %5d  "
             "ssq %7d   (%.0fs)"
             % (trial, rnd, label,
                " ".join(W["cands"][c] for c in old_words),
                " ".join(W["cands"][c] for c in new_words),
-               u, q2, time.time() - t0))
-
-    def score_fn(wl):
-        """The objective for a whole opening -- the one in greedybuild."""
-        return score(tuple(wl), (W["full"], W["codes"], W["cols"], W["ans"],
-                                 [W["M"][c] for c in wl]),
-                     budget=W["budget"])
+               vname, sign * key, q2, time.time() - t0))
 
     # THE SECTIONS AND THE LOOP LIVE IN hillclimb.climb_all, which states the
     # rule; this only prints.  Three widening neighbourhoods run in order, each
     # to exhaustion, and then the whole pass repeats until an entire pass moves
     # nothing -- because a pair move reopens single-word swaps.
     uns, ssq, wds, rounds, phases = climb_all(
-        W["full"], W["cols"], W["M"], W["ans"], score_fn, W["C"], W["by_sig"],
-        start, on_swap=on_swap, on_move=on_move, budget=W["budget"])
+        W["last_level"], W["score_fn"], W["C"], W["by_sig"],
+        start, on_swap=on_swap, on_move=on_move)
     names = [W["cands"][c] for c in wds]
-    if neighbourhood(W["full"], W["cols"], W["M"], wds, W["ans"],
-                     (uns, ssq), budget=W["budget"]) is not None:
+    if neighbourhood(W["last_level"], wds, (uns, ssq)) is not None:
         raise SystemExit("GATE FAILED: the climb stopped at %s but a swap "
                          "still improves it" % " ".join(names))
-    _, losing, _, _, _ = check_opening(names, W["gctx"])
-    if len(losing) != uns:
-        raise SystemExit("GATE FAILED: %s scores %d unsolved here and %d "
-                         "losing in guarantee_sweep"
-                         % (" ".join(names), uns, len(losing)))
+    # THE SECOND HALF OF THE GATE IS PER OBJECTIVE, because the two measure
+    # different things and each needs an oracle that shares no machinery with
+    # the fast path it checks.
+    if W["objective"] == "guarantee":
+        _, losing, _, _, _ = check_opening(names, W["gctx"])
+        if len(losing) != uns:
+            raise SystemExit("GATE FAILED: %s scores %d unsolved here and %d "
+                             "losing in guarantee_sweep"
+                             % (" ".join(names), uns, len(losing)))
+    else:
+        # Recount the singletons FROM THE STRINGS: bucket every answer by its
+        # tuple of replies, with no matrix, no joint key and no candidate
+        # grouping.  ~14000 pattern calls, so it costs nothing per trial.
+        got = {}
+        for aw in W["answers"]:
+            got.setdefault(tuple(pattern(g, aw) for g in names), 0)
+            got[tuple(pattern(g, aw) for g in names)] += 1
+        n_single = sum(1 for v in got.values() if v == 1)
+        n_ssq = sum(v * v for v in got.values())
+        if (n_single, n_ssq) != (-uns, ssq):
+            raise SystemExit("GATE FAILED: %s scores %d singles / ssq %d here "
+                             "and %d / %d recounted from the strings"
+                             % (" ".join(names), -uns, ssq, n_single, n_ssq))
     return (trial, names, uns, ssq,
             "rounds %d; " % rounds
             + ", ".join("%s %d" % (l, n) for l, n in phases),
@@ -252,22 +316,33 @@ def main(argv):
     M = Mpool if same else cand_matrix(
         full, np.array([gpos[w] for w in cands]), cols)
 
-    print("hill climb: pool %s (%d)  answers %d  words %d  cap %d  budget %d"
-          % (a["pool"], len(pool), len(answers), a["words"], a["cap"],
-             a["cap"] - a["words"]))
-    print("  budget   the %d guesses left after the blind opening -- an answer is"
-          % (a["cap"] - a["words"]))
-    print("           SOLVED when the random tail always finishes inside them")
+    vname, sign = OBJECTIVES[a["objective"]]
+    print("hill climb: pool %s (%d)  answers %d  words %d  objective %s"
+          % (a["pool"], len(pool), len(answers), a["words"], a["objective"]))
+    if a["objective"] == "guarantee":
+        print("  objective FEWEST answers the random tail can be made to LOSE,")
+        print("           with the %d guesses left after the blind opening"
+              % (a["cap"] - a["words"]))
+    else:
+        print("  objective MOST answers alone in their bucket -- a reply that")
+        print("           names the word outright.  No tail, so no budget and")
+        print("           --cap is not used.  Buckets are over the POOL, so")
+        print("           --pool mystery is the classic singletons metric.")
+    print("  ties     ascending ssq, the standing second key")
     print("  words    the %d come from %s (%d)%s"
           % (a["words"], a["candidates"] or a["pool"], len(cands),
              "" if same else "  -- a DIFFERENT list from the pool"))
     print("  trials   %d random restarts, seed %d" % (a["trials"], a["seed"]))
+    print("  ---")
+    # Filtered by the opening SIZE, exactly as climb_all filters it: naming a
+    # section here that cannot run there would be the banner lying.
     print("  sections %s -- each to exhaustion,"
           % ", ".join(["single-word swaps"]
                       + ["%s (%d words%s)"
                          % (lab, size, "" if within == 0
                             else ", within %d letter" % within)
-                         for lab, size, within in SECTIONS]))
+                         for lab, size, within in SECTIONS
+                         if size <= a["words"]]))
     print("           then ROUND AGAIN from the first until a WHOLE PASS moves")
     print("           nothing (a wider move reopens the narrower sections)")
     print("  workers  %d%s" % (a["workers"], "" if a["workers"] > 1 else
@@ -283,41 +358,48 @@ def main(argv):
         os.makedirs(os.path.dirname(a["out"]) or ".", exist_ok=True)
         fresh = not os.path.exists(a["out"])
         if not fresh:
-            check_stamp(a["out"])
+            check_stamp(a["out"], a["objective"])
         fh = open(a["out"], "a")
         if fresh:
             fh.write("# hill climb (see math/hillclimb.py): random starts, "
-                     "one-word swaps\n")
-            fh.write("# settings pool=%s candidates=%s words=%d cap=%d "
-                     "seed=%d sections=%s\n"
-                     % (a["pool"], a["candidates"] or a["pool"], a["words"],
-                        a["cap"], a["seed"], sections_stamp()))
-            fh.write(COLUMNS + "\n")
+                     "widening swaps\n")
+            fh.write("# settings objective=%s pool=%s candidates=%s words=%d "
+                     "cap=%d seed=%d sections=%s\n"
+                     % (a["objective"], a["pool"], a["candidates"] or a["pool"],
+                        a["words"], a["cap"], a["seed"], sections_stamp()))
+            fh.write(columns(a["objective"]) + "\n")
 
     gctx = (full, cols, pool, ans, answers, 2, a["cap"], gpos)
     best_ever = None
     t_all = time.time()
 
-    def record(trial, names, uns, ssq, steps, secs):
-        """One finished trial: report it, rank it, write it."""
+    def record(trial, names, key, ssq, steps, secs):
+        """One finished trial: report it, rank it, write it.
+
+        `key` is the climb's MINIMISED primary; `sign * key` is the number a
+        human reads, which for singletons is the negation.  The comparison stays
+        on the key, so "better" means the same thing in both objectives.
+        """
         nonlocal best_ever
-        print("  trial %-4d done [%s]: %s   unsolved %d  ssq %d  (%.0fs)"
-              % (trial, steps, " ".join(names), uns, ssq, secs), flush=True)
-        if best_ever is None or (uns, ssq) < best_ever[:2]:
-            best_ever = (uns, ssq, names, trial)
+        print("  trial %-4d done [%s]: %s   %s %d  ssq %d  (%.0fs)"
+              % (trial, steps, " ".join(names), vname, sign * key, ssq, secs),
+              flush=True)
+        if best_ever is None or (key, ssq) < best_ever[:2]:
+            best_ever = (key, ssq, names, trial)
             print("  NEW BEST across trials", flush=True)
         else:
-            print("  best so far: trial %d, unsolved %d (%s)"
-                  % (best_ever[3], best_ever[0], " ".join(best_ever[2])),
-                  flush=True)
+            print("  best so far: trial %d, %s %d (%s)"
+                  % (best_ever[3], vname, sign * best_ever[0],
+                     " ".join(best_ever[2])), flush=True)
         if fh:
             fh.write("%d,%s,%d,%d,%s,%.1f\n"
-                     % (trial, " ".join(names), uns, ssq,
+                     % (trial, " ".join(names), sign * key, ssq,
                         steps.replace(",", ";"), secs))
             fh.flush()
 
     if a["workers"] <= 1:
-        _init(a["pool"], a["candidates"], a["words"], a["cap"], None)
+        _init(a["pool"], a["candidates"], a["words"], a["cap"], None,
+              a["objective"])
         for trial in range(1, a["trials"] + 1):
             print("", flush=True)
             record(*_trial((trial, a["seed"])))
@@ -330,7 +412,8 @@ def main(argv):
         q = mgr.Queue()
         with ProcessPoolExecutor(max_workers=a["workers"], initializer=_init,
                                  initargs=(a["pool"], a["candidates"],
-                                           a["words"], a["cap"], q)) as ex:
+                                           a["words"], a["cap"], q,
+                                           a["objective"])) as ex:
             pending = {ex.submit(_trial, (t, a["seed"]))
                        for t in range(1, a["trials"] + 1)}
             while pending:
@@ -350,9 +433,9 @@ def main(argv):
                     break
 
     print("\nbest over %d trial(s): %s" % (a["trials"], " ".join(best_ever[2])))
-    print("  unsolved %d of %d,  ssq %d   (trial %d, %.0fs total)"
-          % (best_ever[0], len(answers), best_ever[1], best_ever[3],
-             time.time() - t_all))
+    print("  %s %d of %d,  ssq %d   (trial %d, %.0fs total)"
+          % (vname, sign * best_ever[0], len(answers), best_ever[1],
+             best_ever[3], time.time() - t_all))
     if fh:
         fh.close()
     if a["out"]:

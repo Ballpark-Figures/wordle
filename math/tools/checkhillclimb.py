@@ -179,6 +179,7 @@ def main(argv):
             r = subprocess.run(
                 [sys.executable, os.path.join(HERE, "hill_climb.py"),
                  "--pool", "custom", "--candidates", lst, "--words", "4",
+                 "--objective", "guarantee",
                  "--trials", str(TRIALS), "--seed", "7", "--workers", str(nw),
                  "--out", path], capture_output=True, text=True)
             if not os.path.exists(path):

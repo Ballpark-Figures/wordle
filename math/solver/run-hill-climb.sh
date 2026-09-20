@@ -4,6 +4,15 @@
 #
 #     bash solver/run-hill-climb.sh -t 100
 #     bash solver/run-hill-climb.sh -t 50 --candidates guess
+#     bash solver/run-hill-climb.sh -t 50 --objective singles --pool mystery --words 3
+#
+# TWO OBJECTIVES, and they are different quantities over the same openings --
+# never put their numbers in one table.  `guarantee` (the default here, a human
+# reading a default rather than a program falling back on one) minimises the
+# answers a random tail can be made to lose; `singles` maximises the answers a
+# reply names outright, which is what data/shared/singletons ranks by.  The
+# objective leads the filename and is stamped in the CSV, and a run refuses a
+# file written under the other one.
 #
 # Draw k random words, then repeatedly take the single-word swap that lowers the
 # number of UNSOLVED answers the most, until none does.  That is a LOCAL
@@ -22,6 +31,7 @@ set -u
 MATH=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 
 POOL=custom
+OBJ=guarantee
 CANDS=
 NWORDS=4
 TRIALS=""
@@ -33,6 +43,7 @@ DRYRUN=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --pool)       POOL="$2";   shift 2 ;;
+        --objective)  OBJ="$2";    shift 2 ;;
         --candidates) CANDS="$2";  shift 2 ;;
         --words)      NWORDS="$2"; shift 2 ;;
         -t|--trials)  TRIALS="$2"; shift 2 ;;
@@ -60,7 +71,13 @@ PY=../.venv/bin/python
     echo "  Build it with '$PY build_patterns.py --full' (~18s, 168 MB)." >&2
     exit 1; }
 
-STEM="climb_${POOL}"
+# THE OBJECTIVE LEADS THE NAME, and `guarantee` keeps the historical `climb_`
+# so every committed file stays readable under the name it was written with.
+case "$OBJ" in
+    guarantee) STEM="climb_${POOL}" ;;
+    singles)   STEM="singles_${POOL}" ;;
+    *) echo "--objective must be guarantee or singles" >&2; exit 1 ;;
+esac
 [ -z "$CANDS" ] || STEM="${STEM}-from-${CANDS}"
 STEM="${STEM}_w${NWORDS}_s${SEED}"
 [ "$CAP" = 6 ] || STEM="${STEM}_cap${CAP}"
@@ -68,14 +85,20 @@ OUTDIR=data/shared/hillclimb
 LOC=data/local/hillclimb
 OUT="$OUTDIR/$STEM.csv"
 
-FLAGS="--pool $POOL --words $NWORDS --trials $TRIALS --cap $CAP --seed $SEED"
+FLAGS="--pool $POOL --objective $OBJ --words $NWORDS --trials $TRIALS"
+FLAGS="$FLAGS --cap $CAP --seed $SEED"
 FLAGS="$FLAGS --workers $WORKERS"
 [ -z "$CANDS" ] || FLAGS="$FLAGS --candidates $CANDS"
 
 echo "hill climb"
-echo "  pool       $POOL -- what the opening partitions AND what the 5th guess draws"
+echo "  objective  $OBJ"
+echo "  pool       $POOL -- what the opening partitions; for guarantee it is"
+echo "             also what the random tail draws from"
 echo "  words      the $NWORDS come from ${CANDS:-$POOL}$([ -z "$CANDS" ] && echo " (the pool itself)")"
-echo "  objective  fewest answers UNSOLVED after the opening and the 5th draw"
+case "$OBJ" in
+  guarantee) echo "  target     fewest answers UNSOLVED after the opening and the tail" ;;
+  singles)   echo "  target     MOST answers alone in their bucket (--cap unused)" ;;
+esac
 echo "  moves      one word, then anagram PAIRS, then pairs within one letter,"
 echo "             then anagram TRIPLES -- each to exhaustion, then round again"
 echo "             until a whole pass moves nothing.  Steepest within a section."

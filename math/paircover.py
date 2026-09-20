@@ -401,6 +401,62 @@ def _rep_rows(blk):
     return uniq.view(blk.dtype).reshape(len(uniq), blk.shape[1]), inv
 
 
+def last_level_singles(M, prefix, ans_pool_idx):
+    """(singles, ssq) for EVERY candidate as the final word, in one pass.
+
+    THE SINGLETON OBJECTIVE, and the counterpart to `last_level_scores` below:
+    same bucket walk, same candidate grouping, a different thing counted.  An
+    answer is a SINGLE when its bucket holds it and nothing else -- so seeing
+    that reply names the word outright -- and that is what
+    `data/shared/singletons/` ranks openings by.
+
+    IT NEEDS NEITHER `full` NOR A BUDGET, which is why it is cheap: a singleton
+    is a property of the PARTITION alone, with no look-ahead into what a
+    follow-up could draw.  The guarantee objective's whole cost is that
+    look-ahead; this has none.
+
+    **THE TWO LISTS KEEP THEIR USUAL MEANING AND THAT IS WORTH STATING.**
+    Buckets are over the POOL and the count is over the ANSWERS, so
+    `--pool mystery` is the classic metric (`singletons.py`, `pairsplit`) --
+    answers alone among the 2315 -- while `--pool custom` asks the harder
+    question `--buckets custom` asks: alone among the 4282 words a
+    random-compatible follow-up could still be holding.
+    """
+    nc = M.shape[0]
+    key = joint_key(M, prefix)
+    is_ans = np.zeros(M.shape[1], dtype=bool)
+    is_ans[ans_pool_idx] = True
+    order = np.argsort(key, kind="stable")
+    skey = key[order]
+    cuts = np.flatnonzero(np.r_[True, skey[1:] != skey[:-1], True])
+
+    singles = np.zeros(nc, dtype=np.int32)
+    ssq = np.zeros(nc, dtype=np.int64)
+    ones = base = 0
+    for lo, hi in zip(cuts[:-1], cuts[1:]):
+        members = order[lo:hi]
+        if hi - lo == 1:
+            # Already alone before the last word, so no candidate can change it
+            # either way: it stays a single and contributes 1 to ssq.
+            ones += 1
+            base += int(is_ans[members[0]])
+            continue
+        rows, inv = _rep_rows(M[:, members])
+        flags = is_ans[members]
+        cu = np.empty(len(rows), dtype=np.int32)
+        cs = np.empty(len(rows), dtype=np.int64)
+        for r, rep in enumerate(rows):
+            g = s2 = 0
+            for loc in _parts(rep):
+                s2 += len(loc) * len(loc)
+                if len(loc) == 1 and flags[loc[0]]:
+                    g += 1
+            cu[r], cs[r] = g, s2
+        singles += cu[inv]
+        ssq += cs[inv]
+    return singles + base, ssq + ones
+
+
 def last_level_scores(full, cols, M, prefix, ans_pool_idx, budget=2):
     """(unsolved, ssq) for EVERY candidate as the final word, in one pass.
 
