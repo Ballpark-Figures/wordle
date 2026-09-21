@@ -33,6 +33,21 @@ consistent after the reply, with the answer drawn uniformly.  The mean of n and
 the max of n are different aggregations and neither implies the other, so a
 number from one key never belongs in a table with a number from another.
 
+`gray_bucket` IS NOT AN AGGREGATION AT ALL -- it is ONE named part, the all-grey
+reply, holding the answers that share no letter with the guess.  It is the least
+informative thing the board can say, and for 12445 of the 12972 guesses it is
+also the LARGEST part, which is why `max_pattern` reads `.....` on most rows.
+For the other 527 a single-yellow part is bigger, so `gray_bucket <= max_bucket`
+always and the two keys are NOT interchangeable; the gate asserts both that
+inequality and the exact condition for equality.
+
+IT IS A FUNCTION OF THE GUESS'S LETTER SET ALONE, not of its spelling or its
+letter positions -- an answer avoids all five tiles iff it contains none of those
+letters.  So anagrams tie EXACTLY, as does any pair of words drawing on the same
+letters, and a guess with a repeated letter is covering fewer distinct letters
+and is therefore at a structural disadvantage.  Expect large tie classes here in
+a way the other keys do not produce.
+
 THE WIN BUCKET IS REPORTED BOTH WAYS, as `singletons.py` and `wordle_in_one.py`
 already do for the same ambiguity.  `avg_remaining` counts every part; a guess
 that IS an answer has a part of size 1 there and is charged 1/NA for it.
@@ -92,7 +107,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 from absurdle import bucket_counts, show  # noqa: E402
 from build_patterns import load_patterns  # noqa: E402
-from wordle import ALL_GREEN, load_words, pattern  # noqa: E402
+from wordle import ALL_GRAY, ALL_GREEN, load_words, pattern  # noqa: E402
 
 _MATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 ABSURDLE_WITNESS = os.path.join(_MATH, "data", "shared", "absurdle",
@@ -101,7 +116,8 @@ GATE_SAMPLE = 12          # guesses re-bucketed from the STRINGS by the gate
 
 # name -> (exact INTEGER sort key builder, descending?, the column it reports).
 # Every key orders on an integer; the float columns are readable derivatives.
-RANK_KEYS = ("max_bucket", "buckets", "avg_remaining", "avg_remaining_nowin")
+RANK_KEYS = ("max_bucket", "buckets", "avg_remaining", "avg_remaining_nowin",
+             "gray_bucket")
 
 
 def _arg(argv, flag, choices):
@@ -134,6 +150,11 @@ def gate_strings(guesses, answers, counts, rng):
             raise SystemExit("GATE FAILED: %s largest bucket %d from the "
                              "strings, %d from the matrix"
                              % (guesses[g], mx, counts[g].max()))
+        if hist.get(ALL_GRAY, 0) != int(counts[g][ALL_GRAY]):
+            raise SystemExit("GATE FAILED: %s all-grey bucket %d from the "
+                             "strings, %d from the matrix"
+                             % (guesses[g], hist.get(ALL_GRAY, 0),
+                                counts[g][ALL_GRAY]))
         ssq = sum(n * n for n in hist.values())
         if ssq != int((counts[g].astype(np.int64) ** 2).sum()):
             raise SystemExit("GATE FAILED: %s sum of squared buckets %d from "
@@ -154,6 +175,47 @@ def gate_strings(guesses, answers, counts, rng):
                              "strings, %d from the matrix"
                              % (guesses[g], want_pat, counts[g].argmax()))
     print("gate: %d guesses re-bucketed from the strings, exact" % GATE_SAMPLE)
+
+
+def gate_gray(guesses, answers, gray, mx, worst):
+    """Pin the all-grey column against the columns already trusted, and against
+    the LETTERS -- two checks that share nothing with each other.
+
+    STRUCTURAL: the all-grey part is one of the parts, so `gray <= max_bucket`
+    for every guess, with equality exactly when the argmax pattern IS the
+    all-grey code.  That ties the new column to the one the Absurdle witness
+    already cross-checks, over all 12972 rows rather than a sample.
+
+    FROM THE LETTERS: an answer lands in the all-grey part iff it shares no
+    letter with the guess, so the count is recomputable with set arithmetic on
+    the strings -- no pattern function, no matrix, no encoding.  This is the
+    check that would catch the column being read at the wrong index, which the
+    structural one alone cannot (a wrong-but-smaller column still satisfies it).
+    """
+    bad = np.flatnonzero(gray > mx)
+    if len(bad):
+        raise SystemExit("GATE FAILED: %s has all-grey bucket %d above its "
+                         "largest bucket %d"
+                         % (guesses[bad[0]], gray[bad[0]], mx[bad[0]]))
+    eq = (gray == mx)
+    if not np.array_equal(eq, worst == ALL_GRAY):
+        i = int(np.flatnonzero(eq != (worst == ALL_GRAY))[0])
+        raise SystemExit("GATE FAILED: %s -- all-grey %d, max %d, argmax code "
+                         "%d: equality and 'the argmax is all-grey' disagree"
+                         % (guesses[i], gray[i], mx[i], worst[i]))
+
+    sets = [set(a) for a in answers]
+    for g in np.random.default_rng(1).choice(len(guesses), size=GATE_SAMPLE,
+                                             replace=False):
+        letters = set(guesses[g])
+        want = sum(1 for a in sets if not (a & letters))
+        if want != gray[g]:
+            raise SystemExit("GATE FAILED: %s shares no letter with %d answers "
+                             "by set arithmetic, %d in the all-grey bucket"
+                             % (guesses[g], want, gray[g]))
+    print("gate: all-grey bucket <= largest for all %d guesses, equal on %d, "
+          "and %d re-counted from the letters" % (len(guesses), int(eq.sum()),
+                                                  GATE_SAMPLE))
 
 
 def gate_root_values(pat, ssq_nowin):
@@ -250,6 +312,7 @@ def main(argv):
     buckets = (counts > 0).sum(axis=1)
     # Exact integers: a bucket is at most NA and there are at most 243 of them,
     # so int64 cannot overflow and no comparison below is a float comparison.
+    gray = counts[:, ALL_GRAY].astype(np.int64)
     ssq = (counts.astype(np.int64) ** 2).sum(axis=1)
     win = counts[:, ALL_GREEN].astype(np.int64)
     ssq_nowin = ssq - win * win
@@ -260,6 +323,7 @@ def main(argv):
                                               time.time() - t0))
 
     gate_strings(guesses, answers, counts, np.random.default_rng(0))
+    gate_gray(guesses, answers, gray, mx, worst)
     gate_root_values(pat, ssq_nowin)
     if not full:
         gate_absurdle(guesses, mx)
@@ -271,7 +335,8 @@ def main(argv):
     # THE SORT KEY IS THE EXACT INTEGER, never the printed float, and `buckets`
     # is the one key where MORE is better -- so it alone sorts descending.
     key_col = {"max_bucket": mx, "buckets": buckets,
-               "avg_remaining": ssq, "avg_remaining_nowin": ssq_nowin}[rank_by]
+               "avg_remaining": ssq, "avg_remaining_nowin": ssq_nowin,
+               "gray_bucket": gray}[rank_by]
     desc = rank_by == "buckets"
     sign = -1 if desc else 1
     order = sorted(keep, key=lambda i: (sign * int(key_col[i]), guesses[i]))
@@ -293,25 +358,25 @@ def main(argv):
             f.write("# settings answer_set=%s rank=%s rank_by=%s answers=%d "
                     "guesses=%d\n"
                     % (answer_set, rank, rank_by, na, len(guesses)))
-            f.write("word,max_bucket,max_pattern,max_ties,buckets,ssq,"
-                    "ssq_nowin,avg_remaining,avg_remaining_nowin,rank\n")
+            f.write("word,max_bucket,max_pattern,max_ties,buckets,gray_bucket,"
+                    "ssq,ssq_nowin,avg_remaining,avg_remaining_nowin,rank\n")
             for r, i in enumerate(order, 1):
-                f.write("%s,%d,%s,%d,%d,%d,%d,%.4f,%.4f,%d\n"
+                f.write("%s,%d,%s,%d,%d,%d,%d,%d,%.4f,%.4f,%d\n"
                         % (guesses[i], mx[i], show(int(worst[i])), ties[i],
-                           buckets[i], ssq[i], ssq_nowin[i], avg[i],
+                           buckets[i], gray[i], ssq[i], ssq_nowin[i], avg[i],
                            avg_nowin[i], r))
         print("wrote %s" % os.path.relpath(out, _MATH))
 
-    head = "\n%7s %11s %12s %10s %8s %9s %9s %6s" % (
-        "word", "max_bucket", "max_pattern", "max_ties", "buckets",
+    head = "\n%7s %11s %12s %10s %8s %6s %9s %9s %6s" % (
+        "word", "max_bucket", "max_pattern", "max_ties", "buckets", "gray",
         "avg_rem", "avg_nowin", "rank")
     print(head + "        <- ranked %s by %s"
           % ("DESCENDING" if desc else "ASCENDING", rank_by))
 
     def row(r, i):
-        print("%7s %11d %12s %10d %8d %9.2f %9.2f %6d"
+        print("%7s %11d %12s %10d %8d %6d %9.2f %9.2f %6d"
               % (guesses[i], mx[i], show(int(worst[i])), ties[i], buckets[i],
-                 avg[i], avg_nowin[i], r))
+                 gray[i], avg[i], avg_nowin[i], r))
 
     for r, i in enumerate(order[:top], 1):
         row(r, i)
@@ -323,7 +388,8 @@ def main(argv):
     # max_bucket under an avg_remaining ranking would describe a different column
     # from the one the rows are sorted on.
     kept = np.asarray(key_col)[list(order)]
-    scale = 1.0 if rank_by in ("max_bucket", "buckets") else 1.0 / na
+    scale = (1.0 if rank_by in ("max_bucket", "buckets", "gray_bucket")
+             else 1.0 / na)
     print("\n%s: min %.4g, median %.4g, mean %.4g, max %.4g over %d %s"
           % (rank_by, kept.min() * scale, float(np.median(kept)) * scale,
              kept.mean() * scale, kept.max() * scale, len(kept),

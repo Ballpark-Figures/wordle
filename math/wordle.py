@@ -40,6 +40,11 @@ import numpy as np
 WORD_LEN = 5
 N_PATTERNS = 3 ** WORD_LEN          # 243
 ALL_GREEN = N_PATTERNS - 1          # 242 == "22222" in base 3, MSB = position 0
+ALL_GRAY = 0                        # 0 == "00000"; grey is trit 0, so this is
+                                    # the code at EVERY word length, unlike
+                                    # ALL_GREEN.  The reply that shares no letter
+                                    # with the answer -- the least informative
+                                    # one, and usually the biggest bucket.
 
 _DATA = os.path.join(os.path.dirname(__file__), "data", "shared", "words")
 

@@ -8,6 +8,7 @@
 #     bash solver/run-maxbucket.sh --top 50             # longer printed head
 #     bash solver/run-maxbucket.sh --rank-by avg_remaining
 #     bash solver/run-maxbucket.sh --rank-by buckets
+#     bash solver/run-maxbucket.sh --rank-by gray_bucket
 #
 # WHAT THIS COMPUTES, precisely:
 #
@@ -37,6 +38,16 @@
 #                          already won contributes nothing and an opener is not
 #                          penalised for being answerable.  Both divide by the
 #                          full NA, so they differ by (win part)^2 / NA.
+#     gray_bucket          NOT an aggregation -- ONE named part, the all-grey
+#                          reply: the answers sharing no letter with the guess,
+#                          the least informative thing the board can say.
+#                          Ascending.  It is at most max_bucket and usually IS
+#                          it (the all-grey part is the largest for 12445 of the
+#                          12972), so the two keys agree often and are still not
+#                          the same question.  NB it depends on the guess's
+#                          LETTER SET alone, so anagrams tie exactly and a
+#                          repeated letter is a structural handicap -- expect
+#                          much larger tie classes than the other keys give.
 #
 #   THE SORT IS ON EXACT INTEGERS (ssq / ssq_nowin), never on the printed float,
 #   so a tie in the file is a real tie rather than a rounding artefact.
@@ -58,6 +69,10 @@
 #   avg_remaining_nowin is diffed against multiwordle_fast.root_values for EVERY
 #   guess -- an independent implementation of that exact quantity, the one
 #   run-multiwordle-exact.sh already orders openers by, compared as integers;
+#   gray_bucket is checked against max_bucket structurally over every row (it can
+#   never exceed it, and equals it exactly when the argmax pattern is all-grey)
+#   and re-counted from the LETTERS by set arithmetic on sampled guesses, with no
+#   pattern function or matrix involved;
 #   and in the default answer set the minimum is cross-checked against the
 #   committed data/shared/absurdle/one_shortest_solution.txt, whose opener is a
 #   minimiser of max_bucket.  It exits nonzero rather than reporting.
@@ -67,8 +82,8 @@
 # EXPLICITLY, so the one decision has one owner, and it tees a log naming the run.
 #
 # Outputs data/shared/maxbucket/maxbucket_<answer-set>_<rank>[_by-<key>].csv,
-# columns word,max_bucket,max_pattern,max_ties,buckets,ssq,ssq_nowin,
-# avg_remaining,avg_remaining_nowin,rank.  max_bucket KEEPS THE HISTORIC
+# columns word,max_bucket,max_pattern,max_ties,buckets,gray_bucket,ssq,
+# ssq_nowin,avg_remaining,avg_remaining_nowin,rank.  max_bucket KEEPS THE HISTORIC
 # UNSUFFIXED NAME, so the committed file stays where every reader expects it and
 # the other keys cannot collide with it.  max_pattern is the lowest-coded pattern
 # attaining the maximum and max_ties how many attain it; both are DESCRIPTIVE --
@@ -107,8 +122,8 @@ case "$RANK" in
        exit 1 ;;
 esac
 case "$RANK_BY" in
-    max_bucket|buckets|avg_remaining|avg_remaining_nowin) ;;
-    *) echo "--rank-by must be max_bucket, buckets, avg_remaining or avg_remaining_nowin" >&2
+    max_bucket|buckets|avg_remaining|avg_remaining_nowin|gray_bucket) ;;
+    *) echo "--rank-by must be max_bucket, buckets, gray_bucket, avg_remaining or avg_remaining_nowin" >&2
        exit 1 ;;
 esac
 
