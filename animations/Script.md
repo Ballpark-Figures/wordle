@@ -4,13 +4,39 @@
      Google Doc 1jZIN2hElf5MyNBmSqQ4SyKISVfYywSyt7OCw3WsegVs
      Edit the Doc and re-run; edits here are overwritten. -->
 
-1 scene(s), 0 subscene(s), 0 talking head(s).
+3 scene(s), 0 subscene(s), 1 talking head(s).
 
 | scene | subscenes | VO sections |
 | ----- | --------- | ----------- |
 | 01 | -- | 1 |
+| 02 | -- | 1 |
+| THB | -- | 1 |
+| 03 | -- | 1 |
 
 
 ## 01
 
 ### 01 - VO section 1 - no subscene (voiceover only)
+
+
+## 02
+
+### 02 - VO section 1 - no subscene (voiceover only)
+
+> Wordle is a word guessing game where you have 6 chances to guess a 5-letter word.  After each guess, you’re given some information about the accuracy of each letter in your guess.  If the letter is in the correct location, it’s marked green.  If the letter is in the word, but not where you placed it, it’s marked yellow.  Otherwise, it’s marked gray.  After each guess, you’re given more information about the final word.  If you can guess the word correctly within 6 guesses, you win the game.
+
+
+## THB
+
+> Wordle is simple enough, but what do we have to do if we want to play the game as well as possible?  That’s going to start with something I’m going to say for the first time of what I’m sure will be many on this channel.  Every game becomes a math game once you have enough skill.
+>
+> Here’s what that means in Wordle.  The “skill” here is the ability to think of words that match a certain pattern of green and yellow letters.  Without that skill, we have no chance of winning.  But having this skill, it turns out, is not quite enough.
+
+
+## 03
+
+### 03 - VO section 1 - no subscene (voiceover only)
+
+> Take a look at this example.  Here’s a sequence of guesses we can make where every word is an actual Wordle answer that matches all of the clues leading up to it.
+>
+> We’re making good use of our word guessing skill,
