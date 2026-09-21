@@ -22,6 +22,30 @@ size ONE while this looks only at the largest; and it is emphatically not an
 6-guess guarantee.  A worst-case bucket size says nothing about how the rest of
 the game goes.  Never put a number from here in a table with any of those.
 
+THREE AGGREGATIONS OF ONE PARTITION, AND THEY RANK DIFFERENTLY.  The partition
+is computed once; what differs is how a row reduces it to a number, and
+`--rank-by` says which one ORDERS the file.  `max_bucket` is the MAX part size
+(the minimax criterion above).  `buckets` is the NUMBER of non-empty parts --
+how many distinct colourings the guess can show -- and it is the one key where
+MORE is better, so it sorts DESCENDING.  `avg_remaining` is the answer-weighted
+MEAN part size, `sum over parts of n^2 / NA`: the expected number of words still
+consistent after the reply, with the answer drawn uniformly.  The mean of n and
+the max of n are different aggregations and neither implies the other, so a
+number from one key never belongs in a table with a number from another.
+
+THE WIN BUCKET IS REPORTED BOTH WAYS, as `singletons.py` and `wordle_in_one.py`
+already do for the same ambiguity.  `avg_remaining` counts every part; a guess
+that IS an answer has a part of size 1 there and is charged 1/NA for it.
+`avg_remaining_nowin` drops the all-green part, so a game already won contributes
+nothing and an opener is not penalised for being answerable -- the reading
+`multiwordle_fast.root_values` uses, and the one the gate diffs against.  BOTH
+divide by the full NA, so the two differ by exactly `(win part)^2 / NA`.
+
+THE ORDERING IS ON EXACT INTEGERS, never on the printed float.  `ssq` and
+`ssq_nowin` are the integer sums; `avg_remaining*` is that over NA and is
+order-equivalent, so it is a readable column rather than the sort key.  The
+objective being an integer is what makes a tie a real tie.
+
 THE ANSWER SET IS PART OF THE QUESTION, not a detail -- a bucket is counted over
 whichever answers exist, so `--answer-set mystery` (the 2315 curated answers) and
 `--answer-set all` (every one of the 12972 legal words an answer) are answers to
@@ -37,7 +61,7 @@ itself an answer and 0 otherwise, against maxima in the hundreds.  This is why
 there is no `_nowin` column here of the kind `singletons.py` needs.
 
 TIES ARE REAL -- the quantity is an integer and the field is large, so many words
-share a value.  The RANKING is on `max_bucket` alone; ties are broken
+share a value.  The RANKING is on the chosen key alone; ties are broken
 alphabetically purely to make the file deterministic, and that order carries NO
 meaning.  `buckets`, `max_pattern` and `max_ties` are DESCRIPTIVE columns, not
 secondary keys: `max_pattern` is the LOWEST-CODED pattern attaining the maximum
@@ -68,12 +92,16 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 from absurdle import bucket_counts, show  # noqa: E402
 from build_patterns import load_patterns  # noqa: E402
-from wordle import load_words, pattern  # noqa: E402
+from wordle import ALL_GREEN, load_words, pattern  # noqa: E402
 
 _MATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 ABSURDLE_WITNESS = os.path.join(_MATH, "data", "shared", "absurdle",
                                 "one_shortest_solution.txt")
 GATE_SAMPLE = 12          # guesses re-bucketed from the STRINGS by the gate
+
+# name -> (exact INTEGER sort key builder, descending?, the column it reports).
+# Every key orders on an integer; the float columns are readable derivatives.
+RANK_KEYS = ("max_bucket", "buckets", "avg_remaining", "avg_remaining_nowin")
 
 
 def _arg(argv, flag, choices):
@@ -106,6 +134,17 @@ def gate_strings(guesses, answers, counts, rng):
             raise SystemExit("GATE FAILED: %s largest bucket %d from the "
                              "strings, %d from the matrix"
                              % (guesses[g], mx, counts[g].max()))
+        ssq = sum(n * n for n in hist.values())
+        if ssq != int((counts[g].astype(np.int64) ** 2).sum()):
+            raise SystemExit("GATE FAILED: %s sum of squared buckets %d from "
+                             "the strings, %d from the matrix"
+                             % (guesses[g], ssq,
+                                (counts[g].astype(np.int64) ** 2).sum()))
+        win = hist.get(ALL_GREEN, 0)
+        if ssq - win * win != int((counts[g].astype(np.int64) ** 2).sum()
+                                  - int(counts[g][ALL_GREEN]) ** 2):
+            raise SystemExit("GATE FAILED: %s no-win sum of squares disagrees "
+                             "with the matrix" % guesses[g])
         if len(hist) != int((counts[g] > 0).sum()):
             raise SystemExit("GATE FAILED: %s has %d non-empty buckets from "
                              "the strings, %d from the matrix"
@@ -115,6 +154,39 @@ def gate_strings(guesses, answers, counts, rng):
                              "strings, %d from the matrix"
                              % (guesses[g], want_pat, counts[g].argmax()))
     print("gate: %d guesses re-bucketed from the strings, exact" % GATE_SAMPLE)
+
+
+def gate_root_values(pat, ssq_nowin):
+    """Diff `avg_remaining_nowin` against multiwordle's OWN implementation.
+
+    `multiwordle_fast.root_values` computes the identical quantity by a wholly
+    different route -- a numba kernel that walks the matrix row by row with a
+    touched-list scratch counter, never materialising the (NG, 243) bucket table
+    this tool is built on -- and it is the ranking `run-multiwordle-exact.sh`
+    already visits openers in.  So this is a real differential test over EVERY
+    guess, not a sample, and it costs one pass.
+
+    Compared as INTEGERS: each squared bucket size and their sum are exactly
+    representable in float64 at these magnitudes, so `rv * NA` must land on
+    `ssq_nowin` exactly rather than merely close to it.
+    """
+    try:
+        import multiwordle_fast as mf
+    except Exception as e:                              # pragma: no cover
+        print("gate: multiwordle_fast unavailable (%s), root_values not "
+              "cross-checked" % e)
+        return
+    na = pat.shape[1]
+    rv = mf.root_values(np.array(pat), np.arange(pat.shape[0], dtype=np.int64))
+    got = np.rint(rv * na).astype(np.int64)
+    bad = np.flatnonzero(got != ssq_nowin)
+    if len(bad):
+        raise SystemExit("GATE FAILED: %d guesses disagree with "
+                         "multiwordle_fast.root_values, first at index %d "
+                         "(%d here, %d there)"
+                         % (len(bad), bad[0], ssq_nowin[bad[0]], got[bad[0]]))
+    print("gate: all %d guesses agree with multiwordle_fast.root_values, exact"
+          % pat.shape[0])
 
 
 def gate_absurdle(guesses, mx):
@@ -152,6 +224,7 @@ def gate_absurdle(guesses, mx):
 def main(argv):
     answer_set = _arg(argv, "--answer-set", ("mystery", "all"))
     rank = _arg(argv, "--rank", ("all", "answers"))
+    rank_by = _arg(argv, "--rank-by", RANK_KEYS)
     if "--out" not in argv and "--no-out" not in argv:
         raise SystemExit("--out PATH is REQUIRED (or an explicit --no-out). A "
                          "run that prints its answer and saves nothing is how a "
@@ -175,10 +248,19 @@ def main(argv):
     worst = counts.argmax(axis=1)                       # lowest code attaining it
     ties = (counts == mx[:, None]).sum(axis=1)
     buckets = (counts > 0).sum(axis=1)
+    # Exact integers: a bucket is at most NA and there are at most 243 of them,
+    # so int64 cannot overflow and no comparison below is a float comparison.
+    ssq = (counts.astype(np.int64) ** 2).sum(axis=1)
+    win = counts[:, ALL_GREEN].astype(np.int64)
+    ssq_nowin = ssq - win * win
+    na = len(answers)
+    avg = ssq / na
+    avg_nowin = ssq_nowin / na
     print("%d guesses x %d answers, %.1fs" % (len(guesses), len(answers),
                                               time.time() - t0))
 
     gate_strings(guesses, answers, counts, np.random.default_rng(0))
+    gate_root_values(pat, ssq_nowin)
     if not full:
         gate_absurdle(guesses, mx)
 
@@ -186,42 +268,70 @@ def main(argv):
     if rank == "answers":
         answer_set_words = set(load_words("mystery"))
         keep = [i for i in keep if guesses[i] in answer_set_words]
-    order = sorted(keep, key=lambda i: (mx[i], guesses[i]))
+    # THE SORT KEY IS THE EXACT INTEGER, never the printed float, and `buckets`
+    # is the one key where MORE is better -- so it alone sorts descending.
+    key_col = {"max_bucket": mx, "buckets": buckets,
+               "avg_remaining": ssq, "avg_remaining_nowin": ssq_nowin}[rank_by]
+    desc = rank_by == "buckets"
+    sign = -1 if desc else 1
+    order = sorted(keep, key=lambda i: (sign * int(key_col[i]), guesses[i]))
 
     if out:
         os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
         with open(out, "w") as f:
-            f.write("# largest feedback bucket per opener, over %d answers "
-                    "(%s); ranking %s\n"
+            f.write("# feedback-partition aggregations per opener, over %d "
+                    "answers (%s); ranking %s\n"
                     % (len(answers),
                        "all 12972 legal words" if full else "the 2315 mystery answers",
                        "the 2315 answer words" if rank == "answers"
                        else "all %d legal guesses" % len(guesses)))
-            f.write("# ranked ASCENDING by max_bucket; ties broken "
-                    "alphabetically and that order carries no meaning.\n")
-            f.write("word,max_bucket,max_pattern,max_ties,buckets,rank\n")
+            f.write("# ranked %s by %s; ties broken alphabetically and that "
+                    "order carries no meaning.\n"
+                    % ("DESCENDING" if desc else "ASCENDING", rank_by))
+            f.write("# avg_remaining = ssq / %d; avg_remaining_nowin drops the "
+                    "all-green bucket and divides by the same %d.\n" % (na, na))
+            f.write("# settings answer_set=%s rank=%s rank_by=%s answers=%d "
+                    "guesses=%d\n"
+                    % (answer_set, rank, rank_by, na, len(guesses)))
+            f.write("word,max_bucket,max_pattern,max_ties,buckets,ssq,"
+                    "ssq_nowin,avg_remaining,avg_remaining_nowin,rank\n")
             for r, i in enumerate(order, 1):
-                f.write("%s,%d,%s,%d,%d,%d\n"
+                f.write("%s,%d,%s,%d,%d,%d,%d,%.4f,%.4f,%d\n"
                         % (guesses[i], mx[i], show(int(worst[i])), ties[i],
-                           buckets[i], r))
+                           buckets[i], ssq[i], ssq_nowin[i], avg[i],
+                           avg_nowin[i], r))
         print("wrote %s" % os.path.relpath(out, _MATH))
 
-    print("\n%7s %11s %12s %10s %8s %6s"
-          % ("word", "max_bucket", "max_pattern", "max_ties", "buckets", "rank"))
+    head = "\n%7s %11s %12s %10s %8s %9s %9s %6s" % (
+        "word", "max_bucket", "max_pattern", "max_ties", "buckets",
+        "avg_rem", "avg_nowin", "rank")
+    print(head + "        <- ranked %s by %s"
+          % ("DESCENDING" if desc else "ASCENDING", rank_by))
+
+    def row(r, i):
+        print("%7s %11d %12s %10d %8d %9.2f %9.2f %6d"
+              % (guesses[i], mx[i], show(int(worst[i])), ties[i], buckets[i],
+                 avg[i], avg_nowin[i], r))
+
     for r, i in enumerate(order[:top], 1):
-        print("%7s %11d %12s %10d %8d %6d"
-              % (guesses[i], mx[i], show(int(worst[i])), ties[i], buckets[i], r))
+        row(r, i)
     print("...")
     for r, i in list(enumerate(order, 1))[-3:]:
-        print("%7s %11d %12s %10d %8d %6d"
-              % (guesses[i], mx[i], show(int(worst[i])), ties[i], buckets[i], r))
-    kept = mx[list(order)]
-    print("\nmin %d, median %d, mean %.1f, max %d over %d %s"
-          % (kept.min(), int(np.median(kept)), kept.mean(), kept.max(), len(kept),
+        row(r, i)
+
+    # The SUMMARY describes the key that ordered the file -- quoting a spread of
+    # max_bucket under an avg_remaining ranking would describe a different column
+    # from the one the rows are sorted on.
+    kept = np.asarray(key_col)[list(order)]
+    scale = 1.0 if rank_by in ("max_bucket", "buckets") else 1.0 / na
+    print("\n%s: min %.4g, median %.4g, mean %.4g, max %.4g over %d %s"
+          % (rank_by, kept.min() * scale, float(np.median(kept)) * scale,
+             kept.mean() * scale, kept.max() * scale, len(kept),
              "answer words" if rank == "answers" else "guesses"))
-    print("%d word(s) tie for the minimum: %s"
-          % ((kept == kept.min()).sum(),
-             " ".join(guesses[i] for i in order if mx[i] == kept.min())[:200]))
+    best = kept.max() if desc else kept.min()
+    tied = [guesses[i] for i in order if int(key_col[i]) == int(best)]
+    print("%d word(s) tie for the best %s (%.4g): %s"
+          % (len(tied), rank_by, best * scale, " ".join(tied)[:200]))
 
 
 if __name__ == "__main__":
