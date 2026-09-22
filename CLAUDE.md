@@ -2964,10 +2964,14 @@ Exact and deterministic — no sampling, no seed — so a re-run reproduces the 
       clove rugby spank whift mozed  6.000864  vs 6.000883 +/- 0.000030   0.63 sd
       slate                          3.821367  vs 3.821830 +/- 0.000999   0.46 sd
 
-- **IT PRICES, IT DOES NOT SEARCH.** A race screens thousands of openings and
-  eliminates; this evaluates what it is handed, so its head is the best of the
-  openings HANDED IN and the field's own caveat still applies. The two COMPOSE:
-  race wide and cheap, then price the survivors exactly.
+- **IT PRICES, IT DOES NOT SEARCH — but `last_level_mean` DOES feed a search.**
+  A race screens thousands of openings and eliminates; `evaluate` prices what it
+  is handed, so its head is the best of the openings HANDED IN. The SEARCH that
+  uses this objective is **`run-hill-climb.sh --objective mean`** (see
+  § `hillclimb`), which ranks every candidate in every slot through
+  `last_level_mean` — the whole-pool pass, grouping candidates by the PARTITION
+  they induce so the last level is affordable. `evaluate` is then its oracle,
+  candidate by candidate, in `checkopenexact.py` check F.
 - **OPENING WORDS ARE GUESSES, NOT POOL WORDS** — `clint`, `horst` and `sowed` lead
   real openings here — so they index the CANDIDATE side of the rectangle and a live
   set stays a set of POOL words, exactly as `paircover.cand_matrix` splits it. An
@@ -3096,18 +3100,63 @@ sampling, no seed — so a re-run reproduces the file byte for byte.
 `tools/hill_climb.py` is the driver. Run it with
 **`bash solver/run-hill-climb.sh -t N [--candidates L]`** (from `math/`),
 attached, tee'd log, `--dry-run`.
-- **TWO OBJECTIVES, AND THEY ARE DIFFERENT QUANTITIES over the same openings —
+- **THREE OBJECTIVES, AND THEY ARE DIFFERENT QUANTITIES over the same openings —
   never put their numbers in one table** (`--objective`, user's call,
   2026-09-19). **`guarantee`** minimises the answers a random tail can be made
   to LOSE and wants zero; **`singles`** maximises the answers a reply names
-  OUTRIGHT, which is what `data/shared/singletons/` ranks by. A guaranteed
+  OUTRIGHT, which is what `data/shared/singletons/` ranks by; **`mean`**
+  minimises EXACT EXPECTED GUESSES (added 2026-09-22, user's ask). A guaranteed
   opening need not be singleton-rich, or the reverse.
+  - **`mean` IS THE RACE'S OWN QUANTITY, COMPUTED** — `math/openexact.py`, the
+    same blind opening and random-compatible-answer tail
+    `run-wordle-race.sh --fallback answer` samples. So a climb has no seed, no
+    standard error and no winner's curse, and it reaches openings no race can:
+    a race screens a ranking's top N, and the climb has no such gate.
+    **It is expected guesses OUTRIGHT** (play is never truncated), so it never
+    belongs beside an optturns-family total.
+  - **`mean`'s KEY IS FIXED POINT, NOT FLOAT, AND THAT IS FORCED BY THE CLIMB.**
+    `neighbourhood` casts the primary with `astype(np.int64)` and bans a word by
+    writing **INT32's max** into it — so a float key would be truncated and a
+    key ABOVE that sentinel would make a banned word look best. `openexact.SCALE`
+    is 10**4: the total runs to ~8800 guesses over the 2315, so the key peaks
+    near 8.8e7, two orders inside the sentinel, at a granularity of 1e-4 of a
+    guess in the TOTAL (4e-8 in the mean). **Do not raise SCALE without moving
+    that sentinel first.**
   - **THE CLIMB IS OBJECTIVE-AGNOSTIC**: it takes `last_level(prefix)` as an
     injected callable returning two arrays over the candidates, both MINIMISED
     lexicographically. `guarantee` passes `(unsolved, ssq)`; `singles` passes
     **`(-singles, ssq)`**, negated because the climb only knows how to go down,
-    and only the printout and the CSV turn it back the right way up. Nothing in
-    the climb knows which is running, which is what keeps one climb and not two.
+    and only the printout and the CSV turn it back the right way up; `mean`
+    passes `(total x SCALE, ssq)`. Nothing in the climb knows which is running,
+    which is what keeps one climb and not two. **`reported()`/`fmt()` in the
+    DRIVER own the key-to-number conversion** — one place, or the printout, the
+    CSV and the ranking drift apart.
+  - **FOR `mean` THE COST IS SET BY THE PREFIX, so SMALL openings are the
+    expensive ones** — the reverse of the intuition that fewer words is less
+    work. A swap scan holds k-1 words fixed and prices candidates against THOSE
+    buckets: a 2-word opening means a ONE-word prefix, whose buckets run to 221
+    answers, while a 4-word opening prices against buckets of 16 or fewer.
+    MEASURED, one whole-pool pass on a 157-word candidate list: **0.07 s at k=4,
+    0.81 s at k=3, 34 s at k=2**. A whole trial on the 2315 answers is **~25 s
+    at k=4 and ~20 s at k=5**.
+  - **THE PASS IS GATED AGAINST THE PER-OPENING PATH, candidate by candidate**
+    (`checkopenexact.py` check F): `last_level_mean` prices the whole pool at
+    once by grouping candidates on the PARTITION they induce and sharing one
+    memo, `evaluate` re-derives each opening from scratch, and they must agree on
+    the total AND the ssq for EVERY candidate. MEASURED 0 mismatches at k=2, 3
+    and 4 — and the pass is 7.6x to 34x faster than the oracle even on a
+    157-word list, where the real pool is 15x larger.
+  - **`climb`'s `current` ASSERTION IS A FREE DIFFERENTIAL for `mean` too**: the
+    pass computes the key, `score_one` computes it again through `evaluate`
+    (the path verified against the committed race cells), and a disagreement
+    stops the run. **The per-trial gate checks the BUCKETING from the strings**
+    rather than re-deriving the tail — that recursion is gated hard in
+    `checkopenexact.py` against exact-rational string recursions, which is far
+    too slow to repeat per trial.
+  - **A `mean` BUCKET OF TWO IS NOT CONSTANT, unlike the guarantee pass.** There
+    one and two are solved whatever the last word does, so only their ssq was
+    owed; for the mean a two-bucket costs T = 3 whole and 2 split, so the last
+    word is worth exactly one guess on it. Buckets of ONE stay constant (T = 1).
   - **THE OBJECTIVE IS REQUIRED BY THE TOOL AND DEFAULTED ONLY IN THE WRAPPER**
     (`guarantee`, a default a human reads — the greens scar). It LEADS the
     filename (`climb_…` keeps the historical name, `singles_…` is the new one,

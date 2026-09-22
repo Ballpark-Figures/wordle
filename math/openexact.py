@@ -195,3 +195,110 @@ def evaluate(M, rows, at_pool, ans_pool_idx, cap=6, memo=None, lost_memo=None):
     return {"mean": total / n_ans, "win_rate": 1.0 - lost / n_ans,
             "total": total, "lost": lost, "answers": n_ans,
             "buckets": len(uniq), "budget": budget}
+
+
+# ---------------------------------------------------------------------------
+# THE WHOLE LAST LEVEL AT ONCE -- what makes this usable as a HILL-CLIMB
+# objective rather than only as a way to price one opening.
+#
+# `evaluate` answers about ONE opening.  A swap scan asks about every candidate
+# in every position, so it needs the same question answered for the whole pool
+# in one pass -- the shape `paircover.last_level_scores` already has for the
+# guarantee objective, and for the same two reasons:
+#
+#   * THE PREFIX IS FIXED, SO ITS BUCKETS ARE.  A final word only REFINES the
+#     partition the first k-1 words made, so each prefix bucket can be priced on
+#     its own and the results summed.
+#   * CANDIDATES GROUP BY THE PARTITION THEY INDUCE, not by their replies.  The
+#     pattern codes are labels; what matters is which members a word puts
+#     together, so a bucket of three has five possible outcomes however many
+#     candidates exist.  `_rep_rows` is that collapse and it is shared.
+#
+# WHERE THIS DIFFERS FROM THE GUARANTEE PASS, and it is the one real difference:
+# **a bucket of TWO is not constant here.**  There, one and two are solved
+# whatever the last word does, so only their ssq was owed.  For the mean a
+# two-bucket costs T = 3 left whole and 2 when split, so the last word is worth
+# exactly one guess on it and the bucket has to be priced.  Buckets of ONE stay
+# constant (T = 1).
+# ---------------------------------------------------------------------------
+
+SCALE = 10 ** 4
+"""Fixed-point units for the climb's primary key -- see `mean_objective`."""
+
+
+def last_level_mean(Mpool, M, prefix, ans_pool_idx, k, cand_to_pool, memo=None):
+    """(total guesses x SCALE, ssq) for EVERY candidate as the k-th word.
+
+    `Mpool` is pool-vs-pool (what a live set is made of, and what `tail_total`
+    walks); `M` is candidate-vs-pool (how a candidate SPLITS, and a candidate
+    need not be a pool word).  `cand_to_pool` maps each candidate to its pool
+    index or -1 -- the one thing the guarantee pass does not need and this one
+    does, because an opening word that IS an answer is found by playing it.
+
+    The returned total is the WHOLE opening's, constant terms included, so it is
+    directly comparable with `evaluate`'s -- which is what makes the climb's
+    own `current` assertion a free differential between the two paths.
+    """
+    from paircover import _parts, _rep_rows          # local: avoids a cycle
+
+    memo = {} if memo is None else memo
+    nc = M.shape[0]
+    rows = M[list(prefix)] if len(prefix) else M[:0]
+    key = joint_key(rows)
+    order = np.argsort(key, kind="stable")
+    skey = key[order]
+    cuts = np.flatnonzero(np.r_[True, skey[1:] != skey[:-1], True])
+
+    # An opening word that is a pool word is ALONE in its prefix bucket (it
+    # replies all-green to itself and to nothing else), and its game ended when
+    # it was played -- so that bucket costs its POSITION and nothing the last
+    # word does can touch it.
+    at_pos = {}
+    for pos, c in enumerate(prefix, start=1):
+        p = int(cand_to_pool[c])
+        if p >= 0:
+            at_pos.setdefault(p, pos)
+
+    const = 0.0
+    var = np.zeros(nc, dtype=np.float64)
+    ssq = np.zeros(nc, dtype=np.int64)
+    eligible = np.zeros(Mpool.shape[0], dtype=bool)
+    for lo, hi in zip(cuts[:-1], cuts[1:]):
+        members = order[lo:hi]
+        n = hi - lo
+        if n == 1 and int(members[0]) in at_pos:
+            const += at_pos[int(members[0])]
+            ssq += 1
+            continue
+        eligible[members] = True
+        const += k * n                     # every answer here plays all k words
+        if n == 1:
+            const += 1.0                   # T({x}) = 1, whatever the last word
+            ssq += 1
+            continue
+        if n == 2:
+            same = M[:, members[0]] == M[:, members[1]]
+            var += np.where(same, 3.0, 2.0)
+            ssq += np.where(same, 4, 2)
+            continue
+        reps, inv = _rep_rows(M[:, members])
+        cv = np.empty(len(reps), dtype=np.float64)
+        cs = np.empty(len(reps), dtype=np.int64)
+        for r, rep in enumerate(reps):
+            t = 0.0
+            s2 = 0
+            for loc in _parts(rep):
+                s2 += len(loc) * len(loc)
+                t += tail_total(Mpool, np.sort(members[loc]), memo)
+            cv[r], cs[r] = t, s2
+        var += cv[inv]
+        ssq += cs[inv]
+
+    # A CANDIDATE THAT IS ITSELF A LIVE ANSWER IS FOUND BY PLAYING IT, so it
+    # costs k rather than k + T({c}) = k + 1.  It is alone in its sub-bucket for
+    # the same reason a prefix word is, so the correction is exactly one guess.
+    live = (cand_to_pool >= 0)
+    live[live] &= eligible[cand_to_pool[live]]
+    var -= live
+
+    return np.rint((const + var) * SCALE).astype(np.int64), ssq

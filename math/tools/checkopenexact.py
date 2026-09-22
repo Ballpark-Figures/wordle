@@ -29,6 +29,13 @@ the same idea would only prove the idea was typed twice.
   E  The opening-word accounting: an answer that IS the i-th opening word must
      cost exactly i, checked against a direct replay.
 
+  F  `last_level_mean` -- the WHOLE-POOL pass the hill climb ranks swaps with --
+     against `evaluate` called once per candidate.  This is the check that makes
+     the climb trustworthy: the pass prices every candidate at once by grouping
+     them on the PARTITION they induce and reusing one memo, where the oracle
+     re-derives each opening from scratch.  They must agree on the total AND on
+     the ssq tie-break for EVERY candidate, at every opening size.
+
 COVERAGE IS ASSERTED, because every check above passes vacuously on a field that
 never exercises the interesting branch.  It FAILS unless a guaranteed opening
 and a non-guaranteed one both occurred, unless an opening word that is an answer
@@ -47,8 +54,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 import ladder                                                             # noqa: E402
 from build_patterns import load_patterns                                  # noqa: E402
 from guarantee_sweep import check_opening                                 # noqa: E402
-from openexact import evaluate, joint_key, tail_lost, tail_total          # noqa: E402
-from paircover import pool_matrix                                         # noqa: E402
+from openexact import (SCALE, evaluate, joint_key,   # noqa: E402
+                       last_level_mean, tail_lost, tail_total)
+from paircover import cand_matrix, pool_matrix                            # noqa: E402
 from wordle import load_words, pattern                                    # noqa: E402
 
 TOL = 1e-9
@@ -202,6 +210,38 @@ def main():
             check(r["total"] < r2["total"],
                   "slate as its own answer costs less than not",
                   "%.1f vs %.1f" % (r["total"], r2["total"]))
+
+    print("F  last_level_mean (the climb's pass) vs evaluate, per candidate")
+    # A SMALL candidate list, because the oracle is one full evaluation each and
+    # its cost is set by the PREFIX: a 1-word prefix leaves buckets of 200+, so
+    # k = 2 is priced on 30 candidates where k = 3 and 4 take the lot.
+    def pass_vs_oracle(cand_words, prefix_words, k, limit=None):
+        cw = sorted(set(list(cand_words) + list(prefix_words)))
+        cc = np.array([gpos[w] for w in cw])
+        Mc = cand_matrix(full, cc, cols)
+        c2p = np.array([ppos.get(w, -1) for w in cw])
+        prefix = [cw.index(w) for w in prefix_words]
+        pri, sq = last_level_mean(M, Mc, prefix, ans, k, c2p)
+        which = range(len(cw) if limit is None else min(limit, len(cw)))
+        bad = 0
+        for c in which:
+            ws = prefix + [c]
+            r = evaluate(M, Mc[ws], [int(c2p[w]) for w in ws], ans)
+            want = int(round(r["total"] * SCALE))
+            kk = joint_key(Mc[ws])
+            _, iv = np.unique(kk, return_inverse=True)
+            sz = np.bincount(iv)
+            if abs(int(pri[c]) - want) > 1 or int(sq[c]) != int((sz.astype(
+                    np.int64) ** 2).sum()):
+                bad += 1
+        check(bad == 0, "k=%d prefix=%s, %d candidates"
+              % (k, " ".join(prefix_words) or "(none)", len(list(which))),
+              "%d mismatch(es)" % bad)
+
+    base = list(answers[:120]) + ["clint", "horst", "sowed", "whift"]
+    pass_vs_oracle(base, ["bugle", "champ", "downy"], 4)
+    pass_vs_oracle(base, ["dance", "blimp"], 3)
+    pass_vs_oracle(base, ["crane"], 2, limit=30)
 
     print("COVERAGE")
     for k, v in sorted(seen.items()):

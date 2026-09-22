@@ -67,6 +67,8 @@ import itertools
 
 import numpy as np
 
+from openexact import (SCALE, evaluate, joint_key,   # the exact objective
+                       last_level_mean)
 from paircover import (last_level_scores,   # the two slot-scorers; see above
                        last_level_singles, singles_of)
 
@@ -368,6 +370,47 @@ def singles_objective(M, ans):
     def score_one(words):
         sg, ssq = singles_of(M, list(words), ans)
         return -sg, ssq
+    return last_level, score_one
+
+
+def mean_objective(Mpool, M, ans, k, cand_to_pool, cap=6):
+    """Fewest EXPECTED GUESSES, exactly, ties on ssq.  `math/openexact.py`.
+
+    THE THIRD OBJECTIVE, and the first whose primary is not a count.  It is the
+    quantity `run-wordle-race.sh --fallback answer` estimates by Monte Carlo --
+    a blind k-word opening then a uniform draw from the still-consistent
+    answers -- computed rather than sampled, so a climb is reproducible and has
+    no winner's curse.
+
+    **FIXED POINT, NOT FLOAT, and that is forced by `neighbourhood`.**  It casts
+    the primary with `astype(np.int64)` and bans a word by writing INT32's max
+    into it, so a float key would be truncated and a key above that sentinel
+    would make a banned word look best.  `SCALE` is 10**4: the total runs to
+    about 8800 guesses over the 2315 answers, so the key peaks near 8.8e7 --
+    two orders inside the sentinel -- and the granularity is 1e-4 of a guess in
+    the TOTAL, i.e. 4e-8 in the mean.  Do not raise SCALE without moving that
+    sentinel first.
+
+    `score_one` goes through `evaluate`, the whole-opening path VERIFIED against
+    the committed race cells, rather than through the pass it is checked
+    against.  That makes `climb`'s `current` assertion a real differential
+    between two implementations of one number, exactly as it is for guarantee.
+    """
+    memo, ev_memo = {}, {}
+
+    def last_level(prefix):
+        return last_level_mean(Mpool, M, prefix, ans, k, cand_to_pool, memo)
+
+    def score_one(words):
+        words = list(words)
+        r = evaluate(Mpool, M[words], [int(cand_to_pool[w]) for w in words],
+                     ans, cap=cap, memo=ev_memo)
+        key = joint_key(M[words])
+        _, inv = np.unique(key, return_inverse=True)
+        sizes = np.bincount(inv)
+        return (int(round(r["total"] * SCALE)),
+                int((sizes.astype(np.int64) ** 2).sum()))
+
     return last_level, score_one
 
 

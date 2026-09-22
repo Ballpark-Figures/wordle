@@ -5,14 +5,23 @@
 #     bash solver/run-hill-climb.sh -t 100
 #     bash solver/run-hill-climb.sh -t 50 --candidates guess
 #     bash solver/run-hill-climb.sh -t 50 --objective singles --pool mystery --words 3
+#     bash solver/run-hill-climb.sh -t 20 --objective mean --pool mystery --words 4
 #
-# TWO OBJECTIVES, and they are different quantities over the same openings --
+# THREE OBJECTIVES, and they are different quantities over the same openings --
 # never put their numbers in one table.  `guarantee` (the default here, a human
 # reading a default rather than a program falling back on one) minimises the
 # answers a random tail can be made to lose; `singles` maximises the answers a
-# reply names outright, which is what data/shared/singletons ranks by.  The
-# objective leads the filename and is stamped in the CSV, and a run refuses a
-# file written under the other one.
+# reply names outright, which is what data/shared/singletons ranks by; `mean`
+# minimises EXPECTED GUESSES exactly (math/openexact.py), which is the number
+# run-wordle-race.sh --fallback answer estimates by Monte Carlo for this same
+# strategy.  The objective leads the filename and is stamped in the CSV, and a
+# run refuses a file written under another one.
+#
+# COST DEPENDS ON THE WORD COUNT, and for `mean` it is the PREFIX that decides:
+# a swap scan holds k-1 words fixed, so a 2-word opening prices candidates
+# against ONE-word buckets of up to 221 answers, while a 4- or 5-word opening
+# prices them against buckets of 16 or fewer.  Small openings are the expensive
+# ones here.  Price one trial before launching a batch.
 #
 # Draw k random words, then repeatedly take the single-word swap that lowers the
 # number of UNSOLVED answers the most, until none does.  That is a LOCAL
@@ -76,7 +85,8 @@ PY=../.venv/bin/python
 case "$OBJ" in
     guarantee) STEM="climb_${POOL}" ;;
     singles)   STEM="singles_${POOL}" ;;
-    *) echo "--objective must be guarantee or singles" >&2; exit 1 ;;
+    mean)      STEM="mean_${POOL}" ;;
+    *) echo "--objective must be guarantee, singles or mean" >&2; exit 1 ;;
 esac
 [ -z "$CANDS" ] || STEM="${STEM}-from-${CANDS}"
 STEM="${STEM}_w${NWORDS}_s${SEED}"
@@ -98,6 +108,9 @@ echo "  words      the $NWORDS come from ${CANDS:-$POOL}$([ -z "$CANDS" ] && ech
 case "$OBJ" in
   guarantee) echo "  target     fewest answers UNSOLVED after the opening and the tail" ;;
   singles)   echo "  target     MOST answers alone in their bucket (--cap unused)" ;;
+  mean)      echo "  target     fewest EXPECTED GUESSES, computed exactly -- the number"
+             echo "             run-wordle-race.sh --fallback answer samples for"
+             echo "             this same strategy.  Expected guesses OUTRIGHT." ;;
 esac
 echo "  moves      one word, then anagram PAIRS, then pairs within one letter,"
 echo "             then anagram TRIPLES -- each to exhaustion, then round again"

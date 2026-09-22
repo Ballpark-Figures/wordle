@@ -34,17 +34,37 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from build_patterns import load_patterns                                  # noqa: E402
 from guarantee_sweep import check_opening                                 # noqa: E402
 from hillclimb import (SECTIONS, anagram_index, climb_all,            # noqa: E402
-                       guarantee_objective, letter_counts, neighbourhood,
-                       singles_objective)
+                       guarantee_objective, letter_counts, mean_objective,
+                       neighbourhood, singles_objective)
 from csvout import fresh_file                                             # noqa: E402
 from opening_list import resolve_word_set                                 # noqa: E402
+from openexact import SCALE                                               # noqa: E402
 from paircover import cand_matrix, pool_matrix                            # noqa: E402
 from wordle import load_words, pattern, to_codes                          # noqa: E402
 
 # THE VALUE COLUMN IS NAMED AFTER THE OBJECTIVE, so a file can never be read as
 # the other one's -- the same reason the race names its column after its ranking.
 # `sign` turns the climb's MINIMISED key back into the reported number.
-OBJECTIVES = {"guarantee": ("unsolved", 1), "singles": ("singles", -1)}
+OBJECTIVES = {"guarantee": ("unsolved", 1), "singles": ("singles", -1),
+              "mean": ("mean", 1)}
+
+# THE KEY THE CLIMB MINIMISES IS NOT ALWAYS THE NUMBER A HUMAN READS.  Two
+# objectives carry counts and report them as-is (singles negated, since the
+# climb only goes down); `mean` carries the TOTAL guesses in fixed point, so its
+# reported value is that divided by SCALE and by the answer count.  One place
+# owns that conversion, or the printout, the CSV and the ranking drift apart.
+
+
+def reported(objective, key, n_ans):
+    """The key as the number this objective is ABOUT."""
+    if objective == "mean":
+        return key / (SCALE * float(n_ans))
+    return OBJECTIVES[objective][1] * key
+
+
+def fmt(objective, key, n_ans):
+    return ("%.9f" if objective == "mean" else "%d") % reported(
+        objective, key, n_ans)
 
 
 def columns(objective):
@@ -156,7 +176,7 @@ def parse_args(argv):
     if a["out"] is None:
         raise SystemExit("--out is required (or --no-out).  Use the wrapper: "
                          "bash solver/run-hill-climb.sh")
-    if a["objective"] == "guarantee" and a["cap"] - a["words"] < 1:
+    if a["objective"] in ("guarantee", "mean") and a["cap"] - a["words"] < 1:
         # Only the guarantee objective has a tail to budget.  A singleton is a
         # property of the partition, so a 6-word opening in a 6-guess game is a
         # perfectly ordinary question there and must not be refused.
@@ -205,6 +225,14 @@ def _init(pool_name, cand_name, words, cap, q, objective):
     if objective == "guarantee":
         last_level, score_fn = guarantee_objective(full, cols, M, ans, codes,
                                                    cap - words)
+    elif objective == "mean":
+        # It needs BOTH matrices and the candidate-to-pool map: pool-vs-pool is
+        # what a live set is walked over, candidate-vs-pool is how a candidate
+        # SPLITS, and the map is how a candidate that is itself an answer gets
+        # charged for being played rather than for being found by the tail.
+        Mpool = pool_matrix(full, cols)
+        c2p = np.array([ppos.get(w, -1) for w in cands])
+        last_level, score_fn = mean_objective(Mpool, M, ans, words, c2p, cap)
     else:
         last_level, score_fn = singles_objective(M, ans)
     _W.update(full=full, cols=cols, ans=ans, M=M, cands=cands, words=words,
@@ -237,20 +265,22 @@ def _trial(args):
         # `sign * key` is the number a human reads: the climb minimises, so the
         # singleton objective carries a negated key internally and only the
         # printout and the CSV turn it back the right way up.
-        say("  trial %-4d r%-2d swap      %-7s -> %-7s   %s %5d  "
+        say("  trial %-4d r%-2d swap      %-7s -> %-7s   %s %11s  "
             "ssq %7d   (%.0fs)"
             % (trial, rnd, W["cands"][old], W["cands"][new], vname,
-               sign * key, ssq, time.time() - t0))
+               fmt(W["objective"], key, len(W["answers"])), ssq,
+               time.time() - t0))
 
     def on_move(rnd, label, step, old_words, new_words, key, q2):
         # Joined rather than per-slot, because a section may move two words or
         # three and one printer has to read for both.
-        say("  trial %-4d r%-2d %-9s %-23s -> %-23s   %s %5d  "
+        say("  trial %-4d r%-2d %-9s %-23s -> %-23s   %s %11s  "
             "ssq %7d   (%.0fs)"
             % (trial, rnd, label,
                " ".join(W["cands"][c] for c in old_words),
                " ".join(W["cands"][c] for c in new_words),
-               vname, sign * key, q2, time.time() - t0))
+               vname, fmt(W["objective"], key, len(W["answers"])), q2,
+               time.time() - t0))
 
     # THE SECTIONS AND THE LOOP LIVE IN hillclimb.climb_all, which states the
     # rule; this only prints.  Three widening neighbourhoods run in order, each
@@ -272,6 +302,24 @@ def _trial(args):
             raise SystemExit("GATE FAILED: %s scores %d unsolved here and %d "
                              "losing in guarantee_sweep"
                              % (" ".join(names), uns, len(losing)))
+    elif W["objective"] == "mean":
+        # THE ORACLE HERE IS THE PARTITION, not the tail recursion.  `climb`
+        # already cross-checks the last-level pass against `evaluate` on every
+        # round (two implementations of the total, one assertion), and the tail
+        # recursion itself is gated hard in tools/checkopenexact.py against
+        # exact-rational recursions over the STRINGS -- which is far too slow to
+        # repeat per trial.  What is cheap and worth doing here is re-deriving
+        # the BUCKETING from the strings, since that is what the candidate
+        # grouping and the joint key could get wrong.
+        got = {}
+        for aw in W["answers"]:
+            k = tuple(pattern(g, aw) for g in names)
+            got[k] = got.get(k, 0) + 1
+        n_ssq = sum(v * v for v in got.values())
+        if n_ssq != ssq:
+            raise SystemExit("GATE FAILED: %s scores ssq %d here and %d "
+                             "recounted from the strings"
+                             % (" ".join(names), ssq, n_ssq))
     else:
         # Recount the singletons FROM THE STRINGS: bucket every answer by its
         # tuple of replies, with no matrix, no joint key and no candidate
@@ -301,6 +349,22 @@ def main(argv):
     if missing:
         raise SystemExit("the pool is missing %d answer(s): %s"
                          % (len(missing), ", ".join(missing[:5])))
+    # THE `mean` OBJECTIVE NEEDS THE POOL TO *BE* THE ANSWER LIST, and it is
+    # REFUSED rather than approximated when it is not.  Both of its recursions
+    # carry a single index over the live set, which is only sound because a
+    # bucket's live words and its answers are then the same set.  With a strict
+    # superset -- `custom`, `guess` -- a bucket holds words that can never BE
+    # the answer, so T(S) would sum over the wrong thing and every number would
+    # be confidently wrong rather than missing.  Same refusal, same reason, as
+    # tools/open_exact.py's --pool.
+    if a["objective"] == "mean" and sorted(pool) != sorted(answers):
+        raise SystemExit(
+            "--objective mean needs --pool mystery: its recursions carry one "
+            "index over the live set, which is sound only while a bucket's "
+            "live words and its answers are the same set.  Pool %r is a "
+            "superset of the 2315, so a bucket would hold words that can never "
+            "be the answer.  (--candidates is unrestricted -- that is the list "
+            "the opening is BUILT from, and it may be anything.)" % a["pool"])
     ppos = {w: i for i, w in enumerate(pool)}
     cands = pool if a["candidates"] is None else sorted(
         resolve_word_set(a["candidates"]))
@@ -324,6 +388,14 @@ def main(argv):
         print("  objective FEWEST answers the random tail can be made to LOSE,")
         print("           with the %d guesses left after the blind opening"
               % (a["cap"] - a["words"]))
+    elif a["objective"] == "mean":
+        print("  objective FEWEST EXPECTED GUESSES, computed EXACTLY -- the")
+        print("           quantity run-wordle-race.sh --fallback answer")
+        print("           estimates by Monte Carlo.  Play is never truncated,")
+        print("           so this is expected guesses OUTRIGHT and never")
+        print("           belongs beside an optturns-family total.")
+        print("           The tail draws from the POOL, so --pool mystery is")
+        print("           the random-compatible-ANSWER follow-up.")
     else:
         print("  objective MOST answers alone in their bucket -- a reply that")
         print("           names the word outright.  No tail, so no budget and")
@@ -383,19 +455,22 @@ def main(argv):
         on the key, so "better" means the same thing in both objectives.
         """
         nonlocal best_ever
-        print("  trial %-4d done [%s]: %s   %s %d  ssq %d  (%.0fs)"
-              % (trial, steps, " ".join(names), vname, sign * key, ssq, secs),
+        print("  trial %-4d done [%s]: %s   %s %s  ssq %d  (%.0fs)"
+              % (trial, steps, " ".join(names), vname,
+                 fmt(a["objective"], key, len(answers)), ssq, secs),
               flush=True)
         if best_ever is None or (key, ssq) < best_ever[:2]:
             best_ever = (key, ssq, names, trial)
             print("  NEW BEST across trials", flush=True)
         else:
-            print("  best so far: trial %d, %s %d (%s)"
-                  % (best_ever[3], vname, sign * best_ever[0],
+            print("  best so far: trial %d, %s %s (%s)"
+                  % (best_ever[3], vname,
+                     fmt(a["objective"], best_ever[0], len(answers)),
                      " ".join(best_ever[2])), flush=True)
         if fh:
-            fh.write("%d,%s,%d,%d,%s,%.1f\n"
-                     % (trial, " ".join(names), sign * key, ssq,
+            fh.write("%d,%s,%s,%d,%s,%.1f\n"
+                     % (trial, " ".join(names),
+                        fmt(a["objective"], key, len(answers)), ssq,
                         steps.replace(",", ";"), secs))
             fh.flush()
 
@@ -435,9 +510,17 @@ def main(argv):
                     break
 
     print("\nbest over %d trial(s): %s" % (a["trials"], " ".join(best_ever[2])))
-    print("  %s %d of %d,  ssq %d   (trial %d, %.0fs total)"
-          % (vname, sign * best_ever[0], len(answers), best_ever[1],
-             best_ever[3], time.time() - t_all))
+    # `mean` is already an average over the answers, so "of N" would read as a
+    # count out of the answer set and be a lie; the counts genuinely are.
+    if a["objective"] == "mean":
+        print("  %s %s,  ssq %d   (trial %d, %.0fs total)"
+              % (vname, fmt(a["objective"], best_ever[0], len(answers)),
+                 best_ever[1], best_ever[3], time.time() - t_all))
+    else:
+        print("  %s %s of %d,  ssq %d   (trial %d, %.0fs total)"
+              % (vname, fmt(a["objective"], best_ever[0], len(answers)),
+                 len(answers), best_ever[1], best_ever[3],
+                 time.time() - t_all))
     if fh:
         fh.close()
     if a["out"]:
