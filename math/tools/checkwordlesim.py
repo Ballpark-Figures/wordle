@@ -159,6 +159,42 @@ def refplay_game(pool, answer, rng, opening=()):
             raise AssertionError("reference eliminated the answer %s" % answer)
 
 
+def refplay_blind(pool, answer, rng):
+    """Replay one `random-blind` game from strings alone.
+
+    The feedback-blind rule: draw uniformly from the WHOLE pool every turn, with
+    replacement, ignoring which words the replies have ruled out -- except when
+    exactly one candidate is left, when that word is named and NO draw is made.
+    The candidate list is still maintained (by the string rule, as everywhere in
+    this file) because it is what the singleton test reads.
+
+    Returns the words played plus the three things coverage is asserted on: did
+    the game end by naming the lone survivor or by a lucky draw, was any word
+    played twice, and how many guesses were inconsistent when played.
+    """
+    cands = list(pool)
+    played, repeats, inconsistent = [], 0, 0
+    while True:
+        if len(cands) == 1:
+            # named, not drawn -- the rng must not be consulted here or the two
+            # sides fall out of step on every later turn
+            g = cands[0]
+            played.append(g)
+            if g != answer:
+                raise AssertionError("the lone candidate was not the answer")
+            return played, True, repeats, inconsistent
+        g = pool[int(rng.integers(len(pool)))]
+        repeats += g in played
+        inconsistent += g not in cands
+        played.append(g)
+        if g == answer:
+            return played, False, repeats, inconsistent
+        fb = ref_pattern(g, answer)
+        cands = [w for w in cands if ref_pattern(g, w) == fb]
+        if answer not in cands:
+            raise AssertionError("reference eliminated the answer %s" % answer)
+
+
 def ref_play_second(pool, answer, rng, opener, second, fires):
     """Replay a gray-second game from strings alone.  Returns the words played.
 
@@ -404,6 +440,92 @@ def main(argv):
         custom_differed += gw != cw
     print("the custom pool is not the guess pool: %d of %d identically-seeded "
           "games diverged" % (custom_differed, guess_games))
+
+    # --- differential: random-blind, the FEEDBACK-BLIND baseline -------------
+    # Same game, same reference machinery; the rule draws from ALL 2315 whatever
+    # the replies said.  The load-bearing coverage assertion is at the bottom:
+    # a rule that quietly filtered by consistency would BE `random` and every
+    # sequence check here would still pass.
+    brule, btail_name = make_strategy("random-blind", guesses, answers, ans2g)
+    btail = make_tail(btail_name, guesses, answers, ans2g)
+    if btail_name != "answer":
+        failures.append("strategy 'random-blind' resolved to the %r follow-up" % btail_name)
+    bscores = []
+    blind_singleton = blind_lucky = blind_repeat = blind_inconsistent = 0
+    for seed in range(games):
+        fast_rng = np.random.default_rng(900000 + seed)
+        ref_rng = np.random.default_rng(900000 + seed)
+        a_fast = draw_answer(len(answers), fast_rng)
+        a_ref = int(ref_rng.integers(len(answers)))
+        if a_fast != a_ref:
+            failures.append("random-blind seed %d: the two sides drew different answers" % seed)
+            break
+        answer = answers[a_fast]
+        played, replies = play_game(pat, ans2g, a_fast, brule, btail, fast_rng)
+        words = [guesses[g] for g in played]
+        ref_words, singleton, repeats, inconsistent = refplay_blind(answers, answer, ref_rng)
+        if words != ref_words:
+            failures.append("random-blind seed %d (%s): fast %s vs reference %s"
+                            % (seed, answer, " ".join(words), " ".join(ref_words)))
+            break
+        if words[-1] != answer:
+            failures.append("random-blind seed %d (%s): the game did not end on the "
+                            "answer" % (seed, answer))
+            break
+        if replies[-1] != ALL_GREEN or ALL_GREEN in replies[:-1]:
+            failures.append("random-blind seed %d (%s): the all-green reply is "
+                            "misplaced" % (seed, answer))
+            break
+        if any(w not in set(answers) for w in words):
+            failures.append("random-blind seed %d (%s): played %s, which is not an "
+                            "answer word" % (seed, answer, words))
+            break
+        bscores.append(len(words))
+        blind_singleton += singleton
+        blind_lucky += not singleton
+        blind_repeat += repeats > 0
+        blind_inconsistent += inconsistent > 0
+    print("replayed %d games of random-blind against the string reference: "
+          "identical sequences, every word an answer word (%d ended by naming "
+          "the lone survivor, %d by a lucky draw)"
+          % (len(bscores), blind_singleton, blind_lucky))
+
+    # --- constructed: with replacement, and the singleton does not draw ------
+    # Both are rare enough in random play to be worth building rather than
+    # waiting for -- and the second pins that the rng is NOT consulted at a
+    # singleton, which is what keeps the two sides in step turn for turn.
+    class _FixedRng:
+        """An rng that always returns the same index, and counts its calls."""
+        def __init__(self, value):
+            self.value, self.calls = value, 0
+        def integers(self, n):
+            self.calls += 1
+            assert self.value < n, "the rule drew from a pool of %d" % n
+            return self.value
+
+    wide = np.ones(len(answers), dtype=bool)
+    fixed = _FixedRng(7)
+    twice = [brule(turn=t, alive=wide, played=[], replies=[], rng=fixed)
+             for t in (0, 1)]
+    if twice[0] != twice[1]:
+        failures.append("random-blind did not repeat under a fixed draw, so the "
+                        "draw is not with replacement")
+    if guesses[twice[0]] != answers[7]:
+        failures.append("random-blind drew answer index 7 as %r, not %r"
+                        % (guesses[twice[0]], answers[7]))
+    lone = np.zeros(len(answers), dtype=bool)
+    lone[1234] = True
+    fixed_one = _FixedRng(7)
+    got = brule(turn=3, alive=lone, played=[], replies=[], rng=fixed_one)
+    if guesses[got] != answers[1234]:
+        failures.append("random-blind named %r with one candidate alive, not %r"
+                        % (guesses[got], answers[1234]))
+    if fixed_one.calls:
+        failures.append("random-blind consumed the rng at a singleton (%d draws), "
+                        "so its stream depends on the board" % fixed_one.calls)
+    print("random-blind constructed: a fixed draw repeats a played word, and the "
+          "lone survivor is named through ans2g with no draw taken")
+
 
     # --- the pool mask defends its two preconditions --------------------------
     # Both are constructed: the shipped list satisfies each, so neither case can
@@ -1611,6 +1733,20 @@ def main(argv):
         failures.append("random-custom played the identical games to random-guess on "
                         "every seed, so the POOL MASK was never shown to do anything "
                         "-- a mask that selected all 12972 would pass this run")
+    if not blind_inconsistent:
+        failures.append("random-blind never played a word the replies had already "
+                        "ruled out, so it was indistinguishable from random -- a "
+                        "rule that filtered by consistency would pass every other "
+                        "check here (raise --games)")
+    if not blind_singleton:
+        failures.append("no random-blind game ended by naming the lone survivor, "
+                        "so the singleton rule was never exercised (raise --games)")
+    if not blind_lucky:
+        failures.append("every random-blind game ended at a singleton, so winning "
+                        "by a lucky draw was never exercised (raise --games)")
+    if not blind_repeat:
+        failures.append("no random-blind game repeated a word -- the constructed "
+                        "case still passed, but raise --games to see one in play")
     if not gs_fired:
         failures.append("the gray-second rule never fired, so its second word "
                         "was never played")

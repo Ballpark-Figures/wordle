@@ -1900,6 +1900,38 @@ source of truth. Run it with **`bash solver/run-wordle-sim.sh --strategy NAME -t
   pool is the STRATEGY's, never the GAME's.** That is what makes two runs differing
   only in their follow-up directly comparable with each other, unlike a
   cross-game comparison.
+- **`random-blind` IS A RULE, NOT A FOLLOW-UP, and it is the one baseline that
+  IGNORES THE BOARD** (user's call, 2026-09-22). Every turn it draws uniformly
+  from ALL 2315 answers — consistent with the replies or not — until exactly one
+  candidate is left, and then it names that word. `random` draws from the answers
+  still ALIVE; this draws from the whole list. Same pool, same game, one
+  difference, so the two are directly comparable.
+  - **THE DRAW IS WITH REPLACEMENT** (user's call): a word already played can come
+    up again. That is the literal reading of "random answers", and it means this
+    rule BREAKS the invariant `_MAX_TURNS` is justified by — "a follow-up
+    eliminates at least one word per turn" — since a repeat returns the identical
+    reply and eliminates nothing. Termination is still certain by a different
+    argument (every non-repeat strictly shrinks the set), which is written out in
+    `BlindRandomAnswer`'s docstring. Do not "fix" the bound.
+  - **IT STILL LEARNS, so do not describe it as playing blind.** An inconsistent
+    guess is scored against the true ANSWER like any other, so its reply narrows
+    the candidates — badly, since the word was not chosen to split anything, but
+    not at all blindly. It ignores the board when CHOOSING, which is a different
+    claim from receiving no information.
+  - **IT CAN WIN BY LUCK**, a draw that happens to BE the answer, however many
+    candidates were alive. So the singleton ending is the usual one and not the
+    only one — measured in the gate at 198 of 200 games ending at a singleton and
+    2 by a lucky draw.
+  - **It PINS the `answer` follow-up** (that is the list it draws from) and takes
+    no `--fallback`, but unlike the three baselines below it does so while HAVING
+    a rule — one that answers every turn, so the follow-up never actually plays.
+  - **The gate's load-bearing check is the coverage assertion that it actually
+    played a word the replies had ruled out.** A rule that quietly filtered by
+    consistency would BE `random`, and every sequence check would still pass.
+    MUTATION-TESTED exactly that way, and caught. `checkwordlesim.py` also
+    CONSTRUCTS the two cases random play makes rare: a fixed draw repeating a
+    played word, and a singleton naming its survivor while consuming NO rng (a
+    draw there would put the two sides out of step on every later turn).
 - **`random`, `random-guess` and `random-custom` are the SAME EMPTY RULE under the
   three follow-ups**,
   and each PINS its own (the name is what records it), so they take no `--fallback`

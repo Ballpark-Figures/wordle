@@ -42,8 +42,8 @@
 # two runs differing only in their follow-up are directly comparable.
 #
 # The strategies live in math/wordlesim.py's registry; `--strategy list` prints
-# them.  Today they are the two baselines, which are the same EMPTY rule under the
-# two follow-ups -- so each PINS its own and takes no --fallback:
+# them.  The BASELINES are the same EMPTY rule under each follow-up -- so each
+# PINS its own and takes no --fallback:
 #
 #   random         no rule: the ANSWER follow-up plays the whole game.  Nothing is
 #                  hardcoded and no opener is an input -- on turn one every answer
@@ -53,6 +53,25 @@
 #                  words that can never be the answer (10657 of the 12972 are not
 #                  mystery words); that is the point, it is what a player without
 #                  the curated answer list can do.
+#
+#   random-custom  no rule: the CUSTOM follow-up (words/custom.txt, 4282) plays
+#                  it -- a player who knows ordinary English but not the curated
+#                  answer list.  A THIRD quantity, not an interpolation.
+#
+# One more strategy pins a follow-up, but because of what it draws FROM rather
+# than because it has no rule of its own:
+#
+#   random-blind   the FEEDBACK-BLIND baseline (2026-09-22).  A uniform draw from
+#                  ALL 2315 answers every turn -- consistent with the replies or
+#                  not, and WITH REPLACEMENT, so a word can be played twice --
+#                  until exactly one candidate is left, which it then names.  The
+#                  companion to `random`: same pool, same game, and the only
+#                  difference is that `random` draws from the answers still ALIVE.
+#                  Its rule answers every turn, so the follow-up never fires and
+#                  --fallback is refused.  NB it still LEARNS -- an inconsistent
+#                  guess is scored against the true answer like any other, so its
+#                  reply narrows the candidates; it ignores the board when
+#                  CHOOSING, which is not the same as getting no information.
 #
 # A strategy that DOES have a rule takes --fallback to say which of the two fills
 # in the rest; the flag is required there, and refused for the two above, whose

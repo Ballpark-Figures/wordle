@@ -459,6 +459,69 @@ def _no_rule(guesses, answers, ans2g, args, name, tail=None, adapt=0):
     return None
 
 
+class BlindRandomAnswer:
+    """Guess a uniform random ANSWER every turn, IGNORING the replies -- until
+    exactly one candidate is left, and then name it.
+
+    The deliberately feedback-blind baseline (the user's, 2026-09-22), and the
+    companion to `random`: that one draws from the answers still CONSISTENT with
+    every reply, this one draws from all 2315 whatever the board says.  The ONE
+    thing it ever reads off the board is when the candidate set reaches a single
+    word, and then it plays that word.  So the two differ only in how the guess
+    is CHOSEN, which is what makes them directly comparable.
+
+    THE DRAW IS WITH REPLACEMENT (the user's call, 2026-09-22) -- a word already
+    played can come up again, which is the literal reading of "random answers".
+    A repeat returns the IDENTICAL reply, so it eliminates nothing, and this rule
+    therefore BREAKS the invariant `_MAX_TURNS` is justified by up top ("a
+    follow-up eliminates at least one word per turn").  Termination is still
+    certain, by a different argument: every non-repeat strictly shrinks the
+    candidate set, and a repeat has probability at most (turns so far) / 2315, so
+    the run of repeats needed to reach 100000 turns has probability zero in any
+    practical sense.  The bound cannot fire here; the REASON is this paragraph,
+    not the one it is stated with.
+
+    IT STILL LEARNS.  An inconsistent guess is scored against the true answer
+    like any other, so its reply narrows the candidates just the same -- badly,
+    since the word was not chosen to split anything, but not not-at-all.  This is
+    "ignores the board when CHOOSING", never "receives no information".
+
+    IT CAN ALSO WIN BY LUCK: a draw that happens to BE the answer ends the game
+    inside `play_game` however many candidates were alive.  The singleton ending
+    is the usual one, not the only one, so a mean built only from the singleton
+    path would be wrong.
+
+    The rule answers EVERY turn (`alive` always holds at least the true answer),
+    so the follow-up it is registered with NEVER FIRES.  `answer` is the honest
+    name for it regardless, because the answer list is the pool this draws from.
+    """
+
+    def __init__(self, ans2g):
+        self.ans2g = ans2g
+
+    def __call__(self, turn, alive, played, replies, rng):
+        idx = np.flatnonzero(alive)
+        if not len(idx):
+            raise AssertionError("no answer is consistent with the replies so far")
+        if len(idx) == 1:
+            # The lone survivor is an ANSWER index and is about to be used as a
+            # GUESS -- the two index spaces are different lists, so it goes
+            # through ans2g.  (The same trap checktopk.py caught in topk.py.)
+            return int(self.ans2g[idx[0]])
+        return int(self.ans2g[int(rng.integers(len(self.ans2g)))])
+
+
+def _make_blind_random(guesses, answers, ans2g, args, name, tail=None, adapt=0):
+    """The BlindRandomAnswer rule -- takes no arguments and no opening."""
+    if args:
+        raise SystemExit("strategy %r takes no arguments, got: %s"
+                         % (name, " ".join(args)))
+    if adapt:
+        raise SystemExit("--pair-adaptive needs an opening to abandon; strategy "
+                         "%r plays a fresh random draw every turn" % name)
+    return BlindRandomAnswer(ans2g)
+
+
 class FixedOpening:
     """Play a fixed sequence of words in order, BLIND, then decline.
 
@@ -744,6 +807,12 @@ STRATEGIES = {
     "random":        Strategy(_no_rule, "answer"),
     "random-guess":  Strategy(_no_rule, "guess"),
     "random-custom": Strategy(_no_rule, "custom"),
+    # The FEEDBACK-BLIND baseline: a uniform draw from all 2315 answers every
+    # turn, consistent or not, until exactly one candidate is left.  It pins
+    # `answer` because that is the list it draws from -- but unlike the three
+    # above it HAS a rule, and that rule answers every turn, so the follow-up
+    # never actually plays.
+    "random-blind":  Strategy(_make_blind_random, "answer"),
     # One fixed opener, then the follow-up.  It pins NOTHING: both follow-ups are
     # meaningful under it, they are different strategies, and --fallback says which.
     "opener":       Strategy(_make_opener, None),
