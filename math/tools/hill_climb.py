@@ -359,12 +359,28 @@ def main(argv):
     # tools/open_exact.py's --pool.
     if a["objective"] == "mean" and sorted(pool) != sorted(answers):
         raise SystemExit(
-            "--objective mean needs --pool mystery: its recursions carry one "
-            "index over the live set, which is sound only while a bucket's "
-            "live words and its answers are the same set.  Pool %r is a "
-            "superset of the 2315, so a bucket would hold words that can never "
-            "be the answer.  (--candidates is unrestricted -- that is the list "
-            "the opening is BUILT from, and it may be anything.)" % a["pool"])
+            "--objective mean needs --pool mystery, and --pool %s is refused.\n"
+            "\n"
+            "  DID YOU MEAN --candidates %s?  The two are different lists:\n"
+            "    --pool        what the random TAIL draws from -- the "
+            "follow-up's own vocabulary\n"
+            "    --candidates  which words the OPENING may be built from, "
+            "which is unrestricted\n"
+            "  So an opening built from all 12972 with the "
+            "random-compatible-ANSWER tail is\n"
+            "    --pool mystery --candidates %s\n"
+            "\n"
+            "  WHY THE POOL IS REFUSED rather than approximated: both "
+            "recursions carry ONE\n"
+            "  index over the live set, which is sound only while a bucket's "
+            "live words and\n"
+            "  its answers are the same set.  A superset pool puts words in a "
+            "bucket that can\n"
+            "  never BE the answer, so the total would be summed over the "
+            "wrong set -- wrong,\n"
+            "  not missing.  Supporting it means carrying the answer subset "
+            "alongside the live\n"
+            "  set in both recursions." % (a["pool"], a["pool"], a["pool"]))
     ppos = {w: i for i, w in enumerate(pool)}
     cands = pool if a["candidates"] is None else sorted(
         resolve_word_set(a["candidates"]))
