@@ -110,16 +110,29 @@ def parse_args(argv):
 
 
 def load_field(a):
-    """The openings to price, as lists of words, in the order given."""
+    """The openings to price, as lists of words, in the order given.
+
+    MIXED SIZES ARE ALLOWED FROM `--opening` AND REFUSED FROM A RANKING, and the
+    difference is what the two are FOR.  A ranking is a field being compared, so
+    a 1-word entry beside a 2-word one would rank two different strategies
+    against each other -- the refusal `wordle_sweep.py` carries for the same
+    reason.  Named openings are a LIST TO PRICE: nothing here ranks them, the
+    per-opening budget is `cap - len(opening)` and the CSV records each row's
+    own word count, so pricing a 1-word and a 5-word opening in one run is
+    exactly as meaningful as two runs.  (It shipped refusing both, which turned
+    one summary table into five commands.)
+    """
     field = [w.split() for w in a.opening]
     if a.openings_from:
         restrict = resolve_word_set(a.openings_in) if a.openings_in else None
-        field += read_openings(a.openings_from, a.top, restrict, {})
-    sizes = {len(f) for f in field}
-    if len(sizes) > 1:
-        raise SystemExit("the field mixes opening sizes %s -- ranking a 1-word "
-                         "opening against a 2-word one compares two different "
-                         "strategies" % sorted(sizes))
+        ranked = read_openings(a.openings_from, a.top, restrict, {})
+        sizes = {len(f) for f in ranked}
+        if len(sizes) > 1:
+            raise SystemExit("%s mixes opening sizes %s -- a RANKING is a field "
+                             "being compared, so a 1-word opening beside a "
+                             "2-word one would rank two different strategies"
+                             % (a.openings_from, sorted(sizes)))
+        field += ranked
     return field
 
 
@@ -147,10 +160,11 @@ def main(argv):
     if bad:
         raise SystemExit("%d opening word(s) are not legal guesses: %s"
                          % (len(bad), ", ".join(bad[:5])))
-    k = len(field[0])
-    if k >= a.cap:
+    sizes = sorted({len(f) for f in field})
+    too_long = [k for k in sizes if k >= a.cap]
+    if too_long:
         raise SystemExit("a %d-word opening leaves no guesses under --cap %d"
-                         % (k, a.cap))
+                         % (too_long[0], a.cap))
 
     full = np.array(load_patterns(full=True))
     cols = np.array([gpos[w] for w in answers])
@@ -160,8 +174,9 @@ def main(argv):
     seen = done_already(a.out) if a.out else set()
     todo = [f for f in field if " ".join(f) not in seen]
 
-    print("open-exact: %d openings of %d word(s), pool %s (%d), cap %d "
-          "(budget %d)" % (len(field), k, a.pool, len(answers), a.cap, a.cap - k))
+    print("open-exact: %d opening(s) of %s word(s), pool %s (%d), cap %d"
+          % (len(field), "/".join(str(k) for k in sizes), a.pool, len(answers),
+             a.cap))
     print("  EXACT -- no sampling, no seed; the mean is expected guesses "
           "OUTRIGHT and the")
     print("  win rate is the fraction of those untruncated scores at %d or "
@@ -179,8 +194,9 @@ def main(argv):
         if new:
             out.write("# exact expected guesses and win rate for blind "
                       "openings (math/openexact.py)\n")
-            out.write("# settings pool=%s cap=%d words=%d answers=%d\n"
-                      % (a.pool, a.cap, k, len(answers)))
+            out.write("# settings pool=%s cap=%d words=%s answers=%d\n"
+                      % (a.pool, a.cap, ";".join(str(k) for k in sizes),
+                         len(answers)))
             out.write("# EXACT: no sampling and no seed, so there is no "
                       "standard error and a re-run reproduces this file\n")
             out.write("# mean is expected guesses OUTRIGHT (play is never "
@@ -191,6 +207,7 @@ def main(argv):
     best, last = None, time.time()
     for i, words in enumerate(todo, start=1):
         t0 = time.time()
+        k = len(words)
         rows = np.ascontiguousarray(full[np.ix_([gpos[w] for w in words], cols)])
         at = [ppos.get(w, -1) for w in words]
         r = evaluate(M, rows, at, ans, cap=a.cap)
