@@ -2879,6 +2879,127 @@ moment that becomes true, and the survivors double.
   resume, the pairwise switch and the chunk size all change nothing. Mutation-
   tested by seeding the games per chunk instead of per index.
 
+#### ANSWERS-ONLY openings — which ranking feeds each k, and the one that is MISSING
+The answers-only version of the blind k-word cascade needs NO code change: the
+race already takes `--words mystery` at k=1 and `--openings-from <ranking>` above
+it, and the answers rankings live beside the unrestricted ones under their own
+`_answers` names, so no stem can collide. **All five forms verified with
+`--dry-run` 2026-09-22.** Match the unrestricted cascade's letter restriction so
+the two are comparable — it used L19 quads and L23 quints.
+
+    k=1  --words mystery                                        (2315 openers)
+    k=2  pair_singletons_answers_*.csv                          (SEE BELOW)
+    k=3  triple_singletons_answers_exhaustive.csv               (top 100000 of 2.07e9)
+    k=4  quad_singletons_answers_L19_exhaustive.csv             (2920188, complete=1)
+    k=5  quint_singletons_answers_L23_exhaustive.csv            (complete=1)
+
+- **THE ANSWERS RANKINGS ARE BETTER INPUTS THAN THE UNRESTRICTED CASCADE'S WERE**,
+  which is worth saying because it inverts the usual expectation about a
+  restriction. The quad and quint ones are `complete=1` — EXHAUSTIVE over the
+  2315 — where the unrestricted runs screened a capped top-10000 of a top-100000.
+  Only the triple one is still capped.
+- **THE k=2 RANKING EXISTS ONLY IN ITS `_disjoint_` FORM, and that is a narrower
+  question, not a cheaper one.** `pair_singletons_answers_disjoint_exhaustive.csv`
+  is 10 DISTINCT LETTERS only; the unrestricted pair cascade used the plain
+  ranking. So racing the disjoint file answers "best all-answer pair among those
+  sharing no letter", which is not the same question the k=1/3/4/5 rows answer.
+  The plain one is `bash solver/run-singles.sh pairs --answers --top 100000` —
+  C(2315, 2) = 2678455 pairs, 31x fewer than the unrestricted 84M, so minutes.
+  **Build it before racing k=2**, or say in the write-up which file was raced.
+- **k=1 IS ALREADY SETTLED AND NEEDS NO RUN.** `slate` is itself an answer word
+  and it won the FULL 12972-word cascade (3.821830 +/- 0.000999, 98.8629% at 1M
+  games), so restricting the field to a subset containing it cannot do better.
+  Race it only to put the answers-only k=1 on the same footing as the others.
+- **THE RETAINED SWEEPS ALREADY HOLD ALL-ANSWER ROWS at every k** — the cascades
+  scored every opening they screened and the files keep them, so filtering those
+  by membership in `mystery.txt` gives a free preview of what a race should find.
+  MEASURED 2026-09-22: k=2 `crane spilt` 3.698408 (1M games), k=3
+  `chase print godly` 4.197333 (3k, and the top seven there are inside their own
+  standard errors, so it is a coin flip), k=4 `bugle champ downy first` 5.023256
+  (2M), k=5 `bowel curvy might spank fjord` 6.001948 (500k). NB k=4's is ALSO
+  rank 1 of `quad_singletons_answers_L19_exhaustive.csv`. **Those are the best of
+  whatever happened to qualify for an UNRESTRICTED ranking's top 10000** — 864
+  pairs, 329 triples, 95 quads and just 2 quints — which is exactly why the race
+  over the answers rankings is a different and better-founded question.
+
+### `openexact` — the race's TWO numbers, computed instead of sampled
+`math/openexact.py` states the strategy and the two recursions and IS the source of
+truth; `tools/open_exact.py` is the driver. Run it with **`bash
+solver/run-open-exact.sh --opening "crane spilt"`** or **`--openings-from RANK.csv
+--top N`** (from `math/`), attached, tee'd log, `--dry-run`, resumable per opening.
+Exact and deterministic — no sampling, no seed — so a re-run reproduces the file.
+- **IT IS THE SAME STRATEGY `run-wordle-race.sh --fallback answer` MEASURES**: a
+  k-word opening played BLIND (a game whose answer IS an opening word ends there),
+  then a uniform draw from the pool words still CONSISTENT with every reply. The
+  race ESTIMATES the mean and the win rate; this COMPUTES them.
+- **TWO QUANTITIES, AND THE CAP ENTERS ONLY ONE.** `mean` is expected guesses
+  OUTRIGHT — play is never truncated — so it sits with `wordlesim`/`multiwordle`
+  and NEVER beside an optturns-family total. `win_rate` is the fraction of those
+  same untruncated scores at `--cap` or fewer: a REPORTING THRESHOLD, not a rule
+  the strategy obeys. Same split `--win-within` carries in the simulation.
+- **THE TWO RECURSIONS**, over a live set `S` with a uniform draw from it:
+  `T(S) = |S| + (1/|S|) Σ_g Σ_parts T(P)` summed over the answers, UNCAPPED; and
+  `L(S,b)` = expected answers not found within `b`, which is `|S|` at `b == 0` and
+  **0 whenever `|S| <= b`** (every wrong draw eliminates the word drawn — the same
+  bound `guarantee.solved_within` prunes on). The drawn word contributes 0 to `L`.
+- **THEY COST THE SAME, WHICH WAS WORTH MEASURING BECAUSE THE SHAPES SUGGEST
+  OTHERWISE.** `L` carries a BUDGET in its memo key that `T` does not, so its state
+  space is nominally bigger — but the budget also truncates it at `cap - k` levels
+  where `T` recurses to singletons. MEASURED on `slate`: **4.1 s for the mean, 4.5 s
+  for the win rate**. The prediction that the cap would make the win rate the cheap
+  one was WRONG; at k = 1 the two effects cancel and above it both are free.
+- **COST IS GOVERNED BY THE WORD COUNT and nothing else**, since it is all in the
+  bucket sizes. MEASURED: ~4 s at k=1 (147 buckets, largest 221), **0.08 s at k=2**,
+  milliseconds at k=3,4,5. So a 10000-opening field of quads is minutes and the same
+  field of single words is most of a day — price the shape before launching one.
+- **VERIFIED AGAINST THE COMMITTED RACE CELLS AT EVERY k, each inside ONE standard
+  error** — the sharpest check available, because the two share no machinery (one
+  enumerates states, the other plays games):
+
+      crane spilt                    3.699156  vs 3.698408 +/- 0.000783   0.96 sd
+      parse clint                    3.693496  vs 3.692743 +/- 0.000781   0.96 sd
+      dance horst blimp              4.164319  vs 4.164442 +/- 0.000133   0.92 sd
+      bugle champ downy first        5.023218  vs 5.023256 +/- 0.000146   0.26 sd
+      champ flint rugby sowed        5.021922  vs 5.021944 +/- 0.000089   0.25 sd
+      clove rugby spank whift mozed  6.000864  vs 6.000883 +/- 0.000030   0.63 sd
+      slate                          3.821367  vs 3.821830 +/- 0.000999   0.46 sd
+
+- **IT PRICES, IT DOES NOT SEARCH.** A race screens thousands of openings and
+  eliminates; this evaluates what it is handed, so its head is the best of the
+  openings HANDED IN and the field's own caveat still applies. The two COMPOSE:
+  race wide and cheap, then price the survivors exactly.
+- **OPENING WORDS ARE GUESSES, NOT POOL WORDS** — `clint`, `horst` and `sowed` lead
+  real openings here — so they index the CANDIDATE side of the rectangle and a live
+  set stays a set of POOL words, exactly as `paircover.cand_matrix` splits it. An
+  opening word that IS an answer is ALONE in its bucket (all-green to itself only),
+  which is why the "the answer was an opening word" case needs no special case in
+  either recursion; it is charged the word's POSITION.
+- **ONLY THE `answer` POOL IS IMPLEMENTED, and the others are REFUSED rather than
+  approximated.** With pool == the answer list a bucket's live set and its answers
+  are the same set, which is what lets both recursions carry a single index. Under
+  `guess`/`custom` the pool is a strict superset, so both need to carry the answer
+  subset alongside the live set — a real change, not a flag. **The open follow-up.**
+- Data under `math/data/shared/openexact/`, log under `data/local/openexact/`.
+  **Pool and cap are in the filename**; each is a different question.
+- **`python3 tools/checkopenexact.py` is the GATE** (~40 s): `tail_total` against
+  `ladder.tail_total`, an exact-RATIONAL recursion over WORD STRINGS that never
+  touches the matrix; `tail_lost` against a brute-force ENUMERATION of draw
+  sequences in `Fraction`s with no memo; the win rate against
+  **`guarantee_sweep.check_opening`**, a different tool answering the neighbouring
+  question, where `lost > 0` must hold exactly when it names a losing answer and a
+  guaranteed opening must give `win_rate` of exactly 1; and the joint key against
+  `wordle.pattern` recomputed from the strings.
+  - **k=1 IS DELIBERATELY OUT OF THE `guarantee` CROSS-CHECK**: `check_opening`
+    computes the exact WORST CASE, which at k=1 runs on live sets past 200 words —
+    the cell `solved_within`'s docstring records as not finishing in eight minutes.
+    k >= 2 exercises the identical code on sets the oracle can afford.
+  - **COVERAGE IS ASSERTED** and it caught a real gap on the first run: the field
+    had NO guaranteed opening, so the `win_rate == 1` branch was never taken and
+    check C passed having tested only the losing side. `chubs delft grown vampy`
+    (the hill climb's 0-unsolved quad) is in the field for that reason. It also
+    FAILS unless an opening word that is an answer and one that is guess-only both
+    occurred, and unless `L`'s `|S| <= b` shortcut and its deep path were both hit.
+
 ### `guarantee` — does an opening reach 100%?  EXACT, not simulated
 `math/guarantee.py` states the question and IS the source of truth;
 `tools/guarantee_sweep.py` is the driver. Run it with

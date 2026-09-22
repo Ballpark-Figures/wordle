@@ -1,0 +1,7 @@
+# exact expected guesses and win rate for blind openings (math/openexact.py)
+# settings pool=answer cap=6 words=2 answers=2315
+# EXACT: no sampling and no seed, so there is no standard error and a re-run reproduces this file
+# mean is expected guesses OUTRIGHT (play is never truncated); win_rate is the fraction at <= cap
+word,words,mean,win_rate,total,lost,answers,buckets,budget,seconds
+crane spilt,2,3.699156122,0.995052834,8563.5,11.452689756,2315,1071,4,0.081
+parse clint,2,3.693496242,0.994794138,8550.4,12.051569814,2315,1079,4,0.083
