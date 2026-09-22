@@ -544,6 +544,26 @@ def check_refusals():
               "--out", out]),
         ("no --out", d + ["--ladder", "2", "--topk", "3"]),
     ]
+    # --words: a word that is not a legal guess, and an opener outside the pool.
+    # Both are REFUSED rather than dropped -- a mistyped pool file would
+    # otherwise run a smaller experiment under this one's name.
+    pool = os.path.join(tmp, "pool.txt")
+    with open(pool, "w") as f:
+        f.write("\n".join(MINI_ANSWERS) + "\n")
+    typo = os.path.join(tmp, "typo.txt")
+    with open(typo, "w") as f:
+        f.write(MINI_ANSWERS[0] + "\nzzzzz\n")
+    empty = os.path.join(tmp, "empty.txt")
+    open(empty, "w").close()
+    cases += [
+        ("--words with a non-guess",
+         d + ["--ladder", "2", "--topk", "3", "--words", typo, "--out", out]),
+        ("--words empty",
+         d + ["--ladder", "2", "--topk", "3", "--words", empty, "--out", out]),
+        ("--opener outside --words",
+         d + ["--ladder", "2", "--topk", "3", "--words", pool,
+              "--opener", MINI_SPLITTERS[0], "--out", out]),
+    ]
     for name, args in cases:
         if os.path.exists(out):
             os.remove(out)
@@ -552,6 +572,135 @@ def check_refusals():
             bad("%s was ACCEPTED" % name)
             return
     print("   ok   all %d refused" % len(cases))
+
+
+# --------------------------------------------------------------------------- 9
+def check_pool():
+    """--words RESTRICTS WHICH WORDS MAY BE COMMITTED TO, at every level and at
+    the root.  Three things have to hold, and the third is what makes the other
+    two worth checking:
+
+      * every committed word really is in the pool, at EVERY level and the root;
+      * the restricted total is never BETTER than the unrestricted one -- but
+        only when the beam is at least as wide as the pool, since under a genuine
+        beam a good restricted word can fall outside the unrestricted top-K and
+        the comparison stops meaning anything;
+      * restricting ACTUALLY CHANGED a choice.  Without that a pool that selected
+        every word would pass the first two silently.
+
+    The mini problem is built for exactly this: the splitters -- the words that
+    beat the tail -- are guess-only, so an answers-only pool has to give them up.
+    It also covers the GROUP path, which shares the predicate but not the search.
+    """
+    print("9. --words, the committed-word pool")
+    tmp = tempfile.mkdtemp(prefix="checklad-pool-")
+    make_data(tmp, MINI_GUESSES, MINI_ANSWERS)
+    pool = os.path.join(tmp, "pool.txt")
+    with open(pool, "w") as f:
+        f.write("\n".join(MINI_ANSWERS) + "\n")
+    wide = str(len(MINI_GUESSES) + 5)
+
+    free = os.path.join(tmp, "free.csv")
+    lim = os.path.join(tmp, "lim.csv")
+    ow = MINI_SPLITTERS[0]
+    run(["--data", tmp, "--ladder", "3", "--topk", wide, "--threads", "1",
+         "--opener", ow, "--out", free])
+    # the opener must come from the pool too, so the restricted run gets an
+    # ANSWER as its root -- which is itself part of what --words means
+    ow2 = MINI_ANSWERS[0]
+    run(["--data", tmp, "--ladder", "3", "--topk", wide, "--threads", "1",
+         "--words", pool, "--opener", ow2, "--out", lim])
+    got = read_ladders(lim)
+    if not got:
+        bad("--words produced no rows")
+        return
+    for o, (_, rungs) in got.items():
+        if o not in MINI_ANSWERS:
+            bad("the opener %s is outside --words" % o)
+            return
+        for w, _ in rungs:
+            if w is not None and w not in MINI_ANSWERS:
+                bad("committed word %s is outside --words" % w)
+                return
+
+    # THE ROOT IS RESTRICTED TOO: an unrestricted sweep must offer openers the
+    # restricted one cannot.
+    allfree = os.path.join(tmp, "allfree.csv")
+    allpool = os.path.join(tmp, "allpool.csv")
+    run(["--data", tmp, "--ladder", "2", "--topk", wide, "--threads", "1",
+         "--no-prune", "--out", allfree])
+    run(["--data", tmp, "--ladder", "2", "--topk", wide, "--threads", "1",
+         "--no-prune", "--words", pool, "--out", allpool])
+    a, b = read_ladders(allfree), read_ladders(allpool)
+    if set(b) - set(MINI_ANSWERS):
+        bad("--words left openers outside the pool: %s"
+            % sorted(set(b) - set(MINI_ANSWERS))[:3])
+        return
+    if not set(a) - set(b):
+        bad("the unrestricted run examined no opener the pool excludes, so the "
+            "root restriction was not exercised")
+        return
+    # WEAKLY WORSE, and only because the beam is wider than the pool here.
+    common = set(a) & set(b)
+    changed = 0
+    for o in sorted(common):
+        if b[o][0] < a[o][0] - 1e-9:
+            bad("%s: --words scores %.6f, BETTER than unrestricted %.6f at a "
+                "beam wider than the pool" % (o, b[o][0], a[o][0]))
+            return
+        if b[o][1] != a[o][1]:
+            changed += 1
+    if not changed:
+        bad("--words changed no committed word anywhere, so the pool selected "
+            "everything the search wanted and the check is vacuous")
+        return
+    print("   ok   %d of %d shared openers changed their ladder, none improved, "
+          "and %d openers were excluded outright"
+          % (changed, len(common), len(set(a) - set(b))))
+
+    # THE GROUP PATH shares the predicate but not the search, so it is checked
+    # too -- otherwise --words would be verified in one of the two places the
+    # one-line test was added.
+    # --min-grays 1, not 3: these answers differ in ONE position, so an answer
+    # opener replies `gggg_` -- a single grey -- and a higher threshold would
+    # fire on almost nothing, leaving no second word to compare.
+    gfree = os.path.join(tmp, "gfree.csv")
+    gpool = os.path.join(tmp, "gpool.csv")
+    run(["--data", tmp, "--min-grays", "1", "--topk", wide, "--threads", "1",
+         "--no-prune", "--out", gfree])
+    run(["--data", tmp, "--min-grays", "1", "--topk", wide, "--threads", "1",
+         "--no-prune", "--words", pool, "--out", gpool])
+
+    def seconds(path):
+        out = {}
+        with open(path) as f:
+            for line in f:
+                if line.startswith("#") or line.startswith("opener,"):
+                    continue
+                c = line.rstrip("\n").split(",")
+                if len(c) > 4 and c[4] and c[2]:
+                    out[c[0]] = c[2]
+        return out
+
+    gf, gp = seconds(gfree), seconds(gpool)
+    bad_words = [w for w in gp.values() if w not in MINI_ANSWERS]
+    if bad_words:
+        bad("the group path committed %s, outside --words" % bad_words[:3])
+        return
+    moved = sum(1 for o in set(gf) & set(gp) if gf[o] != gp[o])
+    if not moved:
+        bad("--words moved no second word on the group path either")
+        return
+    print("   ok   the group path honours it too (%d second words moved)" % moved)
+
+    # A POOLED FILE AND AN UNPOOLED ONE ARE DIFFERENT QUANTITIES, so the pool is
+    # in the label, hence in the stamp, and a resume across them is refused.
+    p = run(["--data", tmp, "--ladder", "2", "--topk", wide, "--threads", "1",
+             "--out", allpool], expect_fail=True)
+    if p.returncode == 0:
+        bad("an unrestricted run RESUMED from a --words file")
+        return
+    print("   ok   a resume across the pool boundary is refused")
 
 
 def main(argv):
@@ -567,6 +716,7 @@ def main(argv):
     check_blind()
     check_matched()
     check_resume()
+    check_pool()
     check_refusals()
     print("\n%s" % ("FAILED (%d)" % fail if fail else "all checks passed"))
     return 1 if fail else 0

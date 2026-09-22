@@ -107,6 +107,16 @@ static uint8_t  GFIRE[MAXGRP][NPAT]; /* the CURRENT opener's group masks */
 static uint8_t  FIRE[NPAT];          /* any group at all: the union */
 static int      OPENER_DEP;          /* do the masks depend on the opener? */
 static int32_t *ANS2G;               /* answer index -> guess index */
+/* --words POOL: WHICH WORDS MAY BE COMMITTED TO, at every level and at the root.
+ * NULL means all 12972.  It is a DIFFERENT OBJECTIVE, not a setting -- a strictly
+ * smaller strategy space, so its totals are weakly worse and must never share a
+ * table with an unrestricted run.  Hence it is in the label, hence in the
+ * filename and the settings stamp, and a resume refuses a file from the other.
+ *
+ * It does NOT touch the TAIL, which always draws from the consistent ANSWERS:
+ * that is the strategy's definition, not a pool anyone chose. */
+static uint8_t *INPOOL;
+#define COMMITTABLE(w) (!INPOOL || INPOOL[w])
 
 static double now_s(void) {
     struct timespec ts;
@@ -749,6 +759,9 @@ static double solve_case(Memo *m, Levels *L, const uint16_t *buf, const Bkt *bk,
     int *cnt = m->cnt + (size_t)depth * NPAT;
     int *touch = m->touch + (size_t)depth * NPAT;
     for (int w = 0; w < NG; w++) {
+        cand[w].w = w;
+        cand[w].key = 0.0;
+        if (!COMMITTABLE(w)) { cand[w].ssq = INT64_MAX; continue; }
         const uint8_t *row = PAT + (size_t)w * NA;
         int64_t ssq = 0;
         for (int b = 0; b < nbk; b++) {
@@ -764,9 +777,7 @@ static double solve_case(Memo *m, Levels *L, const uint16_t *buf, const Bkt *bk,
                 cnt[touch[k]] = 0;
             }
         }
-        cand[w].w = w;
         cand[w].ssq = ssq;
-        cand[w].key = 0.0;
     }
     qsort(cand, (size_t)NG, sizeof(Cand), cmp_cand_ssq);
 
@@ -774,6 +785,7 @@ static double solve_case(Memo *m, Levels *L, const uint16_t *buf, const Bkt *bk,
     int bestnode = -1, bestw = -1;
     int lim = topk < NG ? topk : NG;
     for (int i = 0; i < lim; i++) {
+        if (cand[i].ssq == INT64_MAX) break;       /* outside --words: nothing left */
         int trial = node_new(L);
         double v = expand(m, L, buf, bk, st, nbk, cand[i].w, depth, maxlvl,
                           topk, out, trial);
@@ -984,7 +996,7 @@ static double solve_ladder(Memo *m, Levels *L, const uint16_t *buf, const Bkt *b
              * in every live bucket replied to it identically -- so it is dropped
              * rather than left to sort last, which is also what the two-level
              * path does with the opener and is what makes the two agree. */
-            int seen = 0;
+            int seen = !COMMITTABLE(w);
             for (int i = 0; i < nplayed; i++) if (played[i] == w) { seen = 1; break; }
             if (seen) { cand[w].ssq = INT64_MAX; continue; }
             int64_t ssq = 0;
@@ -1128,7 +1140,7 @@ static double choose_third(Memo *m, const uint16_t *jbuf, const int *jstart,
     int *touch = m->touch + (size_t)depth * NPAT;
     for (int w = 0; w < NG; w++) {
         cand[w].w = w;
-        if (w == og || w == g2) { cand[w].ssq = INT64_MAX; continue; }
+        if (w == og || w == g2 || !COMMITTABLE(w)) { cand[w].ssq = INT64_MAX; continue; }
         const uint8_t *row3 = PAT + (size_t)w * NA;
         int64_t ssq = 0;
         for (int j = 0; j < nidx; j++) {
@@ -1235,15 +1247,29 @@ static double opener_bound(Memo *m, int og, uint16_t *q, uint16_t *out,
         if (!nq) { gbound[g] = 0.0; continue; }
         double best = HUGE_VAL;
         for (int w = 0; w < NG; w++) {
-            if (w == og) continue;
+            /* THE BOUND MINIMISES OVER THE CANDIDATES THAT EXIST.  Restricting
+             * the pool can only RAISE this minimum, which keeps it a sound lower
+             * bound and makes it a tighter one; leaving it unrestricted would
+             * merely be slack. */
+            if (w == og || !COMMITTABLE(w)) continue;
             double v = fired_total(m, q + g * NA, nq, rstart + g * NPAT,
                                    rlen + g * NPAT, nb, w, 1, out, 1, NULL);
             if (v < best) best = v;
         }
+        if (best == HUGE_VAL) best = 0.0;          /* the pool offers nothing */
         gbound[g] = best;
         tot += best;
     }
     return tot;
+}
+
+/* THE POOL'S NAME, appended to the label so it reaches the filename and the
+ * settings stamp.  It is a basename, so it can be computed before anything is
+ * loaded -- which is what --print-label needs. */
+static void append_pool(char *lab, size_t n, const char *poolname) {
+    if (!poolname || !*poolname) return;
+    size_t k = strlen(lab);
+    if (k + 3 < n) snprintf(lab + k, n - k, "_w%s", poolname);
 }
 
 /* Evaluate ONE opener exactly: the best second word, and the strategy's total.
@@ -1416,7 +1442,7 @@ static void solve_opener(Memo *m, int og, Row *r, double incumbent, int no_prune
         for (int w = 0; w < NG; w++) {
             cand[w].w = w;
             cand[w].ssq = INT64_MAX;                  /* the opener itself sorts last */
-            if (w == og) { cand[w].key = HUGE_VAL; continue; }
+            if (w == og || !COMMITTABLE(w)) { cand[w].key = HUGE_VAL; continue; }
             cand[w].ssq = 0;
             cand[w].key = fired_total(m, qq, nq, rs, rl, nb, w, 1, out, 1,
                                       topk ? &cand[w].ssq : NULL);
@@ -1770,7 +1796,7 @@ static void write_rows(FILE *f, Row *v) {
 int main(int argc, char **argv) {
     const char *datadir = "data", *outpath = NULL, *patpath = NULL;
     const char *matchpath = NULL;              /* --dump-matched, the gate hook */
-    const char *one = NULL, *openpath = NULL;
+    const char *one = NULL, *openpath = NULL, *poolpath = NULL;
     int min_grays = 3, by_grays = 0, threads = 0, limit = 0, no_prune = 0,
         memo_bits = 19, split_v = 0, split_mv = 0, split_nz = 0, print_label = 0, topk = 0;
     int third_max = -1;                        /* -1: no third level at all */
@@ -1807,6 +1833,9 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--split-nongray")) split_nz = 1;
         else if (!strcmp(argv[i], "--opener") && i + 1 < argc) one = argv[++i];
         else if (!strcmp(argv[i], "--openers") && i + 1 < argc) openpath = argv[++i];
+        /* --words POOL: which words may be COMMITTED to, at every level and at
+         * the root.  A different objective, not a setting -- see INPOOL. */
+        else if (!strcmp(argv[i], "--words") && i + 1 < argc) poolpath = argv[++i];
         else if (!strcmp(argv[i], "--threads") && i + 1 < argc) threads = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--memo-bits") && i + 1 < argc) memo_bits = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--report") && i + 1 < argc) report = atof(argv[++i]);
@@ -1932,6 +1961,15 @@ int main(int argc, char **argv) {
                         "--by-grays N too\n");
         return 1;
     }
+    char poolname[64] = "";
+    if (poolpath) {
+        const char *b = strrchr(poolpath, '/');
+        b = b ? b + 1 : poolpath;
+        snprintf(poolname, sizeof poolname, "%s", b);
+        char *dot = strstr(poolname, ".txt");
+        if (dot) *dot = 0;
+    }
+
     /* ---------------------------------------------------------- the ladder --
      * THE LEVEL-2 THRESHOLD *IS* THE FIRING CONDITION, and it is what the search
      * chooses -- so a group condition would be fixing the very thing being
@@ -2008,7 +2046,16 @@ int main(int argc, char **argv) {
         fprintf(stderr, "--pin-thresholds is an option ON --ladder\n");
         return 1;
     }
-    if (print_label && ladder) { printf("%s\n", ladder_label); return 0; }
+    /* BOTH BRANCHES APPEND THE POOL, and the second one is easy to forget: the
+     * wrapper derives its filename from this label while the settings stamp is
+     * written from `label` in main, so a pool reaching one and not the other
+     * would put a restricted run under the unrestricted run's NAME, with a stamp
+     * that then refuses to resume its own file. */
+    if (print_label && ladder) {
+        append_pool(ladder_label, sizeof ladder_label, poolname);
+        printf("%s\n", ladder_label);
+        return 0;
+    }
     if (print_label) {
         /* the tiles are all groups_resolve needs (a vowel atom defers its
          * checks to the opener loop), so this answers without loading a thing */
@@ -2016,6 +2063,7 @@ int main(int argc, char **argv) {
         groups_build_tiles();
         if (by_grays) groups_add_by_grays(by_grays, split_v, split_mv, split_nz);
         groups_resolve(min_grays, lab, sizeof lab);
+        append_pool(lab, sizeof lab, poolname);
         printf("%s\n", lab);
         return 0;
     }
@@ -2046,6 +2094,40 @@ int main(int argc, char **argv) {
             fprintf(stderr, "the answer %s is not a legal guess\n", AWORD[a]);
             return 1;
         }
+    }
+    if (poolpath) {
+        char (*pw)[WBUF] = malloc(sizeof(char[WBUF]) * 20000);
+        int np = load_words_file(poolpath, pw);
+        INPOOL = calloc(NG, 1);
+        for (int i = 0; i < np; i++) {
+            int found = -1;
+            for (int g = 0; g < NG; g++)
+                if (!strcmp(GWORD[g], pw[i])) { found = g; break; }
+            /* REFUSED, NOT SKIPPED.  A mistyped pool file would otherwise run a
+             * smaller and different experiment under the name of this one, and
+             * the only evidence would be a total nobody could reproduce. */
+            if (found < 0) {
+                fprintf(stderr, "--words: %s is not a legal guess\n", pw[i]);
+                return 1;
+            }
+            INPOOL[found] = 1;
+        }
+        free(pw);
+        int npool = 0;
+        for (int g = 0; g < NG; g++) npool += INPOOL[g];
+        if (npool < 2) {
+            /* TWO IS THE FLOOR, and it is not fussiness: with one word the
+             * opener IS the pool, so the two-level path has no second word to
+             * score and its group cost comes back as infinity rather than as a
+             * strategy.  Refusing beats reporting that. */
+            fprintf(stderr, "--words: %s holds %d word%s -- a pool needs at "
+                    "least 2, since the opener is one of them and a level with "
+                    "no candidate left is not a strategy\n",
+                    poolpath, npool, npool == 1 ? "" : "s");
+            return 1;
+        }
+        fprintf(stderr, "committed words restricted to %d of %d (%s)\n",
+                npool, NG, poolpath);
     }
     if (matchpath) {
         FILE *mf = fopen(matchpath, "w");
@@ -2099,6 +2181,7 @@ int main(int argc, char **argv) {
             }
         }
     }
+    append_pool(label, sizeof label, poolname);
     fprintf(stderr, "loaded %d guesses x %d answers; firing on %s (%d group%s%s)\n",
             NG, NA, label, NGROUP, NGROUP == 1 ? "" : "s",
             OPENER_DEP ? ", per opener" : "");
@@ -2126,6 +2209,13 @@ int main(int argc, char **argv) {
     if (one) {
         for (int g = 0; g < NG; g++) if (!strcmp(GWORD[g], one)) openers[nopen++] = g;
         if (!nopen) { fprintf(stderr, "%s is not a legal guess\n", one); return 1; }
+        /* A NAMED OPENER OUTSIDE THE POOL IS A CONTRADICTION, not something to
+         * resolve quietly in one direction: --words says which words may be
+         * committed to, and the opener is the first of them. */
+        if (!COMMITTABLE(openers[0])) {
+            fprintf(stderr, "--opener %s is not in --words %s\n", one, poolpath);
+            return 1;
+        }
     } else if (openpath) {
         char (*rw)[WBUF] = malloc(sizeof(char[WBUF]) * 20000);
         int nr = load_words_file(openpath, rw);
@@ -2137,11 +2227,20 @@ int main(int argc, char **argv) {
                 fprintf(stderr, "--openers word %s is not a legal guess\n", rw[i]);
                 return 1;
             }
+            if (!COMMITTABLE(found)) {
+                fprintf(stderr, "--openers word %s is not in --words %s\n",
+                        rw[i], poolpath);
+                return 1;
+            }
             openers[nopen++] = found;
         }
         free(rw);
     } else {
-        for (int g = 0; g < NG; g++) openers[nopen++] = g;
+        /* --words RESTRICTS THE ROOT TOO.  The opener is the first committed
+         * word, so a pool that did not reach it would be answering a question
+         * nobody asked -- and it is the root beam, not --openers, that then
+         * keeps the run affordable. */
+        for (int g = 0; g < NG; g++) if (COMMITTABLE(g)) openers[nopen++] = g;
     }
     /* THE ROOT BEAM, before phase 1: under --topk only the K best openers are
      * examined at all, so only they are bounded.  A NAMED opener (--opener /

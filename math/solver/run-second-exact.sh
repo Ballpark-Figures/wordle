@@ -65,6 +65,7 @@ MATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 OPENER=""
 OPENERS=""
+WORDS=""
 MINGRAYS=3
 BYGRAYS=""
 SPLITV=0
@@ -87,6 +88,7 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --opener)     OPENER="$2";   shift 2 ;;
         --openers)    OPENERS="$2";  shift 2 ;;
+        --words)      WORDS="$2";    shift 2 ;;
         --min-grays)  MINGRAYS="$2"; shift 2 ;;
         --by-grays)   BYGRAYS="$2";  shift 2 ;;
         --split-vowels)         SPLITV=1;  shift ;;
@@ -143,6 +145,22 @@ COND="$COND$GSPECS"
 # --min-grays is the SUGAR for "no groups named", so it applies only then.
 [ -n "$COND" ] || COND=" --min-grays $MINGRAYS"
 
+# --words RESTRICTS WHICH WORDS MAY BE COMMITTED TO, at every level and at the
+# root -- `--words mystery` is the answers-only variant, `secondword`'s
+# `--variant mystery` made exact.  A DIFFERENT OBJECTIVE, not a setting: a
+# strictly smaller strategy space, so its totals are weakly worse and never share
+# a table with the unrestricted run.  It rides in the LABEL, so it reaches the
+# filename and the settings stamp and a resume refuses a file from the other --
+# which is why it is part of COND rather than a flag added later.
+if [ -n "$WORDS" ]; then
+    case "$WORDS" in
+        */*|*.txt) WLIST="$WORDS" ;;
+        *)         WLIST="data/shared/words/$WORDS.txt" ;;
+    esac
+    [ -f "$WLIST" ] || { echo "--words: no such list: $WLIST" >&2; exit 1; }
+    COND="$COND --words $WLIST"
+fi
+
 # ASK THE BINARY WHAT THE CONDITION IS CALLED.  groups.c canonicalises a spec --
 # it sorts the groups, drops repeats, and collapses a vacuous split (e5_mv0 IS
 # e5) -- so the name cannot be derived here without writing that rule a second
@@ -177,6 +195,12 @@ echo "exact second word"
 NGRP=$(echo "$LABEL" | tr '.' '\n' | wc -l | tr -d ' ')
 echo "  fires on   $LABEL$([ "$NGRP" -gt 1 ] && echo "  ($NGRP groups, a SEPARATE word for each)")"
 echo "  openers    ${OPENER:-${OPENERS:-${TOPK:+the $TOPK best by expected answers remaining}}}${OPENER:-${OPENERS:-${TOPK:+}}}${LIMIT:+ (first $LIMIT)}"
+[ -z "$WORDS" ] || {
+    echo "  WORDS      every committed word -- the opener included -- from $WLIST"
+    echo "             ^ a DIFFERENT objective: a strictly smaller strategy space,"
+    echo "               so its expected is weakly WORSE and never shares a table"
+    echo "               with the 12972-word run.  The tail is untouched."
+}
 echo "  follow-up  answer (a uniformly random consistent answer)"
 if [ -n "$MAXLVL" ]; then
     echo "  LEVELS     a committed word at every level down to $MAXLVL, each of which"

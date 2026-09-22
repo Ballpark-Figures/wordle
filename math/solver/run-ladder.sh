@@ -4,7 +4,20 @@
 #
 #     bash solver/run-ladder.sh --ladder 5 -k 5
 #     bash solver/run-ladder.sh --ladder 5 -k 20 --opener clint
+#     bash solver/run-ladder.sh --ladder 5 -k 20 --words mystery
 #     bash solver/run-ladder.sh --ladder 3 -k 50 --dry-run
+#
+# --words RESTRICTS WHICH WORDS MAY BE COMMITTED TO, at every level AND at the
+# root -- `--words mystery` is the answers-only variant, every word of the ladder
+# drawn from the 2315.  It is a DIFFERENT OBJECTIVE, not a setting: a strictly
+# smaller strategy space, so its totals are weakly worse and must never share a
+# table with the unrestricted run.  It is in the filename and in the settings
+# stamp, and a resume refuses a file from the other.  The random TAIL is
+# untouched -- it always draws from the consistent answers, which is the
+# strategy's definition rather than a pool anyone chose.
+#   NB restrict with --words, NOT with `--openers mystery.txt`: a named opener
+#   list is exempt from the root beam, so that would walk all 2315 openers
+#   rather than the K best, which at depth 5 is a different kind of run entirely.
 #
 # THE STRATEGY, exactly (math/ladder.py states it and IS the source of truth):
 #
@@ -75,6 +88,7 @@ LEVELS=""
 TOPK=""
 OPENER=""
 OPENERS=""
+WORDS=""
 PIN=""
 LIMIT=""
 THREADS=""
@@ -88,6 +102,7 @@ while [ $# -gt 0 ]; do
         --topk|-k)    TOPK="$2";     shift 2 ;;
         --opener)     OPENER="$2";   shift 2 ;;
         --openers)    OPENERS="$2";  shift 2 ;;
+        --words)      WORDS="$2";    shift 2 ;;
         --pin-thresholds) PIN="$2";  shift 2 ;;
         --limit)      LIMIT="$2";    shift 2 ;;
         --threads)    THREADS="$2";  shift 2 ;;
@@ -122,7 +137,19 @@ BIN=solver/secondexact
 OUTDIR=data/shared/ladder
 LOC=data/local/ladder
 
+# --words: a STEM under data/shared/words, or a path -- the repo's convention
+# (run-singles.sh resolves it the same way).
+WLIST=""
+if [ -n "$WORDS" ]; then
+    case "$WORDS" in
+        */*|*.txt) WLIST="$WORDS" ;;
+        *)         WLIST="data/shared/words/$WORDS.txt" ;;
+    esac
+    [ -f "$WLIST" ] || { echo "--words: no such list: $WLIST" >&2; exit 1; }
+fi
+
 FLAGS="--ladder $LEVELS --topk $TOPK --report $REPORT"
+[ -z "$WLIST" ]    || FLAGS="$FLAGS --words $WLIST"
 [ -z "$PIN" ]      || FLAGS="$FLAGS --pin-thresholds $PIN"
 
 # ASK THE BINARY WHAT THE RUN IS CALLED.  The depth and the pinning are the
@@ -148,6 +175,17 @@ echo "  rule       guess d plays its word while the CUMULATIVE matched letters"
 echo "             are BELOW that level's threshold; going over ENDS the ladder"
 echo "             and every guess after it is a random consistent ANSWER"
 echo "  openers    ${OPENER:-${OPENERS:-the $TOPK best by expected answers remaining}}${LIMIT:+ (first $LIMIT)}"
+if [ -n "$WLIST" ]; then
+    echo "  WORDS      every committed word -- the opener included -- comes from"
+    echo "             $WLIST"
+    echo "             ^ a DIFFERENT objective, not a setting: a strictly smaller"
+    echo "               strategy space, so its expected is weakly WORSE and its"
+    echo "               numbers never share a table with the 12972-word run."
+    echo "             ^ the random tail still draws from the consistent ANSWERS;"
+    echo "               that is the strategy's definition, not a pool."
+else
+    echo "  words      every committed word from the full 12972 guess list"
+fi
 echo "  follow-up  answer (a uniformly random consistent answer)"
 if [ -n "$PIN" ]; then
     echo "  PINNED     thresholds $PIN -- not searched.  A DIFFERENT quantity from"

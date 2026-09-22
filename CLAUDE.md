@@ -2620,6 +2620,33 @@ machinery it already had. Run it with **`bash solver/run-ladder.sh --ladder 5 -k
   Two code paths sharing no ranking, layout or accounting must agree to the last digit.
   **Deeper the equivalence stops** — matched accumulates across replies and one reply's
   greys no longer determine it.
+- **`--words <stem|path>` RESTRICTS WHICH WORDS MAY BE COMMITTED TO — at every level AND
+  at the ROOT** (added 2026-09-22, user's ask). `--words mystery` is the answers-only
+  variant: opener and every rung drawn from the 2315. **It is a DIFFERENT OBJECTIVE, not
+  a setting** — a strictly smaller strategy space, so its totals are weakly WORSE and
+  never share a table with the unrestricted run. Same standing as `secondword`'s
+  `--variant mystery`, which is the one-ply version of the same choice.
+  - **THE TAIL IS UNTOUCHED.** It always draws from the consistent ANSWERS — that is the
+    strategy's definition, not a pool anyone chose — so `--words` moves only the
+    COMMITTED words. Under `--words mystery` the two coincide anyway.
+  - **RESTRICT WITH `--words`, NOT `--openers mystery.txt`.** A named opener list is
+    EXEMPT from the root beam (the exemption was written for `--opener W`, where the root
+    really was chosen), so that route walks all 2315 openers rather than the K best —
+    at depth 5 a different kind of run entirely. `--words` filters the root and leaves
+    the beam in charge.
+  - **It is a binary-wide predicate, so `run-second-exact.sh` takes it too** — one flag,
+    both wrappers, rather than the half-done refactor where the binary supports something
+    only one caller can reach. It rides in the LABEL (`_w<stem>`), hence in the filename
+    AND the settings stamp, so a resume across the pool boundary is refused.
+  - **A pool word that is not a legal guess, an empty pool, and a `--opener`/`--openers`
+    outside the pool are all REFUSED, not skipped** — a mistyped pool file would
+    otherwise run a smaller experiment under this one's name.
+  - **The BOUND is restricted too, and that is sound**: minimising over fewer candidates
+    can only RAISE a lower bound, so it stays valid and gets tighter.
+  - **Weakly-worse is only guaranteed when the beam is at least as wide as the pool.**
+    Under a genuine beam a good restricted word can fall outside the unrestricted top-K,
+    so a restricted run CAN come out ahead at a fixed small K — the gate asserts the
+    inequality only where K covers the pool.
 - **It takes no firing condition and refuses every group flag** (`--min-grays`,
   `--by-grays`, `--group`, `--split-*`): the level-2 threshold IS that condition and it
   is what the search is choosing, so a group would pin it while the filename claimed
@@ -2639,6 +2666,10 @@ machinery it already had. Run it with **`bash solver/run-ladder.sh --ladder 5 -k
   oracle above; monotonicity in the depth; all-thresholds-at-6 as a blind opening; the
   matched key three ways (C, `ladder.py`, `tree_states`); resume including the words; and
   the refusals.
+  - **The `--words` check covers the GROUP path as well**, which shares the one-line
+    predicate but not the search — otherwise the flag would be verified in one of the two
+    places it was added. **MUTATION-TESTED**: making `COMMITTABLE` always true is caught
+    twice over (a committed word outside the pool, and the `--opener` refusal accepted).
   - **THE MINI PROBLEM IS BUILT SO COMMITTED WORDS WIN, and that is load-bearing.** On an
     answer set where any guess separates everything the random tail is already optimal,
     every ladder declines, and the search checks prove NOTHING —
