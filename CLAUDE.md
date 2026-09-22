@@ -2552,6 +2552,104 @@ is the proven optimum over all 12972 x 12972 (opener, second word) pairs.
     vowels instead of matched ones, dropping `y` from the vowels, and swapping
     the two counts inside `groups.c` were each caught.
 
+### `run-ladder.sh` — FIVE committed words, each with its own MATCHED-LETTER threshold
+`math/ladder.py` states the rule and IS the source of truth; it is a **fifth mode of
+`secondexact.c` (`--ladder N`)**, not a new binary — the objective, the exact random-tail
+recursion, the matched-letter state, the opener walk and the resume are all optturns-side
+machinery it already had. Run it with **`bash solver/run-ladder.sh --ladder 5 -k K`**
+(from `math/`), attached, tee'd log, `--dry-run`.
+- **THE STRATEGY (the user's, 2026-09-22), exactly:**
+
+      guess 1     w1                                       always
+      guess d     matched < T_d ?  w_d  :  a random consistent ANSWER, and the
+                                           LADDER IS OVER
+      guess N+1   a random consistent ANSWER
+
+  So it is **N words and N-1 thresholds — nine numbers at N=5**, and the only thing it
+  asks a player to read off the board is a COUNT of letters.
+- **`matched` IS THE CUMULATIVE COUNT**, `tree_states`' greens + yellows counted again
+  per proved copy — the same key `--third-max-matched` uses. It is a function of the
+  words and replies ALONE, so it is constant within a bucket, which is what makes it a
+  legal thing to branch on and the value exactly summable.
+- **DECLINING ENDS THE LADDER (the user's call).** Once a level is over its threshold
+  every remaining guess is random, so word `d` is played only when levels 2..d-1 all
+  fired. The other reading — re-test every level against the board whatever was played
+  before — is a **strictly richer and more expensive** strategy and is NOT what this
+  computes; the user's expectation is that it would not move the answer (thresholds
+  should stay flat or fall with depth), and that is untested.
+  - **PLANNED, NOT BUILT: key the level on the (greens, yellows, greys) COMPOSITION
+    rather than a threshold on their sum** (user, 2026-09-22), with the monotonicity
+    assumption that declining in one case means declining in every strictly BETTER one
+    (greys replaced by yellows or greens, yellows by greens). The C's level rule was
+    written as "play iff the key is in a downward-closed set of a partial order" for
+    exactly this — the threshold is the total-order case, so the composition version is
+    a swap of the KEY, not a rewrite.
+- **IT IS A DIFFERENT STRATEGY FROM `--max-level`, not a cheaper search for one.**
+  There every matched count at a level gets its OWN word; here they share one and a
+  threshold decides who plays it, so this family is strictly CONTAINED in that one at
+  the same beam. **Never put their totals in one table.**
+- **THE NUMBER IS EXPECTED GUESSES OUTRIGHT** — play is never truncated, so it sits with
+  `wordlesim`/`multiwordle`/`foximax` and **never beside an optturns-family total**,
+  every one of which is an optimum subject to a 6-guess guarantee. Guess 6 being random
+  is not a cap; it is where a 5-word ladder runs out of committed words.
+- **`-k K` IS REQUIRED AND MAKES IT A SCREEN.** ONE K governs both ends as everywhere
+  else here: the K best OPENERS by ascending expected answers remaining, and the K best
+  words at EVERY level below by the one-ply sum-of-squares score (`secondword`'s rule,
+  the same code path). Every total is an **UPPER BOUND** and the winner is the best of
+  the openers EXAMINED. A NAMED `--opener` is exempt from the root beam.
+- **THRESHOLDS ARE ENUMERATED, NOT BEAMED** — a threshold is part of the objective, and
+  only the values inducing a DIFFERENT firing set are tried (at most 7 at level 2,
+  usually 2-3 deeper). Cost is therefore roughly `(3k)^(N-1)` ladders per opener before
+  the bound cuts, so a deep run wants a far smaller k than a shallow one. **Price it
+  with `--opener` on one word before launching a sweep.**
+- **ONE COUNTING PASS SERVES EVERY THRESHOLD.** Sum of squared bucket sizes is additive
+  over buckets, so accumulating it PER MATCHED COUNT makes each threshold's ranking key
+  a prefix sum — not one O(NG x answers) pass per threshold.
+- **THE BOUND IS SOUND FOR ANY STRATEGY, not just the tail**: a live set of `n` needs at
+  least `2n-1` more guesses, since only the answer equal to the word played can finish
+  in one. So the opener bound needs no word loop at all (phase 1 is a pass over the
+  answers, not `opener_bound`'s minute over 12972 second words), and the within-level
+  cut never discards a better ladder — **the BEAM stays the single approximation**.
+- **A PINNED THRESHOLD MUST FIRE.** Free, a level may always decline (T=0), which is what
+  makes a deeper ladder contain a shallower one. Under `--pin-thresholds` the threshold
+  is given and only the WORD is being chosen, so declining is off the table — otherwise
+  a pinned run would quietly price a SHORTER ladder than the one it is named for.
+- **THE LEVEL-2 ORACLE, and it is what makes this checkable at all: a 2-level ladder
+  with threshold T pinned IS `--group g<6-T>`.** After ONE guess the board is five tiles
+  and nothing else, so `matched = 5 - greys` exactly and `matched < T` is `greys >= 6-T`.
+  Two code paths sharing no ranking, layout or accounting must agree to the last digit.
+  **Deeper the equivalence stops** — matched accumulates across replies and one reply's
+  greys no longer determine it.
+- **It takes no firing condition and refuses every group flag** (`--min-grays`,
+  `--by-grays`, `--group`, `--split-*`): the level-2 threshold IS that condition and it
+  is what the search is choosing, so a group would pin it while the filename claimed
+  otherwise. The single all-replies case is built directly rather than asked of
+  `groups.c`, whose whole job is carving the replies up (and which rightly refuses a
+  condition covering every reply).
+- Data under `math/data/shared/ladder/`, log under `data/local/ladder/`. **Depth and any
+  pinning are in the name AND in the settings stamp**, and a resume refuses a file
+  written for a different question. Each opener's rows are appended as it finishes — a
+  summary row plus one `L<d>|t<T>` row per level, `-` where the ladder stopped — and a
+  resume reads the level rows back for EVERY opener, or it would report a total with no
+  strategy attached.
+- **`python3 tools/checkladder.py` is the GATE** (~40s; `--real` adds the real-list
+  oracles): the value against `ladder.py`'s exact-rational reference from the STRINGS on
+  pinned thresholds; **the SEARCH against a brute force** enumerating every (word,
+  threshold) at every level with no bound, no beam and no ordering; the level-2 group
+  oracle above; monotonicity in the depth; all-thresholds-at-6 as a blind opening; the
+  matched key three ways (C, `ladder.py`, `tree_states`); resume including the words; and
+  the refusals.
+  - **THE MINI PROBLEM IS BUILT SO COMMITTED WORDS WIN, and that is load-bearing.** On an
+    answer set where any guess separates everything the random tail is already optimal,
+    every ladder declines, and the search checks prove NOTHING —
+    `checksecondexact.py`'s 16-word problem is exactly like that, and the first version
+    of this gate passed vacuously on it. Here the answers are `aaaab`..`aaaat`: they
+    differ in ONE position, so an answer played as a guess eliminates only itself and the
+    tail costs `1+2+...+n`, while the guess list also holds words probing four
+    distinguishing letters at once. That is the real lists' asymmetry in miniature — the
+    tail draws from CANDIDATES, which split each other badly. **Coverage is asserted** at
+    every check that could pass vacuously.
+
 ### `run-second-loss.sh` — where the EV loss goes, by the opener's grey count
 The gap between a second-word strategy and OPTIMAL play, decomposed. Every answer
 is played `-n` times under the strategy and compared with what that answer costs

@@ -48,7 +48,16 @@
  * consistent legal WORDS, which is a different and much larger recursion, and is
  * not what this computes.
  *
+ * FIVE MODES, ONE SEARCH.  A committed SECOND word per group (the above); a
+ * fixed THIRD level keyed by matched count (--third-key); a word at EVERY level
+ * and every count (--max-level); and THE LADDER (--ladder), which is one word
+ * per level fired by a THRESHOLD on the matched letters, with declining ENDING
+ * the ladder -- the strategy a player can actually follow.  They are DIFFERENT
+ * strategies, not four searches for one answer, so their totals never share a
+ * table; what they share is the exact tail, the bound and the walk.
+ *
  * Build:  see build.sh      Run:  bash solver/run-second-exact.sh   (from math/)
+ *                                 bash solver/run-ladder.sh         (--ladder)
  */
 
 #define _GNU_SOURCE
@@ -86,6 +95,14 @@ static char   (*GWORD)[WBUF];
 #define MAXGRP MAXGROUP
 /* matched letters run 0..5, so a case index is one of six */
 #define MAXCASE 6
+/* how deep a committed-word ladder may go: --max-level's cap and --ladder's */
+#define MAXLVL 8
+/* THE PER-LEVEL SCRATCH IS SIZED MAXLVL + 2, NOT MAXLVL.  `expand` writes its
+ * children into the arrays at its OWN depth, and depth reaches `maxlvl`, so
+ * arrays of MAXLVL entries are one short at the deepest legal cap and the
+ * ladder's own expansion needs one more still.  Sized here rather than by
+ * lowering the cap, because the cap is the user's knob. */
+#define NLVLBUF (MAXLVL + 2)
 static uint8_t  GFIRE[MAXGRP][NPAT]; /* the CURRENT opener's group masks */
 static uint8_t  FIRE[NPAT];          /* any group at all: the union */
 static int      OPENER_DEP;          /* do the masks depend on the opener? */
@@ -299,6 +316,11 @@ typedef struct {
                                        * flattened as (path, word) pairs */
     uint32_t tpath[MAXGRP][24];
     int32_t  tword[MAXGRP][24];
+    /* --ladder: ONE word and ONE threshold per level, so the whole strategy is
+     * nine numbers rather than a tree.  `lthr[d]` fires `lword[d]` when the
+     * cumulative matched letters are strictly below it. */
+    int32_t  lword[MAXLVL + 2];
+    int8_t   lthr[MAXLVL + 2];
     double  decline;              /* exact total over the replies that do NOT fire */
     double  bound;                /* a sound lower bound on the whole total */
     int     done;
@@ -586,8 +608,6 @@ static int matched_letters(int g1, int p1, int g2, int p2) {
  * child cases, so the search is k^(levels-1) per group before declining prunes
  * it.  Deep runs want a much smaller k than shallow ones.
  */
-#define MAXLVL 8
-
 typedef struct { int32_t start, len; } Bkt;
 
 typedef struct {
@@ -606,15 +626,19 @@ typedef struct {
     int n, cap;
     TreeEnt ent[MAXTREE];
     int nent;
-    uint16_t *buf[MAXLVL];        /* one answer buffer per level */
-    Bkt      *bkt[MAXLVL];
-    MState   *st[MAXLVL];
-    int8_t   *mc[MAXLVL];
+    uint16_t *buf[NLVLBUF];       /* one answer buffer per level */
+    Bkt      *bkt[NLVLBUF];
+    MState   *st[NLVLBUF];
+    int8_t   *mc[NLVLBUF];
     /* ONE CANDIDATE ARRAY PER LEVEL.  A single shared one is clobbered by the
      * recursion: a case ranks into it, sorts, then walks it calling expand --
      * which recurses and re-ranks the SAME array, so the parent's loop resumes
      * reading its child's list.  Same shape as the per-depth memo scratch. */
-    Cand     *cand[MAXLVL];
+    Cand     *cand[NLVLBUF];
+    /* THE LADDER'S RANKING PASS, NG x MAXCASE per level: the sum of squared
+     * bucket sizes accumulated PER MATCHED COUNT, so every threshold's key is a
+     * prefix sum of ONE counting pass rather than one pass per threshold. */
+    int64_t  *ssqm[NLVLBUF];
 } Levels;
 
 static int node_new(Levels *L) {
@@ -760,6 +784,329 @@ static double solve_case(Memo *m, Levels *L, const uint16_t *buf, const Bkt *bk,
         L->node[node].word = bestw;
     }
     return best;
+}
+
+
+/* ================================================================ THE LADDER =
+ * ONE committed word per LEVEL, each with its own THRESHOLD on the matched
+ * letters -- the strategy a human can actually follow, because the only thing it
+ * asks you to read off the board is how many letters you have found.
+ *
+ *     guess 1   w1                              always
+ *     guess L   matched < T_L ?  w_L  :  a uniformly random consistent ANSWER,
+ *                                        and the ladder is OVER
+ *     after it  a uniformly random consistent ANSWER
+ *
+ * `matched` is the CUMULATIVE count over every reply so far -- tree_states'
+ * greens + yellows, the same key --third-max-matched uses, and constant within a
+ * bucket, which is what makes it a legal decision variable.
+ *
+ * DECLINING ENDS THE LADDER (the user's call, 2026-09-22).  Once a level is over
+ * its threshold every remaining guess is random, so word `k` is only ever played
+ * when levels 2..k-1 all fired.  That is what makes the whole strategy nine
+ * numbers -- five words and four thresholds -- rather than a tree.
+ *
+ * HOW IT DIFFERS FROM --max-level, which is the machinery it reuses.  There, a
+ * level splits into one case PER matched count and each picks its own word; here
+ * every count below the threshold shares ONE word and every count above it
+ * leaves.  So this family is strictly CONTAINED in that one at the same beam --
+ * a richer rule can always imitate a threshold -- and the two are different
+ * strategies, not two searches for one answer.  Their numbers do not belong in
+ * one table.
+ *
+ * THE LEVELS ARE NOT INDEPENDENT the way --by-grays' groups are: every firing
+ * bucket feeds the SAME next word, so the choice at level L+1 depends on which
+ * buckets level L let through.  Hence one nested search, and hence the beam.
+ *
+ * THRESHOLDS ARE ENUMERATED, NOT BEAMED.  A threshold is part of the objective
+ * and there are at most seven of them; only the values that induce a DIFFERENT
+ * firing set are tried, which deeper down is usually two or three.
+ */
+typedef struct {
+    int32_t word[NLVLBUF];        /* the committed word at each level, -1 = none */
+    int8_t  thr[NLVLBUF];         /* and the matched-letter threshold that fires it */
+} Ladder;
+
+static double solve_ladder(Memo *m, Levels *L, const uint16_t *buf, const Bkt *bk,
+                           const MState *st, const int8_t *mc, int nbk,
+                           int depth, int maxlvl, int topk,
+                           const int32_t *played, int nplayed,
+                           const int8_t *pin, Ladder *best,
+                           double *dec_out, int *scanned, int *cut);
+
+/* Play `w` on the buckets this level's threshold FIRES on, then hand every
+ * child to the next level -- POOLED, because the next level has one word for
+ * all of them.  `bound_only` stops after the sizes, which is the cheap sound
+ * lower bound (any strategy needs 2n-1 on a live set of n) and is what lets a
+ * hopeless (word, threshold) be dropped without the deep recursion. */
+static double ladder_expand(Memo *m, Levels *L, const uint16_t *buf, const Bkt *bk,
+                            const MState *st, const int8_t *mc, int nbk,
+                            int w, int thr, int depth, int maxlvl, int topk,
+                            const int32_t *played, int nplayed,
+                            const int8_t *pin, Ladder *best, int bound_only) {
+    const uint8_t *row = PAT + (size_t)w * NA;
+    int *cnt = m->cnt + (size_t)depth * NPAT;
+    int *touch = m->touch + (size_t)depth * NPAT;
+    uint16_t *nbuf = L->buf[depth];
+    Bkt *nb = L->bkt[depth];
+    MState *nst = L->st[depth];
+    int8_t *nmc = L->mc[depth];
+    double tot = 0.0;
+    int nn = 0, fill = 0;
+
+    for (int b = 0; b < nbk; b++) {
+        if (mc[b] >= thr) continue;                /* over the threshold: gone */
+        const uint16_t *s = buf + bk[b].start;
+        int n = bk[b].len, nt = 0;
+        tot += n;                                  /* this guess, once per answer */
+        for (int i = 0; i < n; i++) {
+            int p = row[s[i]];
+            if (cnt[p]++ == 0) touch[nt++] = p;
+        }
+        int acc = fill;
+        for (int k = 0; k < nt; k++) {
+            int p = touch[k];
+            int len = cnt[p];
+            cnt[p] = acc;
+            acc += len;
+            if (p == ALL_GREEN) continue;          /* w was the answer: no tail */
+            nb[nn].start = cnt[p];
+            nb[nn].len = len;
+            nst[nn] = st[b];
+            mstate_add(&nst[nn], w, p);
+            nmc[nn] = (int8_t)mstate_matched(&nst[nn]);
+            nn++;
+        }
+        if (!bound_only)
+            for (int i = 0; i < n; i++) nbuf[cnt[row[s[i]]]++] = s[i];
+        for (int k = 0; k < nt; k++) cnt[touch[k]] = 0;
+        fill = acc;
+    }
+    if (bound_only) {
+        for (int j = 0; j < nn; j++) tot += 2.0 * nb[j].len - 1.0;
+        return tot;
+    }
+    int32_t np[NLVLBUF];
+    for (int i = 0; i < nplayed; i++) np[i] = played[i];
+    np[nplayed] = (int32_t)w;
+    return tot + solve_ladder(m, L, nbuf, nb, nst, nmc, nn, depth + 1, maxlvl,
+                              topk, np, nplayed + 1, pin, best, NULL, NULL, NULL);
+}
+
+static double solve_ladder(Memo *m, Levels *L, const uint16_t *buf, const Bkt *bk,
+                           const MState *st, const int8_t *mc, int nbk,
+                           int depth, int maxlvl, int topk,
+                           const int32_t *played, int nplayed,
+                           const int8_t *pin, Ladder *best,
+                           double *dec_out, int *scanned, int *cut) {
+    for (int d = depth; d <= maxlvl; d++) { best->word[d] = -1; best->thr[d] = 0; }
+
+    /* WHAT EACH MATCHED COUNT COSTS IF THE LADDER ENDS HERE.  Kept per count,
+     * because a threshold is exactly a choice of which counts pay this. */
+    double dec[MAXCASE];
+    int present[MAXCASE];
+    for (int c = 0; c < MAXCASE; c++) { dec[c] = 0.0; present[c] = 0; }
+    for (int b = 0; b < nbk; b++) {
+        int c = mc[b];
+        dec[c] += T(m, buf + bk[b].start, bk[b].len, depth + 1);
+        present[c] = 1;
+    }
+    double all_declined = 0.0;
+    for (int c = 0; c < MAXCASE; c++) all_declined += dec[c];
+    if (depth > maxlvl || !nbk) {
+        if (dec_out) *dec_out = all_declined;
+        return all_declined;
+    }
+
+    /* THE THRESHOLDS WORTH TRYING.  T and T' do the same thing whenever they
+     * bracket the same PRESENT counts, so only 0 (end the ladder) and c+1 for
+     * each count actually on the board are distinct.  The canonical name for a
+     * firing set is the smallest T that induces it, which is what gets reported
+     * -- one rule cannot then have two names. */
+    int thr[MAXCASE + 1], nthr = 0;
+    thr[nthr++] = 0;
+    for (int c = 0; c < MAXCASE; c++) if (present[c]) thr[nthr++] = c + 1;
+    if (pin && pin[depth] >= 0) { thr[0] = pin[depth]; nthr = 1; }
+
+    /* ONE COUNTING PASS, every threshold's key.  The sum of squared bucket sizes
+     * is additive over buckets, so accumulating it per matched count gives every
+     * threshold's score as a prefix sum -- and the score itself is the repo's one
+     * ranking rule (secondword's), every bucket counted, all-green included. */
+    int64_t *sm = L->ssqm[depth];
+    int *cnt = m->cnt + (size_t)depth * NPAT;
+    int *touch = m->touch + (size_t)depth * NPAT;
+    for (int w = 0; w < NG; w++) {
+        const uint8_t *row = PAT + (size_t)w * NA;
+        int64_t s[MAXCASE] = {0};
+        for (int b = 0; b < nbk; b++) {
+            const uint16_t *ss = buf + bk[b].start;
+            int n = bk[b].len, nt = 0;
+            for (int i = 0; i < n; i++) {
+                int p = row[ss[i]];
+                if (cnt[p]++ == 0) touch[nt++] = p;
+            }
+            int64_t acc = 0;
+            for (int k = 0; k < nt; k++) {
+                int64_t v = cnt[touch[k]];
+                acc += v * v;
+                cnt[touch[k]] = 0;
+            }
+            s[mc[b]] += acc;
+        }
+        for (int c = 0; c < MAXCASE; c++) sm[(size_t)w * MAXCASE + c] = s[c];
+    }
+
+    Cand *cand = L->cand[depth];
+    Ladder cur;
+    /* A PINNED THRESHOLD IS THE STRATEGY, NOT AN OPTION.  Free, the level may
+     * always decline (T = 0), which is what makes a deeper ladder contain a
+     * shallower one.  Pinned, the threshold is given and only the WORD is being
+     * chosen, so declining is not on the table -- otherwise the gate's pinned
+     * runs would quietly price a shorter ladder than the one they name. */
+    int pinned = pin && pin[depth] >= 0;
+    double bestv = all_declined;                   /* T = 0 is always available */
+    int lim = topk < NG ? topk : NG;
+    for (int ti = 0; ti < nthr; ti++) {
+        int t = thr[ti];
+        if (t <= 0) continue;                      /* that is all_declined */
+        int fires = 0;
+        for (int b = 0; b < nbk; b++) if (mc[b] < t) { fires = 1; break; }
+        if (!fires) continue;
+        /* nothing fires => the level is a no-op whatever its word, and
+         * all_declined already IS its cost, pinned or not */
+        if (pinned) bestv = HUGE_VAL;
+        double leaves = 0.0;
+        for (int c = t; c < MAXCASE; c++) leaves += dec[c];
+        for (int w = 0; w < NG; w++) {
+            cand[w].w = w;
+            cand[w].key = 0.0;
+            /* A WORD ALREADY PLAYED ON THIS PATH SPLITS NOTHING -- every answer
+             * in every live bucket replied to it identically -- so it is dropped
+             * rather than left to sort last, which is also what the two-level
+             * path does with the opener and is what makes the two agree. */
+            int seen = 0;
+            for (int i = 0; i < nplayed; i++) if (played[i] == w) { seen = 1; break; }
+            if (seen) { cand[w].ssq = INT64_MAX; continue; }
+            int64_t ssq = 0;
+            for (int c = 0; c < t; c++) ssq += sm[(size_t)w * MAXCASE + c];
+            cand[w].ssq = ssq;
+        }
+        qsort(cand, (size_t)NG, sizeof(Cand), cmp_cand_ssq);
+        for (int i = 0; i < lim; i++) {
+            if (cand[i].ssq == INT64_MAX) break;   /* nothing left to try */
+            /* THE BOUND IS SOUND FOR ANY STRATEGY, not just the random tail: a
+             * live set of n needs at least 2n-1 more guesses, since only the one
+             * answer equal to the word played can finish in one.  So a cut here
+             * never discards a better ladder, and the BEAM stays the single
+             * approximation in play. */
+            double lb = leaves + ladder_expand(m, L, buf, bk, st, mc, nbk,
+                                               cand[i].w, t, depth, maxlvl, topk,
+                                               played, nplayed, pin, &cur, 1);
+            if (!(lb < bestv)) { if (cut) (*cut)++; continue; }
+            double v = leaves + ladder_expand(m, L, buf, bk, st, mc, nbk,
+                                              cand[i].w, t, depth, maxlvl, topk,
+                                              played, nplayed, pin, &cur, 0);
+            if (scanned) (*scanned)++;
+            if (v < bestv) {
+                bestv = v;
+                *best = cur;
+                best->word[depth] = cand[i].w;
+                best->thr[depth] = (int8_t)t;
+                if (dec_out) *dec_out = leaves;
+            }
+        }
+    }
+    if (bestv == HUGE_VAL) {                       /* pinned, but no word left */
+        bestv = all_declined;
+        best->word[depth] = -1;
+        best->thr[depth] = 0;
+    }
+    if (best->word[depth] < 0 && dec_out) *dec_out = all_declined;
+    return bestv;
+}
+
+
+/* A CHEAP SOUND BOUND ON A LADDER OPENER, with no word loop and no recursion:
+ * every answer pays for the opener, and every bucket the opener leaves pays at
+ * least 2n-1 however the ladder continues.  This replaces `opener_bound`'s
+ * minimisation over all 12972 second words, which costs a minute over the full
+ * list and buys little once the root is beamed to K openers anyway. */
+static double ladder_bound(Memo *m, int og) {
+    const uint8_t *row = PAT + (size_t)og * NA;
+    int *cnt = m->cnt, *touch = m->touch;
+    int nt = 0;
+    for (int a = 0; a < NA; a++)
+        if (cnt[row[a]]++ == 0) touch[nt++] = row[a];
+    double tot = 0.0;
+    for (int k = 0; k < nt; k++) {
+        int n = cnt[touch[k]];
+        tot += n;                                   /* the opener itself */
+        if (touch[k] != ALL_GREEN) tot += 2.0 * n - 1.0;
+        cnt[touch[k]] = 0;
+    }
+    return tot;
+}
+
+/* ONE OPENER'S LADDER.  Lay the answers out by the opener's reply, give each
+ * bucket the matched-letter state that reply proves, and hand the lot to level
+ * 2 as a SINGLE case -- there are no groups here, because the level-2 threshold
+ * IS the firing condition and it is what the search is choosing. */
+static void solve_ladder_opener(Memo *m, Levels *L, int og, Row *r,
+                                int topk, int maxlvl, const int8_t *pin) {
+    memo_clear(m);
+    r->opener = og;
+    r->done = 1;
+    for (int d = 0; d < NLVLBUF; d++) { r->lword[d] = -1; r->lthr[d] = 0; }
+
+    const uint8_t *row = PAT + (size_t)og * NA;
+    int *cnt = m->cnt, *touch = m->touch;
+    uint16_t *buf = L->buf[1];
+    Bkt *bk = L->bkt[1];
+    MState *st = L->st[1];
+    int8_t *mc = L->mc[1];
+    int nt = 0;
+    for (int a = 0; a < NA; a++)
+        if (cnt[row[a]]++ == 0) touch[nt++] = row[a];
+    int acc = 0, nbk = 0;
+    for (int k = 0; k < nt; k++) {
+        int p = touch[k], len = cnt[p];
+        cnt[p] = acc;
+        acc += len;
+        if (p == ALL_GREEN) continue;              /* the opener won: no ladder */
+        bk[nbk].start = cnt[p];
+        bk[nbk].len = len;
+        memset(&st[nbk], 0, sizeof st[nbk]);
+        mstate_add(&st[nbk], og, p);
+        mc[nbk] = (int8_t)mstate_matched(&st[nbk]);
+        nbk++;
+    }
+    for (int a = 0; a < NA; a++) buf[cnt[row[a]]++] = (uint16_t)a;
+    for (int k = 0; k < nt; k++) cnt[touch[k]] = 0;
+
+    Ladder best;
+    for (int d = 0; d < NLVLBUF; d++) { best.word[d] = -1; best.thr[d] = 0; }
+    double leaves = 0.0;
+    int scanned = 0, cutn = 0;
+    int32_t played[NLVLBUF];
+    played[0] = og;
+    double below = solve_ladder(m, L, buf, bk, st, mc, nbk, 2, maxlvl, topk,
+                                played, 1, pin, &best, &leaves, &scanned, &cutn);
+    for (int d = 0; d < NLVLBUF; d++) { r->lword[d] = best.word[d]; r->lthr[d] = best.thr[d]; }
+    /* THE SPLIT THE REPORT SHOWS is the two-level one: `decline` is what the
+     * answers that leave at level 2 cost, opener included, and `fired` is
+     * everything else.  Answers leaving at level 3 or below are inside `fired`,
+     * which is the only reading that keeps the column meaning what it means in
+     * every other secondexact row. */
+    int nleave = 0;
+    for (int b = 0; b < nbk; b++) if (mc[b] >= best.thr[2]) nleave += bk[b].len;
+    r->decline = nleave + leaves;
+    r->fired[0] = (NA - nleave) + (below - leaves);
+    r->nq[0] = NA - nleave;
+    r->second[0] = best.word[2];
+    r->scanned[0] = scanned;
+    r->cut[0] = cutn;
+    r->ntree[0] = 0;
+    for (int c = 0; c < MAXCASE; c++) r->third[0][c] = -1;
 }
 
 
@@ -960,8 +1307,32 @@ static double fired_with_third(Memo *m, int og, const uint16_t *q, int nq,
  * `|` in the same order the report uses (least informative first), each group's
  * third words following it as `+word`.  Labelled adds each word's case.
  */
+static int LADDER_LEVELS = 0;    /* --ladder N, 0 when the mode is off */
+
 static void format_strategy(char *buf, size_t n, const Row *v, int labelled) {
     size_t k = 0;
+    if (LADDER_LEVELS) {
+        /* `clint<3 dough<2 frizz<2` -- the word and the matched-letter threshold
+         * that fires it, one per level.  The threshold is never dropped: two
+         * ladders over the same five words are two different strategies. */
+        for (int d = 2; d <= LADDER_LEVELS; d++) {
+            int r;
+            if (v->lword[d] < 0) {
+                r = labelled ? snprintf(buf + k, n - k, " -- (L%d: never fires)", d)
+                             : snprintf(buf + k, n - k, " -");
+            } else if (labelled) {
+                r = snprintf(buf + k, n - k, " %s (L%d, matched<%d)",
+                             GWORD[v->lword[d]], d, v->lthr[d]);
+            } else {
+                r = snprintf(buf + k, n - k, " %s<%d", GWORD[v->lword[d]], v->lthr[d]);
+            }
+            if (r < 0 || (size_t)r >= n - k) break;
+            k += (size_t)r;
+            if (v->lword[d] < 0) break;         /* declining ENDS the ladder */
+        }
+        buf[k < n ? k : n - 1] = 0;
+        return;
+    }
     for (int g = NGROUP - 1; g >= 0; g--) {
         const char *w = v->second[g] >= 0 ? GWORD[v->second[g]] : "-";
         int r = labelled
@@ -1264,6 +1635,20 @@ static int read_resume(const char *path, Row *rows, int nopen, const char *label
         for (int i = 0; i < nopen; i++)
             if (!strcmp(GWORD[rows[i].opener], ow)) { oi = i; break; }
         if (oi < 0) continue;
+        /* A LADDER LEVEL ROW carries a word this run will otherwise never
+         * recompute, so it is read back for EVERY opener rather than only the
+         * leader: a resumed run that could not name its own words would report a
+         * total with no strategy attached. */
+        if (LADDER_LEVELS && fires[0] == 'L' && strchr(fires, '|')) {
+            int d = atoi(fires + 1), t = atoi(strchr(fires, '|') + 2);
+            if (d >= 2 && d <= LADDER_LEVELS && n >= 3) {
+                rows[oi].lthr[d] = (int8_t)t;
+                rows[oi].lword[d] = -1;
+                for (int k = 0; k < NG; k++)
+                    if (!strcmp(GWORD[k], sec)) { rows[oi].lword[d] = k; break; }
+            }
+            continue;
+        }
         if (!rows[oi].resumed) { rows[oi].resumed = 1; found++; }
         if (n < 7) continue;                       /* a `none` row: no numbers */
         /* the best total on file becomes the starting incumbent */
@@ -1298,6 +1683,35 @@ static int read_resume(const char *path, Row *rows, int nopen, const char *label
  * end-of-run write uses -- one writer, so a resumed file and a fresh one cannot
  * drift apart. */
 static void write_rows(FILE *f, Row *v) {
+    if (LADDER_LEVELS) {
+        /* ONE SUMMARY ROW plus one row per LEVEL, `L<d>|t<T>` in the `fires`
+         * column -- the level and the threshold that fires its word, which
+         * together ARE the rule.  A declined level is written too, as `-`, so
+         * the file records where the ladder stopped rather than leaving a reader
+         * to infer it from a missing row. */
+        double tot = v->decline + v->fired[0];
+        if (!v->done) {
+            fprintf(f, "%s,ladder,,,,,,%d,0,cut\n", GWORD[v->opener], NA);
+            fflush(f);
+            return;
+        }
+        /* `-` RATHER THAN AN EMPTY FIELD for a level that never fires: the
+         * resume reader's scanf stops at the first empty column, so an empty
+         * `second` would make the summary row unparseable and the run would
+         * resume without its own incumbent. */
+        fprintf(f, "%s,ladder,%s,%.6f,%.4f,%.4f,%.4f,%d,%d,%d\n",
+                GWORD[v->opener], v->lword[2] >= 0 ? GWORD[v->lword[2]] : "-",
+                tot / NA, tot, v->decline, v->fired[0],
+                v->nq[0], v->scanned[0], v->cut[0]);
+        for (int d = 2; d <= LADDER_LEVELS; d++) {
+            fprintf(f, "%s,L%d|t%d,%s,%.6f,%.4f,,,,,level%d\n",
+                    GWORD[v->opener], d, v->lthr[d],
+                    v->lword[d] >= 0 ? GWORD[v->lword[d]] : "-", tot / NA, tot, d);
+            if (v->lword[d] < 0) break;         /* declining ENDS the ladder */
+        }
+        fflush(f);
+        return;
+    }
     double tot = v->decline;
     int any = 0;
     for (int g = 0; g < NGROUP; g++) {
@@ -1362,6 +1776,11 @@ int main(int argc, char **argv) {
     int third_max = -1;                        /* -1: no third level at all */
     int maxlvl = 0;                            /* 0: the fixed 2/3-level paths */
     int third_decline = 0;
+    int ladder = 0;                            /* --ladder N, 0 = mode off */
+    int min_grays_set = 0, ngroupspec = 0;     /* was a GROUP condition asked for? */
+    const char *pinspec = NULL;                /* --pin-thresholds, the gate hook */
+    int8_t pin[NLVLBUF];
+    for (int d = 0; d < NLVLBUF; d++) pin[d] = -1;
     const char *third_key = NULL;
     const int *shared_third = NULL;
     double report = 10.0;
@@ -1370,14 +1789,14 @@ int main(int argc, char **argv) {
         if (!strcmp(argv[i], "--out") && i + 1 < argc) outpath = argv[++i];
         else if (!strcmp(argv[i], "--data") && i + 1 < argc) datadir = argv[++i];
         else if (!strcmp(argv[i], "--patterns") && i + 1 < argc) patpath = argv[++i];
-        else if (!strcmp(argv[i], "--min-grays") && i + 1 < argc) min_grays = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--min-grays") && i + 1 < argc) { min_grays = atoi(argv[++i]); min_grays_set = 1; }
         /* --by-grays N: a SEPARATE word for each grey count from 5 down to N,
          * which is secondword's e5.e4....eN partition. */
         else if (!strcmp(argv[i], "--by-grays") && i + 1 < argc) by_grays = atoi(argv[++i]);
         /* --group SPEC: any partition groups.c can express, including the vowel
          * atoms -- the same flag, the same grammar and the same canonical name
          * secondword uses, because it is the same code. */
-        else if (!strcmp(argv[i], "--group") && i + 1 < argc) groups_add(argv[++i]);
+        else if (!strcmp(argv[i], "--group") && i + 1 < argc) { groups_add(argv[++i]); ngroupspec++; }
         /* --split-vowels / --split-matched-vowels: the cross product of the
          * --by-grays groups with the greyed or matched vowel count, written out
          * here so the flag means the same thing in both solvers. */
@@ -1416,6 +1835,15 @@ int main(int argc, char **argv) {
         /* --max-level N: a committed word at EVERY level down to N, each with a
          * decline option.  Supersedes --third-key, which is the N=3 case. */
         else if (!strcmp(argv[i], "--max-level") && i + 1 < argc) maxlvl = atoi(argv[++i]);
+        /* --ladder N: ONE committed word per level down to N, each fired by its
+         * own THRESHOLD on the matched letters, declining ENDING the ladder.
+         * The whole strategy is N words and N-1 thresholds -- see THE LADDER. */
+        else if (!strcmp(argv[i], "--ladder") && i + 1 < argc) ladder = atoi(argv[++i]);
+        /* --pin-thresholds a,b,c PINS T2,T3,... instead of searching them.  It is
+         * how the gate turns this into a quantity another code path can compute:
+         * at N=2 a pinned T is exactly the group g<6-T>, because after ONE guess
+         * matched is 5 minus the greys. */
+        else if (!strcmp(argv[i], "--pin-thresholds") && i + 1 < argc) pinspec = argv[++i];
         /* --print-label resolves the firing condition, prints its CANONICAL name
          * and stops.  The wrapper needs that name for the filename, and groups.c
          * is the one place that knows it -- deriving it in shell would be a
@@ -1504,6 +1932,83 @@ int main(int argc, char **argv) {
                         "--by-grays N too\n");
         return 1;
     }
+    /* ---------------------------------------------------------- the ladder --
+     * THE LEVEL-2 THRESHOLD *IS* THE FIRING CONDITION, and it is what the search
+     * chooses -- so a group condition would be fixing the very thing being
+     * optimised, under a name that says otherwise.  Every group flag is refused
+     * rather than ignored. */
+    char ladder_label[512];
+    if (ladder) {
+        if (ladder < 2 || ladder > MAXLVL) {
+            fprintf(stderr, "--ladder must be 2..%d: 2 is one committed word then "
+                            "the random tail, and each\nlevel beyond multiplies "
+                            "the search by the beam width times the thresholds\n",
+                    MAXLVL);
+            return 1;
+        }
+        if (!topk) {
+            fprintf(stderr, "--ladder needs --topk: five words over 12972 each is "
+                            "not a space anything enumerates,\nso the search only "
+                            "exists inside a beam\n");
+            return 1;
+        }
+        if (maxlvl || third_max >= 0) {
+            fprintf(stderr, "--ladder is a DIFFERENT strategy from --max-level / "
+                            "--third-key, not a variant of one:\nthere every "
+                            "matched count gets its own word, here they share one "
+                            "and a threshold\ndecides who plays it.  Pass one or "
+                            "the other\n");
+            return 1;
+        }
+        if (min_grays_set || by_grays || ngroupspec || split_v || split_mv || split_nz) {
+            fprintf(stderr, "--ladder takes no firing condition: the level-2 "
+                            "THRESHOLD is that condition, and it is\nwhat the "
+                            "search is choosing.  A group would pin it while the "
+                            "filename claimed\notherwise\n");
+            return 1;
+        }
+        if (pinspec) {
+            const char *p = pinspec;
+            for (int d = 2; d <= ladder; d++) {
+                if (!*p) {
+                    fprintf(stderr, "--pin-thresholds needs %d values (T2..T%d), "
+                            "comma separated\n", ladder - 1, ladder);
+                    return 1;
+                }
+                int t = atoi(p);
+                if (t < 0 || t > WORDLEN + 1) {
+                    fprintf(stderr, "--pin-thresholds: a threshold is 0..%d "
+                            "(0 never fires, %d always)\n", WORDLEN + 1, WORDLEN + 1);
+                    return 1;
+                }
+                pin[d] = (int8_t)t;
+                while (*p && *p != ',') p++;
+                if (*p == ',') p++;
+            }
+            if (*p) {
+                fprintf(stderr, "--pin-thresholds has more values than --ladder %d "
+                        "has levels\n", ladder);
+                return 1;
+            }
+        }
+        /* THE LABEL IS THE QUANTITY.  A different depth and a different pinning
+         * are different strategies, so both land in the name -- and the resume
+         * stamp is checked against it, so a file cannot be continued by a run
+         * asking a different question. */
+        int k = snprintf(ladder_label, sizeof ladder_label, "ladderL%d", ladder);
+        if (pinspec) {
+            k += snprintf(ladder_label + k, sizeof ladder_label - k, "_pin");
+            for (int d = 2; d <= ladder; d++)
+                k += snprintf(ladder_label + k, sizeof ladder_label - k, "%s%d",
+                              d == 2 ? "" : "-", pin[d]);
+        }
+        LADDER_LEVELS = ladder;
+    }
+    if (pinspec && !ladder) {
+        fprintf(stderr, "--pin-thresholds is an option ON --ladder\n");
+        return 1;
+    }
+    if (print_label && ladder) { printf("%s\n", ladder_label); return 0; }
     if (print_label) {
         /* the tiles are all groups_resolve needs (a vowel atom defers its
          * checks to the opener loop), so this answers without loading a thing */
@@ -1567,24 +2072,50 @@ int main(int argc, char **argv) {
      * --group spec is passed straight through, so `--group e3_mv1` means here
      * exactly what it means to secondword. */
     char label[512];
-    if (by_grays) groups_add_by_grays(by_grays, split_v, split_mv, split_nz);
-    groups_resolve(min_grays, label, sizeof label);
-    OPENER_DEP = groups_opener_dependent();
-    if (!OPENER_DEP) {
-        /* opener-independent: one set of masks serves every opener */
-        int8_t zero[NPAT];
-        for (int p = 0; p < NPAT; p++) zero[p] = 0;
-        for (int g = 0; g < NGROUP; g++)
-            groups_mask_for(&GRP[g], zero, zero, GFIRE[g]);
-        for (int p = 0; p < NPAT; p++) {
-            FIRE[p] = 0;
-            for (int g = 0; g < NGROUP; g++) FIRE[p] |= GFIRE[g][p];
+    if (ladder) {
+        /* ONE CASE COVERING EVERY REPLY.  groups.c refuses such a condition, and
+         * rightly: for the two-level strategy it would be a blind opening.  Here
+         * it is not a condition at all -- the ladder's own thresholds do all the
+         * deciding -- so the single case is built directly rather than asked for
+         * in a grammar whose whole job is to carve the replies up. */
+        NGROUP = 1;
+        snprintf(GSPEC[0], sizeof GSPEC[0], "ladder");
+        snprintf(label, sizeof label, "%s", ladder_label);
+        for (int p = 0; p < NPAT; p++) { GFIRE[0][p] = 1; FIRE[p] = 1; }
+        OPENER_DEP = 0;
+    } else {
+        if (by_grays) groups_add_by_grays(by_grays, split_v, split_mv, split_nz);
+        groups_resolve(min_grays, label, sizeof label);
+        OPENER_DEP = groups_opener_dependent();
+        if (!OPENER_DEP) {
+            /* opener-independent: one set of masks serves every opener */
+            int8_t zero[NPAT];
+            for (int p = 0; p < NPAT; p++) zero[p] = 0;
+            for (int g = 0; g < NGROUP; g++)
+                groups_mask_for(&GRP[g], zero, zero, GFIRE[g]);
+            for (int p = 0; p < NPAT; p++) {
+                FIRE[p] = 0;
+                for (int g = 0; g < NGROUP; g++) FIRE[p] |= GFIRE[g][p];
+            }
         }
     }
     fprintf(stderr, "loaded %d guesses x %d answers; firing on %s (%d group%s%s)\n",
             NG, NA, label, NGROUP, NGROUP == 1 ? "" : "s",
             OPENER_DEP ? ", per opener" : "");
-    if (topk)
+    if (ladder)
+        fprintf(stderr, "LADDER: %d committed words, one per level, each fired "
+                "while the CUMULATIVE\n        matched letters are below its own "
+                "threshold.  Going over a threshold\n        ENDS the ladder: "
+                "every guess from there is a uniformly random consistent\n"
+                "        ANSWER, as is guess %d onward.\n", ladder, ladder + 1);
+    if (topk && ladder)
+        fprintf(stderr, "BEAM k=%d: the %d best OPENERS, and the %d best words at "
+                "EVERY level below.\n          Thresholds are ENUMERATED, not "
+                "beamed -- only the values that induce a\n          different "
+                "firing set.  Every total is an UPPER BOUND and the winner is\n"
+                "          the best of the openers EXAMINED, not the optimum.\n",
+                topk, topk, topk);
+    else if (topk)
         fprintf(stderr, "BEAM k=%d: the %d best OPENERS, and within each the %d "
                 "best second words\n          per group -- ONE K governs both, as "
                 "in every other solver here.  Every\n          total is an UPPER "
@@ -1653,6 +2184,9 @@ int main(int argc, char **argv) {
     for (int oi = 0; oi < nopen; oi++) {
         rows[oi].opener = openers[oi];
         for (int g = 0; g < MAXGRP; g++) rows[oi].second[g] = -1;
+        /* -1, NOT the calloc'd 0: index 0 is a perfectly good word, so a level
+         * the ladder never reached would read back as a real choice. */
+        for (int d = 0; d < NLVLBUF; d++) rows[oi].lword[d] = -1;
     }
     /* RESUME BEFORE ANYTHING IS COMPUTED, so the seeded incumbent is already
      * cutting during phase 2's very first opener. */
@@ -1677,9 +2211,9 @@ int main(int argc, char **argv) {
         fprintf(outf, "# expected is over all %d answers; decline/fired split it "
                 "by whether the rule fired.\n", NA);
         fprintf(outf, "# settings fire=%s openers=%d follow_up=answer topk=%d"
-                " third=%d third_key=%s third_decline=%d\n",
+                " third=%d third_key=%s third_decline=%d ladder=%d\n",
                 label, nopen, topk, third_max,
-                third_key ? third_key : "none", third_decline);
+                third_key ? third_key : "none", third_decline, ladder);
         if (topk)
             fprintf(outf, "# TOPK=%d: each group's word is the best of the %d "
                     "ranked by the one-ply\n# score, so every total here is an "
@@ -1717,9 +2251,16 @@ int main(int argc, char **argv) {
             /* second[] is -1, NOT the calloc'd 0 (set before the resume read):
              * a cut opener never reaches solve_opener, and index 0 is a
              * perfectly good word, so the zero read back as a real choice. */
+            if (ladder) {
+                /* NO WORD LOOP HERE.  The ladder's bound needs only the opener's
+                 * own bucket sizes, so phase 1 is a pass over the answers rather
+                 * than a minimisation over 12972 second words. */
+                rows[oi].bound = ladder_bound(&m, openers[oi]);
+            } else {
             masks_for(openers[oi], gf, fu, gvow, mvow);
             rows[oi].bound = opener_bound(&m, openers[oi], q, out, rstart, rlen,
                                           rpat, nb, nq, gb, gf, fu);
+            }
             /* PHASE 1 NARRATES.  It is a minute of work on the full list, and
              * silence reads as a hang -- the same reason every other phase in
              * this repo prints. */
@@ -1788,12 +2329,16 @@ int main(int argc, char **argv) {
          * one above it.  Allocated once per thread, not per opener. */
         Levels lev;
         memset(&lev, 0, sizeof lev);
-        for (int d = 0; d < MAXLVL; d++) {
+        for (int d = 0; d < NLVLBUF; d++) {
             lev.cand[d] = malloc(sizeof(Cand) * NG);
             lev.buf[d] = malloc(sizeof(uint16_t) * NA);
             lev.bkt[d] = malloc(sizeof(Bkt) * NA);
             lev.st[d]  = malloc(sizeof(MState) * NA);
             lev.mc[d]  = malloc(NA);
+            /* only the ladder ranks per matched count, and the table is 0.6 MB a
+             * level a thread -- not something to pay for when it is unused */
+            lev.ssqm[d] = ladder ? malloc(sizeof(int64_t) * (size_t)NG * MAXCASE)
+                                 : NULL;
         }
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic, 1)
@@ -1814,6 +2359,9 @@ int main(int argc, char **argv) {
                 cut_openers++;
                 continue;
             }
+            if (ladder) {
+                solve_ladder_opener(&m, &lev, rr->opener, rr, topk, ladder, pin);
+            } else {
             /* the layout again -- cheap, and it keeps phase 2 independent of
              * whatever phase 1 left in the shared buffers */
             masks_for(rr->opener, gf, fu, gvow, mvow);
@@ -1822,13 +2370,17 @@ int main(int argc, char **argv) {
             solve_opener(&m, rr->opener, rr, inc, no_prune, q, out, rstart, rlen,
                          rpat, nbs, nqs, gbs, fu, topk, third_max, shared_third,
                          third_decline, maxlvl, &lev);
+            }
 #ifdef _OPENMP
 #pragma omp critical (progress)
 #endif
             {
                 done++;
                 double v = rr->decline;
-                int any = 0;
+                /* A LADDER THAT DECLINES EVERYWHERE IS STILL A STRATEGY -- the
+                 * plain opener -- and still has a total, so it is never treated
+                 * as an empty row the way a group with no qualifying answer is. */
+                int any = ladder ? 1 : 0;
                 for (int g = 0; g < NGROUP; g++) {
                     v += rr->fired[g];
                     any |= rr->second[g] >= 0;
@@ -1860,9 +2412,9 @@ int main(int argc, char **argv) {
             }
         }
         free(lev.node);
-        for (int d = 0; d < MAXLVL; d++) {
+        for (int d = 0; d < NLVLBUF; d++) {
             free(lev.cand[d]); free(lev.buf[d]); free(lev.bkt[d]);
-            free(lev.st[d]); free(lev.mc[d]);
+            free(lev.st[d]); free(lev.mc[d]); free(lev.ssqm[d]);
         }
         free(q); free(out); free(rstart); free(rlen); free(rpat);
         free(gf); free(fu); free(gvow); free(mvow);
