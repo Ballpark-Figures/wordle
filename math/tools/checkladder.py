@@ -703,6 +703,130 @@ def check_pool():
     print("   ok   a resume across the pool boundary is refused")
 
 
+# --------------------------------------------------------------------------- 10
+def check_win_rate():
+    """The WIN RATE, three ways, none of which shares a walk with the others.
+
+    `openexact.evaluate_ladder` is the fast path: numpy, pool indices, a reply
+    MATRIX, doubles.  `ladder.ladder_lost` is the reference: words, replies
+    recomputed from the STRINGS by the multiset rule, exact RATIONALS.  And
+    `ladder.ladder_total_leaves` re-sums the MEAN over the same leaves the loss
+    is summed over, against `ladder_total`'s own older walk -- so the leaf
+    decomposition the win rate rests on is checked by a quantity that predates
+    it.
+
+    COVERAGE IS ASSERTED, because every one of these passes vacuously on a
+    problem where nothing is ever lost: a tight cap that loses answers, a loose
+    cap that loses none, a ladder that fires, a ladder that declines outright,
+    and a committed word that WINS must all have occurred.
+    """
+    print("10. the win rate, against ladder.py in exact rationals")
+    from openexact import evaluate_ladder                     # noqa: E402
+
+    # THE SMALL LISTS, and the reason is worth writing down: `tail_total`'s
+    # memo is keyed by the live SET, and a uniform draw from a set of n reaches
+    # every one of its subsets, so a ladder that hands the tail m words costs
+    # 2**m memo entries.  On MINI_ANSWERS a declining ladder hands over 18 and
+    # the reference alone runs for minutes; at 13 the same walk is 2**12 and the
+    # whole check is seconds.  Nothing it exercises depends on the size.
+    answers = SMALL_ANSWERS
+    pool = np.array([[pattern(a, b) for b in answers] for a in answers],
+                    dtype=np.int16)
+    idx = np.arange(len(answers))
+    gpos = {w: i for i, w in enumerate(SMALL_GUESSES)}
+    full = np.array([[pattern(g, a) for a in answers] for g in SMALL_GUESSES],
+                    dtype=np.int16)
+
+    # A spread of ladders: one that declines at once, one that fires everywhere,
+    # and deeper ones mixing the two -- plus caps either side of what the tail
+    # can manage on this deliberately confusable family.
+    LADDERS = [
+        (["aaaab"], []),
+        (["aaaab", "bcdea"], [6]),
+        (["aaaab", "bcdea"], [0]),
+        (["bcdea", "fghia"], [6]),
+        (["bcdea", "fghia", "jklma"], [6, 6]),
+        (["bcdea", "fghia", "jklma"], [6, 2]),
+        (["aaaab", "bcdea", "fghia", "cdefa"], [6, 6, 6]),
+        # A RUNG THAT IS ITSELF AN ANSWER, so a committed word can win outright
+        # at a level below the opener.  Every other ladder here rungs on
+        # SPLITTERS, which are never answers and so never reply all-green -- the
+        # branch went untested until a mutation walked straight through it.
+        (["bcdea", "aaaab", "fghia"], [6, 6]),
+    ]
+    checked = 0
+    saw = {"lost": 0, "clean": 0, "fired": 0, "declined": 0, "won": 0,
+           "won_deep": 0}
+    for words, thr in LADDERS:
+        rungs = [(w, t) for w, t in zip(words[1:], thr)]
+        # (a) the two reference walks against each other -- the leaf
+        #     decomposition the loss is summed over, checked by the MEAN.
+        want_tot = LAD.ladder_total(words[0], rungs, answers)
+        leaf_tot = LAD.ladder_total_leaves(words[0], rungs, answers)
+        if want_tot != leaf_tot:
+            bad("%s: ladder_total %s but the leaves sum to %s -- the two "
+                "reference walks disagree"
+                % (" ".join(words), want_tot, leaf_tot))
+            return
+        leaves = LAD.ladder_leaves(words[0], rungs, answers)
+        saw["won"] += sum(1 for _, _, won in leaves if won)
+        saw["won_deep"] += sum(1 for _, played, won in leaves
+                               if won and played > 1)
+        saw["fired"] += sum(1 for _, played, _ in leaves if played > 1)
+        saw["declined"] += sum(1 for _, played, won in leaves
+                               if played == 1 and not won)
+
+        crows = np.ascontiguousarray(full[[gpos[w] for w in words]])
+        for cap in (2, 3, 4, 6, 14):
+            if len(words) > cap:
+                continue
+            want_lost = LAD.ladder_lost(words[0], rungs, answers, cap)
+            got = evaluate_ladder(pool, crows, words, thr, idx, cap=cap)
+            if abs(got["mean"] - float(want_tot) / len(answers)) > 1e-9:
+                bad("%s cap %d: fast mean %.12f, reference %.12f"
+                    % (" ".join(words), cap, got["mean"],
+                       float(want_tot) / len(answers)))
+                return
+            if abs(got["lost"] - float(want_lost)) > 1e-9:
+                bad("%s cap %d: fast lost %.12f, reference %.12f"
+                    % (" ".join(words), cap, got["lost"], float(want_lost)))
+                return
+            # win_rate and lost are one number stated two ways; a run where
+            # nothing is lost must read as exactly 1, not 0.9999999.
+            if abs(got["win_rate"] - (1.0 - float(want_lost) / len(answers))) > 1e-12:
+                bad("%s cap %d: win_rate does not match its own lost"
+                    % (" ".join(words), cap))
+                return
+            if want_lost == 0 and got["win_rate"] != 1.0:
+                bad("%s cap %d: nothing lost yet win_rate %r"
+                    % (" ".join(words), cap, got["win_rate"]))
+                return
+            saw["lost" if want_lost > 0 else "clean"] += 1
+            checked += 1
+
+    # A LOOSER CAP CAN NEVER LOSE MORE -- the same games, read against a bigger
+    # threshold -- so this is monotone for free, and a budget slipped by one
+    # would break it.
+    for words, thr in LADDERS:
+        rungs = [(w, t) for w, t in zip(words[1:], thr)]
+        prev = None
+        for cap in range(len(words), 15):
+            lost = LAD.ladder_lost(words[0], rungs, answers, cap)
+            if prev is not None and lost > prev:
+                bad("%s: cap %d loses %s, more than cap %d's %s"
+                    % (" ".join(words), cap, lost, cap - 1, prev))
+                return
+            prev = lost
+    if not all(saw.values()):
+        bad("coverage: %s never happened, so the checks above prove less than "
+            "they look like they do"
+            % ", ".join(k for k, v in saw.items() if not v))
+        return
+    print("   ok   %d (ladder, cap) cells identical in numpy and in exact "
+          "rationals; %d lost answers, %d did not; loss monotone in the cap"
+          % (checked, saw["lost"], saw["clean"]))
+
+
 def main(argv):
     real = "--real" in argv
     if not os.path.exists(BINARY):
@@ -718,6 +842,7 @@ def main(argv):
     check_resume()
     check_pool()
     check_refusals()
+    check_win_rate()
     print("\n%s" % ("FAILED (%d)" % fail if fail else "all checks passed"))
     return 1 if fail else 0
 

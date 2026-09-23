@@ -302,3 +302,115 @@ def last_level_mean(Mpool, M, prefix, ans_pool_idx, k, cand_to_pool, memo=None):
     var -= live
 
     return np.rint((const + var) * SCALE).astype(np.int64), ssq
+
+
+# ---------------------------------------------------------------------------
+# THE LADDER -- the same two quantities for a CONDITIONAL opening.
+#
+# Everything above prices a BLIND opening: k words go down whatever the board
+# shows, so their replies fold into one joint key and a bucket is reached one
+# way.  A LADDER (`math/ladder.py`, `solver/secondexact.c --ladder N`) plays its
+# d-th committed word only while `matched < T_d`, so which words a game sees
+# depends on its replies and there is no single joint key -- it needs an
+# explicit walk.  What does NOT change is anything below the handoff: the tail
+# is the same uniform draw from the consistent ANSWERS, so `tail_total` and
+# `tail_lost` are reused exactly as `evaluate` uses them, and `mean` and
+# `win_rate` mean precisely what they mean above.  That is why this lives here
+# rather than in a module of its own.
+#
+# `ladder.py` is the source of truth for the rule and the exact-rational oracle
+# (`ladder_total`, `ladder_lost`); this is the fast path the gate diffs it
+# against.  `matched_letters` is IMPORTED from it rather than restated -- the
+# independent implementations of that key are the C's and `tree_states`', which
+# `checkladder.check_matched` already diffs all three ways.
+# ---------------------------------------------------------------------------
+
+
+def _split_row(row, live):
+    """(reply code, members) per distinct reply of one word over `live`.
+
+    `live` is a sorted array of pool indices and each part comes back sorted, so
+    a part is a valid `tail_total` / `tail_lost` memo key in its own right.
+    """
+    vals = row[live]
+    order = np.argsort(vals, kind="stable")
+    v, m = vals[order], live[order]
+    cuts = np.flatnonzero(np.diff(v)) + 1
+    for seg_v, seg_m in zip(np.split(v, cuts), np.split(m, cuts)):
+        yield int(seg_v[0]), np.sort(seg_m)
+
+
+def evaluate_ladder(M, crows, words, thresholds, ans_pool_idx, cap=6,
+                    memo=None, lost_memo=None):
+    """Exact (mean guesses, win rate) for one committed-word ladder.
+
+    `M`            pool-vs-pool reply matrix -- what the tail sees in a bucket.
+    `crows`        (len(words), npool) replies of each committed word against
+                   every pool word, in PLAY ORDER.  THEY ARE GUESSES, NOT POOL
+                   WORDS: `trine` leads the best ladder here and is not an
+                   answer, so they index the candidate side of the rectangle.
+    `words`        the committed words themselves, opener first, already
+                   TRUNCATED at the first declined level -- a rung with no word
+                   ends the ladder, so it is simply absent.
+    `thresholds`   `T_2 .. T_N`, one shorter than `words`: word `d` is played
+                   only while the cumulative matched count is below `T_d`.
+    `ans_pool_idx` each answer as a pool index.
+
+    Returns a dict shaped like `evaluate`'s.  `total` and `lost` are the raw
+    sums the two numbers divide, so a caller can add runs up.
+    """
+    from ladder import matched_letters                  # local: the reference
+    from wordle import ALL_GREEN, decode
+
+    if len(thresholds) != len(words) - 1:
+        raise ValueError("a ladder of %d words has %d thresholds, not %d"
+                         % (len(words), len(words) - 1, len(thresholds)))
+    memo = {} if memo is None else memo
+    lost_memo = {} if lost_memo is None else lost_memo
+
+    state = {"total": 0.0, "lost": 0.0, "leaves": 0, "won": 0, "deepest": 1}
+
+    def handoff(live, played):
+        """The ladder is over for `live`; the random tail runs from here."""
+        state["leaves"] += 1
+        state["total"] += tail_total(M, live, memo)
+        budget = cap - played
+        if budget < len(live):              # else provably all found in time
+            state["lost"] += tail_lost(M, live, budget, lost_memo)
+
+    def walk(live, played, hist_w, hist_t):
+        if len(live) == 0:
+            return
+        state["deepest"] = max(state["deepest"], played)
+        if played >= len(words):
+            handoff(live, played)
+            return
+        # Constant across `live` -- it reads the REPLIES, never the answer --
+        # so the whole set fires or the whole set leaves.
+        if matched_letters(hist_w, hist_t) >= thresholds[played - 1]:
+            handoff(live, played)
+            return
+        state["total"] += len(live)         # this committed word, once per answer
+        w, row = words[played], crows[played]
+        for code, part in _split_row(row, live):
+            if code == ALL_GREEN:
+                # w WAS the answer: the game ended on the guess just charged.
+                # It is alone in its part, and never a loss while the ladder is
+                # no longer than the cap -- asserted by the caller.
+                state["won"] += len(part)
+                continue
+            walk(part, played + 1, hist_w + [w], hist_t + [decode(code)])
+
+    n_ans = len(ans_pool_idx)
+    state["total"] += n_ans                 # the opener, once per answer
+    for code, part in _split_row(crows[0], np.sort(ans_pool_idx)):
+        if code == ALL_GREEN:
+            state["won"] += len(part)
+            continue
+        walk(part, 1, [words[0]], [decode(code)])
+
+    return {"mean": state["total"] / n_ans,
+            "win_rate": 1.0 - state["lost"] / n_ans,
+            "total": state["total"], "lost": state["lost"], "answers": n_ans,
+            "leaves": state["leaves"], "won_outright": state["won"],
+            "deepest": state["deepest"], "cap": cap}

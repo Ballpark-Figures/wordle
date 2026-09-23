@@ -61,6 +61,7 @@ from fractions import Fraction
 from functools import lru_cache
 
 __all__ = ["tiles", "matched_letters", "tail_total", "ladder_total",
+           "tail_lost", "ladder_leaves", "ladder_total_leaves", "ladder_lost",
            "threshold_of_grays", "grays_of_threshold"]
 
 
@@ -184,3 +185,142 @@ def ladder_total(opener, rungs, answers):
             continue
         tot += walk(members, [opener], [p], list(rungs))
     return tot
+
+
+# ---------------------------------------------------------------------------
+# THE WIN RATE -- the second quantity, and the cap is the ONLY place it enters.
+#
+# `ladder_total` above is expected guesses OUTRIGHT: play is never truncated, so
+# no cap appears in it at all.  The win rate is the fraction of those SAME
+# untruncated games finishing in `cap` guesses or fewer -- a REPORTING THRESHOLD
+# on one play, not a rule the strategy obeys.  That is exactly the split
+# `openexact.py` states for blind openings and `--win-within` carries in the
+# simulation, and the two numbers must never be described as if the strategy
+# were playing to the cap.
+#
+#     L(S, b) = |S|                                     if b == 0
+#             = 0                                       if |S| <= b
+#             = (1/|S|) * sum over g in S of sum over parts P of L(P, b - 1)
+#
+#       the expected answers in S NOT found within b further guesses.  The drawn
+#       word contributes 0 -- it is found on that guess.  `|S| <= b` is a BOUND,
+#       not a guess: every wrong draw eliminates at least the word drawn, so a
+#       set no bigger than the budget is always finished inside it.
+#
+# ONE WALK, TWO READINGS.  `ladder_leaves` is the ladder's structure on its own
+# -- where each answer stops being governed by a committed word -- and both the
+# total and the loss are sums over it.  `ladder_total` is deliberately LEFT
+# ALONE rather than rebuilt on top of it: it is the gated reference, so keeping
+# the older walk makes the two a free differential on each other, which is what
+# `checkladder.check_win_rate` asserts.
+# ---------------------------------------------------------------------------
+
+
+@lru_cache(maxsize=None)
+def tail_lost(words, budget):
+    """L(S, b): expected answers in `words` NOT found within `budget` guesses.
+
+    Exact rationals, and the same uniform-random-consistent-ANSWER tail
+    `tail_total` sums -- this counts what that play fails to finish in time
+    rather than what it costs.  `openexact.tail_lost` is the float/numpy
+    implementation of the identical recursion.
+    """
+    words = tuple(sorted(words))
+    n = len(words)
+    if budget <= 0:
+        return Fraction(n)
+    if n <= budget:
+        return Fraction(0)              # every wrong draw eliminates one word
+    tot = Fraction(0)
+    for g in words:
+        parts = {}
+        for a in words:
+            if a != g:
+                parts.setdefault(tiles(g, a), []).append(a)
+        for p in parts.values():
+            tot += tail_lost(tuple(p), budget - 1) / n
+    return tot
+
+
+def ladder_leaves(opener, rungs, answers):
+    """Where each answer stops being governed by a committed word.
+
+    Returns a list of `(live, played, won)`:
+
+      `live`    the answers still consistent at that point, sorted;
+      `played`  committed words played by then, so also the guesses each of
+                those answers has already spent;
+      `won`     True when a committed word WAS the answer, so the game ended on
+                it: `live` is that one word and it costs exactly `played`.
+                False when the ladder handed over, so the tail still runs.
+
+    Every answer appears in exactly one record.  Written as the strategy reads,
+    and the SAME structure `ladder_total` walks -- see the block comment above
+    for why that one is not rebuilt on this.
+    """
+    answers = tuple(answers)
+    out = []
+
+    def walk(live, guesses, replies, rungs):
+        if not live:
+            return
+        played = len(guesses)
+        if not rungs or rungs[0][0] is None:
+            out.append((tuple(sorted(live)), played, False))
+            return
+        w, thr = rungs[0]
+        # THE THRESHOLD IS TESTED ON THE BOARD AS IT STANDS, before this guess,
+        # and is constant across `live`, so the whole set fires or the whole set
+        # leaves -- which is what makes a leaf a well-defined set.
+        if matched_letters(guesses, replies) >= thr:
+            out.append((tuple(sorted(live)), played, False))
+            return
+        parts = {}
+        for a in live:
+            parts.setdefault(tiles(w, a), []).append(a)
+        for p, members in parts.items():
+            if all(t == 2 for t in p):
+                out.append((tuple(members), played + 1, True))
+                continue
+            walk(members, guesses + [w], replies + [p], rungs[1:])
+
+    parts = {}
+    for a in answers:
+        parts.setdefault(tiles(opener, a), []).append(a)
+    for p, members in parts.items():
+        if all(t == 2 for t in p):
+            out.append((tuple(members), 1, True))
+            continue
+        walk(members, [opener], [p], list(rungs))
+    return out
+
+
+def ladder_total_leaves(opener, rungs, answers):
+    """`ladder_total`'s value, summed over `ladder_leaves` instead.
+
+    Exists to be diffed against `ladder_total`: two walks of one strategy, so a
+    slip in either shows up as a disagreement rather than as a plausible number.
+    """
+    tot = Fraction(0)
+    for live, played, won in ladder_leaves(opener, rungs, answers):
+        tot += played * len(live)
+        if not won:
+            tot += tail_total(live)
+    return tot
+
+
+def ladder_lost(opener, rungs, answers, cap):
+    """EXACT expected answers NOT found within `cap` guesses, as a Fraction.
+
+    `1 - ladder_lost(...) / len(answers)` is the win rate.  The cap is a
+    reporting threshold on the untruncated play `ladder_total` prices -- the two
+    describe the same games.
+    """
+    lost = Fraction(0)
+    for live, played, won in ladder_leaves(opener, rungs, answers):
+        if won:
+            if played > cap:
+                lost += len(live)       # cannot happen while len(words) <= cap
+        else:
+            lost += tail_lost(live, cap - played)
+    return lost
