@@ -1,0 +1,59 @@
+# deep families: the answer families hard mode walks one word at a time (see tools/deep_families.py)
+# EXACT: a pure function of the committed hardturns trees -- no sampling, no seed
+# settings min_depth=7 min_fixed=0 trees=data/shared/hardturns/trees
+depth,family,fixed,size,walk,deepest,openers,kin,opener,line
+10,.ight,4,9,10,wight,14,5,aight,aight eight fight light might night right sight tight wight
+9,.ound,4,8,8,wound,19,5,adunc,bound found hound mound pound round sound wound
+8,.atch,4,7,7,watch,74,3,airth,batch catch hatch latch match patch watch
+8,.ower,4,7,7,tower,26,5,awner,sower cower lower mower power rower tower
+8,sha.e,4,7,6,shave,60,3,aches,shade shake shale shame share shave
+8,.aste,4,6,6,waste,18,2,donna,baste caste haste paste taste waste
+8,.aunt,4,6,6,vaunt,3,2,newer,daunt gaunt haunt jaunt taunt vaunt
+8,gra.e,4,6,6,graze,2,1,hings,grace grade grape grate grave graze
+8,.o.er,3,25,5,mover,1,9,ratha,power boner foyer joker mover
+7,boxer,5,1,2,boxer,94,0,adder,boner boxer
+7,.atty,4,6,4,tatty,142,2,aggri,catty fatty patty tatty
+7,.illy,4,6,5,willy,275,0,acton,dilly billy filly hilly willy
+7,s.ore,4,6,5,swore,128,1,abear,score shore snore store swore
+7,sta.e,4,6,6,stave,81,0,antes,stale stage stake stare state stave
+7,.ater,4,5,4,water,55,2,adder,cater eater hater water
+7,.olly,4,5,5,jolly,48,0,blent,dolly folly golly holly jolly
+7,.over,4,5,3,hover,84,1,abune,lover cover hover
+7,.ried,4,5,5,tried,2,0,geres,cried dried fried pried tried
+7,.rown,4,5,5,grown,17,0,humor,brown crown drown frown grown
+7,.unch,4,5,4,munch,16,1,angry,bunch hunch lunch munch
+7,.usty,4,5,5,rusty,16,0,cotts,dusty gusty lusty musty rusty
+7,.ying,4,5,3,vying,13,0,chang,dying tying vying
+7,spi.e,4,5,5,spite,3,0,pushy,spice spike spine spire spite
+7,sto.e,4,5,5,stove,2,0,guise,stone stoke stole store stove
+7,.ider,4,4,4,wider,2,0,buyer,aider cider rider wider
+7,.inch,4,4,4,winch,1,0,quant,cinch finch pinch winch
+7,.iner,4,4,4,miner,5,0,aggry,diner finer liner miner
+7,.itty,4,4,4,witty,4,0,geese,bitty ditty kitty witty
+7,.oist,4,4,4,moist,1,0,glued,foist hoist joist moist
+7,.reak,4,4,4,wreak,4,0,heigh,break creak freak wreak
+7,.reed,4,4,4,greed,5,0,alkyl,breed creed freed greed
+7,.udge,4,4,4,nudge,10,0,hythe,budge fudge judge nudge
+7,fi.er,4,4,3,fixer,16,0,aggri,fiber filer fixer
+7,pa.er,4,4,2,parer,13,1,enurn,paper parer
+7,pro.e,4,4,4,prove,3,0,jaker,probe prone prose prove
+7,tri.e,4,4,4,trite,1,0,quonk,tribe trice tripe trite
+7,.aker,4,3,2,maker,4,0,cuter,baker maker
+7,.aper,4,3,2,paper,4,0,buyer,caper paper
+7,.iper,4,3,2,viper,9,1,egger,piper viper
+7,.iser,4,3,2,wiser,19,0,abear,miser wiser
+7,ga.er,4,3,3,gazer,2,0,fouer,gamer gayer gazer
+7,.etch,4,2,2,retch,4,0,dutch,fetch retch
+7,.oker,4,2,2,poker,62,0,aggry,joker poker
+7,.wing,4,2,2,swing,1,0,undid,owing swing
+7,fe.er,4,2,2,fewer,1,0,grama,fever fewer
+7,sa.er,4,2,2,saner,9,0,aduki,safer saner
+7,u.der,4,2,2,under,2,0,grege,udder under
+7,.a.er,3,29,5,waver,77,5,allay,gamer parer safer baker waver
+7,.i.er,3,24,6,piper,6,4,buyer,tiler diner river miser fixer piper
+7,..ing,3,23,6,thing,7,1,again,sling doing eying bring icing thing
+7,sta..,3,19,6,stash,10,1,atocs,stark stale staid staff stamp stash
+7,.la.e,3,16,5,slave,2,0,exult,glare blame flake place slave
+7,o..er,3,8,2,offer,2,0,gnawn,odder offer
+7,...er,2,141,7,fever,1,0,twier,twier sorer layer under cheer ember fever
+7,.a..y,2,78,6,mammy,6,0,fishy,early candy tabby gawky jazzy mammy
