@@ -12,9 +12,9 @@ BEAT MAP
              5 cols, one COLUMN per day
 
 LEDGER — both splits are yahtzee 03dice `_grow` (run 0.8); the ORDER differs:
-  ORDER: an anti-diagonal sweep from the top-left in all three subscenes —
-  top-left first, then its 2 neighbours, then the next 3, ... (`_diagonal`,
-  by year in a, by week in the 25 x 80 week grid in b and c).
+  ORDER: a 45-degree sweep from the top-left in all three subscenes, by SCREEN
+  position (x - y), so the front is 45 degrees whatever the grid's aspect
+  (`_diagonal`; by year in a, by week in b and c).
   b: EVERY week (1-50) starts as a full, visible copy of its year stacked on
      it; each copy slides to its slot turning into its week on the way (page ->
      5 day rows, header -> header, month boxes shrink onto the week and fade).
@@ -119,23 +119,28 @@ def _layout():
     return (ycent, yw, yh), weeks
 
 
-def _week_rc(y, w):
-    """Global (row, col) of week `w` of year `y` in the full 25 x 80 grid of
-    weeks across the frame."""
-    yr, yc = divmod(y, _YEAR_SPLIT[1])
-    wr, wc = divmod(w, _WEEK_SPLIT[1])
-    return yr * _WEEK_SPLIT[0] + wr, yc * _WEEK_SPLIT[1] + wc
+def _pitch(shape, cw, ch):
+    """The smaller centre-to-centre spacing of a (rows, cols, gap) grid of
+    cw x ch cells — the diagonal's step size."""
+    return min(cw, ch) + shape[2]
 
 
-def _diagonal(anims_rc, lag_ratio):
-    """Anti-diagonal sweep from the top-left: every animation whose (row, col)
-    shares row + col starts together, and the diagonals follow one another
-    with `lag_ratio` between them."""
-    by_d = {}
-    for anim, r, c in anims_rc:
-        by_d.setdefault(r + c, []).append(anim)
-    return LaggedStart(*[AnimationGroup(*by_d[d]) for d in sorted(by_d)],
-                       lag_ratio=lag_ratio)
+def _diagonal(anims_xy, step, item_frac):
+    """A 45-degree sweep from the top-left, by SCREEN position: animations are
+    keyed on x - y (a true 45-degree line whatever the grid's aspect ratio),
+    binned to `step`, and every bin starts together. Distance along the
+    diagonal maps linearly to start time (an empty bin is a Wait), so the
+    front moves at a steady speed. `item_frac` is each bin's share of the
+    run_time, so every item's own move keeps the same length."""
+    keyed = [(anim, round((x - y) / step)) for anim, x, y in anims_xy]
+    lo = min(k for _, k in keyed)
+    bins = [[] for _ in range(max(k for _, k in keyed) - lo + 1)]
+    for anim, k in keyed:
+        bins[k - lo].append(anim)
+    n = len(bins)
+    lag = (1 / item_frac - 1) / (n - 1) if n > 1 else 0.0
+    return LaggedStart(*[AnimationGroup(*b) if b else Wait() for b in bins],
+                       lag_ratio=lag)
 
 
 class Scene96(WordleScene):
@@ -160,10 +165,12 @@ class Scene96(WordleScene):
     @subscene
     def years(self):
         self._setup_years()
-        # diagonal sweep; lag chosen so each year's fade lasts as long as it
-        # did under the old 40-item stagger (39 x 0.04 over 11 diagonals)
-        self.play(_diagonal([(FadeIn(y, scale=0.9), *divmod(i, _YEAR_SPLIT[1]))
-                             for i, y in enumerate(self.years)], lag_ratio=0.142),
+        # 45-degree sweep; item_frac 0.39 keeps each year's fade as long as under
+        # the old 40-item stagger (1 / (1 + 39 x 0.04))
+        (_, yw, yh), _ = _layout()
+        self.play(_diagonal([(FadeIn(y, scale=0.9), *y.get_center()[:2])
+                             for y in self.years],
+                            step=_pitch(_YEAR_SPLIT, yw, yh), item_frac=0.39),
                   run_time=2.0)
 
     # b : each year splits into 50 weekly calendars
@@ -178,12 +185,12 @@ class Scene96(WordleScene):
         # submobject of an on-screen group makes manim split that group and keep
         # its OTHER pieces on screen until the end, where they snap away.
         self.remove(*self.years)
-        items = [(self._year_copy_into_week(year, week), *_week_rc(y, w))
-                 for y, (year, wk) in enumerate(zip(self.years, self.weeks))
-                 for w, week in enumerate(wk)]
-        # diagonal sweep over the 25 x 80 week grid; lag keeps each week's move
-        # as long as under `_grow`'s 0.002 over 2000 items (1999 x 0.002 / 103)
-        self.play(_diagonal(items, lag_ratio=0.0388), run_time=0.8)
+        items = [(self._year_copy_into_week(year, week), *week.get_center()[:2])
+                 for year, wk in zip(self.years, self.weeks) for week in wk]
+        # 45-degree sweep; item_frac 0.2 keeps each week's move as long as under
+        # `_grow`'s 0.002 over 2000 items (1 / (1 + 1999 x 0.002))
+        self.play(_diagonal(items, step=self._week_pitch(), item_frac=0.2),
+                  run_time=0.8)
         self._only(*[w for wk in self.weeks for w in wk])
         self.years = None                       # consumed
 
@@ -202,6 +209,11 @@ class Scene96(WordleScene):
                               Transform(months, ghost),
                               Transform(header, week.header))
 
+    def _week_pitch(self):
+        _, weeks = _layout()
+        _, ww, wh = weeks[0]
+        return _pitch(_WEEK_SPLIT, ww, wh)
+
     def _only(self, *mobs):
         """Hard-clear, then keep just `mobs` — drops the spent seeds and the
         faded-out pieces so nothing lingers invisibly into the next subscene."""
@@ -218,16 +230,17 @@ class Scene96(WordleScene):
         self._setup_hours()
         self.remove(*[w for wk in self.weeks for w in wk])   # before adding pieces
         items = []
-        for y, (wk, hr) in enumerate(zip(self.weeks, self.hours)):
-            for w, (week, dots) in enumerate(zip(wk, hr)):
+        for wk, hr in zip(self.weeks, self.hours):
+            for week, dots in zip(wk, hr):
                 seed = VGroup(*[row.copy() for row in week.rows for _ in range(8)])
                 self.add(seed, week.header)
                 # seed runs day by day; order the dots to match: column d top->bottom
                 by_day = VGroup(*[dots[r * 5 + d] for d in range(5) for r in range(8)])
                 items.append((AnimationGroup(Transform(seed, by_day),
                                              FadeOut(week.header)),
-                              *_week_rc(y, w)))
+                              *week.get_center()[:2]))
         # same diagonal sweep as b, by week
-        self.play(_diagonal(items, lag_ratio=0.0388), run_time=0.8)
+        self.play(_diagonal(items, step=self._week_pitch(), item_frac=0.2),
+                  run_time=0.8)
         self._only(*[d for hr in self.hours for d in hr])
         self.weeks = None                       # consumed
