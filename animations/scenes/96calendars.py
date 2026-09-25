@@ -10,8 +10,10 @@ BEAT MAP
              cell); a week is a header strip + 5 day rows
   c hours  — each day row splits into 8 hour dots (a week -> 5 x 8 = 40 dots)
 
-LEDGER — both splits are yahtzee 03dice `_grow`, same lag (0.002) and run (0.8):
-  one LaggedStart item per CHILD, in lex order (parent-major).
+LEDGER — both splits are yahtzee 03dice `_grow` (run 0.8); the ORDER differs:
+  ORDER: an anti-diagonal sweep from the top-left in all three subscenes —
+  top-left first, then its 2 neighbours, then the next 3, ... (`_diagonal`,
+  by year in a, by week in the 25 x 80 week grid in b and c).
   b: EVERY week (1-50) starts as a full, visible copy of its year stacked on
      it; each copy slides to its slot turning into its week on the way (page ->
      5 day rows, header -> header, month boxes shrink onto the week and fade).
@@ -19,7 +21,7 @@ LEDGER — both splits are yahtzee 03dice `_grow`, same lag (0.002) and run (0.8
      the week header fades alongside. One item per week, same lag/run as b.
 
 REUSE MAP
-  grow motion      -> yahtzee 03dice `_grow` (lag 0.002, run 0.8, lex order)
+  grow motion      -> yahtzee 03dice `_grow` (run 0.8), diagonal order
   nested layout    -> yahtzee 03dice `_cluster_centers` (full-frame box that
                       subdivides; here with absolute gaps, since each level's
                       split shape differs)
@@ -114,6 +116,25 @@ def _layout():
     return (ycent, yw, yh), weeks
 
 
+def _week_rc(y, w):
+    """Global (row, col) of week `w` of year `y` in the full 25 x 80 grid of
+    weeks across the frame."""
+    yr, yc = divmod(y, _YEAR_SPLIT[1])
+    wr, wc = divmod(w, _WEEK_SPLIT[1])
+    return yr * _WEEK_SPLIT[0] + wr, yc * _WEEK_SPLIT[1] + wc
+
+
+def _diagonal(anims_rc, lag_ratio):
+    """Anti-diagonal sweep from the top-left: every animation whose (row, col)
+    shares row + col starts together, and the diagonals follow one another
+    with `lag_ratio` between them."""
+    by_d = {}
+    for anim, r, c in anims_rc:
+        by_d.setdefault(r + c, []).append(anim)
+    return LaggedStart(*[AnimationGroup(*by_d[d]) for d in sorted(by_d)],
+                       lag_ratio=lag_ratio)
+
+
 class Scene96(WordleScene):
     def setup_scene(self):
         pass
@@ -136,8 +157,11 @@ class Scene96(WordleScene):
     @subscene
     def years(self):
         self._setup_years()
-        self.play(LaggedStart(*[FadeIn(y, scale=0.9) for y in self.years],
-                              lag_ratio=0.04), run_time=2.0)
+        # diagonal sweep; lag chosen so each year's fade lasts as long as it
+        # did under the old 40-item stagger (39 x 0.04 over 11 diagonals)
+        self.play(_diagonal([(FadeIn(y, scale=0.9), *divmod(i, _YEAR_SPLIT[1]))
+                             for i, y in enumerate(self.years)], lag_ratio=0.142),
+                  run_time=2.0)
 
     # b : each year splits into 50 weekly calendars
     @subscene
@@ -145,16 +169,18 @@ class Scene96(WordleScene):
         # yahtzee 03dice `_grow`: EVERY child starts as a full, visible copy of
         # its parent stacked on it, and all of them slide out at once. Here each
         # of a year's 50 weeks starts as a copy of the year and turns into its
-        # week on the way. One LaggedStart item per child, lex order, same lag
-        # and run as `_grow`.
+        # week on the way.
         self._setup_weeks()
         # remove the parents BEFORE adding their copies' pieces: adding a
         # submobject of an on-screen group makes manim split that group and keep
         # its OTHER pieces on screen until the end, where they snap away.
         self.remove(*self.years)
-        items = [self._year_copy_into_week(year, week)
-                 for year, wk in zip(self.years, self.weeks) for week in wk]
-        self.play(LaggedStart(*items, lag_ratio=0.002), run_time=0.8)
+        items = [(self._year_copy_into_week(year, week), *_week_rc(y, w))
+                 for y, (year, wk) in enumerate(zip(self.years, self.weeks))
+                 for w, week in enumerate(wk)]
+        # diagonal sweep over the 25 x 80 week grid; lag keeps each week's move
+        # as long as under `_grow`'s 0.002 over 2000 items (1999 x 0.002 / 103)
+        self.play(_diagonal(items, lag_ratio=0.0388), run_time=0.8)
         self._only(*[w for wk in self.weeks for w in wk])
         self.years = None                       # consumed
 
@@ -185,16 +211,18 @@ class Scene96(WordleScene):
     def hours(self):
         # the ORIGINAL c mechanism (user liked it): each day row is copied 8
         # times and the copies shrink into that row's 8 dots; the week header
-        # fades alongside. One LaggedStart item per week, with b's stagger.
+        # fades alongside.
         self._setup_hours()
         self.remove(*[w for wk in self.weeks for w in wk])   # before adding pieces
         items = []
-        for wk, hr in zip(self.weeks, self.hours):
-            for week, dots in zip(wk, hr):
+        for y, (wk, hr) in enumerate(zip(self.weeks, self.hours)):
+            for w, (week, dots) in enumerate(zip(wk, hr)):
                 seed = VGroup(*[row.copy() for row in week.rows for _ in range(8)])
                 self.add(seed, week.header)
-                items.append(AnimationGroup(Transform(seed, dots),
-                                            FadeOut(week.header)))
-        self.play(LaggedStart(*items, lag_ratio=0.002), run_time=0.8)
+                items.append((AnimationGroup(Transform(seed, dots),
+                                             FadeOut(week.header)),
+                              *_week_rc(y, w)))
+        # same diagonal sweep as b, by week
+        self.play(_diagonal(items, lag_ratio=0.0388), run_time=0.8)
         self._only(*[d for hr in self.hours for d in hr])
         self.weeks = None                       # consumed
