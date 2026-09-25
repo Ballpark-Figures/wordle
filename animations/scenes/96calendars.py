@@ -10,17 +10,17 @@ BEAT MAP
              cell); a week is a header strip + 5 day rows
   c hours  — each day row splits into 8 hour dots (a week -> 5 x 8 = 40 dots)
 
-LEDGER (every split plays ALL AT ONCE — no LaggedStart, no wave)
-  b: per week, a year header copy Transforms into the week header, and 5 year
-     body copies Transform into its 5 day rows. Z-ORDER: all body copies, then
-     the month boxes, then all header copies — so the year looks untouched until
-     the pieces move, and every header is visible from the first frame. The month
-     boxes fade out alongside.
-  c: per week, each day row copied 8 times Transforms into that row's 8 dots
-     (40 <-> 40). The week header fades out alongside, over the same run.
+LEDGER — both splits are yahtzee 03dice `_grow`, same lag (0.002) and run (0.8):
+  one LaggedStart item per CHILD, in lex order (parent-major).
+  b: the year ITSELF becomes its first week (page -> 5 day rows, header ->
+     header, month boxes shrink onto the week and fade). Weeks 2-50 each start
+     on the year at opacity 0 and fade in while travelling to their slots — the
+     analogue of `_grow`'s new die.
+  c: per week, each day row copied 8 times Transforms into that row's 8 dots;
+     the week header fades alongside. One item per week, same lag/run as b.
 
 REUSE MAP
-  grow motion      -> yahtzee 03dice `_grow` (seed copies Transform into children)
+  grow motion      -> yahtzee 03dice `_grow` (lag 0.002, run 0.8, lex order)
   nested layout    -> yahtzee 03dice `_cluster_centers` (full-frame box that
                       subdivides; here with absolute gaps, since each level's
                       split shape differs)
@@ -63,11 +63,16 @@ def _split(cx, cy, w, h, shape):
 
 def _year(cx, cy, w, h):
     """A wall-calendar icon: paper body, blue header, 3x4 faint month boxes."""
-    body = RoundedRectangle(width=w, height=h, corner_radius=min(w, h) * 0.08,
+    r = min(w, h) * 0.08
+    body = RoundedRectangle(width=w, height=h, corner_radius=r,
                             fill_color=CARD_FILL, fill_opacity=1.0, stroke_width=0)
     hh = h * _HEADER_FRAC
-    header = Rectangle(width=w, height=hh, fill_color=ACCENT_FILL, fill_opacity=1.0,
-                       stroke_width=0)
+    # rounded TOP corners only, matching the page. NB manim's radius list is offset
+    # by one vertex (entry i rounds vertex i+1; vertices run UR, UL, DL, DR), so
+    # [r, 0, 0, r] rounds UL and UR. Checked against the points, not assumed.
+    header = RoundedRectangle(width=w, height=hh, corner_radius=[r, 0, 0, r],
+                              fill_color=ACCENT_FILL, fill_opacity=1.0,
+                              stroke_width=0)
     body.move_to([cx, cy, 0])
     header.move_to([cx, cy + (h - hh) / 2, 0])
     mcent, mw, mh = _split(cx, cy - hh / 2, w * 0.86, (h - hh) * 0.84,
@@ -139,36 +144,62 @@ class Scene96(WordleScene):
     @subscene
     def weeks(self):
         self._setup_weeks()
-        bodies, headers, transforms = [], [], []
-        for year, wk in zip(self.years, self.weeks):
-            for week in wk:
-                b = VGroup(*[year.body.copy() for _ in range(5)])
-                h = year.header.copy()
-                bodies.append(b)
-                headers.append(h)
-                transforms += [Transform(b, week.rows), Transform(h, week.header)]
-        months = [y.months for y in self.years]
+        # remove the parents BEFORE the builders add their pieces: adding a
+        # submobject of an on-screen group makes manim split that group and keep
+        # its OTHER pieces on screen (the year page lingered behind the weeks
+        # until the final clear, then snapped away).
         self.remove(*self.years)
-        self.add(*bodies, *months, *headers)    # headers on top of every page copy
-        self.play(*transforms, *[FadeOut(m) for m in months], run_time=3.0)
-        self.remove(*bodies, *headers)
-        self.add(*[w for wk in self.weeks for w in wk])
+        items = self._grow_items(self.years, self.weeks, self._year_into_week)
+        self.play(LaggedStart(*items, lag_ratio=0.002), run_time=0.8)
+        self._only(*[w for wk in self.weeks for w in wk])
         self.years = None                       # consumed
+
+    def _year_into_week(self, year, week):
+        """The year itself becomes its first week, piece by piece: page -> the 5
+        day rows, header -> header, month boxes shrink onto the week and fade."""
+        rows = VGroup(*[year.body.copy() for _ in range(5)])
+        self.add(rows, year.months, year.header)
+        return AnimationGroup(
+            ReplacementTransform(rows, week.rows),
+            ReplacementTransform(year.header, week.header),
+            year.months.animate.stretch_to_fit_width(week.width)
+                .stretch_to_fit_height(week.height).move_to(week).set_opacity(0.0))
+
+    def _only(self, *mobs):
+        """Hard-clear, then keep just `mobs` — drops the spent seeds and the
+        faded-out pieces so nothing lingers invisibly into the next subscene."""
+        for m in list(self.mobjects):
+            self.remove(m)
+        self.add(*mobs)
+
+    def _grow_items(self, parents, children, into_first):
+        """yahtzee 03dice `_grow`, one child at a time in lex order: the parent
+        itself becomes its FIRST child (`into_first`); every other child starts
+        on the parent at opacity 0 (like `_grow`'s new die) and fades in while it
+        travels to its slot. One LaggedStart item per child, as in `_grow`."""
+        items = []
+        for parent, kids in zip(parents, children):
+            items.append(into_first(parent, kids[0]))
+            for kid in kids[1:]:
+                start = kid.copy().move_to(parent).set_opacity(0.0)
+                items.append(Transform(start, kid, remover=True))
+        return items
 
     # c : each day row splits into 8 hour dots
     @subscene
     def hours(self):
+        # the ORIGINAL c mechanism (user liked it): each day row is copied 8
+        # times and the copies shrink into that row's 8 dots; the week header
+        # fades alongside. One LaggedStart item per week, with b's stagger.
         self._setup_hours()
-        seeds, transforms, headers = [], [], []
+        self.remove(*[w for wk in self.weeks for w in wk])   # before adding pieces
+        items = []
         for wk, hr in zip(self.weeks, self.hours):
             for week, dots in zip(wk, hr):
                 seed = VGroup(*[row.copy() for row in week.rows for _ in range(8)])
-                seeds.append(seed)
-                transforms.append(Transform(seed, dots))
-                headers.append(week.header)
-        self.remove(*[w for wk in self.weeks for w in wk])
-        self.add(*seeds, *headers)
-        self.play(*transforms, *[FadeOut(h) for h in headers], run_time=3.0)
-        self.remove(*seeds)
-        self.add(*[d for hr in self.hours for d in hr])
+                self.add(seed, week.header)
+                items.append(AnimationGroup(Transform(seed, dots),
+                                            FadeOut(week.header)))
+        self.play(LaggedStart(*items, lag_ratio=0.002), run_time=0.8)
+        self._only(*[d for hr in self.hours for d in hr])
         self.weeks = None                       # consumed
