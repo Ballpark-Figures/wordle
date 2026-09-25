@@ -12,10 +12,9 @@ BEAT MAP
 
 LEDGER — both splits are yahtzee 03dice `_grow`, same lag (0.002) and run (0.8):
   one LaggedStart item per CHILD, in lex order (parent-major).
-  b: the year ITSELF becomes its first week (page -> 5 day rows, header ->
-     header, month boxes shrink onto the week and fade). Weeks 2-50 each start
-     on the year at opacity 0 and fade in while travelling to their slots — the
-     analogue of `_grow`'s new die.
+  b: EVERY week (1-50) starts as a full, visible copy of its year stacked on
+     it; each copy slides to its slot turning into its week on the way (page ->
+     5 day rows, header -> header, month boxes shrink onto the week and fade).
   c: per week, each day row copied 8 times Transforms into that row's 8 dots;
      the week header fades alongside. One item per week, same lag/run as b.
 
@@ -143,27 +142,36 @@ class Scene96(WordleScene):
     # b : each year splits into 50 weekly calendars
     @subscene
     def weeks(self):
+        # yahtzee 03dice `_grow`: EVERY child starts as a full, visible copy of
+        # its parent stacked on it, and all of them slide out at once. Here each
+        # of a year's 50 weeks starts as a copy of the year and turns into its
+        # week on the way. One LaggedStart item per child, lex order, same lag
+        # and run as `_grow`.
         self._setup_weeks()
-        # remove the parents BEFORE the builders add their pieces: adding a
+        # remove the parents BEFORE adding their copies' pieces: adding a
         # submobject of an on-screen group makes manim split that group and keep
-        # its OTHER pieces on screen (the year page lingered behind the weeks
-        # until the final clear, then snapped away).
+        # its OTHER pieces on screen until the end, where they snap away.
         self.remove(*self.years)
-        items = self._grow_items(self.years, self.weeks, self._year_into_week)
+        items = [self._year_copy_into_week(year, week)
+                 for year, wk in zip(self.years, self.weeks) for week in wk]
         self.play(LaggedStart(*items, lag_ratio=0.002), run_time=0.8)
         self._only(*[w for wk in self.weeks for w in wk])
         self.years = None                       # consumed
 
-    def _year_into_week(self, year, week):
-        """The year itself becomes its first week, piece by piece: page -> the 5
-        day rows, header -> header, month boxes shrink onto the week and fade."""
+    def _year_copy_into_week(self, year, week):
+        """One visible copy of `year`, turning into `week` as it travels: page ->
+        the 5 day rows, header -> header, month boxes shrink onto the week and
+        fade. Added page, months, header in that order, so each copy's header
+        sits on top of its OWN page (never over every page)."""
         rows = VGroup(*[year.body.copy() for _ in range(5)])
-        self.add(rows, year.months, year.header)
-        return AnimationGroup(
-            ReplacementTransform(rows, week.rows),
-            ReplacementTransform(year.header, week.header),
-            year.months.animate.stretch_to_fit_width(week.width)
-                .stretch_to_fit_height(week.height).move_to(week).set_opacity(0.0))
+        months = year.months.copy()
+        header = year.header.copy()
+        self.add(rows, months, header)
+        ghost = months.copy().stretch_to_fit_width(week.width) \
+            .stretch_to_fit_height(week.height).move_to(week).set_opacity(0.0)
+        return AnimationGroup(Transform(rows, week.rows),
+                              Transform(months, ghost),
+                              Transform(header, week.header))
 
     def _only(self, *mobs):
         """Hard-clear, then keep just `mobs` — drops the spent seeds and the
@@ -171,19 +179,6 @@ class Scene96(WordleScene):
         for m in list(self.mobjects):
             self.remove(m)
         self.add(*mobs)
-
-    def _grow_items(self, parents, children, into_first):
-        """yahtzee 03dice `_grow`, one child at a time in lex order: the parent
-        itself becomes its FIRST child (`into_first`); every other child starts
-        on the parent at opacity 0 (like `_grow`'s new die) and fades in while it
-        travels to its slot. One LaggedStart item per child, as in `_grow`."""
-        items = []
-        for parent, kids in zip(parents, children):
-            items.append(into_first(parent, kids[0]))
-            for kid in kids[1:]:
-                start = kid.copy().move_to(parent).set_opacity(0.0)
-                items.append(Transform(start, kid, remover=True))
-        return items
 
     # c : each day row splits into 8 hour dots
     @subscene
