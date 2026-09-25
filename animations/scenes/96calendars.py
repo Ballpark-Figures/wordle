@@ -8,7 +8,8 @@ BEAT MAP
   a years  — 40 year calendars fade in, a 5x8 grid (rows x cols)
   b weeks  — each year splits into 50 weekly calendars (5 rows x 10 cols in its
              cell); a week is a header strip + 5 day rows
-  c hours  — each day row splits into 8 hour dots (a week -> 5 x 8 = 40 dots)
+  c hours  — each day row splits into 8 hour dots; a week's 40 dots sit 8 rows x
+             5 cols, one COLUMN per day
 
 LEDGER — both splits are yahtzee 03dice `_grow` (run 0.8); the ORDER differs:
   ORDER: an anti-diagonal sweep from the top-left in all three subscenes —
@@ -17,7 +18,8 @@ LEDGER — both splits are yahtzee 03dice `_grow` (run 0.8); the ORDER differs:
   b: EVERY week (1-50) starts as a full, visible copy of its year stacked on
      it; each copy slides to its slot turning into its week on the way (page ->
      5 day rows, header -> header, month boxes shrink onto the week and fade).
-  c: per week, each day row copied 8 times Transforms into that row's 8 dots;
+  c: per week, each day row copied 8 times Transforms into that day's column
+     of 8 dots (day d -> column d);
      the week header fades alongside. One item per week, same lag/run as b.
 
 REUSE MAP
@@ -39,10 +41,10 @@ from config import *
 # ── layout ─────────────────────────────────────────────────────────────────────
 _BOX_W, _BOX_H = 15.6, 8.6
 # (rows, cols, gap) per level, outermost first: years, weeks-in-a-year,
-# hours-in-a-week (a week's hours are 5 day rows of 8).
+# hours-in-a-week (8 rows x 5 cols: one column of 8 hours per day).
 _YEAR_SPLIT = (5, 8, 0.22)
 _WEEK_SPLIT = (5, 10, 0.015)
-_HOUR_SPLIT = (5, 8, 0.0)
+_HOUR_SPLIT = (8, 5, 0.0)
 
 _HEADER_FRAC = 0.2      # header strip height as a fraction of its calendar
 _WEEK_ROW_GAP = 0.006   # gap between a week's day rows
@@ -103,7 +105,8 @@ def _week(cx, cy, w, h):
 
 
 def _hours(cx, cy, w, h):
-    """A week's 40 hours: 5 day rows of 8 dots, filling the week's cell."""
+    """A week's 40 hours: 8 rows x 5 cols of dots (a column per day), filling
+    the week's cell, in reading order."""
     cent, cw, ch = _split(cx, cy, w, h, _HOUR_SPLIT)
     rad = min(cw, ch) * _DOT_FRAC / 2
     return VGroup(*[Dot([x, y, 0], radius=rad, color=CARD_FILL) for x, y in cent])
@@ -210,7 +213,7 @@ class Scene96(WordleScene):
     @subscene
     def hours(self):
         # the ORIGINAL c mechanism (user liked it): each day row is copied 8
-        # times and the copies shrink into that row's 8 dots; the week header
+        # times and the copies shrink into that DAY'S COLUMN of 8 dots; the week header
         # fades alongside.
         self._setup_hours()
         self.remove(*[w for wk in self.weeks for w in wk])   # before adding pieces
@@ -219,7 +222,9 @@ class Scene96(WordleScene):
             for w, (week, dots) in enumerate(zip(wk, hr)):
                 seed = VGroup(*[row.copy() for row in week.rows for _ in range(8)])
                 self.add(seed, week.header)
-                items.append((AnimationGroup(Transform(seed, dots),
+                # seed runs day by day; order the dots to match: column d top->bottom
+                by_day = VGroup(*[dots[r * 5 + d] for d in range(5) for r in range(8)])
+                items.append((AnimationGroup(Transform(seed, by_day),
                                              FadeOut(week.header)),
                               *_week_rc(y, w)))
         # same diagonal sweep as b, by week
