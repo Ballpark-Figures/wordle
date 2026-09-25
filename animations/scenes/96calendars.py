@@ -6,20 +6,21 @@ one of its children, so the same full-frame box just keeps subdividing.
 
 BEAT MAP
   a years  — 40 year calendars fade in, a 5x8 grid (rows x cols)
-  b weeks  — each year splits into 50 weekly calendars (10 rows x 5 cols in its
+  b weeks  — each year splits into 50 weekly calendars (5 rows x 10 cols in its
              cell); a week is a header strip + 5 day rows
   c hours  — each day row splits into 8 hour dots (a week -> 5 x 8 = 40 dots)
 
-LEDGER
-  b: per week, a seed = [year header copy, year body copy x5] Transforms into
-     [week header, 5 day rows] (matched 1:1, no index blob). The year's month
+LEDGER (every split plays ALL AT ONCE — no LaggedStart, no wave)
+  b: per week, a year header copy Transforms into the week header, and 5 year
+     body copies Transform into its 5 day rows. Z-ORDER: all body copies, then
+     the month boxes, then all header copies — so the year looks untouched until
+     the pieces move, and every header is visible from the first frame. The month
      boxes fade out alongside.
-  c: per week, a seed = each day row copied 8 times Transforms into that row's
-     8 dots (40 <-> 40). The week header fades out alongside.
+  c: per week, each day row copied 8 times Transforms into that row's 8 dots
+     (40 <-> 40). The week header fades out alongside, over the same run.
 
 REUSE MAP
-  grow motion      -> yahtzee 03dice `_grow` (seed copies Transform into children,
-                      LaggedStart across all of them)
+  grow motion      -> yahtzee 03dice `_grow` (seed copies Transform into children)
   nested layout    -> yahtzee 03dice `_cluster_centers` (full-frame box that
                       subdivides; here with absolute gaps, since each level's
                       split shape differs)
@@ -39,7 +40,7 @@ _BOX_W, _BOX_H = 15.6, 8.6
 # (rows, cols, gap) per level, outermost first: years, weeks-in-a-year,
 # hours-in-a-week (a week's hours are 5 day rows of 8).
 _YEAR_SPLIT = (5, 8, 0.22)
-_WEEK_SPLIT = (10, 5, 0.015)
+_WEEK_SPLIT = (5, 10, 0.015)
 _HOUR_SPLIT = (5, 8, 0.0)
 
 _HEADER_FRAC = 0.2      # header strip height as a fraction of its calendar
@@ -138,19 +139,19 @@ class Scene96(WordleScene):
     @subscene
     def weeks(self):
         self._setup_weeks()
-        seeds, transforms = [], []
+        bodies, headers, transforms = [], [], []
         for year, wk in zip(self.years, self.weeks):
             for week in wk:
-                seed = VGroup(year.header.copy(),
-                              *[year.body.copy() for _ in range(5)])
-                seeds.append(seed)
-                transforms.append(Transform(seed, VGroup(week.header, *week.rows)))
+                b = VGroup(*[year.body.copy() for _ in range(5)])
+                h = year.header.copy()
+                bodies.append(b)
+                headers.append(h)
+                transforms += [Transform(b, week.rows), Transform(h, week.header)]
         months = [y.months for y in self.years]
         self.remove(*self.years)
-        self.add(*seeds, *months)
-        self.play(LaggedStart(*transforms, lag_ratio=0.0015),
-                  *[FadeOut(m) for m in months], run_time=3.0)
-        self.remove(*seeds)
+        self.add(*bodies, *months, *headers)    # headers on top of every page copy
+        self.play(*transforms, *[FadeOut(m) for m in months], run_time=3.0)
+        self.remove(*bodies, *headers)
         self.add(*[w for wk in self.weeks for w in wk])
         self.years = None                       # consumed
 
@@ -167,8 +168,7 @@ class Scene96(WordleScene):
                 headers.append(week.header)
         self.remove(*[w for wk in self.weeks for w in wk])
         self.add(*seeds, *headers)
-        self.play(LaggedStart(*transforms, lag_ratio=0.0015),
-                  *[FadeOut(h) for h in headers], run_time=3.0)
+        self.play(*transforms, *[FadeOut(h) for h in headers], run_time=3.0)
         self.remove(*seeds)
         self.add(*[d for hr in self.hours for d in hr])
         self.weeks = None                       # consumed
