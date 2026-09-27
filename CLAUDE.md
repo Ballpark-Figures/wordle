@@ -53,8 +53,7 @@ loading" for the measurements and the full cross-machine history.
 - **A `[FAIL]` from the fetch means Script.md was NOT written and is stale.**
   The Doc has a delimiter mismatch that makes the pairing unrecoverable. Report
   the row it names; never "fix" it by editing the generated file.
-- Scenes become `scenes/NN<name>.py`. (Fill in this video's other script/scene
-  conventions.)
+- Scenes become `scenes/NN<name>.py`.
 
 ## Math / data
 - `math/data/` holds source data & pipeline outputs; `math/notebooks/` holds
@@ -262,12 +261,10 @@ detail. Run it with **`bash solver/run-mm-sweep.sh --depth D [-k K]`** (from `ma
   **`math/data/shared/hardturns/opener_totals.csv`** committed, **`math/data/shared/hardturns/trees/`**
   committed (see the trees bullet above — currently copies), `math/data/local/hardturns/`
   (`tt.bin`, `sweep.log`) gitignored.
-- **Launch it with `bash solver/run-hard-sweep.sh phase1|phase2`** (from `math/`),
-  attached, same tee'd-log rules as `run-sweep.sh`. `phase1` shares the machine
-  with a running `optturns` (nice'd, 12 threads, no table); `phase2` takes the
-  whole machine (20 threads, `--tt-bits 29`, warm from `tt.bin`) and REFUSES to
-  start while `optturns` still holds its 17.2 GB. Resume is automatic across the
-  switch, so stopping phase 1 and starting phase 2 just continues.
+- The depth-6 hard sweep is complete (all 12972 openers, committed). A re-run uses
+  `bash solver/run-hard-sweep.sh phase1|phase2` (from `math/`), attached: `phase1`
+  is nice'd for sharing the machine with another sweep; `phase2` takes the whole
+  machine and refuses while `optturns` is running. Resume carries across the switch.
 - **`--tt-bits 0` disables memoisation entirely** — orders of magnitude slower
   than even a small table. `--tt-bits 24` is 0.5 GB; prefer the smallest table
   that fits over none.
@@ -884,8 +881,7 @@ its state arithmetic against `strspace.py` over a shared deterministic walk — 
   ~3 minutes.
 - **`date -Is` IS GNU-ONLY and prints NOTHING on macOS**, so a wrapper header came out as
   `[] greens: ...`. `run-greens.sh` uses `date -u +%Y-%m-%dT%H:%M:%SZ` instead.
-  `run-sweep.sh`, `run-hard-sweep.sh` and `run-ans-sweep.sh` still carry the broken form
-  — harmless there unless `inflight.py` is asked to find a run boundary on this machine.
+  `run-ans-sweep.sh` still carries the broken form.
 - **A RESUMED run rebuilds the tie list from the CSV**, or it would report only the ties
   found since restarting and read as a complete answer.
 - **`python3 math/tools/checkgreens.py` is the GATE**, ~2s: the yellow predicate
@@ -2264,12 +2260,9 @@ CSV row per word, flushed).
   the generous net is load-bearing, not caution: any cut tight enough to look
   decisive at t=100 would have thrown the leader away. Quote this when explaining
   why a screen head is never reported as a winner.
-- **A WIN-RATE CUT IS DEGENERATE AT SMALL `-t` — do not use `--shortlist-value
-  win_rate` at t=100.** A word scoring 100/100 has a binomial SE of exactly 0, so
-  "within N SE of the best" collapses to "also exactly 100%": measured, it kept
-  3555 words (`answer`) and **5** (`guess`), an exact-tie filter rather than a net.
-  Fixing it needs an interval that stays finite at p=1 (Wilson, say); until then
-  the mean is the only sound column to cut on.
+- A raw binomial SE is 0 at a 100% win rate, so a win-rate cut on raw SEs collapses
+  to "also exactly 100%" (measured: 3555 of 12972 kept under `answer`, 5 under
+  `guess`). That is why the cut uses plus-four; see the win-rate bullet above.
 
 ### `paired_compare.py` — settling finalists by DIFFERENCES, not by two means
 At the end of a cascade the gaps between finalists are far smaller than their own
@@ -4654,17 +4647,13 @@ were never revisited. The wrappers are largely copies of each other (same `WARM`
 block, same `guard_output`, same tee'd-log preamble, same bash-3.2 array guards), so
 a correction to one is invisible to the rest.
 - The same shape has bitten repeatedly and is worth listing when the refactor is
-  scoped: the `date -Is` GNU-ism (fixed in `run-greens.sh`, still broken in
-  `run-sweep.sh`, `run-hard-sweep.sh`, `run-ans-sweep.sh`), the missing `--out`
+  scoped: the `date -Is` GNU-ism (still broken in `run-ans-sweep.sh`), the missing `--out`
   (`run-wordle-in-one.sh` is still red in `checkconventions.sh`), and this one.
 - `solver/checkconventions.sh` is the existing mechanism for exactly this and it
   works — it is what catches a missing wrapper or a missing `--out`. **A cheaper
   first step than a refactor is probably a new CHECK there** ("no wrapper passes
   `--tt-save`", "every wrapper uses the portable `date`"), since a check applies
   everywhere by construction and needs no shared code.
-
-## Gameplay layout
-- (Describe this video's on-screen layout and the assets in `animations/assets/`.)
 
 ## Style
 - Uses `bpkfigures` style + the local `config.py` for colors/fonts.
