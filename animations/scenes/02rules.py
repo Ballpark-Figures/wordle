@@ -1,4 +1,4 @@
-"""Scene 02 — the rules of Wordle, played on one board against ENDED. Dark mode.
+"""Scene 02 — the rules of Wordle, played on one board against ENDED. Navy background.
 
 The empty board is up from frame 0 (setup_scene) — the scene follows talking head
 THA, which covers the cut in — and it ends on the full board, since THB follows.
@@ -14,7 +14,7 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   g type_melee     — MELEE typed into row 2                        (02g, VO 4)
   h score_melee    — row 2 flips: E present, E correct, E absent   (02h, VO 4)
   i type_ended     — ENDED typed into row 3                        (02i, VO 5)
-  j score_ended    — row 3 flips all correct                       (02j, VO 5)
+  j score_ended    — row 3 flips all correct, then the winning bounce (02j, VO 5)
 
 REUSE MAP — every element and the one source it comes from:
   board + tiles + letters  assets/board.py `get_board`, as scene 97
@@ -22,7 +22,7 @@ REUSE MAP — every element and the one source it comes from:
   scored flip              board.reveal; d/e/f use its `cols=` to flip part of
                            the row, always passing the full row's code
   keystroke sfx            assets/keys.py `key_cues` (shared with scene 97)
-  colours                  config.py WORDLE_BG / TILE_* via WordleDarkScene
+  colours                  BOARD_NAVY via WordleBoardScene; tiles config.py TILE_*
   feedback codes           assets/game_data.py load("rules") -> game_cache.json,
                            computed by math/wordle.py `pattern` — never by hand
 No other on-screen text: column 2 asks only for the words and their scoring.
@@ -43,7 +43,7 @@ WORDS = [g["word"] for g in GAME["guesses"]]
 CODES = [g["code"] for g in GAME["guesses"]]
 
 
-class Scene02(WordleDarkScene):
+class Scene02(WordleBoardScene):
     """BEAT MAP
     type_begin — BEGIN typed
     score_begin — BEGIN scored against ENDED
@@ -110,7 +110,8 @@ class Scene02(WordleDarkScene):
     def type_ended(self):
         self._type(3, 0.65)
 
-    # j : ENDED scored — all green
+    # j : ENDED scored — all green, then the winning row jumps
     @subscene
     def score_ended(self):
         self.board.reveal(self, 3, CODES[3], 1.6)
+        self.board.bounce(self, 3, 1.0)

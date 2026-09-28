@@ -26,8 +26,18 @@ class WordleScene(BpkScene):
         super().construct()
 
 
+class WordleBoardScene(BpkScene):
+    """THE DEFAULT FOR BOARD/GAMEPLAY SCENES — the board on BOARD_NAVY (user's call,
+    2026-09-28), the same navy scene 01 settles on after its opening."""
+
+    def construct(self):
+        self.camera.background_color = BOARD_NAVY
+        super().construct()
+
+
 class WordleDarkScene(BpkScene):
-    """A scene on Wordle's own near-black, for board/gameplay beats."""
+    """A scene on Wordle's own near-black. NOT the board default any more — kept for
+    scene 01, whose script opens on the authentic dark page and fades to navy."""
 
     def construct(self):
         self.camera.background_color = WORDLE_BG

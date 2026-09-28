@@ -1,4 +1,4 @@
-"""SCRATCH — a played game of Wordle — TRACE, LOINS, DUMPY, SNOWY against SNOWY. Dark mode.
+"""SCRATCH — a played game of Wordle — TRACE, LOINS, DUMPY, SNOWY against SNOWY. Navy background.
 
 The empty board is up from frame 0 (setup_scene), so the scene opens on the grid and
 the first beat types into a board that is already there.
@@ -22,7 +22,7 @@ REUSE MAP — every element and the one source it comes from:
   typing pop               board.type_word         (not a hand-rolled scale)
   scored flip              board.reveal / TileFlip (not a hand-rolled squash)
   winning bounce           board.bounce
-  colours                  config.py WORDLE_BG / TILE_* — the authentic NYT dark
+  colours                  BOARD_NAVY via WordleBoardScene; TILE_* the authentic NYT dark
                            palette, named there, never a hex in this file
   tile letters             crisp_text, inside the asset
   feedback codes           assets/game_data.py -> game_cache.json, computed by
@@ -69,7 +69,7 @@ WORDS = [g["word"] for g in GAME["guesses"]]
 CODES = [g["code"] for g in GAME["guesses"]]
 
 
-class Scene97(WordleDarkScene):
+class Scene97(WordleBoardScene):
     def setup_scene(self):
         # The empty board is ON SCREEN FROM FRAME 0, which is what setup_scene is
         # for. It used to be added inside subscene a, so the framework's leading
