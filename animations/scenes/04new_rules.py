@@ -364,6 +364,7 @@ class Scene04(WordleBoardScene):
         slots, scale, _, _ = self.lay2
         self._regroup(slots, scale, 2.0, extra=self._swap_guess(self.guess, self.guess2))
         self.remove(self.guess)
+        self.wait(1.0)                              # PIGGY's groups hold a moment
 
         slots, scale, _, _ = self.lay3
         self._regroup(slots, scale, 2.0, extra=self._swap_guess(self.guess2, self.guess3))
