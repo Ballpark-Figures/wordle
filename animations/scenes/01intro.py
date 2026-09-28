@@ -104,7 +104,7 @@ SOLO_GAP = 24.0               # d, e: GREAT/SLOWS stand this far from START — 
                               # over a frame (16) plus a word (4.9), so the screen
                               # is briefly empty between them
 FILL_STEPS = 4000             # f: the fill plan's resolution (steps of the zoom)
-FILL_RAMP = 0.15              # f: the first words land one at a time over this
+FILL_RAMP = 0.25              # f: the first words land one at a time over this
                               # much of the zoom before the pace picks up
 FILL_SQUASH_POW = 2.0         # f: the rows may flatten no faster than
                               # S_FULL ** (u ** POW): square early, S_FULL at the end
@@ -117,9 +117,9 @@ FILL_SFX_MAX_PER_S = 15.0     # f: one cue per word, but no more than this many 
                               # second — at the fill's peak ~40 words land PER FRAME,
                               # and hundreds of overlapping copies of a 1.1s sound
                               # clip into noise (and each costs a full audio remix)
-FILL_EASE_IN = 0.25            # f: starting speed, as a fraction of a linear zoom's
+FILL_EASE_IN = 0.1            # f: starting speed, as a fraction of a linear zoom's
 FILL_TAPER = 0.75             # f: from here the word count tapers to a stop
-FILL_EARLY = 10                # f: the first words are PLACED BY HAND in time: after
+FILL_EARLY = 12               # f: the first words are PLACED BY HAND in time: after
 FILL_PAUSE = 1.1              # a pause of FILL_PAUSE seconds, gaps shrinking
                               # geometrically into the natural pace at word
                               # FILL_EARLY — so the first gaps are long and ease into
