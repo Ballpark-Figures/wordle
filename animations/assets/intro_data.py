@@ -27,6 +27,10 @@ The FILL ORDER is a presentation choice, not a result (the user's rule, 01f):
   - each stack fills BOTTOM TO TOP, fewest average guesses at the bottom;
   - START, GREAT and SLOWS are already on screen, so they sit at the BOTTOM of their
     stacks and count as present from the start.
+  - NUDGED words BREAK the sorted order on purpose (the user's call, 2026-09-28):
+    IRATE and ARISE are moved down their stacks so every Wordlebot starter sits low
+    and scene 01g/h can zoom in tighter. Their BIN — which stack, i.e. their average
+    — is untouched; only their height within the stack is not their rank.
 """
 import csv
 import json
@@ -45,6 +49,9 @@ PINNED = ["start", "great", "slows"]   # shown one by one before the fill (01a-0
 N_ANSWERS = 2315
 BIN = 0.01                             # report.py's bin width
 SEED = 1                               # tie-breaking in the fill order only
+# word -> row within its stack (0 = bottom). Placed just above the highest other
+# starter in reach (RAISE, row 12, shares IRATE's stack), so none of them move.
+NUDGE = {"irate": 13, "arise": 12}
 
 
 def _build():
@@ -72,6 +79,11 @@ def _build():
     for b, members in stacks.items():
         pins = [i for i in members if i in pinned_idx]
         stacks[b] = pins + [i for i in members if i not in pins]
+    for w, target in NUDGE.items():
+        i = words.index(w)
+        members = stacks[bins[i]]
+        members.remove(i)
+        members.insert(target, i)
     row = [0] * len(words)
     for members in stacks.values():
         for k, i in enumerate(members):

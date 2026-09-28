@@ -17,13 +17,15 @@ BEAT MAP
   h starters       — IRATE TRAIN ARISE CRANE RAISE SLATE STARE emphasised ONE AT A
                      TIME, each word's letters coming back with it
   i noise          — no change (the VO's noise plays over this; sound comes later)
-  j left_twenty    — zoom out to the left 20 bins, squashing again, emphasis off
-  k those_words    — zoom out until THOSE and WORDS are in frame (ADIEU and AUDIO
-                     already on screen, not yet emphasised); THOSE and WORDS light
-                     up, and their callouts — a full-size copy just above each word
-                     on a short white line — grow in while the camera zooms
-  l hello          — zoom out to HELLO, its callout growing in on the way; then
-                     ADIEU and AUDIO light up with theirs
+  j left_ten       — zoom out to the left 10 bins, squashing again; the starters
+                     drop back, everything stays dimmed
+  k those_words    — zoom out until THOSE and WORDS are in frame, WORDS' column the
+                     last on the right; THOSE and WORDS light up and their callouts —
+                     a full-size copy just above each word on a short white line —
+                     grow in while the camera zooms. ADIEU and AUDIO are lit and
+                     called out here too, OFF SCREEN, so l can simply reveal them
+  l hello          — zoom out to HELLO, its callout growing in on the way; the zoom
+                     uncovers ADIEU and AUDIO, already there
   m zoom_out       — (added by the user, not yet in the Doc) out the rest of the
                      way to the whole histogram; callouts and emphasis fade
 
@@ -95,6 +97,11 @@ CALLED_OUT = ["those", "words", "hello", "adieu", "audio"]
 CALLOUT_W = 0.12              # a callout word's width, as a fraction of frame width
 CALLOUT_LIFT = 0.05           # line length, as a fraction of frame height
 LINE_STROKE = 3.0             # line width as it would be in a 16-wide frame
+CALLOUT_DX = {"words": -0.07, "adieu": 0.07}
+                              # sideways lean, as a fraction of frame width: WORDS'
+                              # callout leans left so it fits in k, whose right edge
+                              # is WORDS' column; ADIEU's leans right so it stays out
+                              # of k's frame until l reveals it
 K_WORDS_AT = 0.72             # k: WORDS sits this far up the frame, leaving room
                               # above it for its callout
 
@@ -190,11 +197,13 @@ def view_centred(bins, top_rows, s, bottom=-1.5):
 # g: the starters' bins centred, every starter in frame, rows at full height
 VIEW_STARTERS = view_centred([DATA["bins"][IDX[w]] for w in STARTERS],
                              _rows_of(STARTERS), 1.0)
-# j: the left 20 bins, squashing again
-VIEW_TWENTY = view_fit(_bin_right(BIN_LO + 19), 0, 0.5)
-# k: THOSE and WORDS in frame, and ADIEU and AUDIO already on screen (not yet
-# emphasised), with room above WORDS for its callout
-_K_W = _bin_right(DATA["bins"][IDX["audio"]]) - (HIST_L - SIDE_MARGIN)
+# j: the left 10 bins, squashing again
+VIEW_TEN = view_fit(_bin_right(BIN_LO + 9), 0, 0.5)
+# k: THOSE and WORDS in frame, WORDS' column the last on the right (the right edge
+# halfway into the gap after it, so ADIEU's stack is out), with room above WORDS
+# for its callout
+_K_RIGHT = x_of_bin(DATA["bins"][IDX["words"]]) + WORD_W / 2 + (PITCH - WORD_W) / 2
+_K_W = _K_RIGHT - (HIST_L - SIDE_MARGIN)
 _K_S = (K_WORDS_AT * _K_W / ASPECT - 1.5) / (STEP * DATA["rows"][IDX["words"]])
 VIEW_THOSE_WORDS = (HIST_L - SIDE_MARGIN, -1.5, _K_W, _K_S)
 # l: out to HELLO at the same squash; ADIEU and AUDIO are between
@@ -244,12 +253,15 @@ class Scene01(MovingCameraScene, WordleDarkScene):
         self.stacks.set_state(squash=s)
 
     def _move_view(self, to, run_time, letters=None, dim=None, weights=None,
-                   callouts=None, callout_alpha=None, extra=(), rate_func=smooth):
+                   callouts=None, present=(), callout_alpha=None, extra=(),
+                   rate_func=smooth):
         """Animate the view (and optionally letter opacity / emphasis) to `to`.
 
         `callouts` is {word: (u0, u1)}: that word's callout is created and GROWS IN
         over that stretch of the move (its line first, then the word), so a callout
-        can arrive while the camera is still zooming. `callout_alpha` fades every
+        can arrive while the camera is still zooming. `present` callouts are
+        created already fully grown (for words off screen, waiting to be revealed).
+        `callout_alpha` fades every
         callout on screen to that opacity.
 
         Left and bottom interpolate linearly, width and squash geometrically, and
@@ -264,6 +276,8 @@ class Scene01(MovingCameraScene, WordleDarkScene):
         grow = callouts or {}
         for word in grow:
             self._callout(word)
+        for word in present:
+            self._callout(word)["g"] = 1.0
         a0 = {c["word"]: c["a"] for c in self.callouts or []}
         t = ValueTracker(0)
 
@@ -318,7 +332,8 @@ class Scene01(MovingCameraScene, WordleDarkScene):
             row.scale_to_fit_width(CALLOUT_W * w)
             top = self.stacks.word_center(c["word"]) + \
                 UP * SIDE * self.stacks.squash / 2
-            foot = top + UP * CALLOUT_LIFT * h
+            foot = top + UP * CALLOUT_LIFT * h \
+                + RIGHT * CALLOUT_DX.get(c["word"], 0) * w     # the callout's bottom-centre
             row.move_to(foot + UP * row.height / 2)
             g_line = min(1.0, 2 * c["g"])
             g_row = max(0.0, 2 * c["g"] - 1)
@@ -462,28 +477,26 @@ class Scene01(MovingCameraScene, WordleDarkScene):
     def noise(self):
         pass
 
-    # j : out to the left 20 bins, squashing again; emphasis off
+    # j : out to the left 10 bins, squashing again; the rest stays dimmed
     @subscene
-    def left_twenty(self):
-        self._move_view(VIEW_TWENTY, run_time=2.5, dim=0.0,
-                        weights={w: 0 for w in STARTERS})
+    def left_ten(self):
+        self._move_view(VIEW_TEN, run_time=2.5, weights={w: 0 for w in STARTERS})
 
-    # k : out until THOSE and WORDS are in frame; their callouts grow in as it zooms
+    # k : out until THOSE and WORDS are in frame; their callouts grow in as it zooms.
+    # ADIEU and AUDIO are lit and called out now, off screen, for l to uncover.
     @subscene
     def those_words(self):
         self.callouts = []
-        self._move_view(VIEW_THOSE_WORDS, run_time=3.0, dim=1.0,
-                        weights={"those": 1, "words": 1},
-                        callouts={"those": (0.35, 0.75), "words": (0.6, 1.0)})
+        self._move_view(VIEW_THOSE_WORDS, run_time=3.0,
+                        weights={"those": 1, "words": 1, "adieu": 1, "audio": 1},
+                        callouts={"those": (0.35, 0.75), "words": (0.6, 1.0)},
+                        present=["adieu", "audio"])
 
-    # l : out to HELLO (its callout grows in as it zooms); then ADIEU and AUDIO,
-    # on screen since k, light up with theirs
+    # l : out to HELLO, its callout growing in on the way; ADIEU and AUDIO uncovered
     @subscene
     def hello(self):
         self._move_view(VIEW_HELLO, run_time=2.5, weights={"hello": 1},
                         callouts={"hello": (0.5, 1.0)})
-        self._move_view(VIEW_HELLO, run_time=1.0, weights={"adieu": 1, "audio": 1},
-                        callouts={"adieu": (0, 1), "audio": (0, 1)})
 
     # m : out the rest of the way; callouts and emphasis fade
     @subscene
