@@ -211,8 +211,14 @@ class WordleBoard(VGroup):
         f = height / grown.height
         c = grown.get_center()
         row.scale(f, about_point=c).shift(center - c)
+        # BEHIND the existing rows while they shrink: they start larger and overlap
+        # the new row's pose until the shrink finishes, so it emerges from under
+        # them. Restored afterwards (nothing overlaps then, so no pop), so the row
+        # stacks normally in anything later — a rearrange, say.
+        row.set_z_index(-1)
         scene.play(self.animate.scale(f, about_point=c).shift(center - c),
                    FadeIn(row), run_time=run_time)
+        row.set_z_index(0)
         self.tiles.append(list(row))
         self.letters.append([None] * self.n_cols)
         self.rows.append(row)
