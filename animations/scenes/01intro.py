@@ -47,6 +47,7 @@ REUSE MAP
   board, typing, flip        assets/board.py get_board / type_word / reveal
   typing sound               assets/keys.py key_cues (the only sound in the scene;
                              words appearing stay silent — the user's call)
+  camera-move sound          music-library/sfx whoosh (WHOOSH_SFX), at each move's start
   word sounds                music-library/sfx via self.sfx: notify-text (WORD_SFX)
                              as words land in f, notify-app-03 (PING_SFX) from h on
   the histogram              assets/word_stacks.py WordStacks + StacksCamera
@@ -113,6 +114,9 @@ FILL_LOOK = 60                # f: the squash looks this many steps ahead, so it
                               # flattens smoothly rather than in row-sized jerks
 WORD_SFX = "notify-text"      # f: the sound of a word landing in the histogram
 PING_SFX = "notify-app-03"    # h onward: a word emphasised / called out, and i's noise
+PING_GAIN = -6.0              # dB — played quieter than the library's level
+WHOOSH_SFX = "whoosh"         # under every camera move (d, e, f's pan, g, j-m)
+WHOOSH_GAIN = -8.0            # dB — played quieter than the library's level
 FILL_SFX_MAX_PER_S = 15.0     # f: one cue per word, but no more than this many a
                               # second — at the fill's peak ~40 words land PER FRAME,
                               # and hundreds of overlapping copies of a 1.1s sound
@@ -516,7 +520,7 @@ class Scene01(MovingCameraScene, WordleDarkScene):
                          if self._callout_fits(word, self._lerp_view(fr, to, u))), 1.0)
             enter[word] = min(float(np.interp(u_in, us, ts)) * run_time,
                               run_time - CALLOUT_GROW)
-            self.sfx(PING_SFX, at=enter[word])
+            self.sfx(PING_SFX, at=enter[word], gain=PING_GAIN)
         for word in present:
             self._callout(word)["g"] = 1.0
         a0 = {c["word"]: c["a"] for c in self.callouts or []}
@@ -638,6 +642,7 @@ class Scene01(MovingCameraScene, WordleDarkScene):
             self.remove(m)
         self.board = self.start_row = None
         self.add(self.stacks, self.labels["start"], self.great[0])
+        self.sfx(WHOOSH_SFX, gain=WHOOSH_GAIN)
         self._move_view(view_at(-SOLO_GAP), run_time=2.0)
         self.play(FadeIn(self.great[1], shift=UP * 0.2), run_time=1.0)
 
@@ -645,6 +650,7 @@ class Scene01(MovingCameraScene, WordleDarkScene):
     @subscene
     def pan_slows(self):
         self.add(self.slows[0])
+        self.sfx(WHOOSH_SFX, gain=WHOOSH_GAIN)
         self._move_view(view_at(SOLO_GAP), run_time=3.0)
         self.remove(*self.great, self.labels["start"])     # both off screen now
         self.great = self.labels = None
@@ -676,6 +682,7 @@ class Scene01(MovingCameraScene, WordleDarkScene):
     def fill(self):
         run_time = 15.0          # one value for the plan, its cue times and the play
         self._setup_fill(run_time)
+        self.sfx(WHOOSH_SFX, gain=WHOOSH_GAIN)
         self._move_view(view_at(0), run_time=2.5)
         self.remove(*self.slows)                           # off screen now
         self.slows = None
@@ -709,31 +716,32 @@ class Scene01(MovingCameraScene, WordleDarkScene):
     # g : zoom into the leftmost stacks, rows back to full height, letters back
     @subscene
     def zoom_left(self):
+        self.sfx(WHOOSH_SFX, gain=WHOOSH_GAIN)
         self._move_view(VIEW_STARTERS, run_time=3.0, dim=1.0)
 
     # h : Wordlebot's regulars
     @subscene
     def starters(self):
         # the rest dims as the first comes up, then one word at a time
-        self.sfx(PING_SFX)
+        self.sfx(PING_SFX, gain=PING_GAIN)
         self._move_view(VIEW_STARTERS, run_time=0.5, weights={"irate": 1})
         self.wait(0.4)
-        self.sfx(PING_SFX)
+        self.sfx(PING_SFX, gain=PING_GAIN)
         self._move_view(VIEW_STARTERS, run_time=0.5, weights={"train": 1})
         self.wait(0.4)
-        self.sfx(PING_SFX)
+        self.sfx(PING_SFX, gain=PING_GAIN)
         self._move_view(VIEW_STARTERS, run_time=0.5, weights={"arise": 1})
         self.wait(0.4)
-        self.sfx(PING_SFX)
+        self.sfx(PING_SFX, gain=PING_GAIN)
         self._move_view(VIEW_STARTERS, run_time=0.5, weights={"crane": 1})
         self.wait(0.4)
-        self.sfx(PING_SFX)
+        self.sfx(PING_SFX, gain=PING_GAIN)
         self._move_view(VIEW_STARTERS, run_time=0.5, weights={"raise": 1})
         self.wait(0.4)
-        self.sfx(PING_SFX)
+        self.sfx(PING_SFX, gain=PING_GAIN)
         self._move_view(VIEW_STARTERS, run_time=0.5, weights={"slate": 1})
         self.wait(0.4)
-        self.sfx(PING_SFX)
+        self.sfx(PING_SFX, gain=PING_GAIN)
         self._move_view(VIEW_STARTERS, run_time=0.5, weights={"stare": 1})
 
     # i : the noise — no change
@@ -742,13 +750,14 @@ class Scene01(MovingCameraScene, WordleDarkScene):
         # the VO's noise. The wait is the sound's own length: with an empty body the
         # cue would fall in the trailing hold, which the stitch trims and the edit
         # covers with a still — i.e. it would never be heard
-        self.sfx(PING_SFX)                  # ADIEU
-        self.sfx(PING_SFX, at=0.6)          # AUDIO
+        self.sfx(PING_SFX, gain=PING_GAIN)                  # ADIEU
+        self.sfx(PING_SFX, at=0.6, gain=PING_GAIN)          # AUDIO
         self.wait(1.9)
 
     # j : out to the left 10 bins, squashing again; the rest stays dimmed
     @subscene
     def left_ten(self):
+        self.sfx(WHOOSH_SFX, gain=WHOOSH_GAIN)
         self._move_view(VIEW_TEN, run_time=2.5, weights={w: 0 for w in STARTERS})
 
     # k : out until THOSE and WORDS are in frame; each lights up and gets its
@@ -757,6 +766,7 @@ class Scene01(MovingCameraScene, WordleDarkScene):
     @subscene
     def those_words(self):
         self.callouts = []
+        self.sfx(WHOOSH_SFX, gain=WHOOSH_GAIN)
         self._move_view(VIEW_THOSE_WORDS, run_time=3.0, appear=["those", "words"],
                         weights={"adieu": 1, "audio": 1}, present=["adieu", "audio"])
 
@@ -764,11 +774,13 @@ class Scene01(MovingCameraScene, WordleDarkScene):
     # gets its callout the moment it is on screen
     @subscene
     def hello(self):
+        self.sfx(WHOOSH_SFX, gain=WHOOSH_GAIN)
         self._move_view(VIEW_HELLO, run_time=2.5, appear=["hello"])
 
     # m : out the rest of the way; callouts and emphasis fade
     @subscene
     def zoom_out(self):
+        self.sfx(WHOOSH_SFX, gain=WHOOSH_GAIN)
         self._move_view(self.full_view, run_time=3.0, dim=0.0, callout_alpha=0.0,
                         weights={w: 0 for w in CALLED_OUT})
         self.remove(*[m for c in self.callouts for m in (c["row"], c["line"])])
