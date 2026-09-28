@@ -128,11 +128,12 @@ def _scatter(sizes, seed):
         f *= 0.95
 
 
-def _layout(guess, header=False):
+def _layout(guess, header=False, chain=False):
     """Word centres, ovals and header positions for `guess`'s shown groups: the
     ovals scattered over the frame (`_scatter`), the words in a tidy grid inside
-    each. Returns (slots {word: centre}, scale, ovals, header centres)."""
-    groups = DATA["groups"][guess]
+    each. `chain` takes 04e's carry-over groups (lists_data) instead of the
+    size-target ones. Returns (slots {word: centre}, scale, ovals, header centres)."""
+    groups = DATA["chain" if chain else "groups"][guess]
     ww, cg, dy = WORD_W * GROUP_SCALE, CELL_GAP, CELL_DY
     blocks = []
     for g in groups:
@@ -286,8 +287,8 @@ class Scene04(WordleBoardScene):
     def _setup_group_more(self):
         self.guess2 = PigpenWord(SECOND).scale(GUESS_SCALE).set_glyph_stroke(GUESS_SCALE)
         self.guess3 = PigpenWord(THIRD).scale(GUESS_SCALE).set_glyph_stroke(GUESS_SCALE)
-        self.lay2 = _layout(SECOND)
-        self.lay3 = _layout(THIRD)
+        self.lay2 = _layout(SECOND, chain=True)
+        self.lay3 = _layout(THIRD, chain=True)
 
     # e : AAHED out left, PIGGY in right, regroup; then the same with CODES
     @subscene

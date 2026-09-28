@@ -2340,6 +2340,11 @@
   "abbed",
   "abbes"
  ],
+ "guesses": [
+  "aahed",
+  "piggy",
+  "codes"
+ ],
  "groups": {
   "aahed": [
    {
@@ -2351,8 +2356,23 @@
      0,
      0
     ],
+    "size": 1,
     "members": [
      "abhor"
+    ]
+   },
+   {
+    "code": 170,
+    "tiles": [
+     2,
+     0,
+     0,
+     2,
+     2
+    ],
+    "size": 1,
+    "members": [
+     "abled"
     ]
    },
    {
@@ -2364,9 +2384,26 @@
      0,
      0
     ],
+    "size": 2,
     "members": [
      "alpha",
      "awash"
+    ]
+   },
+   {
+    "code": 164,
+    "tiles": [
+     2,
+     0,
+     0,
+     0,
+     2
+    ],
+    "size": 3,
+    "members": [
+     "acrid",
+     "aloud",
+     "avoid"
     ]
    },
    {
@@ -2378,11 +2415,30 @@
      1,
      1
     ],
+    "size": 4,
     "members": [
      "chide",
      "depth",
      "hedge",
      "horde"
+    ]
+   },
+   {
+    "code": 11,
+    "tiles": [
+     0,
+     0,
+     1,
+     0,
+     2
+    ],
+    "size": 5,
+    "members": [
+     "child",
+     "chord",
+     "hound",
+     "humid",
+     "third"
     ]
    },
    {
@@ -2394,6 +2450,7 @@
      1,
      1
     ],
+    "size": 7,
     "members": [
      "abide",
      "abode",
@@ -2405,6 +2462,28 @@
     ]
    },
    {
+    "code": 192,
+    "tiles": [
+     2,
+     1,
+     0,
+     1,
+     0
+    ],
+    "size": 9,
+    "members": [
+     "abase",
+     "abate",
+     "agape",
+     "agate",
+     "algae",
+     "amaze",
+     "arena",
+     "awake",
+     "aware"
+    ]
+   },
+   {
     "code": 168,
     "tiles": [
      2,
@@ -2413,6 +2492,7 @@
      2,
      0
     ],
+    "size": 12,
     "members": [
      "abbey",
      "after",
@@ -2437,6 +2517,7 @@
      0,
      0
     ],
+    "size": 16,
     "members": [
      "aback",
      "again",
@@ -2467,8 +2548,23 @@
      2,
      2
     ],
+    "size": 1,
     "members": [
      "dingy"
+    ]
+   },
+   {
+    "code": 146,
+    "tiles": [
+     1,
+     2,
+     1,
+     0,
+     2
+    ],
+    "size": 1,
+    "members": [
+     "gipsy"
     ]
    },
    {
@@ -2480,9 +2576,26 @@
      1,
      0
     ],
+    "size": 2,
     "members": [
      "aging",
      "going"
+    ]
+   },
+   {
+    "code": 20,
+    "tiles": [
+     0,
+     0,
+     2,
+     0,
+     2
+    ],
+    "size": 3,
+    "members": [
+     "angry",
+     "cagey",
+     "rugby"
     ]
    },
    {
@@ -2494,11 +2607,30 @@
      2,
      2
     ],
+    "size": 4,
     "members": [
      "dodgy",
      "elegy",
      "mangy",
      "tangy"
+    ]
+   },
+   {
+    "code": 26,
+    "tiles": [
+     0,
+     0,
+     2,
+     2,
+     2
+    ],
+    "size": 5,
+    "members": [
+     "baggy",
+     "buggy",
+     "foggy",
+     "leggy",
+     "soggy"
     ]
    },
    {
@@ -2510,6 +2642,7 @@
      0,
      0
     ],
+    "size": 6,
     "members": [
      "agape",
      "grape",
@@ -2517,6 +2650,28 @@
      "grasp",
      "grope",
      "group"
+    ]
+   },
+   {
+    "code": 33,
+    "tiles": [
+     0,
+     1,
+     0,
+     2,
+     0
+    ],
+    "size": 9,
+    "members": [
+     "align",
+     "deign",
+     "feign",
+     "fungi",
+     "image",
+     "neigh",
+     "reign",
+     "thigh",
+     "weigh"
     ]
    },
    {
@@ -2528,6 +2683,7 @@
      2,
      0
     ],
+    "size": 12,
     "members": [
      "bilge",
      "binge",
@@ -2552,6 +2708,7 @@
      0,
      2
     ],
+    "size": 16,
     "members": [
      "agony",
      "gassy",
@@ -2582,8 +2739,23 @@
      0,
      0
     ],
+    "size": 1,
     "members": [
      "caddy"
+    ]
+   },
+   {
+    "code": 195,
+    "tiles": [
+     2,
+     1,
+     0,
+     2,
+     0
+    ],
+    "size": 1,
+    "members": [
+     "cameo"
     ]
    },
    {
@@ -2595,9 +2767,26 @@
      0,
      2
     ],
+    "size": 2,
     "members": [
      "bonus",
      "torus"
+    ]
+   },
+   {
+    "code": 171,
+    "tiles": [
+     2,
+     0,
+     1,
+     0,
+     0
+    ],
+    "size": 3,
+    "members": [
+     "candy",
+     "chard",
+     "child"
     ]
    },
    {
@@ -2609,11 +2798,30 @@
      1,
      0
     ],
+    "size": 4,
     "members": [
      "epoch",
      "gecko",
      "ocean",
      "ounce"
+    ]
+   },
+   {
+    "code": 90,
+    "tiles": [
+     1,
+     0,
+     1,
+     0,
+     0
+    ],
+    "size": 5,
+    "members": [
+     "acrid",
+     "ditch",
+     "duchy",
+     "dutch",
+     "lucid"
     ]
    },
    {
@@ -2625,6 +2833,7 @@
      2,
      0
     ],
+    "size": 7,
     "members": [
      "bicep",
      "emcee",
@@ -2636,26 +2845,50 @@
     ]
    },
    {
-    "code": 10,
+    "code": 13,
     "tiles": [
      0,
      0,
      1,
-     0,
+     1,
      1
     ],
+    "size": 9,
     "members": [
-     "daisy",
-     "dusky",
-     "dusty",
-     "salad",
-     "sandy",
-     "shady",
-     "shard",
-     "squad",
-     "staid",
-     "stand",
-     "study"
+     "aside",
+     "dense",
+     "seedy",
+     "shade",
+     "slide",
+     "snide",
+     "spade",
+     "spend",
+     "stead"
+    ]
+   },
+   {
+    "code": 39,
+    "tiles": [
+     0,
+     1,
+     1,
+     1,
+     0
+    ],
+    "size": 12,
+    "members": [
+     "abode",
+     "adobe",
+     "adore",
+     "anode",
+     "demon",
+     "depot",
+     "detox",
+     "diode",
+     "drone",
+     "drove",
+     "erode",
+     "oxide"
     ]
    },
    {
@@ -2667,6 +2900,7 @@
      1,
      0
     ],
+    "size": 16,
     "members": [
      "badge",
      "budge",
@@ -2688,9 +2922,432 @@
    }
   ]
  },
- "guesses": [
-  "aahed",
-  "piggy",
-  "codes"
- ]
+ "chain": {
+  "piggy": [
+   {
+    "code": 90,
+    "tiles": [
+     1,
+     0,
+     1,
+     0,
+     0
+    ],
+    "size": 6,
+    "members": [
+     "agape",
+     "grape",
+     "graph",
+     "grasp"
+    ]
+   },
+   {
+    "code": 36,
+    "tiles": [
+     0,
+     1,
+     1,
+     0,
+     0
+    ],
+    "size": 33,
+    "members": [
+     "again",
+     "agile",
+     "being",
+     "bring"
+    ]
+   },
+   {
+    "code": 6,
+    "tiles": [
+     0,
+     0,
+     0,
+     2,
+     0
+    ],
+    "size": 39,
+    "members": [
+     "adage",
+     "badge",
+     "barge",
+     "hedge"
+    ]
+   },
+   {
+    "code": 18,
+    "tiles": [
+     0,
+     0,
+     2,
+     0,
+     0
+    ],
+    "size": 33,
+    "members": [
+     "algae",
+     "angel",
+     "anger",
+     "angle",
+     "angst",
+     "argue"
+    ]
+   },
+   {
+    "code": 9,
+    "tiles": [
+     0,
+     0,
+     1,
+     0,
+     0
+    ],
+    "size": 83,
+    "members": [
+     "agate",
+     "agent",
+     "aglow",
+     "agora",
+     "agree",
+     "along"
+    ]
+   },
+   {
+    "code": 81,
+    "tiles": [
+     1,
+     0,
+     0,
+     0,
+     0
+    ],
+    "size": 119,
+    "members": [
+     "adapt",
+     "adept",
+     "adopt",
+     "alpha",
+     "ample",
+     "apart",
+     "depth"
+    ]
+   },
+   {
+    "code": 2,
+    "tiles": [
+     0,
+     0,
+     0,
+     0,
+     2
+    ],
+    "size": 217,
+    "members": [
+     "abbey",
+     "allay",
+     "alley",
+     "alloy",
+     "annoy",
+     "array",
+     "artsy",
+     "assay"
+    ]
+   },
+   {
+    "code": 0,
+    "tiles": [
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "size": 981,
+    "members": [
+     "aback",
+     "abase",
+     "abate",
+     "abhor",
+     "abled",
+     "abode",
+     "adobe",
+     "adore",
+     "after",
+     "alarm",
+     "aloud",
+     "altar",
+     "alter",
+     "amass",
+     "amaze",
+     "amber"
+    ]
+   },
+   {
+    "code": 27,
+    "tiles": [
+     0,
+     1,
+     0,
+     0,
+     0
+    ],
+    "size": 297,
+    "members": [
+     "abide",
+     "acrid",
+     "admin",
+     "admit",
+     "affix",
+     "alien",
+     "aside",
+     "avail",
+     "avian",
+     "avoid",
+     "await",
+     "axial",
+     "chide",
+     "child",
+     "humid",
+     "third"
+    ]
+   }
+  ],
+  "codes": [
+   {
+    "code": 21,
+    "tiles": [
+     0,
+     0,
+     2,
+     1,
+     0
+    ],
+    "size": 16,
+    "members": [
+     "badge",
+     "budge",
+     "fudge",
+     "hedge",
+     "judge"
+    ]
+   },
+   {
+    "code": 39,
+    "tiles": [
+     0,
+     1,
+     1,
+     1,
+     0
+    ],
+    "size": 12,
+    "members": [
+     "abode",
+     "adobe",
+     "adore",
+     "anode",
+     "demon",
+     "depot"
+    ]
+   },
+   {
+    "code": 36,
+    "tiles": [
+     0,
+     1,
+     1,
+     0,
+     0
+    ],
+    "size": 23,
+    "members": [
+     "adopt",
+     "adorn",
+     "aloud",
+     "avoid",
+     "blond",
+     "blood"
+    ]
+   },
+   {
+    "code": 12,
+    "tiles": [
+     0,
+     0,
+     1,
+     1,
+     0
+    ],
+    "size": 67,
+    "members": [
+     "abide",
+     "adage",
+     "adept",
+     "ahead",
+     "amend",
+     "beady",
+     "depth"
+    ]
+   },
+   {
+    "code": 1,
+    "tiles": [
+     0,
+     0,
+     0,
+     0,
+     1
+    ],
+    "size": 194,
+    "members": [
+     "angst",
+     "artsy",
+     "assay",
+     "awash",
+     "basal",
+     "basil",
+     "grasp"
+    ]
+   },
+   {
+    "code": 9,
+    "tiles": [
+     0,
+     0,
+     1,
+     0,
+     0
+    ],
+    "size": 71,
+    "members": [
+     "adapt",
+     "admin",
+     "admit",
+     "adult",
+     "aphid",
+     "award",
+     "humid",
+     "third"
+    ]
+   },
+   {
+    "code": 27,
+    "tiles": [
+     0,
+     1,
+     0,
+     0,
+     0
+    ],
+    "size": 139,
+    "members": [
+     "abbot",
+     "abhor",
+     "abort",
+     "about",
+     "aglow",
+     "agora",
+     "alloy",
+     "along",
+     "annoy"
+    ]
+   },
+   {
+    "code": 6,
+    "tiles": [
+     0,
+     0,
+     0,
+     2,
+     0
+    ],
+    "size": 143,
+    "members": [
+     "abbey",
+     "after",
+     "agree",
+     "alien",
+     "alley",
+     "alter",
+     "amber",
+     "angel",
+     "anger",
+     "annex",
+     "apnea",
+     "bagel"
+    ]
+   },
+   {
+    "code": 0,
+    "tiles": [
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "size": 302,
+    "members": [
+     "affix",
+     "again",
+     "aging",
+     "alarm",
+     "album",
+     "allay",
+     "alpha",
+     "altar",
+     "apart",
+     "array",
+     "avail",
+     "avian",
+     "await",
+     "axial",
+     "bring",
+     "graph"
+    ]
+   },
+   {
+    "code": 3,
+    "tiles": [
+     0,
+     0,
+     0,
+     1,
+     0
+    ],
+    "size": 264,
+    "members": [
+     "abate",
+     "afire",
+     "agape",
+     "agate",
+     "agent",
+     "agile",
+     "alert",
+     "algae",
+     "alike",
+     "amaze",
+     "ample",
+     "angle",
+     "argue",
+     "barge",
+     "being",
+     "grape"
+    ]
+   }
+  ]
+ },
+ "carry": {
+  "piggy": [
+   47,
+   60,
+   71
+  ],
+  "codes": [
+   63,
+   71,
+   92
+  ]
+ }
 }

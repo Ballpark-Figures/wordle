@@ -14,19 +14,29 @@ Provenance:
   answers                — mystery.txt in file order (alphabetical); the scene reads
                            a word's ALPHABETICAL RANK from its index here
   guesses_head           — the first HEAD lines of guess.txt
-  groups[guess]          — the answers partitioned by pattern(guess, answer); code
+  groups / chain         — the answers partitioned by pattern(guess, answer); code
                            and tiles decoded POSITION 0 MOST SIGNIFICANT, as
-                           game_data.py does
+                           game_data.py does; `size` is the WHOLE group, `members`
+                           the words shown (alphabetical)
 
 THE GUESSES: the first is "the topmost guess" of the list (04d), read from
 guess.txt, never typed; PIGGY and CODES are the script's own choices (04e).
 
 WHICH GROUPS ARE SHOWN IS A DISPLAY CHOICE, NOT A RESULT — flagged for the user.
-A guess makes 54-98 groups of up to 981 answers, far more than a frame holds. The
-rule: for each target size in TARGETS, the group whose size is NEAREST to it, ties
-going to the group whose first member is alphabetically earliest (so the ones
-already on screen tend to be picked); a group is never picked twice. Every member of
-a picked group is shown, so the ovals really do differ in size.
+A guess makes 54-98 groups of up to 981 answers, far more than a frame holds. Two
+rules, for two situations:
+
+  groups[guess] — SIZE TARGETS (04d from the column, 04i). For each size in
+    TARGETS, the group whose size is NEAREST it, ties to the alphabetically earliest
+    first member (so words already on screen tend to be picked); never the same
+    group twice. Every member is shown, so the ovals really differ in size.
+
+  chain[guess] — CARRY-OVER (04e, PIGPEN guess after guess). Every word on screen
+    lands in SOME group of the next guess, so the groups shown are the ones holding
+    the most on-screen words (at most CHAIN_GROUPS, ties to the smaller group).
+    Each shows the words it carries over (at most CHAIN_CAP), topped up with up to
+    CHAIN_TOP_UP newcomers — its alphabetically first other members. So most words
+    stay put and move between ovals, and a few come and go.
 """
 import json
 import os
@@ -38,7 +48,10 @@ WORDS = os.path.join(HERE, "..", "..", "math", "data", "shared", "words")
 
 HEAD = 20                         # guess-list lines cached (the scene shows fewer)
 SCRIPT_GUESSES = ["piggy", "codes"]
-TARGETS = [1, 2, 4, 7, 11, 16]    # the group sizes to show, one group each
+TARGETS = [1, 1, 2, 3, 4, 5, 7, 9, 12, 16]   # size-target rule: one group each
+CHAIN_GROUPS = 10                 # carry-over rule: most groups shown
+CHAIN_CAP = 16                    # most words shown in one group
+CHAIN_TOP_UP = 3                  # newcomers added to a group
 
 
 def _read(name):
@@ -46,7 +59,7 @@ def _read(name):
 
 
 def _pick(groups):
-    """The groups nearest each TARGETS size (see the module docstring)."""
+    """Size-target rule (see the module docstring)."""
     chosen = []
     for t in TARGETS:
         best = min((g for g in groups if g not in chosen),
@@ -55,23 +68,46 @@ def _pick(groups):
     return sorted(chosen, key=lambda g: len(g["members"]))
 
 
+def _chain(groups, on_screen):
+    """Carry-over rule (see the module docstring)."""
+    carried = [(g, [w for w in g["members"] if w in on_screen]) for g in groups]
+    carried = [(g, c) for g, c in carried if c]
+    carried.sort(key=lambda gc: (-len(gc[1]), len(gc[0]["members"])))
+    out = []
+    for g, c in carried[:CHAIN_GROUPS]:
+        keep = c[:CHAIN_CAP]
+        room = min(CHAIN_TOP_UP, CHAIN_CAP - len(keep))
+        new = [w for w in g["members"] if w not in on_screen][:max(room, 0)]
+        out.append(dict(g, members=sorted(keep + new)))
+    return sorted(out, key=lambda g: len(g["members"]))
+
+
 def _build():
     sys.path.insert(0, os.path.join(HERE, "..", "..", "math"))
     import wordle
 
     answers, guesses = _read("mystery.txt"), _read("guess.txt")
     assert answers == sorted(answers) and guesses == sorted(guesses)
+    order = [guesses[0]] + SCRIPT_GUESSES
     out = {"n_answers": len(answers), "n_guesses": len(guesses),
-           "answers": answers, "guesses_head": guesses[:HEAD], "groups": {}}
-    for g in [guesses[0]] + SCRIPT_GUESSES:
+           "answers": answers, "guesses_head": guesses[:HEAD], "guesses": order,
+           "groups": {}, "chain": {}}
+    full = {}
+    for g in order:
         assert g in guesses, f"{g} is not a legal guess"
         by_code = {}
         for a in answers:                          # answers is alphabetical, so
             by_code.setdefault(wordle.pattern(g, a), []).append(a)   # members are too
-        groups = [{"code": int(c), "tiles": [(c // 3 ** (4 - i)) % 3 for i in range(5)],
-                   "members": m} for c, m in by_code.items()]
-        out["groups"][g] = _pick(groups)
-    out["guesses"] = [guesses[0]] + SCRIPT_GUESSES
+        full[g] = [{"code": int(c), "tiles": [(c // 3 ** (4 - i)) % 3 for i in range(5)],
+                    "size": len(m), "members": m} for c, m in by_code.items()]
+        out["groups"][g] = _pick(full[g])
+    # 04e: each guess regroups what the one before it left on screen
+    shown = {w for grp in out["groups"][order[0]] for w in grp["members"]}
+    for g in SCRIPT_GUESSES:
+        out["chain"][g] = _chain(full[g], shown)
+        now = {w for grp in out["chain"][g] for w in grp["members"]}
+        out.setdefault("carry", {})[g] = [len(shown & now), len(shown), len(now)]
+        shown = now
     return out
 
 
@@ -86,10 +122,19 @@ if __name__ == "__main__":
         json.dump(data, f, indent=1)
         f.write("\n")
     names = "-YG"
+
+    def show(title, groups):
+        print(title)
+        for grp in groups:
+            tiles = "".join(names[t] for t in grp["tiles"])
+            print(f"  {tiles}  {len(grp['members']):2d} of {grp['size']:4d}  "
+                  f"{' '.join(grp['members'])}")
+
     print(f"{data['n_answers']} answers, {data['n_guesses']} guesses")
     for g in data["guesses"]:
-        print(g.upper())
-        for grp in data["groups"][g]:
-            tiles = "".join(names[t] for t in grp["tiles"])
-            print(f"  {tiles}  {len(grp['members']):3d}  {' '.join(grp['members'])}")
+        show(f"{g.upper()} (size targets)", data["groups"][g])
+    for g in SCRIPT_GUESSES:
+        stay, before, after = data["carry"][g]
+        show(f"{g.upper()} (carry-over: {stay} of {before} stay, {after} shown)",
+             data["chain"][g])
     print(f"\nwrote {CACHE}")
