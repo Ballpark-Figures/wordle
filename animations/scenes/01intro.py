@@ -100,6 +100,7 @@ FILL_RAMP = 0.15              # f: the first words land one at a time over this
                               # much of the zoom before the pace picks up
 FILL_SQUASH_POW = 2.0         # f: the rows may flatten no faster than
                               # S_FULL ** (u ** POW): square early, S_FULL at the end
+FILL_SMOOTH = 301             # f: steps the word count is averaged over (~1.5s)
 FILL_LOOK = 60                # f: the squash looks this many steps ahead, so it
                               # flattens smoothly rather than in row-sized jerks
 FILL_SEED = 1                 # f: which bar each word goes to is random; seeded
@@ -168,19 +169,22 @@ def fill_camera(u):
     """The fill's frame (left, bottom, width) at zoom progress u in [0, 1].
 
     Width grows GEOMETRICALLY from one frame to the full view (a constant zoom
-    speed); the frame centre rises with its height and slides right only once the
-    histogram's left edge would leave the frame — the full view's own rules, so
-    u = 1 IS the full view."""
+    speed) and the frame centre rises with its height. Horizontally the centre moves
+    from START to the histogram's middle IN PROPORTION TO THE WIDTH GAINED, which is
+    exactly the rate at which BOTH edges reach the histogram's ends together, at
+    u = 1 (the user's call — it used to reach the left end first, then slide right).
+    Neither edge overshoots on the way: that needs the middle to lie within half the
+    width gained of START, which it does by a wide margin (asserted below)."""
     w_full = HIST_R - HIST_L + 2 * FULL_MARGIN
     w = FRAME_W * (w_full / FRAME_W) ** u
     h = w / ASPECT
     cy = FILL_BASE * (h - 9)
     mid = (HIST_L + HIST_R) / 2
-    if w >= w_full:
-        cx = mid
-    else:
-        cx = min(max(0.0, HIST_L - FULL_MARGIN + w / 2), HIST_R + FULL_MARGIN - w / 2)
+    cx = mid * (w - FRAME_W) / (w_full - FRAME_W)
     return (cx - w / 2, cy - h / 2, w)
+
+
+assert abs((HIST_L + HIST_R) / 2) <= (HIST_R - HIST_L + 2 * FULL_MARGIN - FRAME_W) / 2
 
 
 def _rows_fitting(h, s):
@@ -188,8 +192,9 @@ def _rows_fitting(h, s):
     return (FILL_TOP * h - FILL_BASE * 9 - SIDE * s / 2) / (STEP * s) + 1
 
 
-def _simulate(pace):
-    """Run the fill once. `pace(k)` scales how many words are due at step k.
+def _simulate(pace=None, targets=None):
+    """Run the fill once. Either `pace(k)` scales how many words are due at step k
+    (from the frame), or `targets[k]` says outright how many have landed by step k.
     Returns (order, n_at, tall_at, limit_at)."""
     bins = np.array(DATA["bins"])
     rows = np.array(DATA["rows"])
@@ -208,12 +213,17 @@ def _simulate(pace):
         left, bottom, w = fill_camera(u)
         vis = (bar_x - WORD_W / 2 >= left) & (bar_x + WORD_W / 2 <= left + w)
         limit = _rows_fitting(w / ASPECT, S_FULL ** (u ** FILL_SQUASH_POW))
-        frac = min(1.0, pace(k) * limit / tall) * min(1.0, u / FILL_RAMP) ** 2
-        if k == FILL_STEPS:
-            frac = 1.0
-        need = int(round(frac * cap[vis].sum())) - int(placed[vis].sum())
+        if targets is not None:
+            need = int(targets[k]) - len(order)
+        else:
+            frac = min(1.0, pace(k) * limit / tall) * min(1.0, u / FILL_RAMP) ** 2
+            if k == FILL_STEPS:
+                frac = 1.0
+            need = int(round(frac * cap[vis].sum())) - int(placed[vis].sum())
         for _ in range(max(need, 0)):
             wgt = np.where(vis, cap - placed, 0).astype(float)
+            if wgt.sum() <= 0:
+                break
             b = rng.choice(len(ub), p=wgt / wgt.sum())
             order.append(int(members[b][placed[b]]))
             placed[b] += 1
@@ -230,7 +240,9 @@ def fill_plan():
     still to fill, among the bars whose left AND right ends are both on screen. Each
     bar fills bottom to top. No bar is ever capped or skipped.
 
-    HOW MANY land by each step — ours, and it only sets the PACE: the tallest bar
+    HOW MANY land by each step — ours, and it only sets the PACE, as a SMOOTH curve
+    of time (so a bar coming into view does not set off a burst). Its shape: the
+    tallest bar
     should just fit the frame at the squash schedule S_FULL ** (u ** POW), eased in
     over FILL_RAMP so the first words land one at a time. The rule favours bars that
     have been on screen longest, so a pace set from the frame alone runs the tallest
@@ -243,7 +255,17 @@ def fill_plan():
     _, _, tall1, limit1 = _simulate(lambda k: 1.0)
     over = np.maximum(tall1 / np.maximum(limit1, 1), 1.0)
     over = np.convolve(over, np.ones(81) / 81, mode="same")      # smooth the dips
-    order, n_at, tall_at, _ = _simulate(lambda k: 1.0 / over[k])
+    _, n2, _, _ = _simulate(lambda k: 1.0 / over[k])
+    # THE COUNT IS A SMOOTH CURVE OF TIME. Tied to the capacity on screen it jumped
+    # every time a bar came into view; smoothed, a newly visible bar still catches
+    # up fast (it has the most left to fill) but the words keep a steady flow.
+    total = len(DATA["words"]) - len(DATA["pinned"])
+    pad = FILL_SMOOTH // 2
+    padded = np.concatenate([np.zeros(pad), n2, np.full(pad, total)])
+    smooth = np.convolve(padded, np.ones(FILL_SMOOTH) / FILL_SMOOTH, mode="valid")
+    targets = np.maximum.accumulate(np.round(smooth[:len(n2)])).astype(int)
+    targets[-1] = total
+    order, n_at, tall_at, _ = _simulate(targets=targets)
     # a smooth ceiling over the (stepwise) tallest bar: its running max, averaged
     # over the NEXT FILL_LOOK steps — never below the real height, since it only
     # ever rises
