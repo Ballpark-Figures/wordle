@@ -129,7 +129,8 @@ FILL_SFX_MAX_PER_S = 15.0     # f: one cue per word, but no more than this many 
 FILL_EASE_IN = 0.1            # f: starting speed, as a fraction of a linear zoom's
 FILL_TAPER = 0.75             # f: from here the word count tapers to a stop
 FILL_EARLY = 12               # f: the first words are PLACED BY HAND in time: after
-FILL_PAUSE = 1.1              # a pause of FILL_PAUSE seconds, gaps shrinking
+FILL_PAUSE = 1.1              # a gap of FILL_PAUSE s after the zoom starts (the
+                              # first word lands BEFORE it), then gaps shrinking
                               # geometrically into the natural pace at word
                               # FILL_EARLY — so the first gaps are long and ease into
                               # the fast part instead of collapsing after two or three
@@ -266,9 +267,11 @@ def _simulate(pace=None, targets=None):
 
 
 def _ease_start(targets, run_time):
-    """Re-time the first FILL_EARLY words: the first at FILL_PAUSE seconds, then
-    gaps shrinking by a constant ratio, chosen so word FILL_EARLY lands exactly
-    where (and at the gap) the natural pace has it. Later words are untouched."""
+    """Re-time the first FILL_EARLY words. Word 0 lands BEFORE the zoom (step 0 —
+    the scene shows it while the camera is still); word 1 at FILL_PAUSE seconds into
+    the zoom, then gaps shrinking by a constant ratio, chosen so word FILL_EARLY
+    lands exactly where (and at the gap) the natural pace has it. Later words are
+    untouched."""
     ts = np.linspace(0, 1, 20001)
     us = np.array([fill_rate(a) for a in ts])
     K = FILL_EARLY
@@ -276,8 +279,8 @@ def _ease_start(targets, run_time):
     t_nat = np.interp(step_of / FILL_STEPS, us, ts) * run_time
     t_k, g_k = t_nat[K], max(t_nat[K + 1] - t_nat[K], 1e-3)
 
-    def first(r):                     # when word 0 lands, for gap ratio r
-        return t_k - g_k * sum(r ** -i for i in range(1, K + 1))
+    def first(r):                     # when word 1 lands, for gap ratio r
+        return t_k - g_k * sum(r ** -i for i in range(1, K))
     lo, hi = 0.05, 1.0                # first() rises with r; bisect for the pause
     if first(hi) < FILL_PAUSE:
         r = hi                        # natural pace already too quick: even gaps
@@ -286,7 +289,8 @@ def _ease_start(targets, run_time):
             mid = (lo + hi) / 2
             lo, hi = (mid, hi) if first(mid) < FILL_PAUSE else (lo, mid)
         r = (lo + hi) / 2
-    times = [t_k - g_k * sum(r ** -i for i in range(1, K - j + 1)) for j in range(K)]
+    times = [0.0] + [t_k - g_k * sum(r ** -i for i in range(1, K - j + 1))
+                     for j in range(1, K)]
     steps = np.interp(np.array(times) / run_time, ts, us) * FILL_STEPS
     out = targets.copy()
     for k in range(int(step_of[K])):
@@ -699,10 +703,16 @@ class Scene01(MovingCameraScene, WordleDarkScene):
         self._move_view(view_at(0), run_time=2.5, whoosh=True)
         self.remove(*self.slows)                           # off screen now
         self.slows = None
-        self.wait(0.6)                   # a brief stop at START before the fill
-
         t = ValueTracker(0)
         n_at, sq_at, let_at = self.fill_n, self.fill_squash, self.fill_letters
+
+        # a pause at START, then the first new word lands while the camera is still
+        # (the plan puts it at step 0), then a beat, then the zoom begins
+        self.wait(0.6)
+        self.sfx(WORD_SFX)
+        self.stacks.set_state(n=n_at[0], squash=sq_at[0], letters=let_at[0])
+        self.stacks.refresh(self.camera.frame)
+        self.wait(0.4)
 
         def upd(m):
             u = t.get_value()
@@ -712,7 +722,8 @@ class Scene01(MovingCameraScene, WordleDarkScene):
             m.refresh(self.camera.frame)
 
         cues = self._fill_cue_times(run_time, fill_rate)
-        for at in cues:
+        assert cues[0] == 0.0, "the plan should land word 0 before the zoom"
+        for at in cues[1:]:                  # word 0's cue already played, above
             self.sfx(WORD_SFX, at=at)
         self.stacks.add_updater(upd)
         self.play(t.animate.set_value(1), run_time=run_time, rate_func=fill_rate)
