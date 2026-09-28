@@ -1,4 +1,4 @@
-"""Scene 03 — the antiwordle chain: 16 guesses, every one a possible answer. Dark mode.
+"""Scene 03 — the antiwordle chain: 16 guesses, every one a possible answer. Navy background.
 
 The empty 6-row board is up from frame 0 (setup_scene), as in scene 02 — the scene
 follows talking head THB, which covers the cut in. It ends on the three-column
@@ -18,7 +18,7 @@ REUSE MAP — every element and the one source it comes from:
                            all five tiles together (no new motion)
   growing column           board.add_row (added for this scene)
   keystroke sfx            assets/keys.py `key_cues`
-  colours                  config.py WORDLE_BG / TILE_* via WordleDarkScene
+  colours                  BOARD_NAVY via WordleBoardScene; tiles config.py TILE_*
   the 16 words + codes     assets/game_data.py load("antiwordle") -> game_cache.json:
                            the `final` row of math/data/shared/eldrow/eldrowmax.
                            mystery.csv, codes from math/wordle.py `pattern`
@@ -49,7 +49,7 @@ GRID_SCALE = 0.85          # tile size as a fraction of the ordinary board's
 GRID_COL_GAP = 0.6         # space between the three boards
 
 
-class Scene03(WordleDarkScene):
+class Scene03(WordleBoardScene):
     """BEAT MAP
     chain — the 16-word chain, typed and quick-scored in one growing column
     columns — rearranged into 3 columns of 6 rows
