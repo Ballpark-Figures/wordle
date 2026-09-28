@@ -21,12 +21,13 @@ Provenance for every number it writes:
   tiles      — math/wordle.py `pattern(word, ANSWER)`, decoded with POSITION 0 AS
                THE MOST SIGNIFICANT TRIT (the convention board.py documents)
 
-The FILL ORDER is a presentation choice, not a result (the user's rule, 01f):
-  - at each step, add one word to the stack MISSING THE MOST WORDS (raw count, target
-    minus current), ties broken at random with a fixed seed so re-runs reproduce;
-  - each stack fills BOTTOM TO TOP, fewest average guesses at the bottom;
-  - START, GREAT and SLOWS are already on screen, so they sit at the BOTTOM of their
-    stacks and count as present from the start.
+STACK ORDER is a presentation choice, not a result:
+  - each stack runs BOTTOM TO TOP, fewest average guesses at the bottom;
+  - START is already on screen when the histogram begins, so it sits at the BOTTOM
+    of its stack (`pinned`). GREAT and SLOWS are shown on their own beforehand and
+    then arrive with everything else, in their normal places (user's call, 2026-09-28).
+  - The FILL ORDER (which word lands when) is NOT here: it depends on where the
+    camera is, so the scene derives it (01intro.py `fill_plan`).
   - NUDGED words BREAK the sorted order on purpose (the user's call, 2026-09-28):
     IRATE and ARISE are moved down their stacks so every Wordlebot starter sits low
     and scene 01g/h can zoom in tighter. Their BIN — which stack, i.e. their average
@@ -36,7 +37,6 @@ import csv
 import json
 import math
 import os
-import random
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -45,10 +45,9 @@ MATH = os.path.join(HERE, "..", "..", "math")
 TOTALS = os.path.join(MATH, "data", "shared", "optturns", "opener_totals.csv")
 
 ANSWER = "intro"                       # the mystery word every opener is scored against
-PINNED = ["start", "great", "slows"]   # shown one by one before the fill (01a-01e)
+PINNED = ["start"]                     # on screen before the histogram exists (01a-01e)
 N_ANSWERS = 2315
 BIN = 0.01                             # report.py's bin width
-SEED = 1                               # tie-breaking in the fill order only
 # word -> row within its stack (0 = bottom). Placed just above the highest other
 # starter in reach (RAISE, row 12, shares IRATE's stack), so none of them move.
 NUDGE = {"irate": 13, "arise": 12}
@@ -64,7 +63,7 @@ def _build():
         assert r["total"], f"{r['word']} has no total"
 
     # stack order within a bin: fewest guesses at the bottom, word as a tie-break;
-    # the three pinned words go to the very bottom of their own stacks
+    # the pinned word goes to the very bottom of its own stack
     rows.sort(key=lambda r: (int(r["total"]), r["word"]))
     words = [r["word"] for r in rows]
     totals = [int(r["total"]) for r in rows]
@@ -89,22 +88,8 @@ def _build():
         for k, i in enumerate(members):
             row[i] = k
 
-    # the fill: always the stack missing the most words, ties at random
-    rng = random.Random(SEED)
-    placed = {b: sum(1 for i in m if i in pinned_idx) for b, m in stacks.items()}
-    order = []
-    remaining = len(words) - len(pinned_idx)
-    while remaining:
-        gap = max(len(stacks[b]) - placed[b] for b in stacks)
-        tied = sorted(b for b in stacks if len(stacks[b]) - placed[b] == gap)
-        b = rng.choice(tied)
-        order.append(stacks[b][placed[b]])
-        placed[b] += 1
-        remaining -= 1
-
     return {"answer": ANSWER, "pinned": PINNED, "words": words, "totals": totals,
-            "labels": labels, "bins": bins, "rows": row, "codes": codes,
-            "order": order}
+            "labels": labels, "bins": bins, "rows": row, "codes": codes}
 
 
 def load():
@@ -121,7 +106,7 @@ if __name__ == "__main__":
     tall = max(d["rows"]) + 1
     print(f"{len(d['words'])} words, bins {lo / 100:.2f}..{hi / 100:.2f} "
           f"({hi - lo + 1} stacks), tallest {tall}")
-    for w in d["pinned"] + ["salet", "hello", "adieu", "audio", "those", "words"]:
+    for w in d["pinned"] + ["great", "slows", "salet", "hello", "adieu", "audio", "those", "words"]:
         i = d["words"].index(w)
         print(f"  {w.upper()}  total {d['totals'][i]}  label {d['labels'][i]}  "
               f"bin {d['bins'][i] / 100:.2f}  row {d['rows'][i]}  code {d['codes'][i]}")

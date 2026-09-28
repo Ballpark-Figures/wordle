@@ -4,14 +4,21 @@ Each of the 12972 words is a scored Wordle row against the mystery word INTRO,
 stacked in its 0.01 bin of average guesses (fewest at the bottom).
 
 BEAT MAP
-  a type_start     — empty board (up from frame 0), START typed into row 0
+  a type_start     — empty board (up from frame 0), START typed into row 0 at a
+                     slow typist's pace (each letter still lands at normal speed)
   b to_navy        — rows 1-5 fade, the board drops so START is centred, bg to navy
   c score_start    — START flips against INTRO; "3.58 guesses" written below it
-  d pan_great      — pan to GREAT; "3.50 guesses"
-  e pan_slows      — pan to SLOWS; "3.70 guesses"
-  f fill           — pan back to START (labels fade), then every word drops into
-                     its stack; the camera follows the growth, rows squash flat and
-                     the letters fade as the stacks get tall
+  d pan_great      — pan to GREAT, standing on its own SOLO_GAP to the left
+                     (close enough that the screen is only briefly empty between
+                     words); "3.50 guesses"
+  e pan_slows      — pan past START to SLOWS, SOLO_GAP to the right; "3.70
+                     guesses". GREAT and START's label are removed once off screen
+  f fill           — pan back to START (SLOWS removed once off screen), then ONE
+                     continuous zoom out while every word drops into its stack:
+                     only bars wholly on screen take words, each chosen at random
+                     in proportion to how much of it is still to fill. Rows
+                     flatten and letters fade as the stacks get tall; GREAT and
+                     SLOWS arrive in their own stacks like any other word
   g zoom_left      — zoom into the leftmost stacks (the starters' bins centred),
                      rows back to full height; letters stay off
   h starters       — IRATE TRAIN ARISE CRANE RAISE SLATE STARE emphasised ONE AT A
@@ -76,7 +83,6 @@ IDX = {w: i for i, w in enumerate(WORDS)}
 ANSWER_CODE = {w: DATA["codes"][IDX[w]] for w in DATA["pinned"]}
 START_BIN = DATA["bins"][IDX["start"]]
 BIN_LO, BIN_HI = min(DATA["bins"]), max(DATA["bins"])
-N_FILL = len(DATA["order"])
 
 ASPECT = 16 / 9
 FRAME_W = 16.0
@@ -86,7 +92,17 @@ SIDE_MARGIN = 1.0             # beside the leftmost stack in the zoomed views
 FILL_BASE = 0.4               # fill: frame centre rises 0.4 per unit of extra height
 FILL_TOP = 0.85               # fill: tallest stack reaches this fraction of the frame
 FULL_MARGIN = 10.0            # full view: space either side of the histogram
-SQUASH_FROM = 20              # fill: rows stay square until a stack is this tall
+SOLO_GAP = 24.0               # d, e: GREAT/SLOWS stand this far from START — just
+                              # over a frame (16) plus a word (4.9), so the screen
+                              # is briefly empty between them
+FILL_STEPS = 4000             # f: the fill plan's resolution (steps of the zoom)
+FILL_RAMP = 0.15              # f: the first words land one at a time over this
+                              # much of the zoom before the pace picks up
+FILL_SQUASH_POW = 2.0         # f: the rows may flatten no faster than
+                              # S_FULL ** (u ** POW): square early, S_FULL at the end
+FILL_LOOK = 60                # f: the squash looks this many steps ahead, so it
+                              # flattens smoothly rather than in row-sized jerks
+FILL_SEED = 1                 # f: which bar each word goes to is random; seeded
 LETTERS_FADE = (25, 60)       # fill: letters fade out between these stack heights
 STARTERS = ["irate", "train", "arise", "crane", "raise", "slate", "stare"]
 CALLED_OUT = ["those", "words", "hello", "adieu", "audio"]
@@ -148,13 +164,99 @@ def _full_squash():
 S_FULL = _full_squash()
 
 
-def _squash_for(h_rows):
-    """Square rows until SQUASH_FROM, then geometric down to S_FULL at the peak."""
-    tall = max(DATA["rows"]) + 1
-    if h_rows <= SQUASH_FROM:
-        return 1.0
-    u = np.log(h_rows / SQUASH_FROM) / np.log(tall / SQUASH_FROM)
-    return float(np.exp(np.log(S_FULL) * u))
+def fill_camera(u):
+    """The fill's frame (left, bottom, width) at zoom progress u in [0, 1].
+
+    Width grows GEOMETRICALLY from one frame to the full view (a constant zoom
+    speed); the frame centre rises with its height and slides right only once the
+    histogram's left edge would leave the frame — the full view's own rules, so
+    u = 1 IS the full view."""
+    w_full = HIST_R - HIST_L + 2 * FULL_MARGIN
+    w = FRAME_W * (w_full / FRAME_W) ** u
+    h = w / ASPECT
+    cy = FILL_BASE * (h - 9)
+    mid = (HIST_L + HIST_R) / 2
+    if w >= w_full:
+        cx = mid
+    else:
+        cx = min(max(0.0, HIST_L - FULL_MARGIN + w / 2), HIST_R + FULL_MARGIN - w / 2)
+    return (cx - w / 2, cy - h / 2, w)
+
+
+def _rows_fitting(h, s):
+    """How many rows high a stack may be at frame height h and squash s."""
+    return (FILL_TOP * h - FILL_BASE * 9 - SIDE * s / 2) / (STEP * s) + 1
+
+
+def _simulate(pace):
+    """Run the fill once. `pace(k)` scales how many words are due at step k.
+    Returns (order, n_at, tall_at, limit_at)."""
+    bins = np.array(DATA["bins"])
+    rows = np.array(DATA["rows"])
+    ub = np.unique(bins)
+    bar_x = np.array([x_of_bin(b) for b in ub])
+    members = [np.nonzero(bins == b)[0][np.argsort(rows[bins == b])] for b in ub]
+    cap = np.array([len(m) for m in members])
+    placed = np.array([sum(1 for w in DATA["pinned"] if DATA["bins"][IDX[w]] == b)
+                       for b in ub])
+    tall = cap.max()
+    rng = np.random.default_rng(FILL_SEED)
+    n = FILL_STEPS + 1
+    order, n_at, tall_at, limit_at = [], np.zeros(n, int), np.zeros(n, int), np.zeros(n)
+    for k in range(n):
+        u = k / FILL_STEPS
+        left, bottom, w = fill_camera(u)
+        vis = (bar_x - WORD_W / 2 >= left) & (bar_x + WORD_W / 2 <= left + w)
+        limit = _rows_fitting(w / ASPECT, S_FULL ** (u ** FILL_SQUASH_POW))
+        frac = min(1.0, pace(k) * limit / tall) * min(1.0, u / FILL_RAMP) ** 2
+        if k == FILL_STEPS:
+            frac = 1.0
+        need = int(round(frac * cap[vis].sum())) - int(placed[vis].sum())
+        for _ in range(max(need, 0)):
+            wgt = np.where(vis, cap - placed, 0).astype(float)
+            b = rng.choice(len(ub), p=wgt / wgt.sum())
+            order.append(int(members[b][placed[b]]))
+            placed[b] += 1
+        n_at[k], tall_at[k], limit_at[k] = len(order), placed.max(), limit
+    return order, n_at, tall_at, limit_at
+
+
+def fill_plan():
+    """What the fill shows at each of FILL_STEPS steps of the zoom:
+    (order, n_at, squash_at, tall_at).
+
+    WHERE words go — the user's rule, and nothing overrides it: a word lands in a
+    bar chosen at random with probability proportional to how much of that bar is
+    still to fill, among the bars whose left AND right ends are both on screen. Each
+    bar fills bottom to top. No bar is ever capped or skipped.
+
+    HOW MANY land by each step — ours, and it only sets the PACE: the tallest bar
+    should just fit the frame at the squash schedule S_FULL ** (u ** POW), eased in
+    over FILL_RAMP so the first words land one at a time. The rule favours bars that
+    have been on screen longest, so a pace set from the frame alone runs the tallest
+    bar ~1.45x too tall mid-zoom; so the pace is CALIBRATED from a first run, scaled
+    down by how far that run's tallest bar overshot. (Capping bars at the frame, or
+    pausing when one reached it, instead flattened the middle bars into a plateau.)
+
+    The SQUASH then follows a smoothed ceiling over the tallest bar — square rows
+    until they no longer fit, flattening only as needed, never back. Seeded."""
+    _, _, tall1, limit1 = _simulate(lambda k: 1.0)
+    over = np.maximum(tall1 / np.maximum(limit1, 1), 1.0)
+    over = np.convolve(over, np.ones(81) / 81, mode="same")      # smooth the dips
+    order, n_at, tall_at, _ = _simulate(lambda k: 1.0 / over[k])
+    # a smooth ceiling over the (stepwise) tallest bar: its running max, averaged
+    # over the NEXT FILL_LOOK steps — never below the real height, since it only
+    # ever rises
+    run = np.maximum.accumulate(tall_at).astype(float)
+    ceil = np.array([run[k:k + FILL_LOOK].mean() for k in range(len(run))])
+    squash_at = np.empty(len(run))
+    squash = 1.0
+    for k in range(len(run)):
+        h = fill_camera(k / FILL_STEPS)[2] / ASPECT
+        squash = min(squash, 1.0, (FILL_TOP * h - FILL_BASE * 9) / row_top(ceil[k], 1.0))
+        squash_at[k] = squash
+    assert len(order) + len(DATA["pinned"]) == len(DATA["words"]), "fill left words out"
+    return np.array(order), n_at, squash_at, tall_at
 
 
 def _letters_for(h_rows):
@@ -163,9 +265,8 @@ def _letters_for(h_rows):
 
 
 # ── named views, as (left, bottom, width, squash) ─────────────────────────────
-def view_on(word):
-    """A plain 16-wide frame centred on a pinned word at row 0."""
-    x = x_of_bin(DATA["bins"][IDX[word]])
+def view_at(x):
+    """A plain 16-wide frame centred on x, row 0 across the middle."""
     return (x - FRAME_W / 2, -4.5, FRAME_W, 1.0)
 
 
@@ -216,9 +317,6 @@ _L_W = (x_of_bin(DATA["bins"][IDX["hello"]]) + SIDE_MARGIN - (HIST_L - SIDE_MARG
     / (1 - CALLOUT_W / 2)
 _L_S = (WORDS_AT * _L_W / ASPECT - 1.5) / (STEP * DATA["rows"][IDX["words"]])
 VIEW_HELLO = (HIST_L - SIDE_MARGIN, -1.5, _L_W, _L_S)
-# m: the whole histogram — the view the fill ends on
-_TALL = max(DATA["rows"]) + 1
-VIEW_FULL = (*_fill_frame(_TALL, _squash_for(_TALL)), _squash_for(_TALL))
 
 
 class Scene01(MovingCameraScene, WordleDarkScene):
@@ -349,7 +447,10 @@ class Scene01(MovingCameraScene, WordleDarkScene):
     # a : empty board up from frame 0; START typed into row 0
     @subscene
     def type_start(self):
-        self.board.type_word(self, 0, "start", run_time=3.0, per_letter=key_cues(self))
+        # run_time is ONE letter's pop, the same as a word typed over 0.8s at the
+        # default pace; key_gap slows only the typist
+        self.board.type_word(self, 0, "start", run_time=0.44, key_gap=0.33,
+                             per_letter=key_cues(self))
 
     # b : bottom five rows fade, board drops so START is centred, bg to navy
     def _setup_to_navy(self):
@@ -377,17 +478,23 @@ class Scene01(MovingCameraScene, WordleDarkScene):
         self.board.reveal(self, 0, ANSWER_CODE["start"], run_time=1.6)
         self.play(FadeIn(self.labels["start"], shift=UP * 0.2), run_time=1.0)
 
-    # d : pan to GREAT
+    # d : pan to GREAT, standing alone SOLO_GAP to START's left
+    def _solo(self, word, x):
+        """A scored word standing on its own at (x, 0), with its label under it.
+        Not part of the histogram: GREAT and SLOWS arrive there later, in f."""
+        row = get_scored_row(word, DATA["codes"][IDX[word]]).move_to([x, 0, 0])
+        label = self._label(word).set_x(x)
+        return row, label
+
     def _setup_pan_great(self):
-        # the bulk histogram takes over from the board row here: it draws START
-        # (and GREAT and SLOWS, off screen) at exactly the board row's size, so
-        # swapping one for the other is invisible
+        # the bulk histogram takes over from the board row here: it draws START at
+        # exactly the board row's size, so swapping one for the other is invisible
         self.stacks = WordStacks(DATA, origin=ORIGIN, origin_bin=START_BIN)
-        self.view = view_on("start")
+        self.view = view_at(0)
         self._apply_view(self.view)
         self.stacks.refresh(self.camera.frame)
-        self.labels["great"] = self._label("great")
-        self.labels["slows"] = self._label("slows")
+        self.great = self._solo("great", -SOLO_GAP)
+        self.slows = self._solo("slows", SOLO_GAP)
 
     @subscene
     def pan_great(self):
@@ -398,60 +505,47 @@ class Scene01(MovingCameraScene, WordleDarkScene):
         for m in list(self.mobjects):
             self.remove(m)
         self.board = self.start_row = None
-        self.add(self.stacks, self.labels["start"])
-        self._move_view(view_on("great"), run_time=2.0)
-        self.play(FadeIn(self.labels["great"], shift=UP * 0.2), run_time=1.0)
+        self.add(self.stacks, self.labels["start"], self.great[0])
+        self._move_view(view_at(-SOLO_GAP), run_time=2.0)
+        self.play(FadeIn(self.great[1], shift=UP * 0.2), run_time=1.0)
 
-    # e : pan to SLOWS
+    # e : pan past START to SLOWS; GREAT and START's label go once off screen
     @subscene
     def pan_slows(self):
-        self._move_view(view_on("slows"), run_time=3.0)
-        self.play(FadeIn(self.labels["slows"], shift=UP * 0.2), run_time=1.0)
+        self.add(self.slows[0])
+        self._move_view(view_at(SOLO_GAP), run_time=3.0)
+        self.remove(*self.great, self.labels["start"])     # both off screen now
+        self.great = self.labels = None
+        self.play(FadeIn(self.slows[1], shift=UP * 0.2), run_time=1.0)
 
-    # f : back to START (labels fade), then every word drops into its stack
+    # f : back to START (SLOWS goes once off screen), then one continuous zoom out
+    #     while every word drops into its stack
     def _setup_fill(self):
-        # the tallest stack after k words of the fill, for every k — so the camera,
-        # the squash and the letter fade are all a function of the fill itself
-        bins = np.array(DATA["bins"])
-        count = {b: 0 for b in set(DATA["bins"])}
-        for w in DATA["pinned"]:
-            count[DATA["bins"][IDX[w]]] += 1
-        tall = np.empty(N_FILL + 1, dtype=int)
-        tall[0] = max(count.values())
-        for k, i in enumerate(DATA["order"]):
-            count[bins[i]] += 1
-            tall[k + 1] = max(tall[k], count[bins[i]])
-        self.fill_tall = tall
+        order, self.fill_n, self.fill_squash, self.fill_tall = fill_plan()
+        self.stacks.set_order(order)
 
     @subscene
     def fill(self):
         self._setup_fill()
-        self._move_view(view_on("start"), run_time=2.5,
-                        extra=[FadeOut(VGroup(*self.labels.values()))])
-        self.labels = None
+        self._move_view(view_at(0), run_time=2.5)
+        self.remove(*self.slows)                           # off screen now
+        self.slows = None
 
         t = ValueTracker(0)
-        tall = self.fill_tall
+        n_at, sq_at, tall_at = self.fill_n, self.fill_squash, self.fill_tall
 
         def upd(m):
-            n = int(round(t.get_value() * N_FILL))
-            h = int(tall[n])
-            s = _squash_for(h)
-            left, bottom, w = _fill_frame(h, s)
-            self._set_frame(left, bottom, w)
-            m.set_state(n=n, squash=s, letters=_letters_for(h))
+            u = t.get_value()
+            k = min(int(u * FILL_STEPS), FILL_STEPS)
+            self._set_frame(*fill_camera(u))
+            m.set_state(n=n_at[k], squash=sq_at[k], letters=_letters_for(tall_at[k]))
             m.refresh(self.camera.frame)
 
-        # slow at first (the first words land one by one), then accelerating
-        k = 9.0
-        grow = lambda u: (np.exp(k * u) - 1) / (np.exp(k) - 1)
         self.stacks.add_updater(upd)
-        self.play(t.animate.set_value(1), run_time=20.0, rate_func=grow)
+        self.play(t.animate.set_value(1), run_time=20.0, rate_func=linear)
         self.stacks.remove_updater(upd)
         self.remove(t)
-        h = int(tall[-1])
-        s = _squash_for(h)
-        self.view = (*_fill_frame(h, s), s)
+        self.view = self.full_view = (*fill_camera(1.0), float(self.fill_squash[-1]))
 
     # g : zoom into the leftmost stacks, rows back to full height, letters back
     @subscene
@@ -505,7 +599,7 @@ class Scene01(MovingCameraScene, WordleDarkScene):
     # m : out the rest of the way; callouts and emphasis fade
     @subscene
     def zoom_out(self):
-        self._move_view(VIEW_FULL, run_time=3.0, dim=0.0, callout_alpha=0.0,
+        self._move_view(self.full_view, run_time=3.0, dim=0.0, callout_alpha=0.0,
                         weights={w: 0 for w in CALLED_OUT})
         self.remove(*[m for c in self.callouts for m in (c["row"], c["line"])])
         self.callouts = None

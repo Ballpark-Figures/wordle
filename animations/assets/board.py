@@ -122,8 +122,15 @@ class WordleBoard(VGroup):
         return t
 
     # ── typing ────────────────────────────────────────────────────────────────
-    def type_word(self, scene, row, word, run_time, per_letter=None):
+    def type_word(self, scene, row, word, run_time, per_letter=None, key_gap=None):
         """Type `word` into `row`, one letter at a time, left to right.
+
+        TWO WAYS TO TIME IT. By default `run_time` is the whole word and the pops
+        overlap (below). With `key_gap`, the PACE of typing and the LOOK of a letter
+        landing come apart — a slower typist, not a slow-motion one: `run_time` is
+        then ONE letter's pop and `key_gap` the seconds between keystrokes, so a
+        letter lands the same way however far apart the keys are. That is the one
+        reason for a second timing knob here.
 
         ONE PLAY for the whole word, not two per letter, and that is what makes
         `run_time` mean what it says. manim rounds every play up to a whole frame,
@@ -137,6 +144,13 @@ class WordleBoard(VGroup):
         The asset owns no sound policy; the scene does.
         """
         n = max(len(word), 1)
+        if key_gap is None:
+            lag, total = 1.0 / n, run_time
+            at = lambda i: i * run_time / (2 * n - 1)
+        else:
+            # member duration d = total / (1 + (n-1)*lag) = run_time, starts i*key_gap
+            lag, total = key_gap / run_time, run_time + (n - 1) * key_gap
+            at = lambda i: i * key_gap
         # lag_ratio 1/n — the pops OVERLAP, which is the look: each letter starts
         # while the previous is still springing, so a typed word reads as one quick
         # gesture rather than five separate stamps. Deliberate, and NOT to be
@@ -159,10 +173,10 @@ class WordleBoard(VGroup):
                 # starts member i at i*lag_ratio*d; at lag_ratio 1/n that reduces to
                 # i * run_time / (2n - 1). Using the even spacing instead fired every
                 # cue progressively later than the letter it belonged to.
-                per_letter(i, ch, i * run_time / (2 * n - 1))
+                per_letter(i, ch, at(i))
         pops = [TilePop(self.tiles[row][i], self.letters[row][i])
                 for i in range(len(word))]
-        scene.play(LaggedStart(*pops, lag_ratio=1.0 / n), run_time=run_time)
+        scene.play(LaggedStart(*pops, lag_ratio=lag), run_time=total)
 
     # ── scoring ───────────────────────────────────────────────────────────────
     def reveal(self, scene, row, code, run_time, lag_ratio=0.45, cols=None):

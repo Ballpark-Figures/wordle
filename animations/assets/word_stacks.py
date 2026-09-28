@@ -188,7 +188,9 @@ class WordStacks(VGroup):
         self.words = data["words"]
         bins = np.array(data["bins"])
         self.row = np.array(data["rows"], dtype=float)
-        self.order = np.array(data["order"])
+        # the order words land in — the scene's to decide (set_order); until then
+        # only the pinned words are drawn
+        self.order = np.zeros(0, dtype=int)
         self.pinned = np.array([self.words.index(w) for w in data["pinned"]])
         self.state = np.array([_trits(c) for c in data["codes"]])       # (N, 5)
         self.letters_of = np.array([[ord(ch) - 97 for ch in w] for w in self.words])
@@ -215,6 +217,10 @@ class WordStacks(VGroup):
         self.add(*[t for g in self.groups for t in g[0]], *[g[1] for g in self.groups])
 
     # ── what to draw ──────────────────────────────────────────────────────────
+    def set_order(self, order):
+        self.order = np.asarray(order, dtype=int)
+        return self
+
     def set_state(self, n=None, squash=None, letters=None, dim=None, weights=None):
         """`weights` is {word: weight}; words not named keep theirs."""
         if n is not None:
