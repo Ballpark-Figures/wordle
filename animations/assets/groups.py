@@ -59,6 +59,7 @@ DOT_FRAC = 0.32            # dot radius / pitch
 DOT_PAD = 0.2              # footprint padding round a dot cluster
 DOT_HEAD_GAP = 0.08        # between a scored row and its dots (x pitch-scale)
 DOT_BLOCK_GAP = 0.12       # least clear space between two dot groups
+NEAR_SIGMA = 1.0           # spread of the candidates clustered round a target
 DOT_REGION_TOP = 4.2       # the guess has left by then: dots take the whole frame,
                            # as far from the top as REGION_BOT is from the bottom
 ROW_ASPECT = None          # a scored row's height / width, measured on first use
@@ -109,7 +110,7 @@ def _place_edges(sizes, f, rng_phase):
 
 
 def _scatter(sizes, edge_sizes, seed, block_gap=BLOCK_GAP, region_top=REGION_TOP,
-             blocked=()):
+             blocked=(), targets=None):
     """Centres for the interior ovals (sizes (w, h)), SCATTERED over the group
     region rather than packed in rows, around edge ovals hung first on the border.
     Best-candidate sampling: biggest oval first, each takes whichever of
@@ -117,6 +118,11 @@ def _scatter(sizes, edge_sizes, seed, block_gap=BLOCK_GAP, region_top=REGION_TOP
     spot closer than `block_gap` counts. If an oval finds no spot, everything
     shrinks 5% and the placement starts over. `blocked` boxes ((x, y), w, h) are
     kept clear, like boxes already placed (06's corner label).
+
+    With `targets` (a point per oval), each oval instead takes the valid spot
+    NEAREST its target, from candidates half spread over the region and half
+    clustered round the target (NEAR_SIGMA) — 06c/d's continuity, so a group lands
+    near where its members already are. Without them the sampling is untouched.
 
     Seeded, so a render is repeatable; change the seed string for a different
     scatter. Returns (shrink factor, interior centres, [(edge index, centre)])."""
@@ -134,11 +140,27 @@ def _scatter(sizes, edge_sizes, seed, block_gap=BLOCK_GAP, region_top=REGION_TOP
             if xr < 0 or ylo > yhi:
                 break
             best, best_gap = None, -1.0
-            for _ in range(SCATTER_TRIES):
-                box = ((rng.uniform(-xr, xr), rng.uniform(ylo, yhi)), w, h)
-                gap = min((_gap(box, b) for b in boxes), default=1e9)
-                if gap >= block_gap and gap > best_gap:
-                    best, best_gap = box, gap
+            if targets is None:
+                for _ in range(SCATTER_TRIES):
+                    box = ((rng.uniform(-xr, xr), rng.uniform(ylo, yhi)), w, h)
+                    gap = min((_gap(box, b) for b in boxes), default=1e9)
+                    if gap >= block_gap and gap > best_gap:
+                        best, best_gap = box, gap
+            else:
+                tx, ty = targets[i][0], targets[i][1]
+                best_d = None
+                for k in range(SCATTER_TRIES):
+                    if k % 2:
+                        x, y = rng.gauss(tx, NEAR_SIGMA), rng.gauss(ty, NEAR_SIGMA)
+                        x, y = min(max(x, -xr), xr), min(max(y, ylo), yhi)
+                    else:
+                        x, y = rng.uniform(-xr, xr), rng.uniform(ylo, yhi)
+                    box = ((x, y), w, h)
+                    if min((_gap(box, b) for b in boxes), default=1e9) < block_gap:
+                        continue
+                    d = (x - tx) ** 2 + (y - ty) ** 2
+                    if best_d is None or d < best_d:
+                        best, best_d = box, d
             if best is None:
                 break
             placed[i] = best
@@ -216,13 +238,18 @@ def row_aspect():
     return ROW_ASPECT
 
 
-def dot_layout(data, guess, seed=None, blocked=()):
+def dot_layout(data, guess, seed=None, blocked=(), prev=None):
     """06b: EVERY group of `guess` (lists_data's `full`), each answer a dot in a
     square-ish grid, the group's scored row atop it, sqrt(size) dot pitches wide —
     so the row's width and height both go as the square root of its dots. Groups
     scattered as in `layout`, no edge groups: all of them are on the frame, and
     over the WHOLE frame (DOT_REGION_TOP) but for the `blocked` boxes — the guess
     has left the top centre (06: for the corner, kept clear via `blocked`).
+
+    `prev` ({word: where its dot is now}) makes the layout CONTINUE the one on
+    screen (06c/d): each group lands as near as it can to its members' centroid,
+    and its dots fill the grid in the order they sit now — top to bottom into rows,
+    left to right within one — so neighbours arrive as neighbours.
 
     Returns (groups, dots {word: centre}, row centres, row widths, dot radius) —
     groups in lists_data's order, the two lists in the same order."""
@@ -238,9 +265,12 @@ def dot_layout(data, guess, seed=None, blocked=()):
                     w=max(nc * p, rw) + DOT_PAD, h=nr * p + rw * asp + DOT_HEAD_GAP + DOT_PAD)
 
     bs = [block(g) for g in groups]
+    targets = None
+    if prev is not None:
+        targets = [np.mean([prev[w] for w in g["members"]], axis=0) for g in groups]
     f, centres, _ = _scatter([(b["w"], b["h"]) for b in bs], [],
                              seed or f"06:{guess}:dots", block_gap=DOT_BLOCK_GAP,
-                             region_top=DOT_REGION_TOP, blocked=blocked)
+                             region_top=DOT_REGION_TOP, blocked=blocked, targets=targets)
     dots, rows, widths = {}, [], []
     for g, b, (bx, by) in zip(groups, bs, centres):
         top = by + b["h"] * f / 2 - DOT_PAD * f / 2
@@ -248,7 +278,12 @@ def dot_layout(data, guess, seed=None, blocked=()):
         widths.append(b["rw"] * f)
         gy = top - (b["rh"] + DOT_HEAD_GAP) * f          # top of the dot grid
         nc, n = b["nc"], g["size"]
-        for k, word in enumerate(g["members"]):
+        members = g["members"]
+        if prev is not None:                 # rows by height, each row left to right
+            by_y = sorted(members, key=lambda w: -prev[w][1])
+            members = [w for i in range(0, n, nc)
+                       for w in sorted(by_y[i:i + nc], key=lambda w: prev[w][0])]
+        for k, word in enumerate(members):
             i, j = divmod(k, nc)
             n_in_row = min(nc, n - i * nc)
             dots[word] = np.array([bx + (j - (n_in_row - 1) / 2) * p * f,

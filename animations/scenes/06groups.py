@@ -45,8 +45,12 @@ LAYOUT CHOICES, flagged:
   - With CODES moved to the top-left corner, the dot groups spread over the WHOLE
     frame (groups.py DOT_REGION_TOP) but for that corner (user's call).
   - The corner label keeps its 06a size.
-  - ROATE's definition: 28pt, left-aligned under the corner word, plain white;
-    the ROATE dot layout keeps its box clear too.
+  - ROATE's definition: 28pt white, two lines ("n. Obsolete" / "variant of
+    rote", each narrower than ROATE), left-aligned under the corner word, "n" and
+    "rote" italic as in the Doc; the ROATE dot layout keeps its box clear too.
+  - A switch (c, d) is kept calm (user's call): each new group lands as near as it
+    can to where its dots already are, the dots keep their neighbours, and rows
+    leave and arrive by their NEAREST edge. 06b's entrances still come radially.
   - What enters comes from beyond the frame's edge, a group's row and hidden
     members together, along the line from the group region's centre out through
     where they land.
@@ -68,7 +72,10 @@ DATA = lists_data.load()
 GUESS = DATA["guesses"][2]                         # codes — 04e's last guess
 TRACE = "trace"            # 06c's word — the script's own choice
 ROATE = "roate"            # 06d's word — the script's own choice
-GLOSS = "n. Obsolete variant of rote"     # 06d, verbatim from the script
+# 06d's definition, verbatim from the script, on two lines so it is no wider than
+# ROATE; the Doc italicises "n" and "rote" (slices are character ranges per line)
+GLOSS = [("n. Obsolete", ["[0:1]"]), ("variant of rote", ["[11:15]"])]
+GLOSS_LINE_BUFF = 0.1
 GLOSS_FS = 28
 GLOSS_BUFF = 0.15          # between the corner word and its definition
 
@@ -76,6 +83,7 @@ DOT_COLOR = WHITE
 ENTER_FROM = np.array([0.0, (DOT_REGION_TOP + REGION_BOT) / 2, 0.0])
 ENTER_DIST = 10.0          # how far beyond its spot an entering group starts
 CORNER_BUFF = 0.3          # the corner label's gap to the frame's edges
+EDGE_CLEAR = 0.3           # how far past its nearest edge a switch's row goes
 
 
 class Scene06(WordleBoardScene):
@@ -166,7 +174,9 @@ class Scene06(WordleBoardScene):
         """Build the switch to `word`: its dot layout (keeping `blocked` clear), its
         rows, the corner word and each shared row as `word` in place — their letters
         are the flip's new faces — and the rows leaving and arriving."""
-        groups, spots, pos, widths, r = dot_layout(DATA, word, blocked=blocked)
+        groups, spots, pos, widths, r = dot_layout(
+            DATA, word, blocked=blocked,
+            prev={w: d.get_center() for w, d in self.dots.items()})
         assert len(spots) == sum(g["size"] for g in groups) == DATA["n_answers"]
         self.t_spots, self.t_scale, self.dot_r = spots, r / self.dot_r, r
         self.t_rows = {g["code"]: scored_row(word, g["code"], wd, c,
@@ -178,15 +188,25 @@ class Scene06(WordleBoardScene):
                                    stroke=row.tiles[0][0].get_stroke_width())
                      for c, row in self.rows.items() if c in self.t_rows}
         self.leave = {c: row for c, row in self.rows.items() if c not in self.t_rows}
-        # the rows only `word` makes start beyond the edge
+        # the rows only `word` makes start just beyond their nearest edge
         self.enter = [(self.t_rows[c], self.t_rows[c].get_center())
                       for c in self.t_rows if c not in self.rows]
         for row, home in self.enter:
-            row.move_to(self._outward(row))
+            row.move_to(self._edge_out(row))
 
     def _outward(self, mob):
         d = mob.get_center() - ENTER_FROM
         return mob.get_center() + d / (np.linalg.norm(d) or 1.0) * ENTER_DIST
+
+    def _edge_out(self, mob):
+        """Just beyond the frame edge NEAREST `mob`, straight out — a switch's rows
+        leave and arrive this way, so none crosses the frame."""
+        c = mob.get_center()
+        X, Y = config.frame_x_radius, config.frame_y_radius
+        gaps = [(X - c[0], RIGHT, mob.width), (X + c[0], LEFT, mob.width),
+                (Y - c[1], UP, mob.height), (Y + c[1], DOWN, mob.height)]
+        d, v, size = min(gaps, key=lambda g: g[0])
+        return c + v * (d + size / 2 + EDGE_CLEAR)
 
     def _flip(self, run_time):
         """The corner word and every shared row turn over to the new word."""
@@ -212,7 +232,7 @@ class Scene06(WordleBoardScene):
         self.play(*[d.animate.move_to(self.t_spots[w]).scale(self.t_scale)
                     for w, d in self.dots.items()],
                   *[Transform(row, self.t_rows[c]) for c, row in self.stay.items()],
-                  *[row.animate.move_to(self._outward(row)) for row in self.leave.values()],
+                  *[row.animate.move_to(self._edge_out(row)) for row in self.leave.values()],
                   *[row.animate.move_to(home) for row, home in self.enter],
                   run_time=run_time)
         self.remove(*self.stay.values(), *self.leave.values())
@@ -229,7 +249,10 @@ class Scene06(WordleBoardScene):
         self._regroup(2.0)
 
     def _setup_roate(self):
-        self.gloss = crisp_text(GLOSS, font_size=GLOSS_FS, color=WHITE)
+        self.gloss = VGroup(*[crisp_text(line, font_size=GLOSS_FS, color=WHITE,
+                                         t2s={k: ITALIC for k in ital})
+                              for line, ital in GLOSS]) \
+            .arrange(DOWN, buff=GLOSS_LINE_BUFF, aligned_edge=LEFT)
         self.gloss.next_to(self.guess, DOWN, buff=GLOSS_BUFF, aligned_edge=LEFT)
         g = self.gloss
         self._setup_switch(ROATE, [self.corner_box,
