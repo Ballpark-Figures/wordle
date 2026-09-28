@@ -38,6 +38,20 @@ loading" for the measurements and the full cross-machine history.
   of a session and reports what changed, so a session cannot BEGIN stale -- but
   it cannot see the Doc being edited WHILE a session runs, which is exactly when
   a script changes. That gap is this rule.
+  - **"I changed / added / modified a beat / sub-beat / row / line" MEANS THE
+    DOC — fetch FIRST, before reading any code or answering.** The user edits
+    the script far more often than the scene file, and rarely says the word
+    "script". Beat vocabulary is script vocabulary: a beat or sub-beat is a
+    `### NN<letter>` block of the Doc. So the reflex on ANY such message is
+    `fetch-script.sh`, then read that beat's new text, then act on it. Only if
+    the Doc is unchanged is the edit somewhere else, and then ask where.
+    (Bit us 2026-09-28: "I modified the second to last sub-beat" was read as an
+    edit to `05colorings.py`, the agent found nothing changed there and asked
+    whether the editor tab was unsaved; the change was a new clause in 05i.)
+  - **It is ON PATH — call it bare, `fetch-script.sh`, from the video root.**
+    It is not a file in this repo, so `bash fetch-script.sh` works only because
+    bash falls back to PATH, and `bash ../../fetch-script.sh` from `scenes/`
+    fails with "No such file".
   - **A stale generated file is invisible, which is why this is a rule and not a
     habit.** It looks identical whether it was fetched a minute or six weeks ago.
     `hangman/animations/Script.md` was committed ONCE, on 2026-08-08, and never
