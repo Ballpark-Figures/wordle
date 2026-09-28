@@ -109,7 +109,8 @@ class WordleBoard(VGroup):
 
     def _tile(self):
         return Square(side_length=TILE, stroke_width=STROKE,
-                      stroke_color=TILE_EMPTY_BORDER, fill_opacity=0)
+                      stroke_color=TILE_EMPTY_BORDER,
+                      fill_color=TILE_EMPTY_FILL, fill_opacity=1.0)
 
     def _letter(self, ch, tile):
         t = crisp_text(ch.upper(), color=TILE_TEXT, weight=BOLD)

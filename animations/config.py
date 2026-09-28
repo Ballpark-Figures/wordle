@@ -7,7 +7,11 @@ from bpkfigures.scene import *
 # glance, and a brand-accent board would not read as Wordle. A later scene wanting
 # brand accents swaps these constants; the board asset reads them and never hardcodes.
 WORDLE_BG = "#121213"          # page background
-TILE_EMPTY_BORDER = "#3a3a3c"  # an untouched tile: border only, no fill
+TILE_EMPTY_BORDER = "#3a3a3c"  # an untouched tile's border
+# An untouched (or typed, unscored) tile is FILLED with Wordle's own near-black, so
+# the board reads as the real game's even on the navy background (user's call,
+# 2026-09-28, for every board). Scoring replaces it with the TILE_STATE colour.
+TILE_EMPTY_FILL = WORDLE_BG
 TILE_FILLED_BORDER = "#565758" # a typed but unsubmitted tile — brighter border
 TILE_ABSENT = "#3a3a3c"        # scored: letter not in the word
 TILE_PRESENT = "#b59f3b"       # scored: right letter, wrong place
