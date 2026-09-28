@@ -3338,6 +3338,883 @@
    }
   ]
  },
+ "groups_edge": {
+  "aahed": [
+   {
+    "code": 162,
+    "tiles": [
+     2,
+     0,
+     0,
+     0,
+     0
+    ],
+    "size": 48,
+    "members": [
+     "abbot",
+     "abort",
+     "about",
+     "abyss",
+     "acorn",
+     "actor",
+     "affix",
+     "afoot",
+     "afoul"
+    ]
+   },
+   {
+    "code": 165,
+    "tiles": [
+     2,
+     0,
+     0,
+     1,
+     0
+    ],
+    "size": 25,
+    "members": [
+     "above",
+     "abuse",
+     "acute",
+     "afire",
+     "agent",
+     "agile",
+     "aisle",
+     "alert",
+     "alike"
+    ]
+   },
+   {
+    "code": 0,
+    "tiles": [
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "size": 448,
+    "members": [
+     "bigot",
+     "billy",
+     "bingo",
+     "bison",
+     "bitty",
+     "blimp",
+     "blink",
+     "bliss",
+     "blitz"
+    ]
+   },
+   {
+    "code": 3,
+    "tiles": [
+     0,
+     0,
+     0,
+     1,
+     0
+    ],
+    "size": 304,
+    "members": [
+     "beefy",
+     "befit",
+     "begin",
+     "begun",
+     "being",
+     "belie",
+     "belle",
+     "belly",
+     "below"
+    ]
+   },
+   {
+    "code": 81,
+    "tiles": [
+     1,
+     0,
+     0,
+     0,
+     0
+    ],
+    "size": 184,
+    "members": [
+     "black",
+     "blank",
+     "blast",
+     "bloat",
+     "boast",
+     "borax",
+     "brain",
+     "brass",
+     "bravo"
+    ]
+   },
+   {
+    "code": 6,
+    "tiles": [
+     0,
+     0,
+     0,
+     2,
+     0
+    ],
+    "size": 175,
+    "members": [
+     "beget",
+     "beret",
+     "beset",
+     "betel",
+     "bevel",
+     "bezel",
+     "bicep",
+     "bleep",
+     "bluer"
+    ]
+   },
+   {
+    "code": 9,
+    "tiles": [
+     0,
+     0,
+     1,
+     0,
+     0
+    ],
+    "size": 152,
+    "members": [
+     "birch",
+     "birth",
+     "blush",
+     "booth",
+     "botch",
+     "bough",
+     "broth",
+     "brush",
+     "bunch"
+    ]
+   },
+   {
+    "code": 84,
+    "tiles": [
+     1,
+     0,
+     0,
+     1,
+     0
+    ],
+    "size": 136,
+    "members": [
+     "beast",
+     "began",
+     "begat",
+     "blame",
+     "blare",
+     "blaze",
+     "bleak",
+     "bleat",
+     "brace"
+    ]
+   }
+  ],
+  "piggy": [
+   {
+    "code": 0,
+    "tiles": [
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "size": 981,
+    "members": [
+     "aback",
+     "abase",
+     "abate",
+     "abbot",
+     "abhor",
+     "abled",
+     "abode",
+     "abort",
+     "about"
+    ]
+   },
+   {
+    "code": 27,
+    "tiles": [
+     0,
+     1,
+     0,
+     0,
+     0
+    ],
+    "size": 297,
+    "members": [
+     "abide",
+     "acrid",
+     "admin",
+     "admit",
+     "affix",
+     "afire",
+     "alibi",
+     "alien",
+     "alike"
+    ]
+   },
+   {
+    "code": 2,
+    "tiles": [
+     0,
+     0,
+     0,
+     0,
+     2
+    ],
+    "size": 217,
+    "members": [
+     "abbey",
+     "allay",
+     "alley",
+     "alloy",
+     "annoy",
+     "array",
+     "artsy",
+     "assay",
+     "aunty"
+    ]
+   },
+   {
+    "code": 81,
+    "tiles": [
+     1,
+     0,
+     0,
+     0,
+     0
+    ],
+    "size": 119,
+    "members": [
+     "adapt",
+     "adept",
+     "adopt",
+     "alpha",
+     "ample",
+     "apart",
+     "apnea",
+     "apple",
+     "apron"
+    ]
+   },
+   {
+    "code": 54,
+    "tiles": [
+     0,
+     2,
+     0,
+     0,
+     0
+    ],
+    "size": 102,
+    "members": [
+     "aider",
+     "aisle",
+     "bible",
+     "biome",
+     "birch",
+     "birth",
+     "bison",
+     "cider",
+     "cinch"
+    ]
+   },
+   {
+    "code": 9,
+    "tiles": [
+     0,
+     0,
+     1,
+     0,
+     0
+    ],
+    "size": 83,
+    "members": [
+     "agate",
+     "agent",
+     "aglow",
+     "agora",
+     "agree",
+     "along",
+     "among",
+     "clang",
+     "clung"
+    ]
+   },
+   {
+    "code": 162,
+    "tiles": [
+     2,
+     0,
+     0,
+     0,
+     0
+    ],
+    "size": 69,
+    "members": [
+     "paler",
+     "panel",
+     "papal",
+     "paper",
+     "parer",
+     "parka",
+     "parse",
+     "pasta",
+     "paste"
+    ]
+   },
+   {
+    "code": 6,
+    "tiles": [
+     0,
+     0,
+     0,
+     2,
+     0
+    ],
+    "size": 39,
+    "members": [
+     "adage",
+     "badge",
+     "barge",
+     "bongo",
+     "bough",
+     "budge",
+     "bulge",
+     "cargo",
+     "cough"
+    ]
+   }
+  ],
+  "codes": [
+   {
+    "code": 27,
+    "tiles": [
+     0,
+     1,
+     0,
+     0,
+     0
+    ],
+    "size": 139,
+    "members": [
+     "abbot",
+     "abhor",
+     "abort",
+     "about",
+     "afoot",
+     "afoul",
+     "aglow",
+     "agony",
+     "agora"
+    ]
+   },
+   {
+    "code": 3,
+    "tiles": [
+     0,
+     0,
+     0,
+     1,
+     0
+    ],
+    "size": 264,
+    "members": [
+     "abate",
+     "afire",
+     "agape",
+     "agate",
+     "agent",
+     "agile",
+     "alert",
+     "algae",
+     "alike"
+    ]
+   },
+   {
+    "code": 6,
+    "tiles": [
+     0,
+     0,
+     0,
+     2,
+     0
+    ],
+    "size": 143,
+    "members": [
+     "abbey",
+     "after",
+     "agree",
+     "alien",
+     "alley",
+     "alter",
+     "amber",
+     "angel",
+     "anger"
+    ]
+   },
+   {
+    "code": 4,
+    "tiles": [
+     0,
+     0,
+     0,
+     1,
+     1
+    ],
+    "size": 122,
+    "members": [
+     "abase",
+     "abuse",
+     "aisle",
+     "amuse",
+     "arise",
+     "baste",
+     "beast",
+     "ensue",
+     "erase"
+    ]
+   },
+   {
+    "code": 81,
+    "tiles": [
+     1,
+     0,
+     0,
+     0,
+     0
+    ],
+    "size": 71,
+    "members": [
+     "aback",
+     "antic",
+     "attic",
+     "batch",
+     "birch",
+     "black",
+     "brick",
+     "bunch",
+     "butch"
+    ]
+   },
+   {
+    "code": 12,
+    "tiles": [
+     0,
+     0,
+     1,
+     1,
+     0
+    ],
+    "size": 67,
+    "members": [
+     "abide",
+     "adage",
+     "adept",
+     "ahead",
+     "amend",
+     "beady",
+     "beard",
+     "blade",
+     "blend"
+    ]
+   },
+   {
+    "code": 30,
+    "tiles": [
+     0,
+     1,
+     0,
+     1,
+     0
+    ],
+    "size": 51,
+    "members": [
+     "above",
+     "alone",
+     "atone",
+     "awoke",
+     "below",
+     "biome",
+     "bloke",
+     "broke",
+     "ebony"
+    ]
+   },
+   {
+    "code": 15,
+    "tiles": [
+     0,
+     0,
+     1,
+     2,
+     0
+    ],
+    "size": 23,
+    "members": [
+     "abled",
+     "bleed",
+     "breed",
+     "defer",
+     "deter",
+     "diner",
+     "diver",
+     "dried",
+     "drier"
+    ]
+   }
+  ]
+ },
+ "chain_edge": {
+  "piggy": [
+   {
+    "code": 54,
+    "tiles": [
+     0,
+     2,
+     0,
+     0,
+     0
+    ],
+    "size": 102,
+    "members": [
+     "aider",
+     "aisle",
+     "bible",
+     "biome",
+     "birch",
+     "birth",
+     "bison",
+     "cider",
+     "cinch"
+    ]
+   },
+   {
+    "code": 162,
+    "tiles": [
+     2,
+     0,
+     0,
+     0,
+     0
+    ],
+    "size": 69,
+    "members": [
+     "paler",
+     "panel",
+     "papal",
+     "paper",
+     "parer",
+     "parka",
+     "parse",
+     "pasta",
+     "paste"
+    ]
+   },
+   {
+    "code": 108,
+    "tiles": [
+     1,
+     1,
+     0,
+     0,
+     0
+    ],
+    "size": 35,
+    "members": [
+     "aphid",
+     "blimp",
+     "chirp",
+     "crimp",
+     "crisp",
+     "equip",
+     "impel",
+     "inept",
+     "input"
+    ]
+   },
+   {
+    "code": 1,
+    "tiles": [
+     0,
+     0,
+     0,
+     0,
+     1
+    ],
+    "size": 32,
+    "members": [
+     "abyss",
+     "bayou",
+     "buyer",
+     "bylaw",
+     "cyber",
+     "cycle",
+     "dryer",
+     "flyer",
+     "foyer"
+    ]
+   },
+   {
+    "code": 56,
+    "tiles": [
+     0,
+     2,
+     0,
+     0,
+     2
+    ],
+    "size": 32,
+    "members": [
+     "biddy",
+     "billy",
+     "bitty",
+     "diary",
+     "dicey",
+     "dilly",
+     "dimly",
+     "dirty",
+     "ditty"
+    ]
+   },
+   {
+    "code": 189,
+    "tiles": [
+     2,
+     1,
+     0,
+     0,
+     0
+    ],
+    "size": 24,
+    "members": [
+     "paint",
+     "panic",
+     "patio",
+     "peril",
+     "plaid",
+     "plain",
+     "plait",
+     "plied",
+     "plier"
+    ]
+   },
+   {
+    "code": 29,
+    "tiles": [
+     0,
+     1,
+     0,
+     0,
+     2
+    ],
+    "size": 22,
+    "members": [
+     "amity",
+     "briny",
+     "daily",
+     "dairy",
+     "daisy",
+     "deity",
+     "edify",
+     "fairy",
+     "hairy"
+    ]
+   },
+   {
+    "code": 164,
+    "tiles": [
+     2,
+     0,
+     0,
+     0,
+     2
+    ],
+    "size": 22,
+    "members": [
+     "paddy",
+     "palsy",
+     "pansy",
+     "parry",
+     "party",
+     "pasty",
+     "patsy",
+     "patty",
+     "penny"
+    ]
+   }
+  ],
+  "codes": [
+   {
+    "code": 4,
+    "tiles": [
+     0,
+     0,
+     0,
+     1,
+     1
+    ],
+    "size": 122,
+    "members": [
+     "abase",
+     "abuse",
+     "aisle",
+     "amuse",
+     "arise",
+     "baste",
+     "beast",
+     "ensue",
+     "erase"
+    ]
+   },
+   {
+    "code": 81,
+    "tiles": [
+     1,
+     0,
+     0,
+     0,
+     0
+    ],
+    "size": 71,
+    "members": [
+     "aback",
+     "antic",
+     "attic",
+     "batch",
+     "birch",
+     "black",
+     "brick",
+     "bunch",
+     "butch"
+    ]
+   },
+   {
+    "code": 15,
+    "tiles": [
+     0,
+     0,
+     1,
+     2,
+     0
+    ],
+    "size": 23,
+    "members": [
+     "abled",
+     "bleed",
+     "breed",
+     "defer",
+     "deter",
+     "diner",
+     "diver",
+     "dried",
+     "drier"
+    ]
+   },
+   {
+    "code": 2,
+    "tiles": [
+     0,
+     0,
+     0,
+     0,
+     2
+    ],
+    "size": 13,
+    "members": [
+     "abyss",
+     "amass",
+     "amiss",
+     "basis",
+     "bliss",
+     "brass",
+     "glass",
+     "grass",
+     "humus"
+    ]
+   },
+   {
+    "code": 13,
+    "tiles": [
+     0,
+     0,
+     1,
+     1,
+     1
+    ],
+    "size": 9,
+    "members": [
+     "aside",
+     "dense",
+     "seedy",
+     "shade",
+     "slide",
+     "snide",
+     "spade",
+     "spend",
+     "stead"
+    ]
+   },
+   {
+    "code": 90,
+    "tiles": [
+     1,
+     0,
+     1,
+     0,
+     0
+    ],
+    "size": 5,
+    "members": [
+     "acrid",
+     "ditch",
+     "duchy",
+     "dutch",
+     "lucid"
+    ]
+   },
+   {
+    "code": 171,
+    "tiles": [
+     2,
+     0,
+     1,
+     0,
+     0
+    ],
+    "size": 3,
+    "members": [
+     "candy",
+     "chard",
+     "child"
+    ]
+   },
+   {
+    "code": 174,
+    "tiles": [
+     2,
+     0,
+     1,
+     1,
+     0
+    ],
+    "size": 2,
+    "members": [
+     "chide",
+     "crude"
+    ]
+   }
+  ]
+ },
  "carry": {
   "piggy": [
    47,

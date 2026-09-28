@@ -37,6 +37,11 @@ rules, for two situations:
     Each shows the words it carries over (at most CHAIN_CAP), topped up with up to
     CHAIN_TOP_UP newcomers — its alphabetically first other members. So most words
     stay put and move between ovals, and a few come and go.
+
+  groups_edge / chain_edge — EDGE groups (`_edges`), hung off the frame's edges by
+    the scene so the grouping reads as covering every answer: further real groups,
+    those holding on-screen words first, then the largest. The carry-over chain
+    does NOT count edge words as on screen — they stand for the rest.
 """
 import json
 import os
@@ -52,6 +57,9 @@ TARGETS = [1, 1, 2, 3, 4, 5, 7, 9, 12, 16]   # size-target rule: one group each
 CHAIN_GROUPS = 10                 # carry-over rule: most groups shown
 CHAIN_CAP = 16                    # most words shown in one group
 CHAIN_TOP_UP = 3                  # newcomers added to a group
+N_EDGE = 8                        # edge groups cached (the scene uses as many as fit)
+EDGE_CAP = 9                      # most words shown in one edge group
+COLUMN = 12                       # answers in the on-screen column (scene N_ROWS)
 
 
 def _read(name):
@@ -82,6 +90,27 @@ def _chain(groups, on_screen):
     return sorted(out, key=lambda g: len(g["members"]))
 
 
+def _edges(groups, shown, on_screen):
+    """EDGE groups — ovals hanging off the frame's edges, so it reads as if every
+    group is out there somewhere. Real groups not already `shown`: those holding the
+    most words on screen first, then the largest. Each shows up to CHAIN_CAP
+    members, its on-screen words first."""
+    taken = {g["code"] for g in shown}
+    rest = [g for g in groups if g["code"] not in taken]
+    rest.sort(key=lambda g: (-sum(w in on_screen for w in g["members"]), -g["size"],
+                             g["code"]))
+    out = []
+    for g in rest[:N_EDGE]:
+        keep = [w for w in g["members"] if w in on_screen]
+        fill = [w for w in g["members"] if w not in on_screen]
+        out.append(dict(g, members=sorted((keep + fill)[:EDGE_CAP])))
+    return out
+
+
+def _words(*selections):
+    return {w for sel in selections for grp in sel for w in grp["members"]}
+
+
 def _build():
     sys.path.insert(0, os.path.join(HERE, "..", "..", "math"))
     import wordle
@@ -101,11 +130,17 @@ def _build():
         full[g] = [{"code": int(c), "tiles": [(c // 3 ** (4 - i)) % 3 for i in range(5)],
                     "size": len(m), "members": m} for c, m in by_code.items()]
         out["groups"][g] = _pick(full[g])
-    # 04e: each guess regroups what the one before it left on screen
-    shown = {w for grp in out["groups"][order[0]] for w in grp["members"]}
+    # size-target selections start from the answer column (04d, 04i)
+    column = set(answers[:COLUMN])
+    out["groups_edge"] = {g: _edges(full[g], out["groups"][g], column) for g in order}
+    # 04e: each guess regroups what the one before it left in its INTERIOR ovals —
+    # edge words stand for "the rest", and counting them swamped every group
+    shown = _words(out["groups"][order[0]])
+    out["chain_edge"] = {}
     for g in SCRIPT_GUESSES:
         out["chain"][g] = _chain(full[g], shown)
-        now = {w for grp in out["chain"][g] for w in grp["members"]}
+        out["chain_edge"][g] = _edges(full[g], out["chain"][g], shown)
+        now = _words(out["chain"][g])
         out.setdefault("carry", {})[g] = [len(shown & now), len(shown), len(now)]
         shown = now
     return out
@@ -133,8 +168,10 @@ if __name__ == "__main__":
     print(f"{data['n_answers']} answers, {data['n_guesses']} guesses")
     for g in data["guesses"]:
         show(f"{g.upper()} (size targets)", data["groups"][g])
+        show("  + edge groups", data["groups_edge"][g])
     for g in SCRIPT_GUESSES:
         stay, before, after = data["carry"][g]
         show(f"{g.upper()} (carry-over: {stay} of {before} stay, {after} shown)",
              data["chain"][g])
+        show("  + edge groups", data["chain_edge"][g])
     print(f"\nwrote {CACHE}")
