@@ -118,8 +118,9 @@ FILL_SFX_MAX_PER_S = 15.0     # f: one cue per word, but no more than this many 
                               # and hundreds of overlapping copies of a 1.1s sound
                               # clip into noise (and each costs a full audio remix)
 FILL_EASE_IN = 0.25            # f: starting speed, as a fraction of a linear zoom's
-FILL_EARLY = 8                # f: the first words are PLACED BY HAND in time: after
-FILL_PAUSE = 0.8              # a pause of FILL_PAUSE seconds, gaps shrinking
+FILL_TAPER = 0.75             # f: from here the word count tapers to a stop
+FILL_EARLY = 10                # f: the first words are PLACED BY HAND in time: after
+FILL_PAUSE = 1.1              # a pause of FILL_PAUSE seconds, gaps shrinking
                               # geometrically into the natural pace at word
                               # FILL_EARLY — so the first gaps are long and ease into
                               # the fast part instead of collapsing after two or three
@@ -284,6 +285,28 @@ def _ease_start(targets, run_time):
     return out
 
 
+def _ease_end(targets):
+    """Taper the word count to a stop at the end, instead of words (and their
+    sounds) still pouring in on the last frame.
+
+    From FILL_TAPER of the way through, the count follows a cubic that matches the
+    natural count AND its rate there and reaches the total with ZERO rate at the
+    final step, so the flow keeps going smoothly and then thins out to nothing.
+    (Matching the natural curve's own slope to a plain ease-out only joined in the
+    last ten steps, because the count accelerates right to the end.)"""
+    n = len(targets)
+    k0 = int(FILL_TAPER * (n - 1))
+    c0, total = float(targets[k0]), float(targets[-1])
+    m0 = float(targets[k0] - targets[k0 - 1])            # words per step at the join
+    L = n - 1 - k0
+    x = (np.arange(k0, n) - k0) / L
+    h00, h10, h01 = 2 * x**3 - 3 * x**2 + 1, x**3 - 2 * x**2 + x, -2 * x**3 + 3 * x**2
+    curve = h00 * c0 + h10 * m0 * L + h01 * total      # Hermite; end slope 0
+    out = targets.copy()
+    out[k0:] = np.round(curve).astype(int)
+    return np.minimum(np.maximum.accumulate(out), int(total))
+
+
 def fill_plan(run_time):
     """What the fill shows at each of FILL_STEPS steps of the zoom:
     (order, n_at, squash_at, letters_at).
@@ -320,7 +343,7 @@ def fill_plan(run_time):
     # on its own (forcing the last step instead dumped ~700 words in one frame)
     smooth = smooth[:len(n2)] * total / smooth[len(n2) - 1]
     targets = np.minimum(np.maximum.accumulate(np.round(smooth)), total).astype(int)
-    targets = _ease_start(targets, run_time)
+    targets = _ease_start(_ease_end(targets), run_time)
     order, n_at, tall_at, _ = _simulate(targets=targets)
     # a smooth ceiling over the (stepwise) tallest bar: its running max, averaged
     # over the NEXT FILL_LOOK steps — never below the real height, since it only
