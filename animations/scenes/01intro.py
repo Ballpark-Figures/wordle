@@ -83,6 +83,7 @@ from assets import intro_data
 from assets.word_stacks import (WordStacks, StacksCamera, PITCH, STEP, SIDE,
                                 WORD_W)
 from assets.board import TILE
+from bpkfigures.sfx import sfx_path, wav_info
 
 DATA = intro_data.load()
 WORDS = DATA["words"]
@@ -655,6 +656,7 @@ class Scene01(MovingCameraScene, WordleDarkScene):
         self._move_view(view_at(0), run_time=2.5)
         self.remove(*self.slows)                           # off screen now
         self.slows = None
+        self.wait(0.6)                   # a brief stop at START before the fill
 
         t = ValueTracker(0)
         n_at, sq_at, let_at = self.fill_n, self.fill_squash, self.fill_letters
@@ -666,12 +668,19 @@ class Scene01(MovingCameraScene, WordleDarkScene):
             m.set_state(n=n_at[k], squash=sq_at[k], letters=let_at[k])
             m.refresh(self.camera.frame)
 
-        for at in self._fill_cue_times(run_time, fill_rate):
+        cues = self._fill_cue_times(run_time, fill_rate)
+        for at in cues:
             self.sfx(WORD_SFX, at=at)
         self.stacks.add_updater(upd)
         self.play(t.animate.set_value(1), run_time=run_time, rate_func=fill_rate)
         self.stacks.remove_updater(upd)
         self.remove(t)
+        # let the last word's sound RING OUT inside this beat: past the play it would
+        # fall in the trailing hold, which the stitch trims and the edit covers with
+        # a silent still — the abrupt cut-off
+        tail = cues[-1] + wav_info(sfx_path(WORD_SFX))[0] - run_time
+        if tail > 0:
+            self.wait(tail)
         self.view = self.full_view = (*fill_camera(1.0), float(self.fill_squash[-1]))
 
     # g : zoom into the leftmost stacks, rows back to full height, letters back
