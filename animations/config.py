@@ -1,11 +1,12 @@
 from bpkfigures.scene import *
 
-# ── Wordle's own dark-mode palette ────────────────────────────────────────────
-# The REAL NYT dark-mode colours, named here because they are not in style.py and a
-# scene may never inline a hex. They are deliberately authentic rather than brand:
-# the green in particular is load-bearing recognition — viewers know these tiles at a
-# glance, and a brand-accent board would not read as Wordle. A later scene wanting
-# brand accents swaps these constants; the board asset reads them and never hardcodes.
+# ── The Wordle palette ────────────────────────────────────────────────────────
+# Wordle's dark-mode colours, with the three SCORED tiles brightened toward the
+# channel palette (user's call, 2026-09-28, option B of scenes/95palette_test):
+# yellow is the channel's ACCENT_GOLD, green a lifted green of similar brightness,
+# grey a notch lighter. Still unmistakably Wordle's grey/yellow/green, which is the
+# recognition that matters. The NYT originals are kept alongside for reference.
+# The board asset reads these and never hardcodes.
 WORDLE_BG = "#121213"          # page background
 TILE_EMPTY_BORDER = "#3a3a3c"  # an untouched tile's border
 # An untouched (or typed, unscored) tile is FILLED with Wordle's own near-black, so
@@ -13,9 +14,9 @@ TILE_EMPTY_BORDER = "#3a3a3c"  # an untouched tile's border
 # 2026-09-28, for every board). Scoring replaces it with the TILE_STATE colour.
 TILE_EMPTY_FILL = WORDLE_BG
 TILE_FILLED_BORDER = "#565758" # a typed but unsubmitted tile — brighter border
-TILE_ABSENT = "#3a3a3c"        # scored: letter not in the word
-TILE_PRESENT = "#b59f3b"       # scored: right letter, wrong place
-TILE_CORRECT = "#538d4e"       # scored: right letter, right place
+TILE_ABSENT = "#4a4a4d"        # scored: letter not in the word   (NYT #3a3a3c)
+TILE_PRESENT = ACCENT_GOLD     # scored: right letter, wrong place (NYT #b59f3b)
+TILE_CORRECT = "#4CB050"       # scored: right letter, right place (NYT #538d4e)
 TILE_TEXT = "#ffffff"
 
 # Feedback code -> scored fill, indexed by the trit values wordle.pattern emits
