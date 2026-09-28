@@ -47,7 +47,7 @@ REUSE MAP
   board, typing, flip        assets/board.py get_board / type_word / reveal
   typing sound               assets/keys.py key_cues (the only sound in the scene;
                              words appearing stay silent — the user's call)
-  camera-move sound          music-library/sfx whoosh (WHOOSH_SFX), at each move's start
+  camera-move sound          music-library/sfx whoosh (WHOOSH_SFX), peaking mid-move
   word sounds                music-library/sfx via self.sfx: notify-text (WORD_SFX)
                              as words land in f, notify-app-03 (PING_SFX) from h on
   the histogram              assets/word_stacks.py WordStacks + StacksCamera
@@ -118,6 +118,10 @@ PING_GAIN = -6.0              # dB — played quieter than the library's level
 NOISE_GAIN = -12.0            # dB — i's two pings, quieter still (user's call)
 WHOOSH_SFX = "whoosh"         # under every camera move (d, e, f's pan, g, j-m)
 WHOOSH_GAIN = -8.0            # dB — played quieter than the library's level
+WHOOSH_PEAK = 0.5             # s into the whoosh file where it is loudest (MEASURED
+                              # at import: -4.4 dB at 0.4s, -4.2 at 0.6s); a move's
+                              # whoosh is placed to peak at the move's midpoint, its
+                              # fastest moment, since every move eases in and out
 FILL_SFX_MAX_PER_S = 15.0     # f: one cue per word, but no more than this many a
                               # second — at the fill's peak ~40 words land PER FRAME,
                               # and hundreds of overlapping copies of a 1.1s sound
@@ -493,7 +497,7 @@ class Scene01(MovingCameraScene, WordleDarkScene):
 
     def _move_view(self, to, run_time, letters=None, dim=None, weights=None,
                    appear=(), present=(), callout_alpha=None, extra=(),
-                   rate_func=smooth):
+                   rate_func=smooth, whoosh=False):
         """Animate the view (and optionally letter opacity / emphasis) to `to`.
 
         `appear` words get their callout THE MOMENT THEY ARE ON SCREEN — the first
@@ -501,10 +505,14 @@ class Scene01(MovingCameraScene, WordleDarkScene):
         with PING_SFX at that instant; the word lights up as its callout grows in over
         CALLOUT_GROW seconds. `present` callouts are created already fully grown (for
         words off screen, waiting to be revealed). `callout_alpha` fades every
-        callout on screen to that opacity.
+        callout on screen to that opacity. `whoosh` plays WHOOSH_SFX with its
+        loudest moment at the move's midpoint.
 
         The stacks are rebuilt every frame from the interpolated view. The updater
         is REMOVED before returning, so nothing unpicklable reaches the snapshot."""
+        if whoosh:
+            self.sfx(WHOOSH_SFX, at=max(0.0, run_time / 2 - WHOOSH_PEAK),
+                     gain=WHOOSH_GAIN)
         fr = self.view
         l0, d0 = self.stacks.letter_opacity, self.stacks.dim
         l1 = l0 if letters is None else letters
@@ -643,16 +651,14 @@ class Scene01(MovingCameraScene, WordleDarkScene):
             self.remove(m)
         self.board = self.start_row = None
         self.add(self.stacks, self.labels["start"], self.great[0])
-        self.sfx(WHOOSH_SFX, gain=WHOOSH_GAIN)
-        self._move_view(view_at(-SOLO_GAP), run_time=2.0)
+        self._move_view(view_at(-SOLO_GAP), run_time=2.0, whoosh=True)
         self.play(FadeIn(self.great[1], shift=UP * 0.2), run_time=1.0)
 
     # e : pan past START to SLOWS; GREAT and START's label go once off screen
     @subscene
     def pan_slows(self):
         self.add(self.slows[0])
-        self.sfx(WHOOSH_SFX, gain=WHOOSH_GAIN)
-        self._move_view(view_at(SOLO_GAP), run_time=3.0)
+        self._move_view(view_at(SOLO_GAP), run_time=3.0, whoosh=True)
         self.remove(*self.great, self.labels["start"])     # both off screen now
         self.great = self.labels = None
         self.play(FadeIn(self.slows[1], shift=UP * 0.2), run_time=1.0)
@@ -683,8 +689,7 @@ class Scene01(MovingCameraScene, WordleDarkScene):
     def fill(self):
         run_time = 15.0          # one value for the plan, its cue times and the play
         self._setup_fill(run_time)
-        self.sfx(WHOOSH_SFX, gain=WHOOSH_GAIN)
-        self._move_view(view_at(0), run_time=2.5)
+        self._move_view(view_at(0), run_time=2.5, whoosh=True)
         self.remove(*self.slows)                           # off screen now
         self.slows = None
         self.wait(0.6)                   # a brief stop at START before the fill
@@ -717,8 +722,7 @@ class Scene01(MovingCameraScene, WordleDarkScene):
     # g : zoom into the leftmost stacks, rows back to full height, letters back
     @subscene
     def zoom_left(self):
-        self.sfx(WHOOSH_SFX, gain=WHOOSH_GAIN)
-        self._move_view(VIEW_STARTERS, run_time=3.0, dim=1.0)
+        self._move_view(VIEW_STARTERS, run_time=3.0, whoosh=True, dim=1.0)
 
     # h : Wordlebot's regulars
     @subscene
@@ -758,8 +762,7 @@ class Scene01(MovingCameraScene, WordleDarkScene):
     # j : out to the left 10 bins, squashing again; the rest stays dimmed
     @subscene
     def left_ten(self):
-        self.sfx(WHOOSH_SFX, gain=WHOOSH_GAIN)
-        self._move_view(VIEW_TEN, run_time=2.5, weights={w: 0 for w in STARTERS})
+        self._move_view(VIEW_TEN, run_time=2.5, whoosh=True, weights={w: 0 for w in STARTERS})
 
     # k : out until THOSE and WORDS are in frame; each lights up and gets its
     # callout the moment it (and its callout) is on screen. ADIEU and AUDIO are lit
@@ -767,22 +770,19 @@ class Scene01(MovingCameraScene, WordleDarkScene):
     @subscene
     def those_words(self):
         self.callouts = []
-        self.sfx(WHOOSH_SFX, gain=WHOOSH_GAIN)
-        self._move_view(VIEW_THOSE_WORDS, run_time=3.0, appear=["those", "words"],
+        self._move_view(VIEW_THOSE_WORDS, run_time=3.0, whoosh=True, appear=["those", "words"],
                         weights={"adieu": 1, "audio": 1}, present=["adieu", "audio"])
 
     # l : out to HELLO, uncovering ADIEU and AUDIO already there; HELLO lights up and
     # gets its callout the moment it is on screen
     @subscene
     def hello(self):
-        self.sfx(WHOOSH_SFX, gain=WHOOSH_GAIN)
-        self._move_view(VIEW_HELLO, run_time=2.5, appear=["hello"])
+        self._move_view(VIEW_HELLO, run_time=2.5, whoosh=True, appear=["hello"])
 
     # m : out the rest of the way; callouts and emphasis fade
     @subscene
     def zoom_out(self):
-        self.sfx(WHOOSH_SFX, gain=WHOOSH_GAIN)
-        self._move_view(self.full_view, run_time=3.0, dim=0.0, callout_alpha=0.0,
+        self._move_view(self.full_view, run_time=3.0, whoosh=True, dim=0.0, callout_alpha=0.0,
                         weights={w: 0 for w in CALLED_OUT})
         self.remove(*[m for c in self.callouts for m in (c["row"], c["line"])])
         self.callouts = None
