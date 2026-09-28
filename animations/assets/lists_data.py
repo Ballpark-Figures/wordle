@@ -24,26 +24,32 @@ Provenance:
 THE GUESSES: the first is "the topmost guess" of the list (04d), read from
 guess.txt, never typed; PIGGY and CODES are the script's own choices (04e).
 
-WHICH GROUPS ARE SHOWN IS A DISPLAY CHOICE, NOT A RESULT — flagged for the user.
-A guess makes 54-98 groups of up to 981 answers, far more than a frame holds. Two
-rules, for two situations:
+EVERY GROUP SHOWN IS SHOWN WHOLE — every member, never a sample (bpkfigures
+CLAUDE.md, "never depict a part as the whole"). A guess makes 54-150 groups of up
+to 981 answers, far more than a frame holds, so what is chosen is WHICH groups:
+only ones small enough to show complete. Three rules, for three situations:
 
   groups[guess] — SIZE TARGETS (04d from the column, 04i). For each size in
     TARGETS, the group whose size is NEAREST it, ties to the alphabetically earliest
     first member (so words already on screen tend to be picked); never the same
     group twice. Every member is shown, so the ovals really differ in size.
 
-  chain[guess] — CARRY-OVER (04e, PIGPEN guess after guess). Every word on screen
-    lands in SOME group of the next guess, so the groups shown are the ones holding
-    the most on-screen words (at most CHAIN_GROUPS, ties to the smaller group).
-    Each shows the words it carries over (at most CHAIN_CAP), topped up with up to
-    CHAIN_TOP_UP newcomers — its alphabetically first other members. So most words
-    stay put and move between ovals, and a few come and go.
+  chain[guess] — CARRY-OVER (04e, PIGPEN guess after guess; 06a). Among the groups
+    of at most CHAIN_MAX answers, the ones holding the most on-screen words (at most
+    CHAIN_GROUPS, ties to the smaller group), each with ALL its members; few small
+    groups carry anything over, so the rest of the CHAIN_GROUPS are filled by the
+    size targets among the small groups. Words carried over stay on screen and
+    move between ovals; the rest come and go.
 
   groups_edge / chain_edge — EDGE groups (`_edges`), hung off the frame's edges by
-    the scene so the grouping reads as covering every answer: further real groups,
-    those holding on-screen words first, then the largest. The carry-over chain
-    does NOT count edge words as on screen — they stand for the rest.
+    the scene so the grouping reads as covering every answer: further real groups of
+    at most EDGE_MAX answers, each with ALL its members, those holding on-screen
+    words first, then the largest. The carry-over chain does NOT count edge words as
+    on screen.
+
+  (Until 2026-09-28 the carry-over and edge groups were CAPPED — CODES's 302-answer
+  all-grey group appeared as 16 words, PIGGY's 981 as 9. That misrepresented them
+  and is gone.)
 """
 import json
 import os
@@ -57,10 +63,9 @@ HEAD = 20                         # guess-list lines cached (the scene shows few
 SCRIPT_GUESSES = ["piggy", "codes"]
 TARGETS = [1, 1, 2, 3, 4, 5, 7, 9, 12, 16]   # size-target rule: one group each
 CHAIN_GROUPS = 10                 # carry-over rule: most groups shown
-CHAIN_CAP = 16                    # most words shown in one group
-CHAIN_TOP_UP = 3                  # newcomers added to a group
+CHAIN_MAX = 16                    # largest group the carry-over rule may show
 N_EDGE = 8                        # edge groups cached (the scene uses as many as fit)
-EDGE_CAP = 9                      # most words shown in one edge group
+EDGE_MAX = 9                      # largest group hung off an edge
 COLUMN = 12                       # answers in the on-screen column (scene N_ROWS)
 FULL_GUESSES = ["codes", "trace", "roate"]   # guesses whose EVERY group is cached (06b/c's dots)
 
@@ -81,32 +86,34 @@ def _pick(groups):
 
 def _chain(groups, on_screen):
     """Carry-over rule (see the module docstring)."""
-    carried = [(g, [w for w in g["members"] if w in on_screen]) for g in groups]
-    carried = [(g, c) for g, c in carried if c]
-    carried.sort(key=lambda gc: (-len(gc[1]), len(gc[0]["members"])))
-    out = []
-    for g, c in carried[:CHAIN_GROUPS]:
-        keep = c[:CHAIN_CAP]
-        room = min(CHAIN_TOP_UP, CHAIN_CAP - len(keep))
-        new = [w for w in g["members"] if w not in on_screen][:max(room, 0)]
-        out.append(dict(g, members=sorted(keep + new)))
-    return sorted(out, key=lambda g: len(g["members"]))
+    carried = [(g, sum(w in on_screen for w in g["members"]))
+               for g in groups if g["size"] <= CHAIN_MAX]
+    carried = [(g, n) for g, n in carried if n]
+    carried.sort(key=lambda gn: (-gn[1], gn[0]["size"], gn[0]["code"]))
+    out = [g for g, _ in carried[:CHAIN_GROUPS]]
+    # few small groups carry words over, so fill up to CHAIN_GROUPS by the size
+    # targets, among the small groups not already taken
+    for t in TARGETS:
+        if len(out) >= CHAIN_GROUPS:
+            break
+        rest = [g for g in groups if g["size"] <= CHAIN_MAX and g not in out]
+        if rest:
+            out.append(min(rest, key=lambda g: (abs(g["size"] - t), g["members"][0])))
+    assert all(len(g["members"]) == g["size"] for g in out)
+    return sorted(out, key=lambda g: g["size"])
 
 
 def _edges(groups, shown, on_screen):
     """EDGE groups — ovals hanging off the frame's edges, so it reads as if every
     group is out there somewhere. Real groups not already `shown`: those holding the
-    most words on screen first, then the largest. Each shows up to CHAIN_CAP
-    members, its on-screen words first."""
+    most words on screen first, then the largest, of at most EDGE_MAX answers —
+    each shown whole."""
     taken = {g["code"] for g in shown}
-    rest = [g for g in groups if g["code"] not in taken]
+    rest = [g for g in groups if g["code"] not in taken and g["size"] <= EDGE_MAX]
     rest.sort(key=lambda g: (-sum(w in on_screen for w in g["members"]), -g["size"],
                              g["code"]))
-    out = []
-    for g in rest[:N_EDGE]:
-        keep = [w for w in g["members"] if w in on_screen]
-        fill = [w for w in g["members"] if w not in on_screen]
-        out.append(dict(g, members=sorted((keep + fill)[:EDGE_CAP])))
+    out = rest[:N_EDGE]
+    assert all(len(g["members"]) == g["size"] for g in out)
     return out
 
 
@@ -153,6 +160,11 @@ def _build():
         now = _words(out["chain"][g])
         out.setdefault("carry", {})[g] = [len(shown & now), len(shown), len(now)]
         shown = now
+    # every group any scene shows is whole — never a part standing for the whole
+    for key in ("groups", "groups_edge", "chain", "chain_edge", "full"):
+        for g, grps in out[key].items():
+            for grp in grps:
+                assert len(grp["members"]) == grp["size"], (key, g, grp["code"])
     return out
 
 
