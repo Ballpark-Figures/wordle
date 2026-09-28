@@ -47,7 +47,7 @@ REUSE MAP
   typing sound               assets/keys.py key_cues (the only sound in the scene;
                              words appearing stay silent — the user's call)
   word sounds                music-library/sfx via self.sfx: notify-text (WORD_SFX)
-                             as words land in f, ping-gentle (PING_SFX) from h on
+                             as words land in f, notify-app (PING_SFX) from h on
   the histogram              assets/word_stacks.py WordStacks + StacksCamera
                              (bulk drawing — see its docstring for why)
   every average, bin, tile   assets/intro_data.py -> intro_cache.json: the
@@ -110,7 +110,7 @@ FILL_SMOOTH = 301             # f: steps the word count is averaged over (~1.5s)
 FILL_LOOK = 60                # f: the squash looks this many steps ahead, so it
                               # flattens smoothly rather than in row-sized jerks
 WORD_SFX = "notify-text"      # f: the sound of a word landing in the histogram
-PING_SFX = "ping-gentle"      # h onward: a word emphasised / called out, and i's noise
+PING_SFX = "notify-app"       # h onward: a word emphasised / called out, and i's noise
 FILL_SFX_MAX_PER_S = 15.0     # f: one cue per word, but no more than this many a
                               # second — at the fill's peak ~40 words land PER FRAME,
                               # and hundreds of overlapping copies of a 1.1s sound
@@ -283,7 +283,6 @@ def fill_plan():
     # on its own (forcing the last step instead dumped ~700 words in one frame)
     smooth = smooth[:len(n2)] * total / smooth[len(n2) - 1]
     targets = np.minimum(np.maximum.accumulate(np.round(smooth)), total).astype(int)
-    targets = np.maximum(targets, 1)       # the first word lands straight away
     order, n_at, tall_at, _ = _simulate(targets=targets)
     # a smooth ceiling over the (stepwise) tallest bar: its running max, averaged
     # over the NEXT FILL_LOOK steps — never below the real height, since it only
@@ -629,10 +628,11 @@ class Scene01(MovingCameraScene, WordleDarkScene):
             m.set_state(n=n_at[k], squash=sq_at[k], letters=let_at[k])
             m.refresh(self.camera.frame)
 
-        for at in self._fill_cue_times(20.0, fill_rate):
+        run_time = 15.0                  # one value for the play AND its cue times
+        for at in self._fill_cue_times(run_time, fill_rate):
             self.sfx(WORD_SFX, at=at)
         self.stacks.add_updater(upd)
-        self.play(t.animate.set_value(1), run_time=20.0, rate_func=fill_rate)
+        self.play(t.animate.set_value(1), run_time=run_time, rate_func=fill_rate)
         self.stacks.remove_updater(upd)
         self.remove(t)
         self.view = self.full_view = (*fill_camera(1.0), float(self.fill_squash[-1]))
@@ -675,7 +675,7 @@ class Scene01(MovingCameraScene, WordleDarkScene):
         # covers with a still — i.e. it would never be heard
         self.sfx(PING_SFX)                  # ADIEU
         self.sfx(PING_SFX, at=0.6)          # AUDIO
-        self.wait(1.8)
+        self.wait(2.2)
 
     # j : out to the left 10 bins, squashing again; the rest stays dimmed
     @subscene
