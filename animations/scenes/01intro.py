@@ -23,7 +23,7 @@ BEAT MAP
                      rows back to full height; letters stay off
   h starters       — IRATE TRAIN ARISE CRANE RAISE SLATE STARE emphasised ONE AT A
                      TIME, each word's letters coming back with it
-  i noise          — no change; the noise the VO asks for — WORD_SFX twice, one
+  i noise          — no change; the noise the VO asks for — PING_SFX twice, one
                      for ADIEU and one for AUDIO
   j left_ten       — zoom out to the left 10 bins, squashing again; the starters
                      drop back, everything stays dimmed
@@ -31,7 +31,7 @@ BEAT MAP
                      last on the right. Each word lights up and gets its callout —
                      a full-size copy just above it, growing out of the tip of a
                      short white line — THE MOMENT it and its callout are on screen,
-                     with WORD_SFX. (WORDS arrives only at the zoom's end: the frame
+                     with PING_SFX. (WORDS arrives only at the zoom's end: the frame
                      is built to stop at its column.) ADIEU and AUDIO are lit and
                      called out here too, OFF SCREEN, so l can simply reveal them
   l hello          — zoom out to HELLO, uncovering ADIEU and AUDIO already there;
@@ -46,7 +46,8 @@ REUSE MAP
   board, typing, flip        assets/board.py get_board / type_word / reveal
   typing sound               assets/keys.py key_cues (the only sound in the scene;
                              words appearing stay silent — the user's call)
-  word-appearing sound       music-library/sfx notify-text (WORD_SFX), via self.sfx
+  word sounds                music-library/sfx via self.sfx: notify-text (WORD_SFX)
+                             as words land in f, ping-gentle (PING_SFX) from h on
   the histogram              assets/word_stacks.py WordStacks + StacksCamera
                              (bulk drawing — see its docstring for why)
   every average, bin, tile   assets/intro_data.py -> intro_cache.json: the
@@ -108,14 +109,16 @@ FILL_SQUASH_POW = 2.0         # f: the rows may flatten no faster than
 FILL_SMOOTH = 301             # f: steps the word count is averaged over (~1.5s)
 FILL_LOOK = 60                # f: the squash looks this many steps ahead, so it
                               # flattens smoothly rather than in row-sized jerks
-WORD_SFX = "notify-text"      # the sound of a word appearing (f, h, i, k, l)
+WORD_SFX = "notify-text"      # f: the sound of a word landing in the histogram
+PING_SFX = "ping-gentle"      # h onward: a word emphasised / called out, and i's noise
 FILL_SFX_MAX_PER_S = 15.0     # f: one cue per word, but no more than this many a
                               # second — at the fill's peak ~40 words land PER FRAME,
                               # and hundreds of overlapping copies of a 1.1s sound
                               # clip into noise (and each costs a full audio remix)
-FILL_EASE_IN = 0.8            # f: starting speed, as a fraction of a linear zoom's
+FILL_EASE_IN = 0.5            # f: starting speed, as a fraction of a linear zoom's
 FILL_SEED = 1                 # f: which bar each word goes to is random; seeded
-LETTERS_FADE = (10, 25)       # fill: letters fade out between these stack heights
+FILL_LETTER_FADE = 0.05       # f: letters fade out over this much of the zoom,
+                              # finishing just as the rows first start to flatten
 STARTERS = ["irate", "train", "arise", "crane", "raise", "slate", "stare"]
 CALLED_OUT = ["those", "words", "hello", "adieu", "audio"]
 
@@ -246,7 +249,7 @@ def _simulate(pace=None, targets=None):
 
 def fill_plan():
     """What the fill shows at each of FILL_STEPS steps of the zoom:
-    (order, n_at, squash_at, tall_at).
+    (order, n_at, squash_at, letters_at).
 
     WHERE words go — the user's rule, and nothing overrides it: a word lands in a
     bar chosen at random with probability proportional to how much of that bar is
@@ -280,6 +283,7 @@ def fill_plan():
     # on its own (forcing the last step instead dumped ~700 words in one frame)
     smooth = smooth[:len(n2)] * total / smooth[len(n2) - 1]
     targets = np.minimum(np.maximum.accumulate(np.round(smooth)), total).astype(int)
+    targets = np.maximum(targets, 1)       # the first word lands straight away
     order, n_at, tall_at, _ = _simulate(targets=targets)
     # a smooth ceiling over the (stepwise) tallest bar: its running max, averaged
     # over the NEXT FILL_LOOK steps — never below the real height, since it only
@@ -293,7 +297,12 @@ def fill_plan():
         squash = min(squash, 1.0, (FILL_TOP * h - FILL_BASE * 9) / row_top(ceil[k], 1.0))
         squash_at[k] = squash
     assert len(order) + len(DATA["pinned"]) == len(DATA["words"]), "fill left words out"
-    return np.array(order), n_at, squash_at, tall_at
+    # LETTERS fade out BEFORE the boxes change shape (the user's call): over
+    # FILL_LETTER_FADE of the zoom, ending the step the squash first drops below 1
+    k_flat = int(np.argmax(squash_at < 1 - 1e-9))
+    window = FILL_LETTER_FADE * FILL_STEPS
+    letters_at = np.clip((k_flat - np.arange(len(squash_at))) / window, 0, 1)
+    return np.array(order), n_at, squash_at, letters_at
 
 
 def fill_rate(a):
@@ -302,11 +311,6 @@ def fill_rate(a):
     `smooth` (starts from rest) and an ease-out quad (starts at twice speed)."""
     k = 1 - FILL_EASE_IN / 2
     return k * smooth(a) + (1 - k) * (1 - (1 - a) ** 2)
-
-
-def _letters_for(h_rows):
-    a, b = LETTERS_FADE
-    return float(np.clip((b - h_rows) / (b - a), 0, 1))
 
 
 # ── named views, as (left, bottom, width, squash) ─────────────────────────────
@@ -429,7 +433,7 @@ class Scene01(MovingCameraScene, WordleDarkScene):
 
         `appear` words get their callout THE MOMENT THEY ARE ON SCREEN — the first
         point on this move's path where the word and its full-size callout both fit —
-        with WORD_SFX at that instant; the word lights up as its callout grows in over
+        with PING_SFX at that instant; the word lights up as its callout grows in over
         CALLOUT_GROW seconds. `present` callouts are created already fully grown (for
         words off screen, waiting to be revealed). `callout_alpha` fades every
         callout on screen to that opacity.
@@ -452,7 +456,7 @@ class Scene01(MovingCameraScene, WordleDarkScene):
                          if self._callout_fits(word, self._lerp_view(fr, to, u))), 1.0)
             enter[word] = min(float(np.interp(u_in, us, ts)) * run_time,
                               run_time - CALLOUT_GROW)
-            self.sfx(WORD_SFX, at=enter[word])
+            self.sfx(PING_SFX, at=enter[word])
         for word in present:
             self._callout(word)["g"] = 1.0
         a0 = {c["word"]: c["a"] for c in self.callouts or []}
@@ -589,7 +593,7 @@ class Scene01(MovingCameraScene, WordleDarkScene):
     # f : back to START (SLOWS goes once off screen), then one continuous zoom out
     #     while every word drops into its stack
     def _setup_fill(self):
-        order, self.fill_n, self.fill_squash, self.fill_tall = fill_plan()
+        order, self.fill_n, self.fill_squash, self.fill_letters = fill_plan()
         self.stacks.set_order(order)
 
     def _fill_cue_times(self, run_time, rate_func):
@@ -616,13 +620,13 @@ class Scene01(MovingCameraScene, WordleDarkScene):
         self.slows = None
 
         t = ValueTracker(0)
-        n_at, sq_at, tall_at = self.fill_n, self.fill_squash, self.fill_tall
+        n_at, sq_at, let_at = self.fill_n, self.fill_squash, self.fill_letters
 
         def upd(m):
             u = t.get_value()
             k = min(int(u * FILL_STEPS), FILL_STEPS)
             self._set_frame(*fill_camera(u))
-            m.set_state(n=n_at[k], squash=sq_at[k], letters=_letters_for(tall_at[k]))
+            m.set_state(n=n_at[k], squash=sq_at[k], letters=let_at[k])
             m.refresh(self.camera.frame)
 
         for at in self._fill_cue_times(20.0, fill_rate):
@@ -642,25 +646,25 @@ class Scene01(MovingCameraScene, WordleDarkScene):
     @subscene
     def starters(self):
         # the rest dims as the first comes up, then one word at a time
-        self.sfx(WORD_SFX)
-        self._move_view(VIEW_STARTERS, run_time=0.8, dim=1.0, weights={"irate": 1})
+        self.sfx(PING_SFX)
+        self._move_view(VIEW_STARTERS, run_time=0.5, dim=1.0, weights={"irate": 1})
         self.wait(0.4)
-        self.sfx(WORD_SFX)
+        self.sfx(PING_SFX)
         self._move_view(VIEW_STARTERS, run_time=0.5, weights={"train": 1})
         self.wait(0.4)
-        self.sfx(WORD_SFX)
+        self.sfx(PING_SFX)
         self._move_view(VIEW_STARTERS, run_time=0.5, weights={"arise": 1})
         self.wait(0.4)
-        self.sfx(WORD_SFX)
+        self.sfx(PING_SFX)
         self._move_view(VIEW_STARTERS, run_time=0.5, weights={"crane": 1})
         self.wait(0.4)
-        self.sfx(WORD_SFX)
+        self.sfx(PING_SFX)
         self._move_view(VIEW_STARTERS, run_time=0.5, weights={"raise": 1})
         self.wait(0.4)
-        self.sfx(WORD_SFX)
+        self.sfx(PING_SFX)
         self._move_view(VIEW_STARTERS, run_time=0.5, weights={"slate": 1})
         self.wait(0.4)
-        self.sfx(WORD_SFX)
+        self.sfx(PING_SFX)
         self._move_view(VIEW_STARTERS, run_time=0.5, weights={"stare": 1})
 
     # i : the noise — no change
@@ -669,8 +673,8 @@ class Scene01(MovingCameraScene, WordleDarkScene):
         # the VO's noise. The wait is the sound's own length: with an empty body the
         # cue would fall in the trailing hold, which the stitch trims and the edit
         # covers with a still — i.e. it would never be heard
-        self.sfx(WORD_SFX)                  # ADIEU
-        self.sfx(WORD_SFX, at=0.6)          # AUDIO
+        self.sfx(PING_SFX)                  # ADIEU
+        self.sfx(PING_SFX, at=0.6)          # AUDIO
         self.wait(1.8)
 
     # j : out to the left 10 bins, squashing again; the rest stays dimmed
