@@ -556,6 +556,13 @@ class Scene01(MovingCameraScene, WordleDarkScene):
         self.stacks.remove_updater(upd)
         self.remove(t)
         self.view = to
+        # let a callout's ping RING OUT inside this beat: one that starts late in the
+        # move (WORDS, HELLO) would otherwise run into the trailing hold, which the
+        # stitch trims and the edit covers with a silent still
+        if enter:
+            tail = max(enter.values()) + wav_info(sfx_path(PING_SFX))[0] - run_time
+            if tail > 0:
+                self.wait(tail)
 
     # ── callouts: a full-size copy of a word, just above it, on a short line ───
     def _callout(self, word):
