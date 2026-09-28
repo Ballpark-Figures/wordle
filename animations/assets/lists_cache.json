@@ -7465,6 +7465,4273 @@
      "copse"
     ]
    }
+  ],
+  "trace": [
+   {
+    "code": 0,
+    "tiles": [
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "size": 246,
+    "members": [
+     "biddy",
+     "billy",
+     "bingo",
+     "bison",
+     "blimp",
+     "blind",
+     "blink",
+     "bliss",
+     "blond",
+     "blood",
+     "bloom",
+     "blown",
+     "bluff",
+     "blush",
+     "bobby",
+     "bongo",
+     "bonus",
+     "booby",
+     "boozy",
+     "bosom",
+     "bossy",
+     "bough",
+     "bound",
+     "buddy",
+     "buggy",
+     "build",
+     "bulky",
+     "bully",
+     "bunny",
+     "bushy",
+     "buxom",
+     "dilly",
+     "dimly",
+     "dingo",
+     "dingy",
+     "dizzy",
+     "dodgy",
+     "doing",
+     "dolly",
+     "dough",
+     "dowdy",
+     "downy",
+     "dully",
+     "dummy",
+     "dumpy",
+     "dusky",
+     "dying",
+     "filly",
+     "filmy",
+     "fishy",
+     "fizzy",
+     "fling",
+     "flood",
+     "floss",
+     "flown",
+     "fluff",
+     "fluid",
+     "flung",
+     "flunk",
+     "flush",
+     "foggy",
+     "folio",
+     "folly",
+     "found",
+     "fully",
+     "fungi",
+     "funky",
+     "funny",
+     "fussy",
+     "fuzzy",
+     "ghoul",
+     "giddy",
+     "gipsy",
+     "gloom",
+     "gloss",
+     "glyph",
+     "godly",
+     "going",
+     "golly",
+     "goody",
+     "goofy",
+     "guild",
+     "gully",
+     "gumbo",
+     "gummy",
+     "guppy",
+     "gypsy",
+     "hilly",
+     "hippo",
+     "hippy",
+     "hobby",
+     "holly",
+     "hound",
+     "howdy",
+     "humid",
+     "humph",
+     "humus",
+     "hunky",
+     "husky",
+     "hussy",
+     "idiom",
+     "idyll",
+     "igloo",
+     "imply",
+     "inbox",
+     "jiffy",
+     "jolly",
+     "jumbo",
+     "jumpy",
+     "kinky",
+     "kiosk",
+     "knoll",
+     "known",
+     "limbo",
+     "lingo",
+     "lipid",
+     "livid",
+     "lobby",
+     "login",
+     "loopy",
+     "lousy",
+     "lowly",
+     "lumpy",
+     "lupus",
+     "lying",
+     "lymph",
+     "milky",
+     "minim",
+     "minus",
+     "missy",
+     "mogul",
+     "moldy",
+     "moody",
+     "mossy",
+     "mound",
+     "muddy",
+     "mummy",
+     "mushy",
+     "musky",
+     "ninny",
+     "nobly",
+     "noisy",
+     "nylon",
+     "nymph",
+     "oddly",
+     "onion",
+     "opium",
+     "ovoid",
+     "owing",
+     "phony",
+     "piggy",
+     "pinky",
+     "plumb",
+     "plump",
+     "plunk",
+     "plush",
+     "polyp",
+     "poppy",
+     "pound",
+     "pudgy",
+     "puffy",
+     "pulpy",
+     "pupil",
+     "puppy",
+     "pushy",
+     "pygmy",
+     "quill",
+     "shiny",
+     "shook",
+     "shown",
+     "showy",
+     "shush",
+     "shyly",
+     "silky",
+     "silly",
+     "sissy",
+     "skiff",
+     "skill",
+     "skimp",
+     "skulk",
+     "skull",
+     "skunk",
+     "slimy",
+     "sling",
+     "slink",
+     "sloop",
+     "slosh",
+     "slump",
+     "slung",
+     "slunk",
+     "slush",
+     "slyly",
+     "smoky",
+     "sniff",
+     "snoop",
+     "snowy",
+     "snuff",
+     "soggy",
+     "solid",
+     "sound",
+     "spiky",
+     "spill",
+     "spiny",
+     "spoil",
+     "spoof",
+     "spook",
+     "spool",
+     "spoon",
+     "spunk",
+     "squib",
+     "suing",
+     "sulky",
+     "sully",
+     "sunny",
+     "sushi",
+     "swill",
+     "swing",
+     "swish",
+     "swoon",
+     "swoop",
+     "swung",
+     "synod",
+     "undid",
+     "unify",
+     "union",
+     "unzip",
+     "using",
+     "vigil",
+     "vinyl",
+     "vivid",
+     "vying",
+     "whiff",
+     "whiny",
+     "whisk",
+     "whoop",
+     "widow",
+     "willy",
+     "wimpy",
+     "windy",
+     "wispy",
+     "woody",
+     "wooly",
+     "woozy",
+     "would",
+     "wound",
+     "young"
+    ]
+   },
+   {
+    "code": 9,
+    "tiles": [
+     0,
+     0,
+     1,
+     0,
+     0
+    ],
+    "size": 127,
+    "members": [
+     "abyss",
+     "admin",
+     "affix",
+     "afoul",
+     "aging",
+     "aglow",
+     "agony",
+     "album",
+     "alibi",
+     "align",
+     "allay",
+     "allow",
+     "alloy",
+     "along",
+     "aloof",
+     "aloud",
+     "alpha",
+     "amiss",
+     "among",
+     "amply",
+     "annoy",
+     "annul",
+     "anvil",
+     "aphid",
+     "aping",
+     "apply",
+     "assay",
+     "audio",
+     "avian",
+     "avoid",
+     "awful",
+     "axial",
+     "axiom",
+     "axion",
+     "badly",
+     "baggy",
+     "balmy",
+     "banal",
+     "banjo",
+     "basal",
+     "basil",
+     "basin",
+     "basis",
+     "bawdy",
+     "bayou",
+     "bylaw",
+     "daddy",
+     "daily",
+     "daisy",
+     "dally",
+     "dandy",
+     "dogma",
+     "fanny",
+     "fauna",
+     "final",
+     "gaily",
+     "gamma",
+     "gassy",
+     "gaudy",
+     "gawky",
+     "gayly",
+     "gonad",
+     "handy",
+     "happy",
+     "human",
+     "inlay",
+     "jazzy",
+     "kappa",
+     "kayak",
+     "lanky",
+     "lasso",
+     "laugh",
+     "loyal",
+     "madam",
+     "madly",
+     "mafia",
+     "magma",
+     "mambo",
+     "mamma",
+     "mammy",
+     "manga",
+     "mango",
+     "mangy",
+     "mania",
+     "manly",
+     "mason",
+     "maxim",
+     "modal",
+     "nanny",
+     "nasal",
+     "naval",
+     "ninja",
+     "nomad",
+     "offal",
+     "paddy",
+     "pagan",
+     "palsy",
+     "pansy",
+     "papal",
+     "pizza",
+     "polka",
+     "pupal",
+     "sadly",
+     "salad",
+     "sally",
+     "salon",
+     "salsa",
+     "salvo",
+     "sandy",
+     "sappy",
+     "sassy",
+     "sauna",
+     "savoy",
+     "savvy",
+     "shoal",
+     "sigma",
+     "squad",
+     "usual",
+     "valid",
+     "vapid",
+     "villa",
+     "viola",
+     "vodka",
+     "voila",
+     "wagon",
+     "woman",
+     "zonal"
+    ]
+   },
+   {
+    "code": 1,
+    "tiles": [
+     0,
+     0,
+     0,
+     0,
+     1
+    ],
+    "size": 123,
+    "members": [
+     "beefy",
+     "begin",
+     "begun",
+     "being",
+     "belly",
+     "below",
+     "bevel",
+     "bezel",
+     "bleed",
+     "bleep",
+     "blend",
+     "bless",
+     "boney",
+     "bowel",
+     "bused",
+     "debug",
+     "deign",
+     "demon",
+     "denim",
+     "devil",
+     "dopey",
+     "dowel",
+     "dozen",
+     "dwell",
+     "ebony",
+     "edify",
+     "eking",
+     "elbow",
+     "elegy",
+     "elfin",
+     "embed",
+     "endow",
+     "enemy",
+     "enjoy",
+     "ennui",
+     "envoy",
+     "epoxy",
+     "equip",
+     "expel",
+     "eying",
+     "feign",
+     "felon",
+     "field",
+     "fiend",
+     "flesh",
+     "geeky",
+     "given",
+     "golem",
+     "gooey",
+     "guess",
+     "helix",
+     "hello",
+     "honey",
+     "hovel",
+     "hymen",
+     "impel",
+     "index",
+     "jelly",
+     "jewel",
+     "kneed",
+     "kneel",
+     "leggy",
+     "lemon",
+     "level",
+     "libel",
+     "liken",
+     "linen",
+     "lumen",
+     "melon",
+     "model",
+     "modem",
+     "money",
+     "needy",
+     "neigh",
+     "newly",
+     "nosey",
+     "novel",
+     "olden",
+     "penny",
+     "pesky",
+     "piney",
+     "pixel",
+     "plied",
+     "poesy",
+     "queen",
+     "quell",
+     "seedy",
+     "semen",
+     "seven",
+     "sheen",
+     "sheep",
+     "sheik",
+     "shelf",
+     "shell",
+     "shied",
+     "sinew",
+     "sleek",
+     "sleep",
+     "smell",
+     "speed",
+     "spell",
+     "spend",
+     "spied",
+     "spiel",
+     "sweep",
+     "swell",
+     "unfed",
+     "unwed",
+     "venom",
+     "video",
+     "vixen",
+     "vowel",
+     "weedy",
+     "weigh",
+     "welsh",
+     "wheel",
+     "whelp",
+     "widen",
+     "wield",
+     "woken",
+     "women",
+     "woven",
+     "yield"
+    ]
+   },
+   {
+    "code": 28,
+    "tiles": [
+     0,
+     1,
+     0,
+     0,
+     1
+    ],
+    "size": 113,
+    "members": [
+     "berry",
+     "bluer",
+     "boxer",
+     "buyer",
+     "defer",
+     "demur",
+     "derby",
+     "diner",
+     "diver",
+     "elder",
+     "ember",
+     "every",
+     "femur",
+     "ferry",
+     "fever",
+     "fewer",
+     "fiber",
+     "fiery",
+     "filer",
+     "finer",
+     "fixer",
+     "flier",
+     "flyer",
+     "foyer",
+     "giver",
+     "goner",
+     "heron",
+     "homer",
+     "hover",
+     "hyper",
+     "idler",
+     "infer",
+     "inner",
+     "jerky",
+     "joker",
+     "leery",
+     "lemur",
+     "leper",
+     "lever",
+     "liner",
+     "liver",
+     "loser",
+     "lover",
+     "lower",
+     "merry",
+     "miner",
+     "miser",
+     "mover",
+     "mower",
+     "nerdy",
+     "never",
+     "newer",
+     "odder",
+     "offer",
+     "older",
+     "owner",
+     "peril",
+     "perky",
+     "piper",
+     "plier",
+     "poker",
+     "poser",
+     "power",
+     "purer",
+     "queer",
+     "query",
+     "rebel",
+     "rebus",
+     "reedy",
+     "refer",
+     "reign",
+     "renew",
+     "repel",
+     "reply",
+     "rerun",
+     "resin",
+     "revel",
+     "rider",
+     "ripen",
+     "riper",
+     "risen",
+     "riser",
+     "river",
+     "rodeo",
+     "roger",
+     "rover",
+     "rower",
+     "ruder",
+     "ruler",
+     "serif",
+     "serum",
+     "sever",
+     "sewer",
+     "sheer",
+     "shrew",
+     "siren",
+     "skier",
+     "sneer",
+     "sober",
+     "sower",
+     "sperm",
+     "super",
+     "surer",
+     "udder",
+     "under",
+     "upper",
+     "usher",
+     "verso",
+     "viper",
+     "weird",
+     "wider",
+     "wiser",
+     "wooer"
+    ]
+   },
+   {
+    "code": 81,
+    "tiles": [
+     1,
+     0,
+     0,
+     0,
+     0
+    ],
+    "size": 113,
+    "members": [
+     "bigot",
+     "bitty",
+     "blitz",
+     "blunt",
+     "boost",
+     "booth",
+     "booty",
+     "built",
+     "digit",
+     "ditto",
+     "ditty",
+     "donut",
+     "doubt",
+     "dusty",
+     "fifth",
+     "fifty",
+     "fight",
+     "filth",
+     "flint",
+     "flout",
+     "foist",
+     "ghost",
+     "glint",
+     "guilt",
+     "gusto",
+     "gusty",
+     "hoist",
+     "hotly",
+     "idiot",
+     "ingot",
+     "input",
+     "joint",
+     "joist",
+     "joust",
+     "junto",
+     "kitty",
+     "light",
+     "limit",
+     "lofty",
+     "lusty",
+     "midst",
+     "might",
+     "minty",
+     "moist",
+     "month",
+     "motif",
+     "motto",
+     "moult",
+     "mount",
+     "mouth",
+     "musty",
+     "night",
+     "ninth",
+     "nutty",
+     "ought",
+     "outdo",
+     "outgo",
+     "photo",
+     "pilot",
+     "pinto",
+     "pithy",
+     "pivot",
+     "point",
+     "posit",
+     "pouty",
+     "putty",
+     "quilt",
+     "quoth",
+     "shift",
+     "shoot",
+     "shout",
+     "shunt",
+     "sight",
+     "sixth",
+     "sixty",
+     "sloth",
+     "smith",
+     "snout",
+     "sooth",
+     "sooty",
+     "south",
+     "spilt",
+     "split",
+     "spout",
+     "stiff",
+     "still",
+     "stilt",
+     "sting",
+     "stink",
+     "stint",
+     "stomp",
+     "stony",
+     "stood",
+     "stool",
+     "stoop",
+     "stout",
+     "study",
+     "stuff",
+     "stump",
+     "stung",
+     "stunk",
+     "stunt",
+     "swift",
+     "unfit",
+     "unity",
+     "unlit",
+     "until",
+     "visit",
+     "vomit",
+     "width",
+     "wight",
+     "witty",
+     "youth"
+    ]
+   },
+   {
+    "code": 2,
+    "tiles": [
+     0,
+     0,
+     0,
+     0,
+     2
+    ],
+    "size": 104,
+    "members": [
+     "belie",
+     "belle",
+     "bible",
+     "bilge",
+     "binge",
+     "biome",
+     "bloke",
+     "booze",
+     "boule",
+     "budge",
+     "bugle",
+     "bulge",
+     "delve",
+     "dense",
+     "diode",
+     "dodge",
+     "elide",
+     "elope",
+     "elude",
+     "ensue",
+     "evoke",
+     "exile",
+     "femme",
+     "fluke",
+     "flume",
+     "fudge",
+     "fugue",
+     "geese",
+     "genie",
+     "glide",
+     "globe",
+     "glove",
+     "gnome",
+     "goose",
+     "gouge",
+     "guide",
+     "guile",
+     "guise",
+     "hedge",
+     "hinge",
+     "house",
+     "imbue",
+     "issue",
+     "judge",
+     "knife",
+     "ledge",
+     "liege",
+     "lodge",
+     "loose",
+     "louse",
+     "lunge",
+     "melee",
+     "midge",
+     "moose",
+     "mouse",
+     "movie",
+     "noble",
+     "noise",
+     "noose",
+     "nudge",
+     "obese",
+     "olive",
+     "opine",
+     "ovine",
+     "oxide",
+     "ozone",
+     "penne",
+     "phone",
+     "pique",
+     "pixie",
+     "plume",
+     "poise",
+     "posse",
+     "pulse",
+     "queue",
+     "segue",
+     "seize",
+     "sense",
+     "shine",
+     "shone",
+     "shove",
+     "siege",
+     "sieve",
+     "singe",
+     "slide",
+     "slime",
+     "slope",
+     "smile",
+     "smoke",
+     "snide",
+     "snipe",
+     "solve",
+     "spike",
+     "spine",
+     "spoke",
+     "swine",
+     "undue",
+     "venue",
+     "vogue",
+     "wedge",
+     "while",
+     "whine",
+     "whole",
+     "whose"
+    ]
+   },
+   {
+    "code": 27,
+    "tiles": [
+     0,
+     1,
+     0,
+     0,
+     0
+    ],
+    "size": 64,
+    "members": [
+     "blurb",
+     "burly",
+     "donor",
+     "dowry",
+     "fjord",
+     "floor",
+     "flour",
+     "forgo",
+     "forum",
+     "furor",
+     "furry",
+     "girly",
+     "glory",
+     "gourd",
+     "honor",
+     "horny",
+     "humor",
+     "hurry",
+     "hydro",
+     "ivory",
+     "juror",
+     "lorry",
+     "lurid",
+     "minor",
+     "moron",
+     "morph",
+     "mourn",
+     "murky",
+     "myrrh",
+     "quirk",
+     "rhino",
+     "rigid",
+     "rigor",
+     "risky",
+     "robin",
+     "roomy",
+     "rough",
+     "round",
+     "rowdy",
+     "ruddy",
+     "rugby",
+     "rumor",
+     "shirk",
+     "shorn",
+     "shrub",
+     "shrug",
+     "slurp",
+     "smirk",
+     "sorry",
+     "sprig",
+     "spurn",
+     "surly",
+     "swirl",
+     "sword",
+     "sworn",
+     "syrup",
+     "usurp",
+     "vigor",
+     "virus",
+     "visor",
+     "whirl",
+     "wordy",
+     "world",
+     "worry"
+    ]
+   },
+   {
+    "code": 36,
+    "tiles": [
+     0,
+     1,
+     1,
+     0,
+     0
+    ],
+    "size": 61,
+    "members": [
+     "abhor",
+     "adorn",
+     "agora",
+     "angry",
+     "apron",
+     "augur",
+     "baron",
+     "borax",
+     "dairy",
+     "fairy",
+     "favor",
+     "flora",
+     "foray",
+     "hairy",
+     "hardy",
+     "harpy",
+     "harry",
+     "harsh",
+     "karma",
+     "labor",
+     "larva",
+     "lunar",
+     "major",
+     "manor",
+     "marry",
+     "marsh",
+     "mayor",
+     "molar",
+     "moral",
+     "mural",
+     "nadir",
+     "parka",
+     "parry",
+     "polar",
+     "rabbi",
+     "rabid",
+     "radar",
+     "radii",
+     "radio",
+     "rainy",
+     "rajah",
+     "rally",
+     "ralph",
+     "randy",
+     "rapid",
+     "raspy",
+     "rayon",
+     "razor",
+     "rival",
+     "royal",
+     "rumba",
+     "rural",
+     "savor",
+     "solar",
+     "sonar",
+     "spray",
+     "sugar",
+     "umbra",
+     "valor",
+     "vapor",
+     "viral"
+    ]
+   },
+   {
+    "code": 82,
+    "tiles": [
+     1,
+     0,
+     0,
+     0,
+     1
+    ],
+    "size": 58,
+    "members": [
+     "befit",
+     "beget",
+     "beset",
+     "betel",
+     "debit",
+     "debut",
+     "deity",
+     "depot",
+     "depth",
+     "detox",
+     "duvet",
+     "dwelt",
+     "eight",
+     "empty",
+     "ethos",
+     "event",
+     "exist",
+     "extol",
+     "exult",
+     "fetid",
+     "fetus",
+     "filet",
+     "fleet",
+     "guest",
+     "hefty",
+     "heist",
+     "hotel",
+     "inept",
+     "inlet",
+     "islet",
+     "jetty",
+     "knelt",
+     "lefty",
+     "motel",
+     "often",
+     "onset",
+     "pesto",
+     "petty",
+     "piety",
+     "quest",
+     "quiet",
+     "setup",
+     "sheet",
+     "sleet",
+     "slept",
+     "smelt",
+     "spelt",
+     "spent",
+     "steed",
+     "steel",
+     "steep",
+     "stein",
+     "sweet",
+     "swept",
+     "unmet",
+     "unset",
+     "upset",
+     "zesty"
+    ]
+   },
+   {
+    "code": 90,
+    "tiles": [
+     1,
+     0,
+     1,
+     0,
+     0
+    ],
+    "size": 53,
+    "members": [
+     "abbot",
+     "about",
+     "admit",
+     "adopt",
+     "adult",
+     "afoot",
+     "allot",
+     "aloft",
+     "amity",
+     "angst",
+     "aptly",
+     "atoll",
+     "audit",
+     "aunty",
+     "baton",
+     "batty",
+     "bloat",
+     "datum",
+     "daunt",
+     "faint",
+     "faith",
+     "fatal",
+     "fatty",
+     "fault",
+     "float",
+     "gamut",
+     "gaunt",
+     "gloat",
+     "habit",
+     "hasty",
+     "haunt",
+     "jaunt",
+     "junta",
+     "nasty",
+     "natal",
+     "paint",
+     "pasta",
+     "pasty",
+     "patio",
+     "patsy",
+     "patty",
+     "quota",
+     "saint",
+     "salty",
+     "satin",
+     "splat",
+     "squat",
+     "vault",
+     "vaunt",
+     "vista",
+     "vital",
+     "waist",
+     "waltz"
+    ]
+   },
+   {
+    "code": 18,
+    "tiles": [
+     0,
+     0,
+     2,
+     0,
+     0
+    ],
+    "size": 49,
+    "members": [
+     "again",
+     "amass",
+     "avail",
+     "awash",
+     "bland",
+     "blank",
+     "flail",
+     "flaky",
+     "flank",
+     "flash",
+     "flask",
+     "foamy",
+     "gland",
+     "glass",
+     "gnash",
+     "guava",
+     "khaki",
+     "koala",
+     "llama",
+     "loamy",
+     "piano",
+     "plaid",
+     "plain",
+     "plank",
+     "plaza",
+     "psalm",
+     "quail",
+     "qualm",
+     "quash",
+     "quasi",
+     "shady",
+     "shaky",
+     "shall",
+     "shank",
+     "shawl",
+     "slain",
+     "slang",
+     "slash",
+     "small",
+     "smash",
+     "snail",
+     "snaky",
+     "soapy",
+     "spank",
+     "spasm",
+     "spawn",
+     "swami",
+     "swamp",
+     "swash"
+    ]
+   },
+   {
+    "code": 54,
+    "tiles": [
+     0,
+     2,
+     0,
+     0,
+     0
+    ],
+    "size": 49,
+    "members": [
+     "bring",
+     "brink",
+     "briny",
+     "brisk",
+     "broil",
+     "brood",
+     "brook",
+     "broom",
+     "brown",
+     "brush",
+     "drill",
+     "drink",
+     "droll",
+     "drool",
+     "droop",
+     "dross",
+     "drown",
+     "druid",
+     "drunk",
+     "dryly",
+     "frill",
+     "frisk",
+     "frond",
+     "frown",
+     "grill",
+     "grimy",
+     "grind",
+     "groin",
+     "groom",
+     "gross",
+     "group",
+     "growl",
+     "grown",
+     "gruff",
+     "irony",
+     "krill",
+     "primo",
+     "prior",
+     "prism",
+     "privy",
+     "prong",
+     "proof",
+     "proud",
+     "prowl",
+     "proxy",
+     "wring",
+     "wrong",
+     "wrung",
+     "wryly"
+    ]
+   },
+   {
+    "code": 3,
+    "tiles": [
+     0,
+     0,
+     0,
+     1,
+     0
+    ],
+    "size": 48,
+    "members": [
+     "child",
+     "chili",
+     "chill",
+     "chump",
+     "chunk",
+     "civic",
+     "civil",
+     "cliff",
+     "climb",
+     "cling",
+     "clink",
+     "cloud",
+     "clown",
+     "clump",
+     "clung",
+     "colon",
+     "comfy",
+     "comic",
+     "condo",
+     "conic",
+     "cough",
+     "could",
+     "coyly",
+     "cubic",
+     "cumin",
+     "cynic",
+     "duchy",
+     "ficus",
+     "focus",
+     "icily",
+     "icing",
+     "ionic",
+     "locus",
+     "logic",
+     "lucid",
+     "lucky",
+     "mimic",
+     "mucky",
+     "mucus",
+     "music",
+     "picky",
+     "pubic",
+     "scion",
+     "scoff",
+     "scold",
+     "scoop",
+     "scowl",
+     "sonic"
+    ]
+   },
+   {
+    "code": 10,
+    "tiles": [
+     0,
+     0,
+     1,
+     0,
+     1
+    ],
+    "size": 48,
+    "members": [
+     "abbey",
+     "abled",
+     "ahead",
+     "alien",
+     "alley",
+     "amend",
+     "angel",
+     "annex",
+     "apnea",
+     "ashen",
+     "askew",
+     "bagel",
+     "began",
+     "bleak",
+     "delay",
+     "easel",
+     "enema",
+     "equal",
+     "essay",
+     "fella",
+     "gavel",
+     "gleam",
+     "glean",
+     "haven",
+     "hazel",
+     "hyena",
+     "ideal",
+     "kebab",
+     "knead",
+     "label",
+     "laden",
+     "lapel",
+     "legal",
+     "medal",
+     "media",
+     "navel",
+     "oaken",
+     "omega",
+     "panel",
+     "pedal",
+     "penal",
+     "plead",
+     "sedan",
+     "sepia",
+     "sneak",
+     "speak",
+     "vegan",
+     "waxen"
+    ]
+   },
+   {
+    "code": 11,
+    "tiles": [
+     0,
+     0,
+     1,
+     0,
+     2
+    ],
+    "size": 45,
+    "members": [
+     "abide",
+     "abode",
+     "above",
+     "abuse",
+     "adobe",
+     "agile",
+     "aisle",
+     "algae",
+     "alike",
+     "alive",
+     "alone",
+     "amble",
+     "ample",
+     "amuse",
+     "angle",
+     "anime",
+     "ankle",
+     "anode",
+     "apple",
+     "aside",
+     "awoke",
+     "badge",
+     "eagle",
+     "fable",
+     "false",
+     "gaffe",
+     "gauge",
+     "gauze",
+     "halve",
+     "ladle",
+     "lapse",
+     "maize",
+     "mange",
+     "maple",
+     "masse",
+     "mauve",
+     "maybe",
+     "naive",
+     "pause",
+     "payee",
+     "salve",
+     "vague",
+     "value",
+     "valve",
+     "waive"
+    ]
+   },
+   {
+    "code": 37,
+    "tiles": [
+     0,
+     1,
+     1,
+     0,
+     1
+    ],
+    "size": 41,
+    "members": [
+     "aider",
+     "amber",
+     "anger",
+     "baker",
+     "baler",
+     "debar",
+     "eager",
+     "early",
+     "feral",
+     "gamer",
+     "gayer",
+     "gazer",
+     "harem",
+     "lager",
+     "layer",
+     "maker",
+     "opera",
+     "paler",
+     "paper",
+     "parer",
+     "payer",
+     "ramen",
+     "rarer",
+     "raven",
+     "rebar",
+     "regal",
+     "rehab",
+     "relax",
+     "relay",
+     "renal",
+     "repay",
+     "safer",
+     "saner",
+     "shear",
+     "smear",
+     "spear",
+     "swear",
+     "wafer",
+     "wager",
+     "waver",
+     "zebra"
+    ]
+   },
+   {
+    "code": 29,
+    "tiles": [
+     0,
+     1,
+     0,
+     0,
+     2
+    ],
+    "size": 40,
+    "members": [
+     "borne",
+     "dirge",
+     "eerie",
+     "fibre",
+     "forge",
+     "genre",
+     "gorge",
+     "horde",
+     "horse",
+     "merge",
+     "nerve",
+     "nurse",
+     "ombre",
+     "puree",
+     "purge",
+     "purse",
+     "reuse",
+     "revue",
+     "rhyme",
+     "ridge",
+     "rifle",
+     "rinse",
+     "rogue",
+     "rouge",
+     "rouse",
+     "rupee",
+     "serve",
+     "shire",
+     "shore",
+     "snore",
+     "spire",
+     "spore",
+     "spree",
+     "surge",
+     "swore",
+     "verge",
+     "verse",
+     "verve",
+     "where",
+     "worse"
+    ]
+   },
+   {
+    "code": 6,
+    "tiles": [
+     0,
+     0,
+     0,
+     2,
+     0
+    ],
+    "size": 38,
+    "members": [
+     "block",
+     "bunch",
+     "chick",
+     "chock",
+     "chuck",
+     "cinch",
+     "click",
+     "clock",
+     "cluck",
+     "conch",
+     "couch",
+     "disco",
+     "finch",
+     "flick",
+     "flock",
+     "gulch",
+     "hunch",
+     "juicy",
+     "knock",
+     "lunch",
+     "lynch",
+     "mulch",
+     "munch",
+     "pinch",
+     "pluck",
+     "pooch",
+     "pouch",
+     "punch",
+     "quick",
+     "shock",
+     "shuck",
+     "slick",
+     "smock",
+     "snuck",
+     "spicy",
+     "vouch",
+     "which",
+     "winch"
+    ]
+   },
+   {
+    "code": 20,
+    "tiles": [
+     0,
+     0,
+     2,
+     0,
+     2
+    ],
+    "size": 35,
+    "members": [
+     "abase",
+     "adage",
+     "agape",
+     "amaze",
+     "awake",
+     "blade",
+     "blame",
+     "blaze",
+     "evade",
+     "flake",
+     "flame",
+     "glade",
+     "glaze",
+     "heave",
+     "image",
+     "inane",
+     "knave",
+     "lease",
+     "leave",
+     "phase",
+     "plane",
+     "quake",
+     "shade",
+     "shake",
+     "shale",
+     "shame",
+     "shape",
+     "shave",
+     "slave",
+     "snake",
+     "spade",
+     "suave",
+     "usage",
+     "weave",
+     "whale"
+    ]
+   },
+   {
+    "code": 12,
+    "tiles": [
+     0,
+     0,
+     1,
+     1,
+     0
+    ],
+    "size": 32,
+    "members": [
+     "bacon",
+     "basic",
+     "cabal",
+     "cabby",
+     "cabin",
+     "cacao",
+     "caddy",
+     "canal",
+     "candy",
+     "canny",
+     "canon",
+     "caulk",
+     "cavil",
+     "china",
+     "cloak",
+     "cocoa",
+     "comma",
+     "focal",
+     "havoc",
+     "iliac",
+     "lilac",
+     "local",
+     "macaw",
+     "macho",
+     "magic",
+     "manic",
+     "mocha",
+     "panic",
+     "scuba",
+     "sumac",
+     "vocal",
+     "wacky"
+    ]
+   },
+   {
+    "code": 108,
+    "tiles": [
+     1,
+     1,
+     0,
+     0,
+     0
+    ],
+    "size": 32,
+    "members": [
+     "birth",
+     "blurt",
+     "burnt",
+     "burst",
+     "dirty",
+     "first",
+     "flirt",
+     "forth",
+     "forty",
+     "girth",
+     "intro",
+     "mirth",
+     "motor",
+     "north",
+     "right",
+     "robot",
+     "roost",
+     "rotor",
+     "rusty",
+     "shirt",
+     "short",
+     "skirt",
+     "snort",
+     "sport",
+     "spurt",
+     "stork",
+     "storm",
+     "story",
+     "strip",
+     "strut",
+     "worst",
+     "worth"
+    ]
+   },
+   {
+    "code": 109,
+    "tiles": [
+     1,
+     1,
+     0,
+     0,
+     1
+    ],
+    "size": 29,
+    "members": [
+     "beret",
+     "berth",
+     "deter",
+     "egret",
+     "enter",
+     "entry",
+     "ester",
+     "ether",
+     "exert",
+     "inert",
+     "inter",
+     "merit",
+     "meter",
+     "metro",
+     "other",
+     "otter",
+     "outer",
+     "overt",
+     "rebut",
+     "refit",
+     "remit",
+     "reset",
+     "retro",
+     "retry",
+     "rivet",
+     "steer",
+     "stern",
+     "utter",
+     "voter"
+    ]
+   },
+   {
+    "code": 72,
+    "tiles": [
+     0,
+     2,
+     2,
+     0,
+     0
+    ],
+    "size": 25,
+    "members": [
+     "braid",
+     "brain",
+     "brand",
+     "brash",
+     "brass",
+     "bravo",
+     "brawl",
+     "brawn",
+     "drain",
+     "drama",
+     "drank",
+     "drawl",
+     "drawn",
+     "frail",
+     "frank",
+     "fraud",
+     "grail",
+     "grain",
+     "grand",
+     "graph",
+     "grasp",
+     "grass",
+     "gravy",
+     "prank",
+     "prawn"
+    ]
+   },
+   {
+    "code": 56,
+    "tiles": [
+     0,
+     2,
+     0,
+     0,
+     2
+    ],
+    "size": 23,
+    "members": [
+     "bribe",
+     "bride",
+     "brine",
+     "broke",
+     "drive",
+     "drone",
+     "drove",
+     "erode",
+     "froze",
+     "grime",
+     "gripe",
+     "grope",
+     "grove",
+     "pride",
+     "prime",
+     "prize",
+     "probe",
+     "prone",
+     "prose",
+     "prove",
+     "prude",
+     "prune",
+     "urine"
+    ]
+   },
+   {
+    "code": 99,
+    "tiles": [
+     1,
+     0,
+     2,
+     0,
+     0
+    ],
+    "size": 21,
+    "members": [
+     "adapt",
+     "await",
+     "blast",
+     "boast",
+     "giant",
+     "loath",
+     "plait",
+     "plant",
+     "shaft",
+     "shalt",
+     "slant",
+     "staff",
+     "staid",
+     "stain",
+     "stalk",
+     "stall",
+     "stamp",
+     "stand",
+     "stank",
+     "stash",
+     "swath"
+    ]
+   },
+   {
+    "code": 171,
+    "tiles": [
+     2,
+     0,
+     1,
+     0,
+     0
+    ],
+    "size": 21,
+    "members": [
+     "tabby",
+     "taboo",
+     "taffy",
+     "taint",
+     "tally",
+     "talon",
+     "tango",
+     "tangy",
+     "tasty",
+     "tatty",
+     "taunt",
+     "tawny",
+     "tibia",
+     "tidal",
+     "titan",
+     "today",
+     "tonal",
+     "tonga",
+     "topaz",
+     "total",
+     "tubal"
+    ]
+   },
+   {
+    "code": 83,
+    "tiles": [
+     1,
+     0,
+     0,
+     0,
+     2
+    ],
+    "size": 20,
+    "members": [
+     "butte",
+     "elite",
+     "etude",
+     "flute",
+     "lithe",
+     "quite",
+     "quote",
+     "smite",
+     "smote",
+     "spite",
+     "stoke",
+     "stole",
+     "stone",
+     "stove",
+     "style",
+     "suite",
+     "unite",
+     "untie",
+     "utile",
+     "white"
+    ]
+   },
+   {
+    "code": 30,
+    "tiles": [
+     0,
+     1,
+     0,
+     1,
+     0
+    ],
+    "size": 19,
+    "members": [
+     "chirp",
+     "choir",
+     "chord",
+     "churn",
+     "color",
+     "corny",
+     "curio",
+     "curly",
+     "curry",
+     "curvy",
+     "incur",
+     "lyric",
+     "micro",
+     "occur",
+     "rocky",
+     "scorn",
+     "scour",
+     "scrub",
+     "scrum"
+    ]
+   },
+   {
+    "code": 55,
+    "tiles": [
+     0,
+     2,
+     0,
+     0,
+     1
+    ],
+    "size": 19,
+    "members": [
+     "breed",
+     "brief",
+     "dress",
+     "dried",
+     "drier",
+     "dryer",
+     "error",
+     "freed",
+     "freer",
+     "fresh",
+     "fried",
+     "greed",
+     "green",
+     "grief",
+     "gruel",
+     "order",
+     "preen",
+     "press",
+     "pried"
+    ]
+   },
+   {
+    "code": 91,
+    "tiles": [
+     1,
+     0,
+     1,
+     0,
+     1
+    ],
+    "size": 19,
+    "members": [
+     "adept",
+     "agent",
+     "asset",
+     "begat",
+     "bleat",
+     "delta",
+     "eaten",
+     "fetal",
+     "matey",
+     "metal",
+     "petal",
+     "pleat",
+     "stead",
+     "steak",
+     "steal",
+     "steam",
+     "sweat",
+     "valet",
+     "wheat"
+    ]
+   },
+   {
+    "code": 21,
+    "tiles": [
+     0,
+     0,
+     2,
+     1,
+     0
+    ],
+    "size": 17,
+    "members": [
+     "chaff",
+     "chain",
+     "chalk",
+     "champ",
+     "chaos",
+     "chasm",
+     "claim",
+     "clamp",
+     "clang",
+     "clank",
+     "clash",
+     "clasp",
+     "class",
+     "scald",
+     "scalp",
+     "scaly",
+     "scamp"
+    ]
+   },
+   {
+    "code": 45,
+    "tiles": [
+     0,
+     1,
+     2,
+     0,
+     0
+    ],
+    "size": 17,
+    "members": [
+     "alarm",
+     "award",
+     "board",
+     "diary",
+     "dwarf",
+     "flair",
+     "guard",
+     "hoard",
+     "ovary",
+     "quark",
+     "shard",
+     "shark",
+     "sharp",
+     "snarl",
+     "spark",
+     "swarm",
+     "wharf"
+    ]
+   },
+   {
+    "code": 162,
+    "tiles": [
+     2,
+     0,
+     0,
+     0,
+     0
+    ],
+    "size": 17,
+    "members": [
+     "thigh",
+     "thing",
+     "think",
+     "thong",
+     "thumb",
+     "thump",
+     "tight",
+     "timid",
+     "tipsy",
+     "toddy",
+     "tooth",
+     "tough",
+     "toxin",
+     "tulip",
+     "twist",
+     "twixt",
+     "tying"
+    ]
+   },
+   {
+    "code": 5,
+    "tiles": [
+     0,
+     0,
+     0,
+     1,
+     2
+    ],
+    "size": 16,
+    "members": [
+     "chide",
+     "chime",
+     "choke",
+     "chose",
+     "clone",
+     "close",
+     "clove",
+     "copse",
+     "coupe",
+     "cycle",
+     "emcee",
+     "niche",
+     "scene",
+     "scone",
+     "scope",
+     "uncle"
+    ]
+   },
+   {
+    "code": 8,
+    "tiles": [
+     0,
+     0,
+     0,
+     2,
+     2
+    ],
+    "size": 15,
+    "members": [
+     "deuce",
+     "dunce",
+     "fence",
+     "hence",
+     "juice",
+     "mince",
+     "niece",
+     "ounce",
+     "pence",
+     "piece",
+     "since",
+     "slice",
+     "spice",
+     "voice",
+     "wince"
+    ]
+   },
+   {
+    "code": 31,
+    "tiles": [
+     0,
+     1,
+     0,
+     1,
+     1
+    ],
+    "size": 14,
+    "members": [
+     "cheer",
+     "cider",
+     "clerk",
+     "corer",
+     "cover",
+     "cower",
+     "cyber",
+     "decor",
+     "decry",
+     "nicer",
+     "recur",
+     "relic",
+     "screw",
+     "ulcer"
+    ]
+   },
+   {
+    "code": 135,
+    "tiles": [
+     1,
+     2,
+     0,
+     0,
+     0
+    ],
+    "size": 14,
+    "members": [
+     "broth",
+     "brunt",
+     "drift",
+     "droit",
+     "fritz",
+     "front",
+     "frost",
+     "froth",
+     "fruit",
+     "grout",
+     "grunt",
+     "orbit",
+     "print",
+     "wrist"
+    ]
+   },
+   {
+    "code": 163,
+    "tiles": [
+     2,
+     0,
+     0,
+     0,
+     1
+    ],
+    "size": 14,
+    "members": [
+     "teddy",
+     "teeth",
+     "tempo",
+     "tenet",
+     "tenth",
+     "tepid",
+     "testy",
+     "theft",
+     "thief",
+     "token",
+     "totem",
+     "towel",
+     "tweed",
+     "tweet"
+    ]
+   },
+   {
+    "code": 4,
+    "tiles": [
+     0,
+     0,
+     0,
+     1,
+     1
+    ],
+    "size": 13,
+    "members": [
+     "bicep",
+     "cello",
+     "cheek",
+     "chess",
+     "chief",
+     "clued",
+     "coven",
+     "covey",
+     "decoy",
+     "dicey",
+     "excel",
+     "gecko",
+     "medic"
+    ]
+   },
+   {
+    "code": 39,
+    "tiles": [
+     0,
+     1,
+     1,
+     1,
+     0
+    ],
+    "size": 13,
+    "members": [
+     "acorn",
+     "acrid",
+     "cairn",
+     "cargo",
+     "carol",
+     "carry",
+     "cigar",
+     "cobra",
+     "coral",
+     "macro",
+     "scram",
+     "scrap",
+     "vicar"
+    ]
+   },
+   {
+    "code": 63,
+    "tiles": [
+     0,
+     2,
+     1,
+     0,
+     0
+    ],
+    "size": 13,
+    "members": [
+     "arbor",
+     "ardor",
+     "armor",
+     "aroma",
+     "array",
+     "arrow",
+     "arson",
+     "briar",
+     "broad",
+     "friar",
+     "groan",
+     "organ",
+     "urban"
+    ]
+   },
+   {
+    "code": 24,
+    "tiles": [
+     0,
+     0,
+     2,
+     2,
+     0
+    ],
+    "size": 12,
+    "members": [
+     "aback",
+     "black",
+     "clack",
+     "coach",
+     "flack",
+     "knack",
+     "quack",
+     "shack",
+     "slack",
+     "smack",
+     "snack",
+     "whack"
+    ]
+   },
+   {
+    "code": 87,
+    "tiles": [
+     1,
+     0,
+     0,
+     2,
+     0
+    ],
+    "size": 12,
+    "members": [
+     "botch",
+     "butch",
+     "ditch",
+     "dutch",
+     "hitch",
+     "hutch",
+     "notch",
+     "pitch",
+     "stick",
+     "stock",
+     "stuck",
+     "witch"
+    ]
+   },
+   {
+    "code": 100,
+    "tiles": [
+     1,
+     0,
+     2,
+     0,
+     1
+    ],
+    "size": 12,
+    "members": [
+     "beast",
+     "dealt",
+     "death",
+     "exalt",
+     "feast",
+     "heath",
+     "leant",
+     "leapt",
+     "least",
+     "meant",
+     "meaty",
+     "yeast"
+    ]
+   },
+   {
+    "code": 101,
+    "tiles": [
+     1,
+     0,
+     2,
+     0,
+     2
+    ],
+    "size": 12,
+    "members": [
+     "abate",
+     "agate",
+     "elate",
+     "ovate",
+     "plate",
+     "skate",
+     "slate",
+     "stage",
+     "stake",
+     "stale",
+     "state",
+     "stave"
+    ]
+   },
+   {
+    "code": 117,
+    "tiles": [
+     1,
+     1,
+     1,
+     0,
+     0
+    ],
+    "size": 12,
+    "members": [
+     "abort",
+     "altar",
+     "aorta",
+     "party",
+     "ratio",
+     "ratty",
+     "satyr",
+     "strap",
+     "straw",
+     "stray",
+     "ultra",
+     "warty"
+    ]
+   },
+   {
+    "code": 57,
+    "tiles": [
+     0,
+     2,
+     0,
+     1,
+     0
+    ],
+    "size": 11,
+    "members": [
+     "crimp",
+     "crisp",
+     "crony",
+     "crook",
+     "cross",
+     "croup",
+     "crowd",
+     "crown",
+     "crumb",
+     "crump",
+     "crush"
+    ]
+   },
+   {
+    "code": 164,
+    "tiles": [
+     2,
+     0,
+     0,
+     0,
+     2
+    ],
+    "size": 11,
+    "members": [
+     "tense",
+     "tepee",
+     "theme",
+     "these",
+     "those",
+     "thyme",
+     "tilde",
+     "tithe",
+     "title",
+     "tulle",
+     "twine"
+    ]
+   },
+   {
+    "code": 189,
+    "tiles": [
+     2,
+     1,
+     0,
+     0,
+     0
+    ],
+    "size": 11,
+    "members": [
+     "third",
+     "thorn",
+     "throb",
+     "throw",
+     "thrum",
+     "torso",
+     "torus",
+     "tumor",
+     "turbo",
+     "tutor",
+     "twirl"
+    ]
+   },
+   {
+    "code": 7,
+    "tiles": [
+     0,
+     0,
+     0,
+     2,
+     1
+    ],
+    "size": 10,
+    "members": [
+     "beech",
+     "belch",
+     "bench",
+     "check",
+     "epoch",
+     "fleck",
+     "leech",
+     "speck",
+     "welch",
+     "wench"
+    ]
+   },
+   {
+    "code": 13,
+    "tiles": [
+     0,
+     0,
+     1,
+     1,
+     1
+    ],
+    "size": 10,
+    "members": [
+     "cagey",
+     "camel",
+     "cameo",
+     "cheap",
+     "clean",
+     "decal",
+     "decay",
+     "fecal",
+     "ocean",
+     "pecan"
+    ]
+   },
+   {
+    "code": 74,
+    "tiles": [
+     0,
+     2,
+     2,
+     0,
+     2
+    ],
+    "size": 10,
+    "members": [
+     "brake",
+     "brave",
+     "drake",
+     "drape",
+     "erase",
+     "frame",
+     "grade",
+     "grape",
+     "grave",
+     "graze"
+    ]
+   },
+   {
+    "code": 92,
+    "tiles": [
+     1,
+     0,
+     1,
+     0,
+     2
+    ],
+    "size": 10,
+    "members": [
+     "atone",
+     "baste",
+     "bathe",
+     "haste",
+     "haute",
+     "lathe",
+     "latte",
+     "paste",
+     "saute",
+     "waste"
+    ]
+   },
+   {
+    "code": 118,
+    "tiles": [
+     1,
+     1,
+     1,
+     0,
+     1
+    ],
+    "size": 10,
+    "members": [
+     "after",
+     "alert",
+     "alter",
+     "avert",
+     "earth",
+     "eater",
+     "extra",
+     "hater",
+     "later",
+     "water"
+    ]
+   },
+   {
+    "code": 216,
+    "tiles": [
+     2,
+     2,
+     0,
+     0,
+     0
+    ],
+    "size": 10,
+    "members": [
+     "troll",
+     "troop",
+     "trout",
+     "truly",
+     "trump",
+     "trunk",
+     "truss",
+     "trust",
+     "truth",
+     "tryst"
+    ]
+   },
+   {
+    "code": 38,
+    "tiles": [
+     0,
+     1,
+     1,
+     0,
+     2
+    ],
+    "size": 9,
+    "members": [
+     "adore",
+     "afire",
+     "agree",
+     "azure",
+     "barge",
+     "large",
+     "parse",
+     "raise",
+     "range"
+    ]
+   },
+   {
+    "code": 46,
+    "tiles": [
+     0,
+     1,
+     2,
+     0,
+     1
+    ],
+    "size": 9,
+    "members": [
+     "beard",
+     "heard",
+     "learn",
+     "pearl",
+     "ready",
+     "realm",
+     "rearm",
+     "weary",
+     "yearn"
+    ]
+   },
+   {
+    "code": 19,
+    "tiles": [
+     0,
+     0,
+     2,
+     0,
+     1
+    ],
+    "size": 8,
+    "members": [
+     "beady",
+     "email",
+     "heady",
+     "heavy",
+     "leafy",
+     "leaky",
+     "leash",
+     "mealy"
+    ]
+   },
+   {
+    "code": 58,
+    "tiles": [
+     0,
+     2,
+     0,
+     1,
+     1
+    ],
+    "size": 8,
+    "members": [
+     "credo",
+     "creed",
+     "creek",
+     "creep",
+     "cress",
+     "cried",
+     "crier",
+     "cruel"
+    ]
+   },
+   {
+    "code": 84,
+    "tiles": [
+     1,
+     0,
+     0,
+     1,
+     0
+    ],
+    "size": 8,
+    "members": [
+     "cloth",
+     "clout",
+     "count",
+     "itchy",
+     "optic",
+     "scout",
+     "stoic",
+     "uncut"
+    ]
+   },
+   {
+    "code": 93,
+    "tiles": [
+     1,
+     0,
+     1,
+     1,
+     0
+    ],
+    "size": 8,
+    "members": [
+     "antic",
+     "ascot",
+     "attic",
+     "cacti",
+     "caput",
+     "catty",
+     "octal",
+     "yacht"
+    ]
+   },
+   {
+    "code": 47,
+    "tiles": [
+     0,
+     1,
+     2,
+     0,
+     2
+    ],
+    "size": 7,
+    "members": [
+     "aware",
+     "blare",
+     "flare",
+     "glare",
+     "share",
+     "snare",
+     "spare"
+    ]
+   },
+   {
+    "code": 64,
+    "tiles": [
+     0,
+     2,
+     1,
+     0,
+     1
+    ],
+    "size": 7,
+    "members": [
+     "arena",
+     "bread",
+     "break",
+     "dread",
+     "dream",
+     "freak",
+     "wreak"
+    ]
+   },
+   {
+    "code": 85,
+    "tiles": [
+     1,
+     0,
+     0,
+     1,
+     1
+    ],
+    "size": 7,
+    "members": [
+     "chest",
+     "cleft",
+     "comet",
+     "covet",
+     "ethic",
+     "octet",
+     "scent"
+    ]
+   },
+   {
+    "code": 96,
+    "tiles": [
+     1,
+     0,
+     1,
+     2,
+     0
+    ],
+    "size": 7,
+    "members": [
+     "batch",
+     "catch",
+     "hatch",
+     "latch",
+     "match",
+     "patch",
+     "watch"
+    ]
+   },
+   {
+    "code": 126,
+    "tiles": [
+     1,
+     1,
+     2,
+     0,
+     0
+    ],
+    "size": 7,
+    "members": [
+     "apart",
+     "quart",
+     "roast",
+     "smart",
+     "stair",
+     "stark",
+     "start"
+    ]
+   },
+   {
+    "code": 190,
+    "tiles": [
+     2,
+     1,
+     0,
+     0,
+     1
+    ],
+    "size": 7,
+    "members": [
+     "tenor",
+     "their",
+     "threw",
+     "tiger",
+     "timer",
+     "tower",
+     "tuber"
+    ]
+   },
+   {
+    "code": 75,
+    "tiles": [
+     0,
+     2,
+     2,
+     1,
+     0
+    ],
+    "size": 6,
+    "members": [
+     "cramp",
+     "crank",
+     "crash",
+     "crass",
+     "crawl",
+     "crazy"
+    ]
+   },
+   {
+    "code": 234,
+    "tiles": [
+     2,
+     2,
+     2,
+     0,
+     0
+    ],
+    "size": 6,
+    "members": [
+     "trail",
+     "train",
+     "trait",
+     "tramp",
+     "trash",
+     "trawl"
+    ]
+   },
+   {
+    "code": 32,
+    "tiles": [
+     0,
+     1,
+     0,
+     1,
+     2
+    ],
+    "size": 5,
+    "members": [
+     "chore",
+     "curse",
+     "curve",
+     "score",
+     "scree"
+    ]
+   },
+   {
+    "code": 40,
+    "tiles": [
+     0,
+     1,
+     1,
+     1,
+     1
+    ],
+    "size": 5,
+    "members": [
+     "caper",
+     "cedar",
+     "clear",
+     "racer",
+     "recap"
+    ]
+   },
+   {
+    "code": 48,
+    "tiles": [
+     0,
+     1,
+     2,
+     1,
+     0
+    ],
+    "size": 5,
+    "members": [
+     "chair",
+     "chard",
+     "charm",
+     "scarf",
+     "scary"
+    ]
+   },
+   {
+    "code": 59,
+    "tiles": [
+     0,
+     2,
+     0,
+     1,
+     2
+    ],
+    "size": 5,
+    "members": [
+     "creme",
+     "crepe",
+     "crime",
+     "crone",
+     "crude"
+    ]
+   },
+   {
+    "code": 60,
+    "tiles": [
+     0,
+     2,
+     0,
+     2,
+     0
+    ],
+    "size": 5,
+    "members": [
+     "brick",
+     "crick",
+     "crock",
+     "frock",
+     "prick"
+    ]
+   },
+   {
+    "code": 88,
+    "tiles": [
+     1,
+     0,
+     0,
+     2,
+     1
+    ],
+    "size": 5,
+    "members": [
+     "edict",
+     "eject",
+     "elect",
+     "evict",
+     "fetch"
+    ]
+   },
+   {
+    "code": 94,
+    "tiles": [
+     1,
+     0,
+     1,
+     1,
+     1
+    ],
+    "size": 5,
+    "members": [
+     "cadet",
+     "cheat",
+     "cleat",
+     "eclat",
+     "facet"
+    ]
+   },
+   {
+    "code": 218,
+    "tiles": [
+     2,
+     2,
+     0,
+     0,
+     2
+    ],
+    "size": 5,
+    "members": [
+     "tribe",
+     "tripe",
+     "trite",
+     "trope",
+     "trove"
+    ]
+   },
+   {
+    "code": 14,
+    "tiles": [
+     0,
+     0,
+     1,
+     1,
+     2
+    ],
+    "size": 4,
+    "members": [
+     "cable",
+     "cache",
+     "canoe",
+     "cause"
+    ]
+   },
+   {
+    "code": 23,
+    "tiles": [
+     0,
+     0,
+     2,
+     1,
+     2
+    ],
+    "size": 4,
+    "members": [
+     "cease",
+     "chafe",
+     "chase",
+     "scale"
+    ]
+   },
+   {
+    "code": 153,
+    "tiles": [
+     1,
+     2,
+     2,
+     0,
+     0
+    ],
+    "size": 4,
+    "members": [
+     "draft",
+     "graft",
+     "grant",
+     "wrath"
+    ]
+   },
+   {
+    "code": 165,
+    "tiles": [
+     2,
+     0,
+     0,
+     1,
+     0
+    ],
+    "size": 4,
+    "members": [
+     "tonic",
+     "topic",
+     "toxic",
+     "tunic"
+    ]
+   },
+   {
+    "code": 199,
+    "tiles": [
+     2,
+     1,
+     1,
+     0,
+     1
+    ],
+    "size": 4,
+    "members": [
+     "taker",
+     "tamer",
+     "taper",
+     "terra"
+    ]
+   },
+   {
+    "code": 17,
+    "tiles": [
+     0,
+     0,
+     1,
+     2,
+     2
+    ],
+    "size": 3,
+    "members": [
+     "dance",
+     "lance",
+     "sauce"
+    ]
+   },
+   {
+    "code": 25,
+    "tiles": [
+     0,
+     0,
+     2,
+     2,
+     1
+    ],
+    "size": 3,
+    "members": [
+     "beach",
+     "leach",
+     "peach"
+    ]
+   },
+   {
+    "code": 26,
+    "tiles": [
+     0,
+     0,
+     2,
+     2,
+     2
+    ],
+    "size": 3,
+    "members": [
+     "peace",
+     "place",
+     "space"
+    ]
+   },
+   {
+    "code": 33,
+    "tiles": [
+     0,
+     1,
+     0,
+     2,
+     0
+    ],
+    "size": 3,
+    "members": [
+     "birch",
+     "lurch",
+     "porch"
+    ]
+   },
+   {
+    "code": 42,
+    "tiles": [
+     0,
+     1,
+     1,
+     2,
+     0
+    ],
+    "size": 3,
+    "members": [
+     "circa",
+     "march",
+     "ranch"
+    ]
+   },
+   {
+    "code": 65,
+    "tiles": [
+     0,
+     2,
+     1,
+     0,
+     2
+    ],
+    "size": 3,
+    "members": [
+     "argue",
+     "arise",
+     "arose"
+    ]
+   },
+   {
+    "code": 77,
+    "tiles": [
+     0,
+     2,
+     2,
+     1,
+     2
+    ],
+    "size": 3,
+    "members": [
+     "crane",
+     "crave",
+     "craze"
+    ]
+   },
+   {
+    "code": 102,
+    "tiles": [
+     1,
+     0,
+     2,
+     1,
+     0
+    ],
+    "size": 3,
+    "members": [
+     "chant",
+     "coast",
+     "scant"
+    ]
+   },
+   {
+    "code": 110,
+    "tiles": [
+     1,
+     1,
+     0,
+     0,
+     2
+    ],
+    "size": 3,
+    "members": [
+     "forte",
+     "route",
+     "store"
+    ]
+   },
+   {
+    "code": 136,
+    "tiles": [
+     1,
+     2,
+     0,
+     0,
+     1
+    ],
+    "size": 3,
+    "members": [
+     "erupt",
+     "greet",
+     "wrest"
+    ]
+   },
+   {
+    "code": 137,
+    "tiles": [
+     1,
+     2,
+     0,
+     0,
+     2
+    ],
+    "size": 3,
+    "members": [
+     "brute",
+     "write",
+     "wrote"
+    ]
+   },
+   {
+    "code": 172,
+    "tiles": [
+     2,
+     0,
+     1,
+     0,
+     1
+    ],
+    "size": 3,
+    "members": [
+     "taken",
+     "theta",
+     "tweak"
+    ]
+   },
+   {
+    "code": 180,
+    "tiles": [
+     2,
+     0,
+     2,
+     0,
+     0
+    ],
+    "size": 3,
+    "members": [
+     "thank",
+     "toast",
+     "twang"
+    ]
+   },
+   {
+    "code": 191,
+    "tiles": [
+     2,
+     1,
+     0,
+     0,
+     2
+    ],
+    "size": 3,
+    "members": [
+     "terse",
+     "there",
+     "three"
+    ]
+   },
+   {
+    "code": 198,
+    "tiles": [
+     2,
+     1,
+     1,
+     0,
+     0
+    ],
+    "size": 3,
+    "members": [
+     "tapir",
+     "tardy",
+     "tarot"
+    ]
+   },
+   {
+    "code": 217,
+    "tiles": [
+     2,
+     2,
+     0,
+     0,
+     1
+    ],
+    "size": 3,
+    "members": [
+     "trend",
+     "tried",
+     "truer"
+    ]
+   },
+   {
+    "code": 15,
+    "tiles": [
+     0,
+     0,
+     1,
+     2,
+     0
+    ],
+    "size": 2,
+    "members": [
+     "fancy",
+     "saucy"
+    ]
+   },
+   {
+    "code": 34,
+    "tiles": [
+     0,
+     1,
+     0,
+     2,
+     1
+    ],
+    "size": 2,
+    "members": [
+     "mercy",
+     "perch"
+    ]
+   },
+   {
+    "code": 67,
+    "tiles": [
+     0,
+     2,
+     1,
+     1,
+     1
+    ],
+    "size": 2,
+    "members": [
+     "creak",
+     "cream"
+    ]
+   },
+   {
+    "code": 78,
+    "tiles": [
+     0,
+     2,
+     2,
+     2,
+     0
+    ],
+    "size": 2,
+    "members": [
+     "crack",
+     "wrack"
+    ]
+   },
+   {
+    "code": 80,
+    "tiles": [
+     0,
+     2,
+     2,
+     2,
+     2
+    ],
+    "size": 2,
+    "members": [
+     "brace",
+     "grace"
+    ]
+   },
+   {
+    "code": 86,
+    "tiles": [
+     1,
+     0,
+     0,
+     1,
+     2
+    ],
+    "size": 2,
+    "members": [
+     "chute",
+     "cutie"
+    ]
+   },
+   {
+    "code": 95,
+    "tiles": [
+     1,
+     0,
+     1,
+     1,
+     2
+    ],
+    "size": 2,
+    "members": [
+     "acute",
+     "caste"
+    ]
+   },
+   {
+    "code": 106,
+    "tiles": [
+     1,
+     0,
+     2,
+     2,
+     1
+    ],
+    "size": 2,
+    "members": [
+     "enact",
+     "exact"
+    ]
+   },
+   {
+    "code": 120,
+    "tiles": [
+     1,
+     1,
+     1,
+     1,
+     0
+    ],
+    "size": 2,
+    "members": [
+     "actor",
+     "carat"
+    ]
+   },
+   {
+    "code": 138,
+    "tiles": [
+     1,
+     2,
+     0,
+     1,
+     0
+    ],
+    "size": 2,
+    "members": [
+     "crust",
+     "crypt"
+    ]
+   },
+   {
+    "code": 139,
+    "tiles": [
+     1,
+     2,
+     0,
+     1,
+     1
+    ],
+    "size": 2,
+    "members": [
+     "crept",
+     "crest"
+    ]
+   },
+   {
+    "code": 155,
+    "tiles": [
+     1,
+     2,
+     2,
+     0,
+     2
+    ],
+    "size": 2,
+    "members": [
+     "grate",
+     "irate"
+    ]
+   },
+   {
+    "code": 168,
+    "tiles": [
+     2,
+     0,
+     0,
+     2,
+     0
+    ],
+    "size": 2,
+    "members": [
+     "thick",
+     "touch"
+    ]
+   },
+   {
+    "code": 173,
+    "tiles": [
+     2,
+     0,
+     1,
+     0,
+     2
+    ],
+    "size": 2,
+    "members": [
+     "table",
+     "taste"
+    ]
+   },
+   {
+    "code": 174,
+    "tiles": [
+     2,
+     0,
+     1,
+     1,
+     0
+    ],
+    "size": 2,
+    "members": [
+     "tacit",
+     "tacky"
+    ]
+   },
+   {
+    "code": 222,
+    "tiles": [
+     2,
+     2,
+     0,
+     2,
+     0
+    ],
+    "size": 2,
+    "members": [
+     "trick",
+     "truck"
+    ]
+   },
+   {
+    "code": 224,
+    "tiles": [
+     2,
+     2,
+     0,
+     2,
+     2
+    ],
+    "size": 2,
+    "members": [
+     "trice",
+     "truce"
+    ]
+   },
+   {
+    "code": 225,
+    "tiles": [
+     2,
+     2,
+     1,
+     0,
+     0
+    ],
+    "size": 2,
+    "members": [
+     "triad",
+     "trial"
+    ]
+   },
+   {
+    "code": 226,
+    "tiles": [
+     2,
+     2,
+     1,
+     0,
+     1
+    ],
+    "size": 2,
+    "members": [
+     "tread",
+     "treat"
+    ]
+   },
+   {
+    "code": 240,
+    "tiles": [
+     2,
+     2,
+     2,
+     2,
+     0
+    ],
+    "size": 2,
+    "members": [
+     "track",
+     "tract"
+    ]
+   },
+   {
+    "code": 16,
+    "tiles": [
+     0,
+     0,
+     1,
+     2,
+     1
+    ],
+    "size": 1,
+    "members": [
+     "mecca"
+    ]
+   },
+   {
+    "code": 35,
+    "tiles": [
+     0,
+     1,
+     0,
+     2,
+     2
+    ],
+    "size": 1,
+    "members": [
+     "force"
+    ]
+   },
+   {
+    "code": 41,
+    "tiles": [
+     0,
+     1,
+     1,
+     1,
+     2
+    ],
+    "size": 1,
+    "members": [
+     "carve"
+    ]
+   },
+   {
+    "code": 44,
+    "tiles": [
+     0,
+     1,
+     1,
+     2,
+     2
+    ],
+    "size": 1,
+    "members": [
+     "farce"
+    ]
+   },
+   {
+    "code": 50,
+    "tiles": [
+     0,
+     1,
+     2,
+     1,
+     2
+    ],
+    "size": 1,
+    "members": [
+     "scare"
+    ]
+   },
+   {
+    "code": 51,
+    "tiles": [
+     0,
+     1,
+     2,
+     2,
+     0
+    ],
+    "size": 1,
+    "members": [
+     "roach"
+    ]
+   },
+   {
+    "code": 52,
+    "tiles": [
+     0,
+     1,
+     2,
+     2,
+     1
+    ],
+    "size": 1,
+    "members": [
+     "reach"
+    ]
+   },
+   {
+    "code": 61,
+    "tiles": [
+     0,
+     2,
+     0,
+     2,
+     1
+    ],
+    "size": 1,
+    "members": [
+     "wreck"
+    ]
+   },
+   {
+    "code": 62,
+    "tiles": [
+     0,
+     2,
+     0,
+     2,
+     2
+    ],
+    "size": 1,
+    "members": [
+     "price"
+    ]
+   },
+   {
+    "code": 66,
+    "tiles": [
+     0,
+     2,
+     1,
+     1,
+     0
+    ],
+    "size": 1,
+    "members": [
+     "croak"
+    ]
+   },
+   {
+    "code": 105,
+    "tiles": [
+     1,
+     0,
+     2,
+     2,
+     0
+    ],
+    "size": 1,
+    "members": [
+     "stack"
+    ]
+   },
+   {
+    "code": 111,
+    "tiles": [
+     1,
+     1,
+     0,
+     1,
+     0
+    ],
+    "size": 1,
+    "members": [
+     "court"
+    ]
+   },
+   {
+    "code": 112,
+    "tiles": [
+     1,
+     1,
+     0,
+     1,
+     1
+    ],
+    "size": 1,
+    "members": [
+     "recut"
+    ]
+   },
+   {
+    "code": 115,
+    "tiles": [
+     1,
+     1,
+     0,
+     2,
+     1
+    ],
+    "size": 1,
+    "members": [
+     "retch"
+    ]
+   },
+   {
+    "code": 121,
+    "tiles": [
+     1,
+     1,
+     1,
+     1,
+     1
+    ],
+    "size": 1,
+    "members": [
+     "cater"
+    ]
+   },
+   {
+    "code": 127,
+    "tiles": [
+     1,
+     1,
+     2,
+     0,
+     1
+    ],
+    "size": 1,
+    "members": [
+     "heart"
+    ]
+   },
+   {
+    "code": 128,
+    "tiles": [
+     1,
+     1,
+     2,
+     0,
+     2
+    ],
+    "size": 1,
+    "members": [
+     "stare"
+    ]
+   },
+   {
+    "code": 129,
+    "tiles": [
+     1,
+     1,
+     2,
+     1,
+     0
+    ],
+    "size": 1,
+    "members": [
+     "chart"
+    ]
+   },
+   {
+    "code": 133,
+    "tiles": [
+     1,
+     1,
+     2,
+     2,
+     1
+    ],
+    "size": 1,
+    "members": [
+     "react"
+    ]
+   },
+   {
+    "code": 142,
+    "tiles": [
+     1,
+     2,
+     0,
+     2,
+     1
+    ],
+    "size": 1,
+    "members": [
+     "erect"
+    ]
+   },
+   {
+    "code": 144,
+    "tiles": [
+     1,
+     2,
+     1,
+     0,
+     0
+    ],
+    "size": 1,
+    "members": [
+     "artsy"
+    ]
+   },
+   {
+    "code": 145,
+    "tiles": [
+     1,
+     2,
+     1,
+     0,
+     1
+    ],
+    "size": 1,
+    "members": [
+     "great"
+    ]
+   },
+   {
+    "code": 156,
+    "tiles": [
+     1,
+     2,
+     2,
+     1,
+     0
+    ],
+    "size": 1,
+    "members": [
+     "craft"
+    ]
+   },
+   {
+    "code": 158,
+    "tiles": [
+     1,
+     2,
+     2,
+     1,
+     2
+    ],
+    "size": 1,
+    "members": [
+     "crate"
+    ]
+   },
+   {
+    "code": 170,
+    "tiles": [
+     2,
+     0,
+     0,
+     2,
+     2
+    ],
+    "size": 1,
+    "members": [
+     "twice"
+    ]
+   },
+   {
+    "code": 182,
+    "tiles": [
+     2,
+     0,
+     2,
+     0,
+     2
+    ],
+    "size": 1,
+    "members": [
+     "tease"
+    ]
+   },
+   {
+    "code": 187,
+    "tiles": [
+     2,
+     0,
+     2,
+     2,
+     1
+    ],
+    "size": 1,
+    "members": [
+     "teach"
+    ]
+   },
+   {
+    "code": 195,
+    "tiles": [
+     2,
+     1,
+     0,
+     2,
+     0
+    ],
+    "size": 1,
+    "members": [
+     "torch"
+    ]
+   },
+   {
+    "code": 207,
+    "tiles": [
+     2,
+     1,
+     2,
+     0,
+     0
+    ],
+    "size": 1,
+    "members": [
+     "tiara"
+    ]
+   },
+   {
+    "code": 208,
+    "tiles": [
+     2,
+     1,
+     2,
+     0,
+     1
+    ],
+    "size": 1,
+    "members": [
+     "teary"
+    ]
+   },
+   {
+    "code": 236,
+    "tiles": [
+     2,
+     2,
+     2,
+     0,
+     2
+    ],
+    "size": 1,
+    "members": [
+     "trade"
+    ]
+   },
+   {
+    "code": 242,
+    "tiles": [
+     2,
+     2,
+     2,
+     2,
+     2
+    ],
+    "size": 1,
+    "members": [
+     "trace"
+    ]
+   }
   ]
  },
  "chain_edge": {

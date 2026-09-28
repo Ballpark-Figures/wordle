@@ -182,3 +182,11 @@ def decode(word, run_time, lag_ratio=0.25):
     return LaggedStart(*[GlyphFlip(t, g, l)
                          for t, g, l in zip(word.tiles, word.glyphs, word.letters)],
                        lag_ratio=lag_ratio, run_time=run_time)
+
+
+def reletter(tiles, old, new, run_time, lag_ratio=0.25):
+    """Tiles turning over from one set of letters to another (06c: CODES to TRACE)
+    — GlyphFlip with a letter on both faces. `new` must already be in the scene,
+    placed on its tile; the flip hides it until the midpoint."""
+    return LaggedStart(*[GlyphFlip(t, o, n) for t, o, n in zip(tiles, old, new)],
+                       lag_ratio=lag_ratio, run_time=run_time)

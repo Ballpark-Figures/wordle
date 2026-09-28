@@ -108,13 +108,15 @@ def _place_edges(sizes, f, rng_phase):
     return hung
 
 
-def _scatter(sizes, edge_sizes, seed, block_gap=BLOCK_GAP, region_top=REGION_TOP):
+def _scatter(sizes, edge_sizes, seed, block_gap=BLOCK_GAP, region_top=REGION_TOP,
+             blocked=()):
     """Centres for the interior ovals (sizes (w, h)), SCATTERED over the group
     region rather than packed in rows, around edge ovals hung first on the border.
     Best-candidate sampling: biggest oval first, each takes whichever of
     SCATTER_TRIES random spots leaves the widest gap to everything placed, and no
     spot closer than `block_gap` counts. If an oval finds no spot, everything
-    shrinks 5% and the placement starts over.
+    shrinks 5% and the placement starts over. `blocked` boxes ((x, y), w, h) are
+    kept clear, like boxes already placed (06's corner label).
 
     Seeded, so a render is repeatable; change the seed string for a different
     scatter. Returns (shrink factor, interior centres, [(edge index, centre)])."""
@@ -124,7 +126,7 @@ def _scatter(sizes, edge_sizes, seed, block_gap=BLOCK_GAP, region_top=REGION_TOP
     f = 1.0
     while True:
         hung = _place_edges(edge_sizes, f, phase)
-        boxes = [b for _, b in hung]
+        boxes = [b for _, b in hung] + list(blocked)
         placed = {}
         for i in order:
             w, h = sizes[i][0] * f, sizes[i][1] * f
@@ -214,12 +216,13 @@ def row_aspect():
     return ROW_ASPECT
 
 
-def dot_layout(data, guess, seed=None):
+def dot_layout(data, guess, seed=None, blocked=()):
     """06b: EVERY group of `guess` (lists_data's `full`), each answer a dot in a
     square-ish grid, the group's scored row atop it, sqrt(size) dot pitches wide —
     so the row's width and height both go as the square root of its dots. Groups
     scattered as in `layout`, no edge groups: all of them are on the frame, and
-    over the WHOLE frame (DOT_REGION_TOP) — the guess has gone off the top.
+    over the WHOLE frame (DOT_REGION_TOP) but for the `blocked` boxes — the guess
+    has left the top centre (06: for the corner, kept clear via `blocked`).
 
     Returns (groups, dots {word: centre}, row centres, row widths, dot radius) —
     groups in lists_data's order, the two lists in the same order."""
@@ -237,7 +240,7 @@ def dot_layout(data, guess, seed=None):
     bs = [block(g) for g in groups]
     f, centres, _ = _scatter([(b["w"], b["h"]) for b in bs], [],
                              seed or f"06:{guess}:dots", block_gap=DOT_BLOCK_GAP,
-                             region_top=DOT_REGION_TOP)
+                             region_top=DOT_REGION_TOP, blocked=blocked)
     dots, rows, widths = {}, [], []
     for g, b, (bx, by) in zip(groups, bs, centres):
         top = by + b["h"] * f / 2 - DOT_PAD * f / 2
