@@ -115,6 +115,7 @@ FILL_LOOK = 60                # f: the squash looks this many steps ahead, so it
 WORD_SFX = "notify-text"      # f: the sound of a word landing in the histogram
 PING_SFX = "notify-app-03"    # h onward: a word emphasised / called out, and i's noise
 PING_GAIN = -6.0              # dB — played quieter than the library's level
+NOISE_GAIN = -12.0            # dB — i's two pings, quieter still (user's call)
 WHOOSH_SFX = "whoosh"         # under every camera move (d, e, f's pan, g, j-m)
 WHOOSH_GAIN = -8.0            # dB — played quieter than the library's level
 FILL_SFX_MAX_PER_S = 15.0     # f: one cue per word, but no more than this many a
@@ -750,8 +751,8 @@ class Scene01(MovingCameraScene, WordleDarkScene):
         # the VO's noise. The wait is the sound's own length: with an empty body the
         # cue would fall in the trailing hold, which the stitch trims and the edit
         # covers with a still — i.e. it would never be heard
-        self.sfx(PING_SFX, gain=PING_GAIN)                  # ADIEU
-        self.sfx(PING_SFX, at=0.6, gain=PING_GAIN)          # AUDIO
+        self.sfx(PING_SFX, gain=NOISE_GAIN)                 # ADIEU
+        self.sfx(PING_SFX, at=0.6, gain=NOISE_GAIN)         # AUDIO
         self.wait(1.9)
 
     # j : out to the left 10 bins, squashing again; the rest stays dimmed
