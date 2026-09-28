@@ -345,7 +345,7 @@ class Scene01(MovingCameraScene, WordleDarkScene):
     # a : empty board up from frame 0; START typed into row 0
     @subscene
     def type_start(self):
-        self.board.type_word(self, 0, "start", run_time=1.8, per_letter=key_cues(self))
+        self.board.type_word(self, 0, "start", run_time=3.0, per_letter=key_cues(self))
 
     # b : bottom five rows fade, board drops so START is centred, bg to navy
     def _setup_to_navy(self):
