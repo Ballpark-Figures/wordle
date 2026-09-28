@@ -13,10 +13,12 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   c guesses      — "12,972 Guesses" + the guess column, same         (04c, VO 2)
   d group_aahed  — the top guess to top centre, the rest fade; the
                    answers shrink into AAHED's groups, members not on
-                   screen rising from below the column; ovals drawn  (04d, VO 3)
+                   screen rising from below the column; ovals drawn,
+                   scattered over the frame (not in rows)            (04d, VO 3)
   e group_more   — AAHED off left, PIGGY in from right, ovals out,
                    regroup, ovals back; the same again with CODES    (04e, VO 3)
-  f back         — the reverse: back to answers left, guesses right  (04f, VO 4)
+  f back         — undo the grouping: answers back to their column, the
+                   guess list back on the right                      (04f, VO 4)
   g reveal_right — the guess glyphs flip over to letters             (04g, VO 5)
   h reveal_left  — the answer glyphs flip over to letters            (04h, VO 5)
   i piggy        — PIGGY on top, the answers into PIGGY's groups, a
@@ -24,8 +26,8 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
 
 REUSE MAP — every element and the one source it comes from:
   board                  assets/board.py `get_board`, as scenes 02/03
-  pigpen words + decode  assets/pigpen.py (NEW) `PigpenWord`, `decode` — the
-                         decode is board.TileFlip's squash applied to a glyph
+  pigpen words + decode  assets/pigpen.py `PigpenWord` (board tiles + glyphs), `decode` — the
+                         decode is board.TileFlip's squash, tile and glyph together
   list reveal            hangman's word_tables_scene `_reveal`: title FadeIn 0.4,
                          then rows FadeIn(shift=UP*0.3) in a LaggedStart, lag 0.12
   scored PIGGY rows      assets/board.py `get_scored_row`
@@ -37,6 +39,7 @@ On-screen text is only what column 2 names: the two titles, the words, the "…"
 """
 from pathlib import Path
 import math
+import random
 import sys
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -44,7 +47,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 
 from config import *
 from assets.board import get_board, get_scored_row
-from assets.pigpen import PigpenWord, decode, GLYPH, PITCH_FRAC
+from assets.pigpen import PigpenWord, decode, WORD_W
 from assets import lists_data
 
 DATA = lists_data.load()
@@ -65,17 +68,18 @@ OFF_DY = 0.003             # below-frame spacing per alphabetical rank (compress
 # ── the groups ────────────────────────────────────────────────────────────────
 GUESS_Y = 3.7              # the guess, top centre
 GUESS_SCALE = 1.2
-WORD_W = (4 * PITCH_FRAC + 1) * GLYPH      # a word's width at list size
-GROUP_SCALE = 0.55         # word size inside a group, before any fit-to-frame
-CELL_GAP = 0.25            # between words in a group (group size)
-CELL_DY = 0.36             # word row pitch in a group (group size)
+GROUP_SCALE = 0.45         # word size inside a group, before any fit-to-frame
+CELL_GAP = 0.2             # between words in a group (group size)
+CELL_DY = 0.26             # word row pitch in a group (group size)
 ELLIPSE_K = 1.3            # ellipse / word-grid bounding box
 ELLIPSE_PAD = 0.4
 ELLIPSE_STROKE = 3
-BLOCK_GAP = 0.35           # between ovals
-REGION_W = 15.2
+BLOCK_GAP = 0.3            # least clear space between two ovals
+SCATTER_TRIES = 300       # candidate spots per oval
+REGION_HALF_W = 7.7        # ovals stay inside x in [-7.7, 7.7]
 REGION_TOP, REGION_BOT = 2.95, -4.2
 HEADER_W = 1.3             # a scored PIGGY row's width atop its oval
+HEADER_H = 0.35            # room reserved above an oval for that row
 OFF_X = 10.0               # a guess entering/leaving sideways starts/ends here
 
 
@@ -90,10 +94,44 @@ def _offspot(w):
     return np.array([LEFT_X, y, 0.0])
 
 
+def _scatter(sizes, seed):
+    """Centres for blocks of size (w, h), SCATTERED over the group region rather
+    than packed in rows. Best-candidate sampling: biggest block first, each takes
+    whichever of SCATTER_TRIES random spots leaves the widest gap to the blocks
+    already placed, and no spot closer than BLOCK_GAP counts. If a block finds no
+    spot, everything shrinks 5% and the placement starts over.
+
+    Seeded, so a render is repeatable; change the seed string for a different
+    scatter. Returns (shrink factor, centres in block order)."""
+    rng = random.Random(seed)
+    order = sorted(range(len(sizes)), key=lambda i: -sizes[i][0] * sizes[i][1])
+    f = 1.0
+    while True:
+        placed = {}
+        for i in order:
+            w, h = sizes[i][0] * f, sizes[i][1] * f
+            xr, ylo, yhi = REGION_HALF_W - w / 2, REGION_BOT + h / 2, REGION_TOP - h / 2
+            if xr < 0 or ylo > yhi:
+                break
+            best, best_gap = None, -1.0
+            for _ in range(SCATTER_TRIES):
+                x, y = rng.uniform(-xr, xr), rng.uniform(ylo, yhi)
+                gap = min((max(abs(x - px) - (w + pw) / 2, abs(y - py) - (h + ph) / 2)
+                           for (px, py), pw, ph in placed.values()), default=1e9)
+                if gap >= BLOCK_GAP and gap > best_gap:
+                    best, best_gap = (x, y), gap
+            if best is None:
+                break
+            placed[i] = (best, w, h)
+        if len(placed) == len(sizes):
+            return f, [placed[i][0] for i in range(len(sizes))]
+        f *= 0.95
+
+
 def _layout(guess, header=False):
-    """Word centres, ovals and header positions for `guess`'s shown groups, packed
-    in rows across the frame and shrunk to fit if needed. Returns
-    (slots {word: centre}, scale, ovals, header centres)."""
+    """Word centres, ovals and header positions for `guess`'s shown groups: the
+    ovals scattered over the frame (`_scatter`), the words in a tidy grid inside
+    each. Returns (slots {word: centre}, scale, ovals, header centres)."""
     groups = DATA["groups"][guess]
     ww, cg, dy = WORD_W * GROUP_SCALE, CELL_GAP, CELL_DY
     blocks = []
@@ -103,40 +141,24 @@ def _layout(guess, header=False):
         nr = math.ceil(n / nc)
         gw, gh = nc * ww + (nc - 1) * cg, nr * dy
         ew, eh = gw * ELLIPSE_K + ELLIPSE_PAD, gh * ELLIPSE_K + ELLIPSE_PAD
-        hh = 0.35 if header else 0.0
-        blocks.append(dict(g=g, nc=nc, ew=ew, eh=eh, h=eh + hh, hh=hh))
-    rows, cur, w = [], [], 0.0
-    for b in blocks:                             # greedy rows
-        if cur and w + BLOCK_GAP + b["ew"] > REGION_W:
-            rows.append(cur)
-            cur, w = [], 0.0
-        w += (BLOCK_GAP if cur else 0) + b["ew"]
-        cur.append(b)
-    rows.append(cur)
-    total_h = sum(max(b["h"] for b in r) for r in rows) + BLOCK_GAP * (len(rows) - 1)
-    f = min(1.0, (REGION_TOP - REGION_BOT) / total_h)
+        hh = HEADER_H if header else 0.0
+        blocks.append(dict(g=g, nc=nc, ew=ew, eh=eh, hh=hh))
+    f, centres = _scatter([(b["ew"], b["eh"] + b["hh"]) for b in blocks],
+                          f"04:{guess}:{header}")
     slots, ovals, headers = {}, [], []
-    y = (REGION_TOP + REGION_BOT) / 2 + total_h * f / 2
-    for r in rows:
-        rh = max(b["h"] for b in r) * f
-        rw = (sum(b["ew"] for b in r) + BLOCK_GAP * (len(r) - 1)) * f
-        x = -rw / 2
-        for b in r:
-            cx = x + b["ew"] * f / 2
-            cy = y - rh / 2 - b["hh"] * f / 2
-            ovals.append(Ellipse(width=b["ew"] * f, height=b["eh"] * f, color=WHITE,
-                                 stroke_width=ELLIPSE_STROKE).move_to([cx, cy, 0]))
-            headers.append(np.array([cx, cy + b["eh"] * f / 2, 0.0]))
-            members, nc = b["g"]["members"], b["nc"]
-            nr = math.ceil(len(members) / nc)
-            for k, word in enumerate(members):
-                i, j = divmod(k, nc)
-                n_in_row = min(nc, len(members) - i * nc)
-                wx = cx + (j - (n_in_row - 1) / 2) * (ww + cg) * f
-                wy = cy + ((nr - 1) / 2 - i) * dy * f
-                slots[word] = np.array([wx, wy, 0.0])
-            x += (b["ew"] + BLOCK_GAP) * f
-        y -= rh + BLOCK_GAP * f
+    for b, (bx, by) in zip(blocks, centres):
+        cx, cy = bx, by - b["hh"] * f / 2          # the oval sits under its header
+        ovals.append(Ellipse(width=b["ew"] * f, height=b["eh"] * f, color=WHITE,
+                             stroke_width=ELLIPSE_STROKE).move_to([cx, cy, 0]))
+        headers.append(np.array([cx, cy + b["eh"] * f / 2, 0.0]))
+        members, nc = b["g"]["members"], b["nc"]
+        nr = math.ceil(len(members) / nc)
+        for k, word in enumerate(members):
+            i, j = divmod(k, nc)
+            n_in_row = min(nc, len(members) - i * nc)
+            wx = cx + (j - (n_in_row - 1) / 2) * (ww + cg) * f
+            wy = cy + ((nr - 1) / 2 - i) * dy * f
+            slots[word] = np.array([wx, wy, 0.0])
     return slots, GROUP_SCALE * f, ovals, headers
 
 
@@ -147,7 +169,7 @@ class Scene04(WordleBoardScene):
     guesses — the guess list, in pigpen
     group_aahed — the answers into AAHED's groups
     group_more — PIGGY's groups, then CODES's
-    back — reverse to the two lists
+    back — undo the grouping, back to the two lists
     reveal_right — decode the guesses
     reveal_left — decode the answers
     piggy — PIGGY's groups, scored, then clear
@@ -171,7 +193,7 @@ class Scene04(WordleBoardScene):
         mob = self.ans[w]
         f = scale / self.scale[w]
         self.scale[w] = scale
-        return mob.animate.scale(f, scale_stroke=True).move_to(centre)
+        return mob.animate.scale(f).set_glyph_stroke(scale).move_to(centre)
 
     def _regroup(self, slots, scale, run_time, revealed=False):
         """Every word in `slots` to its slot at `scale`; every other answer on screen
@@ -253,7 +275,7 @@ class Scene04(WordleBoardScene):
     @subscene
     def group_aahed(self):
         self._setup_group_aahed()
-        self.play(self.guess.animate.scale(GUESS_SCALE, scale_stroke=True)
+        self.play(self.guess.animate.scale(GUESS_SCALE).set_glyph_stroke(GUESS_SCALE)
                   .move_to([0, GUESS_Y, 0]),
                   *[FadeOut(m) for m in self.gss[1:]],
                   FadeOut(self.gss_title), FadeOut(self.gss_dots),
@@ -262,8 +284,8 @@ class Scene04(WordleBoardScene):
         self.play(*[Create(o) for o in self.ovals], run_time=0.8)
 
     def _setup_group_more(self):
-        self.guess2 = PigpenWord(SECOND).scale(GUESS_SCALE, scale_stroke=True)
-        self.guess3 = PigpenWord(THIRD).scale(GUESS_SCALE, scale_stroke=True)
+        self.guess2 = PigpenWord(SECOND).scale(GUESS_SCALE).set_glyph_stroke(GUESS_SCALE)
+        self.guess3 = PigpenWord(THIRD).scale(GUESS_SCALE).set_glyph_stroke(GUESS_SCALE)
         self.lay2 = _layout(SECOND)
         self.lay3 = _layout(THIRD)
 
@@ -286,27 +308,22 @@ class Scene04(WordleBoardScene):
         self.guess2 = self.guess3 = self.lay2 = self.lay3 = None
 
     def _setup_back(self):
-        # AAHED left the frame to the left in e; it comes back the way it went
-        self.top = self.gss[0].move_to([-OFF_X, GUESS_Y, 0])
-        self.add(self.top)
+        # AAHED left the frame in e; it fades back in at its own column slot
+        self.gss[0].scale(1 / GUESS_SCALE).set_glyph_stroke(1.0).move_to(_home(0, RIGHT_X))
 
-    # f : the reverse — back to the answers on the left, the guesses on the right
+    # f : undo the grouping — the answers back into their column, the guess list
+    #     back on the right (CODES, still on top, fades as it returns)
     @subscene
     def back(self):
         self._setup_back()
         self.play(*[FadeOut(o) for o in self.ovals], run_time=0.5)
         self.ovals = None
-        self.play(self.guess.animate.move_to([OFF_X, GUESS_Y, 0]),
-                  self.top.animate.move_to([0, GUESS_Y, 0]), run_time=1.0)
-        self.remove(self.guess)
-        self.guess = None
         self._regroup(self._column(), 1.0, 2.0)
-        self.play(self.top.animate.scale(1 / GUESS_SCALE, scale_stroke=True)
-                  .move_to(_home(0, RIGHT_X)),
-                  *[FadeIn(m) for m in self.gss[1:]],
+        self.play(FadeOut(self.guess),
+                  *[FadeIn(m) for m in self.gss],
                   FadeIn(self.gss_title), FadeIn(self.gss_dots),
                   FadeIn(self.ans_title), FadeIn(self.ans_dots), run_time=1.0)
-        self.top = None
+        self.guess = None
 
     # g : the guesses decode, glyph by glyph
     @subscene
@@ -323,7 +340,7 @@ class Scene04(WordleBoardScene):
 
     def _setup_piggy(self):
         self.guess = PigpenWord(SECOND, revealed=True) \
-            .scale(GUESS_SCALE, scale_stroke=True).move_to([OFF_X, GUESS_Y, 0])
+            .scale(GUESS_SCALE).set_glyph_stroke(GUESS_SCALE).move_to([OFF_X, GUESS_Y, 0])
         self.slots, self.gscale, self.ovals, heads = _layout(SECOND, header=True)
         self.heads = []
         for g, c in zip(DATA["groups"][SECOND], heads):
