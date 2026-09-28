@@ -119,16 +119,19 @@ def _scatter(sizes, edge_sizes, seed, block_gap=BLOCK_GAP, region_top=REGION_TOP
     shrinks 5% and the placement starts over. `blocked` boxes ((x, y), w, h) are
     kept clear, like boxes already placed (06's corner label).
 
-    With `targets` (a point per oval), each oval instead takes the valid spot
-    NEAREST its target, from candidates half spread over the region and half
-    clustered round the target (NEAR_SIGMA) — 06c/d's continuity, so a group lands
-    near where its members already are. Without them the sampling is untouched.
+    With `targets` (a point, or None, per oval), an oval WITH a target takes the
+    valid spot NEAREST it, from candidates half spread over the region and half
+    clustered round it (NEAR_SIGMA), and those ovals are placed first — 06c/d's
+    pattern anchoring. An oval without one is scattered as usual; with no targets
+    at all, nothing here changes.
 
     Seeded, so a render is repeatable; change the seed string for a different
     scatter. Returns (shrink factor, interior centres, [(edge index, centre)])."""
     rng = random.Random(seed)
     phase = rng.random()
-    order = sorted(range(len(sizes)), key=lambda i: -sizes[i][0] * sizes[i][1])
+    anchored = (lambda i: targets is not None and targets[i] is not None)
+    order = sorted(range(len(sizes)),
+                   key=lambda i: (not anchored(i), -sizes[i][0] * sizes[i][1]))
     f = 1.0
     while True:
         hung = _place_edges(edge_sizes, f, phase)
@@ -140,7 +143,7 @@ def _scatter(sizes, edge_sizes, seed, block_gap=BLOCK_GAP, region_top=REGION_TOP
             if xr < 0 or ylo > yhi:
                 break
             best, best_gap = None, -1.0
-            if targets is None:
+            if not anchored(i):
                 for _ in range(SCATTER_TRIES):
                     box = ((rng.uniform(-xr, xr), rng.uniform(ylo, yhi)), w, h)
                     gap = min((_gap(box, b) for b in boxes), default=1e9)
@@ -238,7 +241,7 @@ def row_aspect():
     return ROW_ASPECT
 
 
-def dot_layout(data, guess, seed=None, blocked=(), prev=None):
+def dot_layout(data, guess, seed=None, blocked=(), prev=None, anchors=None):
     """06b: EVERY group of `guess` (lists_data's `full`), each answer a dot in a
     square-ish grid, the group's scored row atop it, sqrt(size) dot pitches wide —
     so the row's width and height both go as the square root of its dots. Groups
@@ -246,10 +249,16 @@ def dot_layout(data, guess, seed=None, blocked=(), prev=None):
     over the WHOLE frame (DOT_REGION_TOP) but for the `blocked` boxes — the guess
     has left the top centre (06: for the corner, kept clear via `blocked`).
 
-    `prev` ({word: where its dot is now}) makes the layout CONTINUE the one on
-    screen (06c/d): each group lands as near as it can to its members' centroid,
-    and its dots fill the grid in the order they sit now — top to bottom into rows,
-    left to right within one — so neighbours arrive as neighbours.
+    Two ways to CONTINUE the layout on screen (06c/d):
+      `anchors` ({pattern code: where that pattern's row is now}) — a group whose
+        pattern is already on screen keeps its row where it is, as near as it fits;
+        the rest scatter round them.
+      `prev` ({word: where its dot is now}) — each group's dots fill its grid in the
+        order they sit now (top to bottom into rows, left to right within one), so
+        neighbours arrive as neighbours.
+    (Placing groups at their members' CENTROID was tried and dropped, user's call:
+    a new group draws from all over, so every centroid sat mid-frame and the big
+    groups just bunched up in the centre.)
 
     Returns (groups, dots {word: centre}, row centres, row widths, dot radius) —
     groups in lists_data's order, the two lists in the same order."""
@@ -266,8 +275,10 @@ def dot_layout(data, guess, seed=None, blocked=(), prev=None):
 
     bs = [block(g) for g in groups]
     targets = None
-    if prev is not None:
-        targets = [np.mean([prev[w] for w in g["members"]], axis=0) for g in groups]
+    if anchors is not None:           # a row's spot, as its box's centre (unshrunk)
+        targets = [None if g["code"] not in anchors else
+                   anchors[g["code"]] - np.array([0.0, (b["h"] - DOT_PAD - b["rh"]) / 2, 0.0])
+                   for g, b in zip(groups, bs)]
     f, centres, _ = _scatter([(b["w"], b["h"]) for b in bs], [],
                              seed or f"06:{guess}:dots", block_gap=DOT_BLOCK_GAP,
                              region_top=DOT_REGION_TOP, blocked=blocked, targets=targets)

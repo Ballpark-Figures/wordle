@@ -48,9 +48,10 @@ LAYOUT CHOICES, flagged:
   - ROATE's definition: 28pt white, two lines ("n. Obsolete" / "variant of
     rote", each narrower than ROATE), left-aligned under the corner word, "n" and
     "rote" italic as in the Doc; the ROATE dot layout keeps its box clear too.
-  - A switch (c, d) is kept calm (user's call): each new group lands as near as it
-    can to where its dots already are, the dots keep their neighbours, and rows
-    leave and arrive by their NEAREST edge. 06b's entrances still come radially.
+  - A switch (c, d) is kept calm (user's call): a pattern both words make keeps
+    its row where it was (pattern anchoring, groups.py `anchors`), the dots keep
+    their neighbours, and rows leave and arrive by their NEAREST edge. 06b's
+    entrances still come radially.
   - What enters comes from beyond the frame's edge, a group's row and hidden
     members together, along the line from the group region's centre out through
     where they land.
@@ -176,7 +177,8 @@ class Scene06(WordleBoardScene):
         are the flip's new faces — and the rows leaving and arriving."""
         groups, spots, pos, widths, r = dot_layout(
             DATA, word, blocked=blocked,
-            prev={w: d.get_center() for w, d in self.dots.items()})
+            prev={w: d.get_center() for w, d in self.dots.items()},
+            anchors={c: row.get_center() for c, row in self.rows.items()})
         assert len(spots) == sum(g["size"] for g in groups) == DATA["n_answers"]
         self.t_spots, self.t_scale, self.dot_r = spots, r / self.dot_r, r
         self.t_rows = {g["code"]: scored_row(word, g["code"], wd, c,
