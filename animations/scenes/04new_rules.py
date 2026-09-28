@@ -34,7 +34,8 @@ REUSE MAP — every element and the one source it comes from:
                          decode is board.TileFlip's squash, tile and glyph together
   list reveal            hangman's word_tables_scene `_reveal`: title FadeIn 0.4,
                          then rows FadeIn(shift=UP*0.3) in a LaggedStart, lag 0.12
-  scored PIGGY rows      assets/board.py `get_scored_row`
+  group layout           assets/groups.py `layout` (extracted from this scene for 06)
+  scored PIGGY rows      assets/groups.py `scored_headers` (board.py `get_scored_row`)
   labels                 crisp_text, white, FadeIn (scene 01's convention)
   colours                BOARD_NAVY via WordleBoardScene; tiles config.py TILE_*
   counts, lists, groups  assets/lists_data.py -> lists_cache.json: line counts of
@@ -42,16 +43,15 @@ REUSE MAP — every element and the one source it comes from:
 On-screen text is only what column 2 names: the two titles, the words, the "…".
 """
 from pathlib import Path
-import math
-import random
 import sys
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 
 from config import *
-from assets.board import get_board, get_scored_row
-from assets.pigpen import PigpenWord, decode, WORD_W
+from assets.board import get_board
+from assets.pigpen import PigpenWord, decode
+from assets.groups import layout, scored_headers, GUESS_Y, GUESS_SCALE
 from assets import lists_data
 
 DATA = lists_data.load()
@@ -69,26 +69,8 @@ TITLE_FS = 40
 DOTS_FS = 40
 OFF_DY = 0.003             # below-frame spacing per alphabetical rank (compressed)
 
-# ── the groups ────────────────────────────────────────────────────────────────
-GUESS_Y = 3.7              # the guess, top centre
-GUESS_SCALE = 1.2
-GROUP_SCALE = 0.45         # word size inside a group, before any fit-to-frame
-CELL_GAP = 0.2             # between words in a group (group size)
-CELL_DY = 0.26             # word row pitch in a group (group size)
-ELLIPSE_K = 1.3            # a group's footprint / its word grid — the room an oval
-ELLIPSE_PAD = 0.4          #   round it took; no oval is drawn (user's call), but the
-                           #   clusters keep that spacing
-BLOCK_GAP = 0.3            # least clear space between two groups' footprints
-SCATTER_TRIES = 300       # candidate spots per oval
-REGION_HALF_W = 7.7        # ovals stay inside x in [-7.7, 7.7]
-REGION_TOP, REGION_BOT = 2.95, -4.2
-HEADER_W = 1.9             # a scored PIGGY row's width atop its oval
-HEADER_H = 0.45            # room reserved above an oval for that row
+# ── the groups (layout in assets/groups.py) ─────────────────────────────────
 OFF_X = 10.0               # a guess entering/leaving sideways starts/ends here
-EDGE_SLOTS = 12            # evenly spaced points round the border for edge ovals
-EDGE_TOP_CLEAR = 4.5       # no edge oval on the top edge within this of centre
-EDGE_OUT = 0.25            # edge oval centre beyond the edge, as a fraction of
-                           # its half-size (0 = centred on the edge)
 
 
 def _home(r, x):
@@ -102,129 +84,8 @@ def _offspot(w):
     return np.array([LEFT_X, y, 0.0])
 
 
-def _gap(a, b):
-    """Clear space between two boxes ((x, y), w, h); negative if they overlap."""
-    (ax, ay), aw, ah = a
-    (bx, by), bw, bh = b
-    return max(abs(ax - bx) - (aw + bw) / 2, abs(ay - by) - (ah + bh) / 2)
-
-
-def _border_point(s):
-    """The point at arc length `s` round the frame's edge, clockwise from the
-    top-left corner, and the outward normal there."""
-    X, Y = config.frame_x_radius, config.frame_y_radius
-    s %= 4 * (X + Y)
-    for (x0, y0), (dx, dy), n, length in [((-X, Y), (1, 0), (0, 1), 2 * X),
-                                          ((X, Y), (0, -1), (1, 0), 2 * Y),
-                                          ((X, -Y), (-1, 0), (0, -1), 2 * X),
-                                          ((-X, -Y), (0, 1), (-1, 0), 2 * Y)]:
-        if s <= length:
-            return np.array([x0 + dx * s, y0 + dy * s]), np.array(n, float)
-        s -= length
-
-
-def _place_edges(sizes, f, rng_phase):
-    """Hang edge ovals on the frame's border: EDGE_SLOTS evenly spaced points round
-    it (the top middle kept clear for the guess), each oval's centre pushed EDGE_OUT
-    of its half-size beyond the edge. A slot whose oval would hit one already hung
-    is skipped. Returns [(index into sizes, box)]."""
-    X, Y = config.frame_x_radius, config.frame_y_radius
-    perim = 4 * (X + Y)
-    hung, k = [], 0
-    for j in range(EDGE_SLOTS):
-        if k >= len(sizes):
-            break
-        p, n = _border_point((rng_phase + j / EDGE_SLOTS) * perim)
-        if n[1] > 0 and abs(p[0]) < EDGE_TOP_CLEAR:
-            continue
-        w, h = sizes[k][0] * f, sizes[k][1] * f
-        c = p + n * np.array([w, h]) / 2 * EDGE_OUT
-        box = ((c[0], c[1]), w, h)
-        if all(_gap(box, b) >= BLOCK_GAP for _, b in hung):
-            hung.append((k, box))
-            k += 1
-    return hung
-
-
-def _scatter(sizes, edge_sizes, seed):
-    """Centres for the interior ovals (sizes (w, h)), SCATTERED over the group
-    region rather than packed in rows, around edge ovals hung first on the border.
-    Best-candidate sampling: biggest oval first, each takes whichever of
-    SCATTER_TRIES random spots leaves the widest gap to everything placed, and no
-    spot closer than BLOCK_GAP counts. If an oval finds no spot, everything shrinks
-    5% and the placement starts over.
-
-    Seeded, so a render is repeatable; change the seed string for a different
-    scatter. Returns (shrink factor, interior centres, [(edge index, centre)])."""
-    rng = random.Random(seed)
-    phase = rng.random()
-    order = sorted(range(len(sizes)), key=lambda i: -sizes[i][0] * sizes[i][1])
-    f = 1.0
-    while True:
-        hung = _place_edges(edge_sizes, f, phase)
-        boxes = [b for _, b in hung]
-        placed = {}
-        for i in order:
-            w, h = sizes[i][0] * f, sizes[i][1] * f
-            xr, ylo, yhi = REGION_HALF_W - w / 2, REGION_BOT + h / 2, REGION_TOP - h / 2
-            if xr < 0 or ylo > yhi:
-                break
-            best, best_gap = None, -1.0
-            for _ in range(SCATTER_TRIES):
-                box = ((rng.uniform(-xr, xr), rng.uniform(ylo, yhi)), w, h)
-                gap = min((_gap(box, b) for b in boxes), default=1e9)
-                if gap >= BLOCK_GAP and gap > best_gap:
-                    best, best_gap = box, gap
-            if best is None:
-                break
-            placed[i] = best
-            boxes.append(best)
-        if len(placed) == len(sizes):
-            return (f, [placed[i][0] for i in range(len(sizes))],
-                    [(k, b[0]) for k, b in hung])
-        f *= 0.95
-
-
 def _layout(guess, header=False, chain=False):
-    """Word centres, ovals and header positions for `guess`'s shown groups: the
-    interior ovals scattered over the frame and the edge ovals hung off its border
-    (`_scatter`), the words in a tidy grid inside each. `chain` takes 04e's
-    carry-over groups (lists_data) instead of the size-target ones.
-    Returns (slots {word: centre}, scale, header centres, groups) — the last two
-    in one order, edge groups after interior ones. (An 'oval' throughout is a
-    group's footprint; none is drawn.)"""
-    key = "chain" if chain else "groups"
-    inner, edge = DATA[key][guess], DATA[key + "_edge"][guess]
-    ww, cg, dy = WORD_W * GROUP_SCALE, CELL_GAP, CELL_DY
-    hh = HEADER_H if header else 0.0
-
-    def block(g):
-        n = len(g["members"])
-        nc = math.ceil(math.sqrt(n))
-        nr = math.ceil(n / nc)
-        gw, gh = nc * ww + (nc - 1) * cg, nr * dy
-        return dict(g=g, nc=nc, ew=gw * ELLIPSE_K + ELLIPSE_PAD,
-                    eh=gh * ELLIPSE_K + ELLIPSE_PAD)
-
-    ib, eb = [block(g) for g in inner], [block(g) for g in edge]
-    f, centres, hung = _scatter([(b["ew"], b["eh"] + hh) for b in ib],
-                                [(b["ew"], b["eh"] + hh) for b in eb],
-                                f"04:{guess}:{header}:{chain}")
-    placed = list(zip(ib, centres)) + [(eb[k], c) for k, c in hung]
-    slots, headers, groups = {}, [], []
-    for b, (bx, by) in placed:
-        cx, cy = bx, by - hh * f / 2               # the group sits under its header
-        headers.append(np.array([cx, cy + b["eh"] * f / 2, 0.0]))
-        groups.append(b["g"])
-        members, nc = b["g"]["members"], b["nc"]
-        nr = math.ceil(len(members) / nc)
-        for k, word in enumerate(members):
-            i, j = divmod(k, nc)
-            n_in_row = min(nc, len(members) - i * nc)
-            wx = cx + (j - (n_in_row - 1) / 2) * (ww + cg) * f
-            wy = cy + ((nr - 1) / 2 - i) * dy * f
-            slots[word] = np.array([wx, wy, 0.0])
-    return slots, GROUP_SCALE * f, headers, groups
+    return layout(DATA, guess, header=header, chain=chain)
 
 
 class Scene04(WordleBoardScene):
@@ -408,11 +269,7 @@ class Scene04(WordleBoardScene):
         self.guess = PigpenWord(SECOND, revealed=True) \
             .move_to([RIGHT_X, -config.frame_y_radius - 0.6, 0])
         self.slots, self.gscale, heads, groups = _layout(SECOND, header=True)
-        self.heads = []
-        for g, c in zip(groups, heads):
-            row = get_scored_row(SECOND, g["code"])
-            self.heads.append(row.scale_to_fit_width(HEADER_W * self.gscale / GROUP_SCALE)
-                              .move_to(c))
+        self.heads = scored_headers(SECOND, groups, heads, self.gscale)
 
     # i : PIGGY rises from below the guess list to the top WHILE the answers regroup
     #     into its groups; then each group's coloured PIGGY

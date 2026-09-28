@@ -18,6 +18,8 @@ Provenance:
                            and tiles decoded POSITION 0 MOST SIGNIFICANT, as
                            game_data.py does; `size` is the WHOLE group, `members`
                            the words shown (alphabetical)
+  full                   — scene 06b: EVERY group of each FULL_GUESSES guess, all
+                           members, largest first (ties by code)
 
 THE GUESSES: the first is "the topmost guess" of the list (04d), read from
 guess.txt, never typed; PIGGY and CODES are the script's own choices (04e).
@@ -60,6 +62,7 @@ CHAIN_TOP_UP = 3                  # newcomers added to a group
 N_EDGE = 8                        # edge groups cached (the scene uses as many as fit)
 EDGE_CAP = 9                      # most words shown in one edge group
 COLUMN = 12                       # answers in the on-screen column (scene N_ROWS)
+FULL_GUESSES = ["piggy"]          # guesses whose EVERY group is cached (06b's dots)
 
 
 def _read(name):
@@ -133,6 +136,9 @@ def _build():
     # size-target selections start from the answer column (04d, 04i)
     column = set(answers[:COLUMN])
     out["groups_edge"] = {g: _edges(full[g], out["groups"][g], column) for g in order}
+    # 06b: every group of the dotted guess, largest first
+    out["full"] = {g: sorted(full[g], key=lambda grp: (-grp["size"], grp["code"]))
+                   for g in FULL_GUESSES}
     # 04e: each guess regroups what the one before it left in its INTERIOR ovals —
     # edge words stand for "the rest", and counting them swamped every group
     shown = _words(out["groups"][order[0]])
