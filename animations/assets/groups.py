@@ -241,7 +241,7 @@ def row_aspect():
     return ROW_ASPECT
 
 
-def dot_layout(data, guess, seed=None, blocked=(), prev=None, anchors=None):
+def dot_layout(data, guess, seed=None, blocked=(), anchors=None):
     """06b: EVERY group of `guess` (lists_data's `full`), each answer a dot in a
     square-ish grid, the group's scored row atop it, sqrt(size) dot pitches wide —
     so the row's width and height both go as the square root of its dots. Groups
@@ -249,13 +249,10 @@ def dot_layout(data, guess, seed=None, blocked=(), prev=None, anchors=None):
     over the WHOLE frame (DOT_REGION_TOP) but for the `blocked` boxes — the guess
     has left the top centre (06: for the corner, kept clear via `blocked`).
 
-    Two ways to CONTINUE the layout on screen (06c/d):
-      `anchors` ({pattern code: where that pattern's row is now}) — a group whose
-        pattern is already on screen keeps its row where it is, as near as it fits;
-        the rest scatter round them.
-      `prev` ({word: where its dot is now}) — each group's dots fill its grid in the
-        order they sit now (top to bottom into rows, left to right within one), so
-        neighbours arrive as neighbours.
+    `anchors` ({pattern code: where that pattern's row is now}) CONTINUES the
+    layout on screen (06c/d): a group whose pattern is already on screen keeps its
+    row where it is, as near as it fits; the rest scatter round them. (Which dot
+    goes to which slot is the scene's business — 06 matches them by distance.)
     (Placing groups at their members' CENTROID was tried and dropped, user's call:
     a new group draws from all over, so every centroid sat mid-frame and the big
     groups just bunched up in the centre.)
@@ -289,12 +286,7 @@ def dot_layout(data, guess, seed=None, blocked=(), prev=None, anchors=None):
         widths.append(b["rw"] * f)
         gy = top - (b["rh"] + DOT_HEAD_GAP) * f          # top of the dot grid
         nc, n = b["nc"], g["size"]
-        members = g["members"]
-        if prev is not None:                 # rows by height, each row left to right
-            by_y = sorted(members, key=lambda w: -prev[w][1])
-            members = [w for i in range(0, n, nc)
-                       for w in sorted(by_y[i:i + nc], key=lambda w: prev[w][0])]
-        for k, word in enumerate(members):
+        for k, word in enumerate(g["members"]):
             i, j = divmod(k, nc)
             n_in_row = min(nc, n - i * nc)
             dots[word] = np.array([bx + (j - (n_in_row - 1) / 2) * p * f,

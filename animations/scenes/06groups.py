@@ -21,8 +21,8 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                    change); then every dot moves to its TRACE group, the rows
                    TRACE never makes slide off, the rows only TRACE makes
                    slide in                                              (06c, VO 1)
-  d roate        — the same switch to ROATE; then "n. Obsolete variant of
-                   rote" fades in under the corner word                  (06d, VO 2)
+  d roate        — the same switch to ROATE, with "n. Obsolete variant of
+                   rote" fading in under the corner word during the shuffle (06d, VO 2)
 
 REUSE MAP — every element and the one source it comes from:
   group layout (a)      assets/groups.py `layout(chain=True, header=True)`
@@ -49,9 +49,16 @@ LAYOUT CHOICES, flagged:
     rote", each narrower than ROATE), left-aligned under the corner word, "n" and
     "rote" italic as in the Doc; the ROATE dot layout keeps its box clear too.
   - A switch (c, d) is kept calm (user's call): a pattern both words make keeps
-    its row where it was (pattern anchoring, groups.py `anchors`), the dots keep
-    their neighbours, and rows leave and arrive by their NEAREST edge. 06b's
-    entrances still come radially.
+    its row where it was (pattern anchoring, groups.py `anchors`), and rows leave
+    and arrive by their NEAREST edge. 06b's entrances still come radially.
+  - From 06c on a dot is ONE ANSWER OF ITS GROUP, not a particular word (user's
+    call): every group always has exactly as many dots as answers, but a switch
+    matches the dots on screen to the new slots by least total squared distance
+    (scipy linear_sum_assignment), so most move only locally. MEASURED for
+    CODES to TRACE: median dot move 1.31 (5.85 with each dot tied to its word),
+    90% under 2.47; the matching takes ~4 s at setup.
+  - The corner word (and ROATE's definition) keep CORNER_MARGIN of clear space
+    round them; no dot or row enters it.
   - What enters comes from beyond the frame's edge, a group's row and hidden
     members together, along the line from the group region's centre out through
     where they land.
@@ -68,6 +75,7 @@ from assets.pigpen import PigpenWord, reletter
 from assets.groups import (layout, scored_headers, scored_row, dot_layout, GUESS_Y,
                            GUESS_SCALE, HEADER_W, REGION_BOT, DOT_REGION_TOP)
 from assets import lists_data
+from scipy.optimize import linear_sum_assignment
 
 DATA = lists_data.load()
 GUESS = DATA["guesses"][2]                         # codes — 04e's last guess
@@ -84,7 +92,15 @@ DOT_COLOR = WHITE
 ENTER_FROM = np.array([0.0, (DOT_REGION_TOP + REGION_BOT) / 2, 0.0])
 ENTER_DIST = 10.0          # how far beyond its spot an entering group starts
 CORNER_BUFF = 0.3          # the corner label's gap to the frame's edges
+CORNER_MARGIN = 0.35       # clear space kept round the corner word (and definition)
 EDGE_CLEAR = 0.3           # how far past its nearest edge a switch's row goes
+
+
+def _keepout(mob):
+    """The box ((x, y), w, h) the dot groups keep clear of round `mob` — its bounds
+    plus CORNER_MARGIN on every side."""
+    c = mob.get_center()
+    return ((c[0], c[1]), mob.width + 2 * CORNER_MARGIN, mob.height + 2 * CORNER_MARGIN)
 
 
 class Scene06(WordleBoardScene):
@@ -108,7 +124,7 @@ class Scene06(WordleBoardScene):
         w, h = self.guess.width, self.guess.height
         self.corner = np.array([-config.frame_x_radius + CORNER_BUFF + w / 2,
                                 config.frame_y_radius - CORNER_BUFF - h / 2, 0.0])
-        self.corner_box = ((self.corner[0], self.corner[1]), w, h)
+        self.corner_box = _keepout(self.guess.copy().move_to(self.corner))
 
     # a : CODES's groups, held — its VO plays over the framework's holds
     @subscene
@@ -177,10 +193,19 @@ class Scene06(WordleBoardScene):
         are the flip's new faces — and the rows leaving and arriving."""
         groups, spots, pos, widths, r = dot_layout(
             DATA, word, blocked=blocked,
-            prev={w: d.get_center() for w, d in self.dots.items()},
             anchors={c: row.get_center() for c, row in self.rows.items()})
         assert len(spots) == sum(g["size"] for g in groups) == DATA["n_answers"]
-        self.t_spots, self.t_scale, self.dot_r = spots, r / self.dot_r, r
+        self.t_scale, self.dot_r = r / self.dot_r, r
+        # a dot stands for ONE ANSWER IN ITS GROUP, not for a particular word, so
+        # each group gets exactly as many dots as it has answers but any dot may
+        # fill any slot: the dots on screen are matched to the new slots by least
+        # total squared distance, so most move only locally and the surplus travels
+        dots, words = list(self.dots.values()), list(spots)
+        a = np.array([d.get_center()[:2] for d in dots])
+        b = np.array([spots[w][:2] for w in words])
+        i, j = linear_sum_assignment(((a[:, None, :] - b[None, :, :]) ** 2).sum(-1))
+        self.moves = [(dots[p], spots[words[q]]) for p, q in zip(i, j)]
+        self.t_dots = {words[q]: dots[p] for p, q in zip(i, j)}
         self.t_rows = {g["code"]: scored_row(word, g["code"], wd, c,
                                              stroke=STROKE * min(1.0, wd / HEADER_W))
                        for g, c, wd in zip(groups, pos, widths)}
@@ -228,19 +253,20 @@ class Scene06(WordleBoardScene):
         self.add(self.t_word, *self.stay.values())
         self.guess = self.t_word
 
-    def _regroup(self, run_time):
-        """Every dot to its new group; shared rows resize and move, the rest leave
-        off the edge or arrive from beyond it."""
-        self.play(*[d.animate.move_to(self.t_spots[w]).scale(self.t_scale)
-                    for w, d in self.dots.items()],
+    def _regroup(self, run_time, extra=()):
+        """Every dot to its matched slot; shared rows resize and move, the rest
+        leave off the edge or arrive from beyond it. `extra` animations join in."""
+        self.play(*extra,
+                  *[d.animate.move_to(c).scale(self.t_scale) for d, c in self.moves],
                   *[Transform(row, self.t_rows[c]) for c, row in self.stay.items()],
                   *[row.animate.move_to(self._edge_out(row)) for row in self.leave.values()],
                   *[row.animate.move_to(home) for row, home in self.enter],
                   run_time=run_time)
         self.remove(*self.stay.values(), *self.leave.values())
         self.add(*[self.t_rows[c] for c in self.stay])
-        self.rows = self.t_rows
-        self.t_word = self.stay = self.leave = self.enter = self.t_rows = self.t_spots = None
+        self.rows, self.dots = self.t_rows, self.t_dots
+        self.t_word = self.stay = self.leave = self.enter = self.t_rows = None
+        self.moves = self.t_dots = None
 
     # c : CODES turns over to TRACE, in the corner and on every row; then the dots
     #     regroup into TRACE's groups, rows leaving and arriving
@@ -256,9 +282,7 @@ class Scene06(WordleBoardScene):
                               for line, ital in GLOSS]) \
             .arrange(DOWN, buff=GLOSS_LINE_BUFF, aligned_edge=LEFT)
         self.gloss.next_to(self.guess, DOWN, buff=GLOSS_BUFF, aligned_edge=LEFT)
-        g = self.gloss
-        self._setup_switch(ROATE, [self.corner_box,
-                                   ((g.get_center()[0], g.get_center()[1]), g.width, g.height)])
+        self._setup_switch(ROATE, [_keepout(VGroup(self.guess, self.gloss))])
 
     # d : TRACE turns over to ROATE and the dots regroup, the same way; then the
     #     definition under ROATE
@@ -266,5 +290,4 @@ class Scene06(WordleBoardScene):
     def roate(self):
         self._setup_roate()
         self._flip(1.0)
-        self._regroup(2.0)
-        self.play(FadeIn(self.gloss), run_time=0.8)
+        self._regroup(2.0, extra=[FadeIn(self.gloss)])
