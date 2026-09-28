@@ -43,6 +43,18 @@ CODES = [g["code"] for g in GAME["guesses"]]
 # text to fit the new row in", so every row from the 7th on costs a shrink.
 COLUMN_H = ROWS * TILE + (ROWS - 1) * GAP
 
+# ...but the column also GROWS toward the full frame as words are added, evenly per
+# row: the ordinary board's height at 6 rows, COLUMN_H_MAX at the last word. So
+# each new row still shrinks the tiles, just less than a fixed height would.
+COLUMN_MARGIN = 0.4        # space kept above and below the finished column
+COLUMN_H_MAX = config.frame_height - 2 * COLUMN_MARGIN
+
+
+def column_height(n_rows):
+    """The column's height once it holds `n_rows` rows (6 .. len(WORDS))."""
+    t = (n_rows - ROWS) / (len(WORDS) - ROWS)
+    return COLUMN_H + t * (COLUMN_H_MAX - COLUMN_H)
+
 # 03b: three 6-row boards side by side. The third holds 4 words and 2 empty rows,
 # so the frame shows three full games' worth of rows.
 GRID_SCALE = 0.85          # tile size as a fraction of the ordinary board's
@@ -65,7 +77,7 @@ class Scene03(WordleBoardScene):
         type_rt, score_rt, grow_rt = 0.45, 0.4, 0.35       # lockstep, all 16
         for i, word in enumerate(WORDS):
             if i >= ROWS:
-                self.board.add_row(self, grow_rt, COLUMN_H)
+                self.board.add_row(self, grow_rt, column_height(i + 1))
             self.board.type_word(self, i, word, type_rt,
                                  per_letter=key_cues(self))
             self.board.reveal(self, i, CODES[i], score_rt, lag_ratio=0)
