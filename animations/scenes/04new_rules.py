@@ -2,8 +2,8 @@
 makes. Navy background.
 
 The empty board is up from frame 0 (setup_scene) — the scene follows talking head
-THC, which covers the cut in. Scene 05 follows directly, so the last beat ends by
-clearing the frame.
+THC, which covers the cut in. Scene 05 follows directly, so an extra last beat (j)
+clears the frame.
 
 BEAT MAP — one subscene per Script.md beat, letters matching:
 
@@ -24,7 +24,8 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   h reveal_left  — the answer glyphs flip over to letters            (04h, VO 5)
   i piggy        — PIGGY rises from below the guess list to the top as
                    the answers regroup into its groups; a scored
-                   PIGGY row atop each oval; then clear              (04i, VO 6)
+                   PIGGY row atop each oval                          (04i, VO 6)
+  j clear_out    — everything out, for scene 05 (not a script beat)
 
 REUSE MAP — every element and the one source it comes from:
   board                  assets/board.py `get_board`, as scenes 02/03
@@ -236,7 +237,8 @@ class Scene04(WordleBoardScene):
     back — undo the grouping, back to the two lists
     reveal_right — decode the guesses
     reveal_left — decode the answers
-    piggy — PIGGY's groups, scored, then clear
+    piggy — PIGGY's groups, scored
+    clear_out — everything out
     """
 
     def setup_scene(self):
@@ -419,8 +421,7 @@ class Scene04(WordleBoardScene):
                               .move_to(c))
 
     # i : PIGGY rises from below the guess list to the top WHILE the answers regroup
-    #     into its groups; ovals, each with its coloured PIGGY; then the frame clears
-    #     for scene 05
+    #     into its groups; ovals, each with its coloured PIGGY
     @subscene
     def piggy(self):
         self._setup_piggy()
@@ -432,5 +433,9 @@ class Scene04(WordleBoardScene):
             self.guess.animate.scale(GUESS_SCALE).move_to([0, GUESS_Y, 0])])
         self.play(*[Create(o) for o in self.ovals],
                   *[FadeIn(h) for h in self.heads], run_time=0.8)
-        self.wait(2.0)
+
+    # j : everything out, so scene 05 starts on an empty frame (not a script beat —
+    #     split from i so the clear can be placed on its own in the edit)
+    @subscene
+    def clear_out(self):
         self.play(FadeOut(Group(*self.mobjects)), run_time=0.8)
