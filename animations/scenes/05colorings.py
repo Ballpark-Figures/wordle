@@ -5,8 +5,9 @@ Scene 04 ends on an empty frame, so this opens from nothing. Talking head THD
 follows, so the last beat ends with the marked grid still on screen.
 
 BEAT MAP — script beat 05a is split into six subscenes (the C's appearance, the
-first split, one per later x3 — the user's call, for editing), so subscene letters
-run AHEAD of the script's from b on:
+first split, one per later x3) and 05i into two (the return, then the five
+vanishing) — the user's calls, for editing — so subscene letters run AHEAD of the
+script's from b on:
 
   a gray_c     — one gray C                                           (05a, VO 1)
   b split      — three copies become green, yellow, gray              (05a, VO 1)
@@ -21,10 +22,11 @@ run AHEAD of the script's from b on:
   k emph_l     — L emphasised                                           (05f, VO 2)
   l unemph     — the emphasis undone                                    (05g, VO 2)
   m impossible — GGGGY, GGGYG above and GYGGG, YGGGG below fade in       (05h, VO 3)
-  n back       — the five shrink back to their slots in the 243, fading out
-                 entirely; every letter fades; the other 238 fade back in
-                 without letters, leaving five empty slots              (05i, VO 4)
-  o trace      — TRACE's letters on the colorings it can produce; the rest's
+  n back       — the five shrink back to their slots in the 243, every
+                 letter fading; the other 238 fade back in without letters (05i, VO 4)
+  o vanish     — the five impossible colorings fade out, leaving five
+                 empty slots (05i split in two — the user's call)       (05i, VO 4)
+  p trace      — TRACE's letters on the colorings it can produce; the rest's
                  colours partly fade (the five empty slots stay empty)  (05j, VO 4)
 
 REUSE MAP — every element and the one source it comes from:
@@ -187,6 +189,7 @@ class Scene05(WordleBoardScene):
     unemph — emphasis undone
     impossible — the other four 4G+1Y colorings fade in around it
     back — the five back to their slots, letters out; the 238 back in
+    vanish — the five fade out
     trace — TRACE's letters on its 150; the rest dimmed
     """
 
@@ -331,12 +334,9 @@ class Scene05(WordleBoardScene):
         self.grid = _level(5)
         for row in self.grid:
             row.letters.set_opacity(0)
-        # the five impossible ones fade out ENTIRELY as they travel home (05i)
-        for code in self.stack:
-            self.grid[_slot(code)].set_opacity(0)
 
-    # n : the five shrink back into the 243, fading out; every letter fades; the
-    #     other 238 fade back in without letters
+    # n : the five shrink back into the 243, letters fading; the other 238 fade
+    #     back in without letters
     @subscene
     def back(self):
         self._setup_back()
@@ -347,16 +347,21 @@ class Scene05(WordleBoardScene):
                   run_time=1.5)
         self.stack = None
 
+    # o : the five impossible colorings fade out, leaving five empty slots (05i)
+    @subscene
+    def vanish(self):
+        self.play(*[FadeOut(self.grid[_slot(c)]) for c in IMPOSSIBLE], run_time=0.8)
+
     # ── j ─────────────────────────────────────────────────────────────────────
     def _setup_trace(self):
         self.trace_letters = VGroup(*[_letters_on(self.grid[_slot(c)].tiles, TRACE_WORD)
                                       for c in sorted(TRACE)])
 
-    # o : TRACE's letters on the colorings it can have; the others' colours fade
+    # p : TRACE's letters on the colorings it can have; the others' colours fade
     @subscene
     def trace(self):
         self._setup_trace()
-        # the five impossible slots faded out in n and stay empty — dimming them
+        # the five impossible slots faded out in o and stay empty — dimming them
         # here would bring them back at DIM
         keep = {_slot(c) for c in TRACE} | {_slot(c) for c in IMPOSSIBLE}
         self.play(FadeIn(self.trace_letters),
