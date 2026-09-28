@@ -62,7 +62,7 @@ CHAIN_TOP_UP = 3                  # newcomers added to a group
 N_EDGE = 8                        # edge groups cached (the scene uses as many as fit)
 EDGE_CAP = 9                      # most words shown in one edge group
 COLUMN = 12                       # answers in the on-screen column (scene N_ROWS)
-FULL_GUESSES = ["codes", "trace"]   # guesses whose EVERY group is cached (06b/c's dots)
+FULL_GUESSES = ["codes", "trace", "roate"]   # guesses whose EVERY group is cached (06b/c's dots)
 
 
 def _read(name):
