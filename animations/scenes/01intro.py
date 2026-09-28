@@ -30,6 +30,8 @@ then on ONLY an emphasised word carries them (the user's rule).
 
 REUSE MAP
   board, typing, flip        assets/board.py get_board / type_word / reveal
+  typing sound               assets/keys.py key_cues (the only sound in the scene;
+                             words appearing stay silent — the user's call)
   the histogram              assets/word_stacks.py WordStacks + StacksCamera
                              (bulk drawing — see its docstring for why)
   every average, bin, tile   assets/intro_data.py -> intro_cache.json: the
@@ -59,6 +61,7 @@ from manim import MovingCameraScene
 
 from config import *
 from assets.board import get_board, get_scored_row
+from assets.keys import key_cues
 from assets import intro_data
 from assets.word_stacks import (WordStacks, StacksCamera, PITCH, STEP, SIDE,
                                 WORD_W)
@@ -305,7 +308,7 @@ class Scene01(MovingCameraScene, WordleDarkScene):
     # a : empty board up from frame 0; START typed into row 0
     @subscene
     def type_start(self):
-        self.board.type_word(self, 0, "start", run_time=0.8)
+        self.board.type_word(self, 0, "start", run_time=0.8, per_letter=key_cues(self))
 
     # b : bottom five rows fade, board drops so START is centred, bg to navy
     def _setup_to_navy(self):
