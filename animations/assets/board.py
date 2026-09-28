@@ -161,16 +161,23 @@ class WordleBoard(VGroup):
         scene.play(LaggedStart(*pops, lag_ratio=1.0 / n), run_time=run_time)
 
     # ── scoring ───────────────────────────────────────────────────────────────
-    def reveal(self, scene, row, code, run_time, lag_ratio=0.45):
+    def reveal(self, scene, row, code, run_time, lag_ratio=0.45, cols=None):
         """Flip `row` to its scored colours. `code` is a wordle.pattern integer.
 
         POSITION 0 IS THE MOST SIGNIFICANT TRIT of that code — the same convention
         `secondword.py` documents, and the one that silently reverses a row if you
         decode it the other way round.
+
+        `cols` flips only those positions (in the order given), for a beat that
+        scores a row a tile or two at a time — scene 02 explains E, then D, then
+        the rest. Pass the SAME full-row code every time; the positions select from
+        it, so no caller ever decodes a code itself. None flips the whole row.
         """
         trits = [(code // 3 ** (self.n_cols - 1 - i)) % 3 for i in range(self.n_cols)]
-        flips = [TileFlip(self.tiles[row][i], self.letters[row][i], TILE_STATE[t])
-                 for i, t in enumerate(trits)]
+        if cols is None:
+            cols = range(self.n_cols)
+        flips = [TileFlip(self.tiles[row][i], self.letters[row][i], TILE_STATE[trits[i]])
+                 for i in cols]
         scene.play(LaggedStart(*flips, lag_ratio=lag_ratio), run_time=run_time)
 
     # ── the win ───────────────────────────────────────────────────────────────

@@ -44,42 +44,10 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 from config import *
 from assets.board import get_board
 from assets import game_data
+from assets.keys import key_cues
 
 TYPING_SOUND = "keys"
-# ONE KEYSTROKE PER LETTER OF THE ALPHABET, the way a real keyboard behaves: the
-# same letter always makes the same sound, so a letter recurring across guesses
-# sounds like the same physical key being hit again. (In this game S, N, O and Y
-# all come back in SNOWY, so four of its five keys are ones already heard.)
-#
-# The source yields 25 separable presses against 26 letters, so exactly one pair
-# has to share — Q and Z, the two rarest, chosen so the doubling is the least
-# likely to be audible. Q and Z never both appear in a word here anyway.
-KEY_SOUNDS = [f"key{i:02d}" for i in range(1, 26)]
-_Q = ord("q") - ord("a")
-
-# Letters whose assigned key did not sit right, SWAPPED with another letter's. A
-# swap rather than a reassignment, so every letter still owns exactly one sound —
-# the rejected one just moves to a letter this game never types. Pick the partner
-# from a letter that does not appear, or you only move the problem.
-#   s <-> j : S's original key19 was disliked; J is unused here, so it absorbs it.
-KEY_SWAPS = [("s", "j")]
-
-
-def _build_key_map():
-    m = {}
-    for c in "abcdefghijklmnopqrstuvwxyz":
-        m[c] = KEY_SOUNDS[_Q if c == "z" else ord(c) - ord("a")]
-    for a, b in KEY_SWAPS:
-        m[a], m[b] = m[b], m[a]
-    return m
-
-
-KEY_MAP = _build_key_map()
-
-
-def key_for(ch):
-    """The keystroke sound for a letter. Q and Z share; every other letter is its own."""
-    return KEY_MAP[ch.lower()]
+# The per-letter keystroke map lives in assets/keys.py (shared with scene 02).
 # Which keyboard the "sequence" bed is. Same slice length and level throughout, so
 # swapping this string is an A/B of the KEYBOARD alone.
 #   "typing-classic" | "typing-corsair" | "typing-logitech" | "typing-razer"
@@ -96,7 +64,7 @@ TYPING_BED = "typing-classic"
 #       --start 10.0 --duration 0.33 --fade 8 --force
 # "keys" has no such coupling — a cue fires per letter, whatever the pace.
 
-GAME = game_data.load()
+GAME = game_data.load("snowy")
 WORDS = [g["word"] for g in GAME["guesses"]]
 CODES = [g["code"] for g in GAME["guesses"]]
 
@@ -117,10 +85,7 @@ class Scene97(WordleDarkScene):
         word = WORDS[row]
         per_letter = None
         if TYPING_SOUND == "keys":
-            def per_letter(i, ch, at):
-                # `at` places the cue at the letter's own moment — the word is ONE
-                # play now, so the call order alone would stack them all at its start.
-                self.sfx(key_for(ch), at=at)
+            per_letter = key_cues(self)
         elif TYPING_SOUND == "sequence":
             self.sfx(TYPING_BED)
         self.board.type_word(self, row, word, run_time, per_letter=per_letter)

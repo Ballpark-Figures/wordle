@@ -1,49 +1,102 @@
 {
-  "answer": "snowy",
-  "guesses": [
-    {
-      "word": "trace",
-      "code": 0,
-      "tiles": [
-        0,
-        0,
-        0,
-        0,
-        0
-      ]
-    },
-    {
-      "word": "loins",
-      "code": 31,
-      "tiles": [
-        0,
-        1,
-        0,
-        1,
-        1
-      ]
-    },
-    {
-      "word": "dumpy",
-      "code": 2,
-      "tiles": [
-        0,
-        0,
-        0,
-        0,
-        2
-      ]
-    },
-    {
-      "word": "snowy",
-      "code": 242,
-      "tiles": [
-        2,
-        2,
-        2,
-        2,
-        2
-      ]
-    }
-  ]
+  "snowy": {
+    "answer": "snowy",
+    "in_mystery": true,
+    "guesses": [
+      {
+        "word": "trace",
+        "code": 0,
+        "tiles": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "word": "loins",
+        "code": 31,
+        "tiles": [
+          0,
+          1,
+          0,
+          1,
+          1
+        ]
+      },
+      {
+        "word": "dumpy",
+        "code": 2,
+        "tiles": [
+          0,
+          0,
+          0,
+          0,
+          2
+        ]
+      },
+      {
+        "word": "snowy",
+        "code": 242,
+        "tiles": [
+          2,
+          2,
+          2,
+          2,
+          2
+        ]
+      }
+    ]
+  },
+  "rules": {
+    "answer": "ended",
+    "in_mystery": false,
+    "guesses": [
+      {
+        "word": "begin",
+        "code": 28,
+        "tiles": [
+          0,
+          1,
+          0,
+          0,
+          1
+        ]
+      },
+      {
+        "word": "edits",
+        "code": 189,
+        "tiles": [
+          2,
+          1,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "word": "melee",
+        "code": 33,
+        "tiles": [
+          0,
+          1,
+          0,
+          2,
+          0
+        ]
+      },
+      {
+        "word": "ended",
+        "code": 242,
+        "tiles": [
+          2,
+          2,
+          2,
+          2,
+          2
+        ]
+      }
+    ]
+  }
 }
