@@ -98,5 +98,187 @@
         ]
       }
     ]
+  },
+  "antiwordle": {
+    "answer": "tower",
+    "in_mystery": true,
+    "guesses": [
+      {
+        "word": "graze",
+        "code": 28,
+        "tiles": [
+          0,
+          1,
+          0,
+          0,
+          1
+        ]
+      },
+      {
+        "word": "inner",
+        "code": 8,
+        "tiles": [
+          0,
+          0,
+          0,
+          2,
+          2
+        ]
+      },
+      {
+        "word": "queer",
+        "code": 8,
+        "tiles": [
+          0,
+          0,
+          0,
+          2,
+          2
+        ]
+      },
+      {
+        "word": "odder",
+        "code": 89,
+        "tiles": [
+          1,
+          0,
+          0,
+          2,
+          2
+        ]
+      },
+      {
+        "word": "foyer",
+        "code": 62,
+        "tiles": [
+          0,
+          2,
+          0,
+          2,
+          2
+        ]
+      },
+      {
+        "word": "boxer",
+        "code": 62,
+        "tiles": [
+          0,
+          2,
+          0,
+          2,
+          2
+        ]
+      },
+      {
+        "word": "joker",
+        "code": 62,
+        "tiles": [
+          0,
+          2,
+          0,
+          2,
+          2
+        ]
+      },
+      {
+        "word": "hover",
+        "code": 62,
+        "tiles": [
+          0,
+          2,
+          0,
+          2,
+          2
+        ]
+      },
+      {
+        "word": "wooer",
+        "code": 143,
+        "tiles": [
+          1,
+          2,
+          0,
+          2,
+          2
+        ]
+      },
+      {
+        "word": "cower",
+        "code": 80,
+        "tiles": [
+          0,
+          2,
+          2,
+          2,
+          2
+        ]
+      },
+      {
+        "word": "lower",
+        "code": 80,
+        "tiles": [
+          0,
+          2,
+          2,
+          2,
+          2
+        ]
+      },
+      {
+        "word": "mower",
+        "code": 80,
+        "tiles": [
+          0,
+          2,
+          2,
+          2,
+          2
+        ]
+      },
+      {
+        "word": "power",
+        "code": 80,
+        "tiles": [
+          0,
+          2,
+          2,
+          2,
+          2
+        ]
+      },
+      {
+        "word": "rower",
+        "code": 80,
+        "tiles": [
+          0,
+          2,
+          2,
+          2,
+          2
+        ]
+      },
+      {
+        "word": "sower",
+        "code": 80,
+        "tiles": [
+          0,
+          2,
+          2,
+          2,
+          2
+        ]
+      },
+      {
+        "word": "tower",
+        "code": 242,
+        "tiles": [
+          2,
+          2,
+          2,
+          2,
+          2
+        ]
+      }
+    ]
   }
 }

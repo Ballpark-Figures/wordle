@@ -6,7 +6,8 @@ module calls it and writes `game_cache.json`; the SCENE reads that cache, so a r
 imports no solver and the numbers sync between machines through git.
 
 SEVERAL GAMES, ONE CACHE, keyed by name — `load("snowy")` for scene 97's test game,
-`load("rules")` for scene 02. A new scripted game is a new entry in GAMES, not a
+`load("rules")` for scene 02, `load("antiwordle")` for scene 03. The last is a
+CHAIN read from a committed solver result (see CHAINS), not a hand-picked list. A new scripted game is a new entry in GAMES, not a
 second data module.
 
 Regenerate (from this directory):
@@ -40,6 +41,28 @@ GAMES = {
     "rules": ("ended", ["begin", "edits", "melee", "ended"]),
 }
 
+# name -> committed result file whose chain IS the game. Read, never typed in: the
+# line is the solver's output, and a re-run of it can legitimately emit a DIFFERENT
+# chain of the same length (eldrowmax's witness depends on thread timing).
+CHAINS = {
+    # Scene 03 — "every word is an actual Wordle answer that matches all of the
+    # clues leading up to it": eldrowmax's longest consistent chain over the 2315.
+    # NOT antistall's 16-word `bully` line, which is a looser game (11 of its plays
+    # are not answer words at all).
+    "antiwordle": ("math/data/shared/eldrow/eldrowmax.mystery.csv", "final"),
+}
+
+
+def _chain(relpath, status):
+    """The `line` of the LAST row with this status; its last word is the answer."""
+    import csv
+    path = os.path.join(HERE, "..", "..", relpath)
+    rows = [r for r in csv.DictReader(open(path)) if r["status"] == status]
+    assert rows, f"{relpath}: no row with status {status!r}"
+    words = rows[-1]["line"].split()
+    assert len(words) == int(rows[-1]["length"]), f"{relpath}: length/line mismatch"
+    return words[-1], words
+
 
 def _build():
     sys.path.insert(0, os.path.join(HERE, "..", "..", "math"))
@@ -49,8 +72,12 @@ def _build():
     legal = {w.strip() for w in open(os.path.join(words, "guess.txt"))}
     answers = {w.strip() for w in open(os.path.join(words, "mystery.txt"))}
 
+    games = dict(GAMES)
+    for name, (relpath, status) in CHAINS.items():
+        games[name] = _chain(relpath, status)
+
     out = {}
-    for name, (answer, guesses) in GAMES.items():
+    for name, (answer, guesses) in games.items():
         assert answer in legal, f"{name}: {answer} is not a legal word"
         for g in guesses:
             assert g in legal, f"{name}: {g} is not a legal guess"
@@ -59,6 +86,14 @@ def _build():
             code = wordle.pattern(g, answer)
             tiles = [(code // 3 ** (4 - i)) % 3 for i in range(5)]
             game["guesses"].append({"word": g, "code": int(code), "tiles": tiles})
+        if name in CHAINS:
+            # The claim the scene makes, checked from the pattern function: every
+            # play is an answer word and reproduces every clue before it.
+            for j, w in enumerate(guesses):
+                assert w in answers, f"{name}: {w} is not one of the 2315"
+                for g in guesses[:j]:
+                    assert wordle.pattern(g, w) == wordle.pattern(g, answer), \
+                        f"{name}: {w} contradicts the clue from {g}"
         out[name] = game
     return out
 

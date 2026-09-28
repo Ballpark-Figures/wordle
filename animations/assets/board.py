@@ -113,7 +113,10 @@ class WordleBoard(VGroup):
 
     def _letter(self, ch, tile):
         t = crisp_text(ch.upper(), color=TILE_TEXT, weight=BOLD)
-        t.scale_to_fit_height(TILE * LETTER_FRAC)
+        # Sized off the tile's CURRENT height, not TILE, so a letter typed into a
+        # board that has been shrunk (scene 03's growing column) fits its tile.
+        # Identical to TILE * LETTER_FRAC on an unscaled board.
+        t.scale_to_fit_height(tile.height * LETTER_FRAC)
         t.move_to(tile.get_center())
         return t
 
@@ -168,6 +171,10 @@ class WordleBoard(VGroup):
         `secondword.py` documents, and the one that silently reverses a row if you
         decode it the other way round.
 
+        `lag_ratio=0` is the QUICK SCORE — all five tiles flip together, which is how
+        scene 03 scores a long run of guesses. Each tile still squashes about its own
+        centre, so it reads as five simultaneous flips, not the row flipping as one.
+
         `cols` flips only those positions (in the order given), for a beat that
         scores a row a tile or two at a time — scene 02 explains E, then D, then
         the rest. Pass the SAME full-row code every time; the positions select from
@@ -179,6 +186,37 @@ class WordleBoard(VGroup):
         flips = [TileFlip(self.tiles[row][i], self.letters[row][i], TILE_STATE[trits[i]])
                  for i in cols]
         scene.play(LaggedStart(*flips, lag_ratio=lag_ratio), run_time=run_time)
+
+    # ── growing past six rows ──────────────────────────────────────────────────
+    def add_row(self, scene, run_time, height, center=ORIGIN):
+        """Append an empty row, shrinking the whole board so it stays `height` tall.
+
+        For a column of guesses longer than a game (scene 03). The existing rows
+        shrink and re-centre while the new row fades in at its final size, in ONE
+        play. The new row is built directly at its end pose — it is not on screen
+        yet — so it never has to be counter-animated against the shrink.
+
+        Tile and gap keep their RATIO, so the board is the same shape at every size.
+        Stroke width does not scale (manim strokes are in pixels); fine at the sizes
+        used, but a very long column would read heavy.
+        """
+        pitch = self.tiles[0][0].width * (1 + GAP / TILE)   # tile + gap, current
+        gap = pitch - self.tiles[0][0].width
+        last = self.rows[-1]
+        row = VGroup(*[self._tile() for _ in range(self.n_cols)])
+        row.scale(self.tiles[0][0].width / TILE)             # match current size
+        row.arrange(RIGHT, buff=gap).next_to(last, DOWN, buff=gap)
+        grown = VGroup(*self.rows, row)
+        f = height / grown.height
+        c = grown.get_center()
+        row.scale(f, about_point=c).shift(center - c)
+        scene.play(self.animate.scale(f, about_point=c).shift(center - c),
+                   FadeIn(row), run_time=run_time)
+        self.tiles.append(list(row))
+        self.letters.append([None] * self.n_cols)
+        self.rows.append(row)
+        self.add(row)
+        self.n_rows += 1
 
     # ── the win ───────────────────────────────────────────────────────────────
     def bounce(self, scene, row, run_time, height=0.35, lag_ratio=0.12):
