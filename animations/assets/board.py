@@ -242,3 +242,18 @@ class WordleBoard(VGroup):
 
 def get_board(**kwargs):
     return WordleBoard(**kwargs)
+
+
+def get_scored_row(word, code):
+    """One already-scored row, static: `word`'s tiles in their final colours with
+    the letters on top — exactly what `type_word` + `reveal` leave behind, built
+    directly. `code` is a wordle.pattern integer (position 0 most significant)."""
+    row = WordleBoard(rows=1, cols=len(word))
+    trits = [(code // 3 ** (row.n_cols - 1 - i)) % 3 for i in range(row.n_cols)]
+    for i, (ch, t) in enumerate(zip(word, trits)):
+        tile = row.tiles[0][i]
+        tile.set_fill(TILE_STATE[t], opacity=1.0).set_stroke(TILE_STATE[t], STROKE)
+        letter = row._letter(ch, tile)
+        row.letters[0][i] = letter
+        row.add(letter)
+    return row

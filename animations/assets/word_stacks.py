@@ -79,15 +79,18 @@ def glyph_points():
     return _GLYPH_POINTS
 
 
-def _glyph_path(ctx, ch):
+def _glyph_path(ch):
     """The cairo path for one letter, built once — with the same subpath walk
-    manim's own `set_cairo_context_path` does — and replayed per letter."""
+    manim's own `set_cairo_context_path` does — and replayed per letter.
+
+    Built on a PRIVATE scratch context, never the one being drawn into: building
+    it on the live context cleared the path mid-draw, which wiped every letter
+    already stamped that frame (the letters that flashed out whenever a letter
+    was drawn for the first time)."""
     path = _GLYPH_PATHS.get(ch)
     if path is None:
         helper = VMobject()
-        ctx.save()
-        ctx.identity_matrix()
-        ctx.new_path()
+        ctx = cairo.Context(cairo.ImageSurface(cairo.FORMAT_ARGB32, 1, 1))
         for pts in glyph_points()[ch]:
             for sub in helper.gen_subpaths_from_points_2d(pts):
                 ctx.new_sub_path()
@@ -97,8 +100,6 @@ def _glyph_path(ctx, ch):
                 if helper.consider_points_equals_2d(sub[0], sub[-1]):
                     ctx.close_path()
         path = ctx.copy_path()
-        ctx.new_path()
-        ctx.restore()
         _GLYPH_PATHS[ch] = path
     return path
 
@@ -147,7 +148,7 @@ class GlyphBatch(VMobject):
     def cairo_draw(self, ctx):
         cx, cy, ch, sy = self.data
         for x, y, k in zip(cx.tolist(), cy.tolist(), ch.tolist()):
-            path = _glyph_path(ctx, chr(97 + k))
+            path = _glyph_path(chr(97 + k))
             ctx.save()
             ctx.translate(x, y)
             ctx.scale(1.0, sy)
@@ -168,7 +169,20 @@ class StacksCamera(MovingCamera):
 
 
 # ── the histogram ─────────────────────────────────────────────────────────────
+N_GROUPS = 4    # distinct emphasis levels drawable at once (rest, focus, 2 in flight)
+
+
 class WordStacks(VGroup):
+    """The histogram. EMPHASIS is per word: `weight[i]` in [0, 1] and a global `dim`
+    in [0, 1]. A word's tiles sit at opacity 1 - (1 - DIM) * dim * (1 - weight), so
+    with dim up, weight-0 words are the dimmed rest and weight-1 words the focus.
+    Its letters show at max(letters * tile opacity, weight) — so once the letters
+    have faded (`letters` 0), ONLY emphasised words carry them.
+
+    Words are drawn in GROUPS of equal weight, each group one set of batches; a
+    frame may hold up to N_GROUPS distinct weights (the rest, the focus, and words
+    fading between them)."""
+
     def __init__(self, data, origin, origin_bin, **kwargs):
         super().__init__(**kwargs)
         self.words = data["words"]
@@ -186,23 +200,23 @@ class WordStacks(VGroup):
         self.n = 0                  # words of `order` placed so far (pinned always are)
         self.squash = 1.0
         self.letter_opacity = 1.0
-        self.focus = np.zeros(len(self.words), dtype=bool)   # emphasised words
-        self.dim = 0.0              # 0 = nobody dimmed, 1 = non-focus fully at DIM
+        self.weight = np.zeros(len(self.words))
+        self.dim = 0.0
 
-        mk = lambda c, o: RectBatch(fill_color=c, fill_opacity=o, stroke_width=0)
-        self.tiles = [mk(TILE_STATE[s], 1.0) for s in range(3)]
-        self.tiles_dim = [mk(TILE_STATE[s], 1.0) for s in range(3)]
-        self.text = GlyphBatch(fill_color=TILE_TEXT, fill_opacity=1.0, stroke_width=0)
-        self.text_focus = GlyphBatch(fill_color=TILE_TEXT, fill_opacity=1.0,
-                                     stroke_width=0)
-        for m in self.tiles + self.tiles_dim:
-            m.set_rects(np.zeros((0, 4)))
-        self.text.set_glyphs(*[np.zeros(0)] * 4)
-        self.text_focus.set_glyphs(*[np.zeros(0)] * 4)
-        self.add(*self.tiles, *self.tiles_dim, self.text, self.text_focus)
+        self.groups = []
+        for _ in range(N_GROUPS):
+            tiles = [RectBatch(fill_color=TILE_STATE[s], fill_opacity=1.0,
+                               stroke_width=0).set_rects(np.zeros((0, 4)))
+                     for s in range(3)]
+            text = GlyphBatch(fill_color=TILE_TEXT, fill_opacity=1.0, stroke_width=0)
+            text.set_glyphs(*[np.zeros(0)] * 4)
+            self.groups.append((tiles, text))
+        # all tiles under all letters
+        self.add(*[t for g in self.groups for t in g[0]], *[g[1] for g in self.groups])
 
     # ── what to draw ──────────────────────────────────────────────────────────
-    def set_state(self, n=None, squash=None, letters=None, dim=None, focus=None):
+    def set_state(self, n=None, squash=None, letters=None, dim=None, weights=None):
+        """`weights` is {word: weight}; words not named keep theirs."""
         if n is not None:
             self.n = int(round(n))
         if squash is not None:
@@ -211,27 +225,22 @@ class WordStacks(VGroup):
             self.letter_opacity = float(letters)
         if dim is not None:
             self.dim = float(dim)
-        if focus is not None:
-            self.focus[:] = False
-            self.focus[[self.index[w] for w in focus]] = True
+        if weights:
+            for w, v in weights.items():
+                self.weight[self.index[w]] = float(v)
         return self
+
+    def weights_of(self, words):
+        return {w: float(self.weight[self.index[w]]) for w in words}
+
+    def emphasised(self):
+        return [self.words[i] for i in np.nonzero(self.weight)[0]]
 
     def word_center(self, word, squash=None):
         """Where `word` sits at the current (or a given) squash."""
         i = self.index[word]
         s = self.squash if squash is None else squash
         return np.array([self.x[i], self.y0 + self.row[i] * STEP * s, 0.0])
-
-    def height_of(self, word):
-        """Rows in the stack holding `word` (its full height, pinned included)."""
-        i = self.index[word]
-        same = self.x == self.x[i]
-        return int(self.row[same].max()) + 1
-
-    def top(self, squash=None):
-        """y of the top edge of the tallest stack."""
-        s = self.squash if squash is None else squash
-        return self.y0 + self.row.max() * STEP * s + SIDE * s / 2
 
     # ── rebuild ───────────────────────────────────────────────────────────────
     def refresh(self, frame):
@@ -248,32 +257,47 @@ class WordStacks(VGroup):
                     & (np.abs(y - fy) < hh + STEP * s)
         idx = np.nonzero(vis)[0]
 
-        # tiles: one batch per (colour, dimmed?)
-        offs = (np.arange(COLS) - (COLS - 1) / 2) * STEP
-        tx = (self.x[idx, None] + offs).ravel()
-        ty = np.repeat(y[idx], COLS)
-        st = self.state[idx].ravel()
-        fo = np.repeat(self.focus[idx], COLS)
-        dimmed = (~fo) & (self.dim > 0)
-        h = SIDE * s
-        for k in range(3):
-            for mob, sel in ((self.tiles[k], (st == k) & ~dimmed),
-                             (self.tiles_dim[k], (st == k) & dimmed)):
-                n = int(sel.sum())
-                mob.set_rects(np.stack([tx[sel] - SIDE / 2, ty[sel] - h / 2,
-                                        np.full(n, SIDE), np.full(n, h)], axis=1))
-            # a dimmed tile fades from full to DIM as `dim` goes 0 -> 1
-            self.tiles_dim[k].set_fill(opacity=1 - (1 - DIM) * self.dim)
-
-        # letters, only where a tile is big enough on screen to carry one
         px = SIDE * min(1.0, s) * config.pixel_width / frame.width
         big = px >= LETTER_MIN_PX
-        rest_op = self.letter_opacity * (1 - (1 - DIM) * self.dim)
-        rest = idx[~self.focus[idx]] if big and rest_op > 0 else idx[:0]
-        focus = idx[self.focus[idx]] if big else idx[:0]
-        self._fill_glyphs(self.text, rest, y, s).set_fill(opacity=rest_op)
-        self._fill_glyphs(self.text_focus, focus, y, s) \
-            .set_fill(opacity=max(self.letter_opacity, self.dim))
+        w_vis = self.weight[idx] if self.dim > 0 else np.ones(len(idx))
+        if self.dim <= 0:
+            # nobody dimmed: one group, weight only matters for the letters
+            levels = [(idx, 1.0, self.letter_opacity, idx[self.weight[idx] > 0])]
+        else:
+            levels = []
+            for w in np.unique(w_vis):
+                sel = idx[w_vis == w]
+                tile_op = 1 - (1 - DIM) * self.dim * (1 - w)
+                levels.append((sel, tile_op, max(self.letter_opacity * tile_op, w), None))
+        assert len(levels) <= N_GROUPS, f"{len(levels)} emphasis levels in one frame"
+
+        offs = (np.arange(COLS) - (COLS - 1) / 2) * STEP
+        h = SIDE * s
+        for g, (tiles, text) in enumerate(self.groups):
+            if g >= len(levels):
+                for t in tiles:
+                    t.set_rects(np.zeros((0, 4)))
+                text.set_glyphs(*[np.zeros(0)] * 4)
+                continue
+            sel, tile_op, let_op, lit = levels[g]
+            tx = (self.x[sel, None] + offs).ravel()
+            ty = np.repeat(y[sel], COLS)
+            st = self.state[sel].ravel()
+            for k in range(3):
+                m = st == k
+                n = int(m.sum())
+                tiles[k].set_rects(np.stack([tx[m] - SIDE / 2, ty[m] - h / 2,
+                                             np.full(n, SIDE), np.full(n, h)], axis=1))
+                tiles[k].set_fill(opacity=tile_op)
+            if lit is not None and self.letter_opacity <= 0:
+                # undimmed, letters faded: only emphasised words carry letters, at
+                # their own weight (a word can be lit before the rest is dimmed)
+                sel, let_op = lit, (float(self.weight[lit].max()) if len(lit) else 0)
+            if big and let_op > 0:
+                self._fill_glyphs(text, sel, y, s)
+            else:
+                text.set_glyphs(*[np.zeros(0)] * 4)
+            text.set_fill(opacity=let_op)
         return self
 
     def _fill_glyphs(self, mob, idx, y, s):

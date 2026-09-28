@@ -12,13 +12,21 @@ BEAT MAP
   f fill           — pan back to START (labels fade), then every word drops into
                      its stack; the camera follows the growth, rows squash flat and
                      the letters fade as the stacks get tall
-  g zoom_left      — zoom into the leftmost stacks, rows back to full height,
-                     letters back
-  h starters       — IRATE TRAIN ARISE CRANE RAISE SLATE STARE emphasised
+  g zoom_left      — zoom into the leftmost stacks (the starters' bins centred),
+                     rows back to full height; letters stay off
+  h starters       — IRATE TRAIN ARISE CRANE RAISE SLATE STARE emphasised ONE AT A
+                     TIME, each word's letters coming back with it
   i noise          — no change (the VO's noise plays over this; sound comes later)
   j left_twenty    — zoom out to the left 20 bins, squashing again, emphasis off
-  k those_words    — zoom out until THOSE and WORDS are in frame; emphasise them
-  l hello          — zoom out to HELLO, revealing ADIEU and AUDIO in between
+  k those_words    — zoom out until THOSE and WORDS are in frame; emphasise them,
+                     each joined by a white line to a full-size copy of the word
+  l hello          — zoom out to HELLO, revealing ADIEU and AUDIO in between; the
+                     same callouts for all three
+  m zoom_out       — (added by the user, not yet in the Doc) out the rest of the
+                     way to the whole histogram; callouts and emphasis fade
+
+LETTERS: they fade out during the fill once the stacks outgrow legibility, and from
+then on ONLY an emphasised word carries them (the user's rule).
 
 REUSE MAP
   board, typing, flip        assets/board.py get_board / type_word / reveal
@@ -28,7 +36,8 @@ REUSE MAP
                              committed optturns sweep + math/wordle.py pattern()
   label numbers              the cache's `labels` (rounded to 2 dp)
   navy background            style.py BOARD_NAVY
-  labels                     crisp_text, white
+  labels                     crisp_text, white, entering with FadeIn (never Write)
+  callout words              assets/board.py get_scored_row — the board's own row
   emphasis                   the house dim-the-rest (0.2 opacity), in WordStacks
   colours                    config.py WORDLE_BG / TILE_*
 
@@ -49,7 +58,7 @@ import numpy as np
 from manim import MovingCameraScene
 
 from config import *
-from assets.board import get_board
+from assets.board import get_board, get_scored_row
 from assets import intro_data
 from assets.word_stacks import (WordStacks, StacksCamera, PITCH, STEP, SIDE,
                                 WORD_W)
@@ -73,6 +82,16 @@ FULL_MARGIN = 10.0            # full view: space either side of the histogram
 SQUASH_FROM = 20              # fill: rows stay square until a stack is this tall
 LETTERS_FADE = (25, 60)       # fill: letters fade out between these stack heights
 STARTERS = ["irate", "train", "arise", "crane", "raise", "slate", "stare"]
+CALLED_OUT = ["those", "words", "hello", "adieu", "audio"]
+
+# CALLOUTS are laid out in SCREEN terms (fractions of the frame), so they keep their
+# size and place while the camera zooms; only their lines chase the words.
+CALLOUT_W = 0.15              # a callout word's width, as a fraction of frame width
+CALLOUT_X = 0.13              # its centre, as a fraction of frame width from the left
+CALLOUT_Y = {"words": 0.88, "adieu": 0.76, "hello": 0.64, "audio": 0.52,
+             "those": 0.40}   # centre heights, ordered so no two lines cross in
+                              # l's frame (THOSE sits low and close, so it goes last)
+LINE_STROKE = 3.0             # line width as it would be in a 16-wide frame
 
 
 def x_of_bin(b):
@@ -155,9 +174,17 @@ def _rows_of(words):
     return max(DATA["rows"][IDX[w]] for w in words) + 1
 
 
-# g: every starter in frame, rows at full height
-VIEW_STARTERS = view_fit(_bin_right(max(DATA["bins"][IDX[w]] for w in STARTERS)),
-                         _rows_of(STARTERS), 1.0)
+def view_centred(bins, top_rows, s, bottom=-1.5):
+    """Centred horizontally on a run of bins, tall enough for `top_rows` rows."""
+    cx = (x_of_bin(min(bins)) + x_of_bin(max(bins))) / 2
+    span = x_of_bin(max(bins)) - x_of_bin(min(bins)) + WORD_W + 2 * SIDE_MARGIN
+    w = max(span, (row_top(top_rows, s) + 1.0 - bottom) * ASPECT)
+    return (cx - w / 2, bottom, w, s)
+
+
+# g: the starters' bins centred, every starter in frame, rows at full height
+VIEW_STARTERS = view_centred([DATA["bins"][IDX[w]] for w in STARTERS],
+                             _rows_of(STARTERS), 1.0)
 # j: the left 20 bins, squashing again
 VIEW_TWENTY = view_fit(_bin_right(BIN_LO + 19), 0, 0.5)
 # k: THOSE and WORDS in frame, and the right edge stopping short of ADIEU's stack
@@ -168,6 +195,9 @@ VIEW_THOSE_WORDS = (HIST_L - SIDE_MARGIN, -1.5, _K_W, _K_S)
 # l: out to HELLO at the same squash, ADIEU and AUDIO now between
 VIEW_HELLO = view_fit(_bin_right(DATA["bins"][IDX["hello"]]),
                       _rows_of(["those", "words"]), _K_S)
+# m: the whole histogram — the view the fill ends on
+_TALL = max(DATA["rows"]) + 1
+VIEW_FULL = (*_fill_frame(_TALL, _squash_for(_TALL)), _squash_for(_TALL))
 
 
 class Scene01(MovingCameraScene, WordleDarkScene):
@@ -204,8 +234,8 @@ class Scene01(MovingCameraScene, WordleDarkScene):
         self._set_frame(left, bottom, w)
         self.stacks.set_state(squash=s)
 
-    def _move_view(self, to, run_time, letters=None, dim=None, extra=(),
-                   rate_func=smooth):
+    def _move_view(self, to, run_time, letters=None, dim=None, weights=None,
+                   extra=(), rate_func=smooth):
         """Animate the view (and optionally letter opacity / emphasis) to `to`.
 
         Left and bottom interpolate linearly, width and squash geometrically, and
@@ -215,6 +245,8 @@ class Scene01(MovingCameraScene, WordleDarkScene):
         l0, d0 = self.stacks.letter_opacity, self.stacks.dim
         l1 = l0 if letters is None else letters
         d1 = d0 if dim is None else dim
+        w1 = weights or {}
+        w0 = self.stacks.weights_of(w1)
         t = ValueTracker(0)
 
         def lerp(a, b, u):
@@ -228,8 +260,10 @@ class Scene01(MovingCameraScene, WordleDarkScene):
             v = (lerp(fr[0], to[0], u), lerp(fr[1], to[1], u),
                  glerp(fr[2], to[2], u), glerp(fr[3], to[3], u))
             self._apply_view(v)
-            m.set_state(letters=lerp(l0, l1, u), dim=lerp(d0, d1, u))
+            m.set_state(letters=lerp(l0, l1, u), dim=lerp(d0, d1, u),
+                        weights={w: lerp(w0[w], w1[w], u) for w in w1})
             m.refresh(self.camera.frame)
+            self._place_callouts()
 
         self.stacks.add_updater(upd)
         self.play(t.animate.set_value(1), *extra, run_time=run_time,
@@ -237,6 +271,36 @@ class Scene01(MovingCameraScene, WordleDarkScene):
         self.stacks.remove_updater(upd)
         self.remove(t)
         self.view = to
+
+    # ── callouts: a full-size copy of a word, joined by a line to it ──────────
+    def _callout(self, word):
+        """Build a callout for `word` (placed by _place_callouts), and register it."""
+        row = get_scored_row(word, DATA["codes"][IDX[word]])
+        line = Line(ORIGIN, RIGHT, color=WHITE)
+        c = {"word": word, "row": row, "line": line}
+        self.callouts.append(c)
+        self._place_callouts()
+        return c
+
+    def _place_callouts(self):
+        f = self.camera.frame
+        w, h = f.width, f.height
+        left, bottom = f.get_left()[0], f.get_bottom()[1]
+        for c in getattr(self, "callouts", None) or []:
+            row, line = c["row"], c["line"]
+            row.scale_to_fit_width(CALLOUT_W * w)
+            row.move_to([left + CALLOUT_X * w, bottom + CALLOUT_Y[c["word"]] * h, 0])
+            # the line runs FROM the word in the histogram TO the callout, so a
+            # Create draws it outward from the word
+            word_left = self.stacks.word_center(c["word"]) - np.array([WORD_W / 2, 0, 0])
+            line.put_start_and_end_on(word_left, row.get_right() + RIGHT * 0.01 * w)
+            line.set_stroke(WHITE, width=LINE_STROKE * w / FRAME_W)
+
+    def _show_callouts(self, words, run_time):
+        """Line out from each word, then its full-size copy fades in on the end."""
+        cs = [self._callout(w) for w in words]
+        self.play(*[Create(c["line"]) for c in cs], run_time=run_time * 0.6)
+        self.play(*[FadeIn(c["row"]) for c in cs], run_time=run_time * 0.4)
 
     # a : empty board up from frame 0; START typed into row 0
     @subscene
@@ -267,7 +331,7 @@ class Scene01(MovingCameraScene, WordleDarkScene):
     def score_start(self):
         self._setup_score_start()
         self.board.reveal(self, 0, ANSWER_CODE["start"], run_time=1.6)
-        self.play(Write(self.labels["start"]), run_time=1.0)
+        self.play(FadeIn(self.labels["start"], shift=UP * 0.2), run_time=1.0)
 
     # d : pan to GREAT
     def _setup_pan_great(self):
@@ -292,13 +356,13 @@ class Scene01(MovingCameraScene, WordleDarkScene):
         self.board = self.start_row = None
         self.add(self.stacks, self.labels["start"])
         self._move_view(view_on("great"), run_time=2.0)
-        self.play(Write(self.labels["great"]), run_time=1.0)
+        self.play(FadeIn(self.labels["great"], shift=UP * 0.2), run_time=1.0)
 
     # e : pan to SLOWS
     @subscene
     def pan_slows(self):
         self._move_view(view_on("slows"), run_time=3.0)
-        self.play(Write(self.labels["slows"]), run_time=1.0)
+        self.play(FadeIn(self.labels["slows"], shift=UP * 0.2), run_time=1.0)
 
     # f : back to START (labels fade), then every word drops into its stack
     def _setup_fill(self):
@@ -348,13 +412,25 @@ class Scene01(MovingCameraScene, WordleDarkScene):
     # g : zoom into the leftmost stacks, rows back to full height, letters back
     @subscene
     def zoom_left(self):
-        self._move_view(VIEW_STARTERS, run_time=3.0, letters=1.0)
+        self._move_view(VIEW_STARTERS, run_time=3.0)
 
     # h : Wordlebot's regulars
     @subscene
     def starters(self):
-        self.stacks.set_state(focus=STARTERS)
-        self._move_view(VIEW_STARTERS, run_time=1.0, dim=1.0)
+        # the rest dims as the first comes up, then one word at a time
+        self._move_view(VIEW_STARTERS, run_time=0.8, dim=1.0, weights={"irate": 1})
+        self.wait(0.4)
+        self._move_view(VIEW_STARTERS, run_time=0.5, weights={"train": 1})
+        self.wait(0.4)
+        self._move_view(VIEW_STARTERS, run_time=0.5, weights={"arise": 1})
+        self.wait(0.4)
+        self._move_view(VIEW_STARTERS, run_time=0.5, weights={"crane": 1})
+        self.wait(0.4)
+        self._move_view(VIEW_STARTERS, run_time=0.5, weights={"raise": 1})
+        self.wait(0.4)
+        self._move_view(VIEW_STARTERS, run_time=0.5, weights={"slate": 1})
+        self.wait(0.4)
+        self._move_view(VIEW_STARTERS, run_time=0.5, weights={"stare": 1})
 
     # i : the noise — no change
     @subscene
@@ -364,17 +440,30 @@ class Scene01(MovingCameraScene, WordleDarkScene):
     # j : out to the left 20 bins, squashing again; emphasis off
     @subscene
     def left_twenty(self):
-        self._move_view(VIEW_TWENTY, run_time=2.5, letters=0.0, dim=0.0)
-        self.stacks.set_state(focus=[])
+        self._move_view(VIEW_TWENTY, run_time=2.5, dim=0.0,
+                        weights={w: 0 for w in STARTERS})
 
     # k : out until THOSE and WORDS are in frame; emphasise them
     @subscene
     def those_words(self):
-        self.stacks.set_state(focus=["those", "words"])
-        self._move_view(VIEW_THOSE_WORDS, run_time=2.5, dim=1.0)
+        self.callouts = []
+        self._move_view(VIEW_THOSE_WORDS, run_time=2.5, dim=1.0,
+                        weights={"those": 1, "words": 1})
+        self._show_callouts(["those"], run_time=1.0)
+        self._show_callouts(["words"], run_time=1.0)
 
     # l : out to HELLO, revealing ADIEU and AUDIO in between
     @subscene
     def hello(self):
-        self.stacks.set_state(focus=["those", "words", "hello", "adieu", "audio"])
-        self._move_view(VIEW_HELLO, run_time=2.5)
+        self._move_view(VIEW_HELLO, run_time=2.5,
+                        weights={"hello": 1, "adieu": 1, "audio": 1})
+        self._show_callouts(["hello"], run_time=1.0)
+        self._show_callouts(["adieu", "audio"], run_time=1.0)
+
+    # m : out the rest of the way; callouts and emphasis fade
+    @subscene
+    def zoom_out(self):
+        fades = [FadeOut(VGroup(c["row"], c["line"])) for c in self.callouts]
+        self._move_view(VIEW_FULL, run_time=3.0, dim=0.0,
+                        weights={w: 0 for w in CALLED_OUT}, extra=fades)
+        self.callouts = None
