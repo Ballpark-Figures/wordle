@@ -102,8 +102,8 @@ CALLOUT_DX = {"words": -0.07, "adieu": 0.07}
                               # callout leans left so it fits in k, whose right edge
                               # is WORDS' column; ADIEU's leans right so it stays out
                               # of k's frame until l reveals it
-K_WORDS_AT = 0.72             # k: WORDS sits this far up the frame, leaving room
-                              # above it for its callout
+WORDS_AT = 0.72               # k, l: WORDS sits this far up the frame, leaving
+                              # room above it for its callout
 
 
 def x_of_bin(b):
@@ -204,14 +204,18 @@ VIEW_TEN = view_fit(_bin_right(BIN_LO + 9), 0, 0.5)
 # for its callout
 _K_RIGHT = x_of_bin(DATA["bins"][IDX["words"]]) + WORD_W / 2 + (PITCH - WORD_W) / 2
 _K_W = _K_RIGHT - (HIST_L - SIDE_MARGIN)
-_K_S = (K_WORDS_AT * _K_W / ASPECT - 1.5) / (STEP * DATA["rows"][IDX["words"]])
+_K_S = (WORDS_AT * _K_W / ASPECT - 1.5) / (STEP * DATA["rows"][IDX["words"]])
 VIEW_THOSE_WORDS = (HIST_L - SIDE_MARGIN, -1.5, _K_W, _K_S)
-# l: out to HELLO at the same squash; ADIEU and AUDIO are between
+# l: out to HELLO; ADIEU and AUDIO are between. Squashed only enough to keep WORDS
+# at WORDS_AT of the (bigger) frame — NOT k's squash, which only k's narrow frame
+# needs. Carrying k's squash here left l flatter than the full view, so m's zoom
+# OUT made the stacks grow UP on screen as the rows unsquashed.
 # (wide enough that HELLO's callout, centred on it and CALLOUT_W of the frame
 # wide, fits: w = x + w * CALLOUT_W / 2 + margin - left, solved for w)
 _L_W = (x_of_bin(DATA["bins"][IDX["hello"]]) + SIDE_MARGIN - (HIST_L - SIDE_MARGIN)) \
     / (1 - CALLOUT_W / 2)
-VIEW_HELLO = (HIST_L - SIDE_MARGIN, -1.5, _L_W, _K_S)
+_L_S = (WORDS_AT * _L_W / ASPECT - 1.5) / (STEP * DATA["rows"][IDX["words"]])
+VIEW_HELLO = (HIST_L - SIDE_MARGIN, -1.5, _L_W, _L_S)
 # m: the whole histogram — the view the fill ends on
 _TALL = max(DATA["rows"]) + 1
 VIEW_FULL = (*_fill_frame(_TALL, _squash_for(_TALL)), _squash_for(_TALL))
