@@ -48,7 +48,7 @@ REUSE MAP
   typing sound               assets/keys.py key_cues (the only sound in the scene;
                              words appearing stay silent — the user's call)
   word sounds                music-library/sfx via self.sfx: notify-text (WORD_SFX)
-                             as words land in f, notify-app-06 (PING_SFX) from h on
+                             as words land in f, notify-app-03 (PING_SFX) from h on
   the histogram              assets/word_stacks.py WordStacks + StacksCamera
                              (bulk drawing — see its docstring for why)
   every average, bin, tile   assets/intro_data.py -> intro_cache.json: the
@@ -112,7 +112,7 @@ FILL_SMOOTH = 301             # f: steps the word count is averaged over (~1.5s)
 FILL_LOOK = 60                # f: the squash looks this many steps ahead, so it
                               # flattens smoothly rather than in row-sized jerks
 WORD_SFX = "notify-text"      # f: the sound of a word landing in the histogram
-PING_SFX = "notify-app-06"    # h onward: a word emphasised / called out, and i's noise
+PING_SFX = "notify-app-03"    # h onward: a word emphasised / called out, and i's noise
 FILL_SFX_MAX_PER_S = 15.0     # f: one cue per word, but no more than this many a
                               # second — at the fill's peak ~40 words land PER FRAME,
                               # and hundreds of overlapping copies of a 1.1s sound
@@ -744,7 +744,7 @@ class Scene01(MovingCameraScene, WordleDarkScene):
         # covers with a still — i.e. it would never be heard
         self.sfx(PING_SFX)                  # ADIEU
         self.sfx(PING_SFX, at=0.6)          # AUDIO
-        self.wait(1.8)
+        self.wait(1.9)
 
     # j : out to the left 10 bins, squashing again; the rest stays dimmed
     @subscene
