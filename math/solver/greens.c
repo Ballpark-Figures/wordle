@@ -1521,7 +1521,6 @@ int main(int argc, char **argv) {
         TRACE_ROOT = 0;                  /* the parallel walk must not interleave */
         double dt = now_s() - s0;
         g_probe += c0->probe; g_hit += c0->hit; g_fill += c0->fill;
-        free(c0);
         done[g] = 1;
         const char *status = v == INFEAS ? "infeasible" : (v == CUT ? "cut" : "exact");
         if (v >= 0) {
@@ -1533,6 +1532,10 @@ int main(int argc, char **argv) {
             write_best_tree(treedir, g, depth, c0, t0);
         } else if (v == INFEAS) infeas++;
         else cut++;
+        /* Freed only AFTER write_best_tree, which uses c0's arena as scratch.
+         * Freeing it first worked by luck on macOS and segfaulted on Linux,
+         * where a block this size is unmapped the moment it is freed. */
+        free(c0);
         if (out) {
             if (v >= 0) fprintf(out, "%s,%d,%.5f,%d,%s,%.1f\n", GWORD[g], v,
                                 (double)v / NA, depth, status, dt);

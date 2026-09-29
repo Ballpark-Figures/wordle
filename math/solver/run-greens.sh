@@ -192,3 +192,6 @@ echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] greens: opener screen, $SUF $WARM" | tee 
     --depth "$DEPTH" \
     --tt-bits "$TTBITS" --threads "$THREADS" $WARM \
     2>&1 | tee -a "$LOG"
+# The SOLVER's status, not tee's -- or a crash reads as success, and a loop of
+# K values runs straight past it leaving empty CSVs (2026-09-29, a segfault).
+exit "${PIPESTATUS[0]}"
