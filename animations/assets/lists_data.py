@@ -20,6 +20,7 @@ Provenance:
                            the words shown (alphabetical)
   full                   — scene 06b/c: EVERY group of each FULL_GUESSES guess, all
                            members, largest first (ties by code)
+  cross                  — scene 07t: "<guess>:<answer>" -> pattern code
   sub                    — scene 07e/g: one group split by the next guess. Key
                            "<g1>:<code1>[:<g2>:<code2>…]:<next>" -> every subgroup
                            of the answers giving code_i to g_i for every i, all
@@ -78,6 +79,7 @@ FULL_GUESSES = ["group", "trace", "roate", "arise", "aurei",   # guesses whose E
 # 07e: FIRST's yellow-T group (code 1) split by AFTER; 07g: AFTER's largest subgroup
 # there, A and T yellow (code 90), split by THIRD. The words are the script's; the
 # groups the user's call (2026-09-29) — AFTER can never be all gray once T is known.
+CROSS = [("burst", "worst")]   # 07t: a guess scored against an answer (user's pair)
 SUBGROUPS = [("first", 1, "after"),
              ("first", 1, "after", 90, "third")]
 
@@ -185,6 +187,8 @@ def _build():
         now = _words(out["chain"][g])
         out.setdefault("carry", {})[g] = [len(shown & now), len(shown), len(now)]
         shown = now
+    # 07t: single scorings, "<guess>:<answer>" -> pattern code
+    out["cross"] = {f"{g}:{a}": int(wordle.pattern(g, a)) for g, a in CROSS}
     # every group any scene shows is whole — never a part standing for the whole
     for key in ("groups", "groups_edge", "chain", "chain_edge", "full", "sub"):
         for g, grps in out[key].items():

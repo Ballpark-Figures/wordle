@@ -42,14 +42,25 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                    the bottom centre, its dot growing into the word    (07j, VO 4)
   k green_centre — the top FIRST off the top; the green FIRST (its word
                    with it) to the centre, its line running out the top (07k, VO 4)
-  l green_win    — the bottom word fades; the green FIRST does the winning
+  l green_win    — the bottom word fades as the green FIRST does the winning
                    row's bounce (02's win), in place of a glow (user's call) (07l, VO 4)
   m case_swap    — the green case off to the left, FRESH's case in from the
                    right: FIRST scored G-YG-, its line out the top, FRESH
                    under it (FRESH is the user's pick)                 (07m, VO 5)
   n type_fresh   — FRESH typed below that FIRST, tiles appearing as typed (07n, VO 5)
   o score_fresh  — FRESH scored, all green                            (07o, VO 5)
-  p fresh_win    — the bottom word fades; FRESH does the win bounce   (07p, VO 5)
+  p fresh_win    — the bottom word fades as FRESH does the win bounce (07p, VO 5)
+  q pair_swap    — FRESH's case off left, the two-word case in from the right:
+                   FIRST scored --GGG, its line, BURST and WORST under it
+                   (the user's pick; BURST is guessed first)           (07q, VO 6)
+  r type_burst   — BURST typed below FIRST                            (07r, VO 6)
+  s branch_two   — two copies of the case branch off, left and right, a
+                   line from BURST's R to each, anchored as they go    (07s, VO 6)
+  t score_both   — BURST scored in both: all green left, --GGG right   (07t, VO 6)
+  u move_words   — BURST under the left case, WORST under the right   (07u, VO 6)
+  v left_win     — the left case's winning bounce                     (07v, VO 6)
+  w right_branch — the right case branches down again: WORST typed,
+                   scored all green, moved under, winning bounce       (07w, VO 6)
 
 REUSE MAP — every element and the one source it comes from:
   board, typing, reveal   assets/board.py `get_board`, `type_word` (its
@@ -121,7 +132,16 @@ SINGLE = "fresh"                   # m-p: the one-word group shown (user's pick 
 SINGLE_CODE = 177                  #   FIRST's 25) and FIRST's score against it, G-YG-
 CASE_WORD_Y = -2.0                 # m: that case's word, below the row typed in n
 BOUNCE_H = 0.35                    # board.bounce's default height, for a full-size tile
-SWAP_DIST = 16.0                   # m: how far the cases travel (a frame width)
+SWAP_DIST = 16.0                   # m, q: how far the cases travel (a frame width)
+PAIR = ("burst", "worst")          # q-w: the two-word group (user's pick of FIRST's 18)
+PAIR_CODE = 26                     #   FIRST's score against both, --GGG; BURST is
+CROSS = DATA["cross"]["burst:worst"]   # guessed first; its score against WORST
+TREE_Y = 2.6                       # q: the pair case's FIRST row
+CHILD_DY = 2.2                     # s, w: a branch's drop, FIRST row to FIRST row
+CHILD_DX = 3.5                     # s: the two branches' distance from the centre
+PAIR_WORD_Y = -1.0                 # q: the two words, side by side under the case
+PAIR_WORD_DX = 1.3
+WORD_GAP = 0.25                    # u, w: a word's gap under the case it moves to
 GREEN_Y = -2.3                     # j: the all-green FIRST row, bottom centre
 WORD_Y = -3.4                      # j: its one word, under it
 WIN_SCALE = 0.8                    # that word's size (1 = scene 04's list size)
@@ -170,6 +190,13 @@ class Scene07(WordleBoardScene):
     type_fresh — FRESH typed under FIRST
     score_fresh — FRESH scored all green
     fresh_win — the word fades; FRESH bounces
+    pair_swap — FRESH's case out left, the BURST/WORST case in from the right
+    type_burst — BURST typed under FIRST
+    branch_two — two copies branch off, left and right
+    score_both — BURST scored all green on the left, --GGG on the right
+    move_words — BURST and WORST under their cases
+    left_win — the left case bounces
+    right_branch — the right case branches down: WORST typed, scored, bounces
     """
 
     def setup_scene(self):
@@ -527,15 +554,15 @@ class Scene07(WordleBoardScene):
         self.remove(self.left, *self.gone)
         self.left = self.gone = self.k_ends = self.k_up = self.k_shift = None
 
-    # l : the FIRST at the bottom vanishes; the green FIRST gets the winning row's
+    # l : the FIRST at the bottom vanishes AS the green FIRST gets the winning row's
     #     bounce (02's and 97's emphasis for a win, in place of the script's glow —
     #     user's call to swap)
     @subscene
     def green_win(self):
-        self.play(FadeOut(self.g_word), run_time=0.5)
+        self.play(FadeOut(self.g_word),
+                  self.g_row.bounce_anim(0, height=_jump(self.g_row)), run_time=1.0)
         self.remove(self.g_word)
         self.g_word = None
-        self.g_row.bounce(self, 0, 1.0, height=_jump(self.g_row))
 
     # ── a one-word group: guess the word and finish in two (m-p) ──────────────
     def _setup_case_swap(self):
@@ -578,10 +605,122 @@ class Scene07(WordleBoardScene):
     def score_fresh(self):
         self.guess2.reveal(self, 0, ALL_GREEN, 1.6)
 
-    # p : the word at the bottom vanishes; FRESH does the winning row's bounce (as l)
+    # p : the word at the bottom vanishes AS FRESH does the winning row's bounce (as l)
     @subscene
     def fresh_win(self):
-        self.play(FadeOut(self.case_word), run_time=0.5)
+        self.play(FadeOut(self.case_word),
+                  self.guess2.bounce_anim(0, height=_jump(self.guess2)), run_time=1.0)
         self.remove(self.case_word)
         self.case_word = None
-        self.guess2.bounce(self, 0, 1.0, height=_jump(self.guess2))
+
+    # ── a two-word group: guess one, and branch on the answer (q-w) ────────────
+    def _typed_row(self, above):
+        """An empty row `above`'s size, under it at the board's row spacing."""
+        row = WordleBoard(rows=1, cols=5)
+        row.scale(above.width / row.width)
+        row.next_to(above, DOWN, buff=above.tiles[0][0].height * GAP / TILE)
+        return row
+
+    def _setup_pair_swap(self):
+        X, Y = config.frame_x_radius, config.frame_y_radius
+        self.pcase = scored_row(FIRST, PAIR_CODE, self.case.width, [0, TREE_Y, 0])
+        self.pline = _line([0, Y + OFF_CLEAR, 0], _r(self.pcase))
+        self.pwords = [PigpenWord(w, revealed=True).scale(WIN_SCALE)
+                       .move_to([sx * PAIR_WORD_DX, PAIR_WORD_Y, 0])
+                       for w, sx in zip(PAIR, (-1, 1))]
+        self.q_out = VGroup(self.case, self.guess2, self.case_line)
+        self.q_in = VGroup(self.pcase, self.pline, *self.pwords).shift(RIGHT * SWAP_DIST)
+
+    # q : FRESH's case off to the left, the BURST/WORST case in from the right
+    @subscene
+    def pair_swap(self):
+        self._setup_pair_swap()
+        self.play(self.q_out.animate.shift(LEFT * SWAP_DIST),
+                  self.q_in.animate.shift(LEFT * SWAP_DIST), run_time=1.5)
+        self.remove(self.q_out, self.q_in)
+        self.add(self.pcase, self.pline, *self.pwords)
+        self.case = self.guess2 = self.case_line = self.q_out = self.q_in = None
+
+    # r : BURST typed below FIRST, tiles appearing as typed
+    @subscene
+    def type_burst(self):
+        self.prow = self._typed_row(self.pcase)
+        self.prow.type_word(self, 0, PAIR[0], 0.65, per_letter=key_cues(self), appear=True)
+
+    def _branch(self, parent, rows, targets):
+        """Copies of the case `rows` (top first), each sliding from where the case is
+        to its target FIRST-row centre, each with a line from `parent`'s R to the
+        copy's FIRST R that stays anchored as it goes. Returns (copies, lines, the
+        play's animations)."""
+        copies, lines, anims = [], [], []
+        src = _r(parent)
+        for t in targets:
+            c = VGroup(*[r.copy() for r in rows])
+            v = np.array(t) - rows[0].get_center()
+            line = _line(src, _r(rows[0]))
+            copies.append(c)
+            lines.append(line)
+            anims.append(c.animate.shift(v))
+            r0 = _r(rows[0])
+            anims.append(UpdateFromAlphaFunc(
+                line, lambda m, a, r0=r0, v=v: m.put_start_and_end_on(src, r0 + v * smooth(a)),
+                rate_func=linear))
+        return copies, lines, anims
+
+    def _setup_branch_two(self):
+        y = TREE_Y - CHILD_DY
+        self.kids, self.kid_lines, self.s_anims = self._branch(
+            self.prow, [self.pcase, self.prow], [[-CHILD_DX, y, 0], [CHILD_DX, y, 0]])
+
+    # s : the case branches into two copies, left and right, each FIRST then BURST,
+    #     lines from BURST's R to each
+    @subscene
+    def branch_two(self):
+        self._setup_branch_two()
+        self.add(*self.kid_lines, *self.kids)
+        self.play(*self.s_anims, run_time=1.5)
+        self.s_anims = None
+
+    # t : BURST scored in both: all green on the left (the answer is BURST), --GGG on
+    #     the right (the answer is WORST)
+    @subscene
+    def score_both(self):
+        (l_first, l_row), (r_first, r_row) = self.kids
+        self.play(l_row.reveal_anim(0, ALL_GREEN), r_row.reveal_anim(0, CROSS),
+                  run_time=1.6)
+
+    def _under(self, word, rows):
+        """Where `word` sits under the case `rows`."""
+        return rows[-1].get_bottom() + DOWN * (WORD_GAP + word.height / 2)
+
+    # u : BURST under the left case, WORST under the right
+    @subscene
+    def move_words(self):
+        self.play(*[w.animate.move_to(self._under(w, k)) for w, k in zip(self.pwords, self.kids)],
+                  run_time=1.2)
+
+    # v : the left case (all green) does the winning bounce
+    @subscene
+    def left_win(self):
+        row = self.kids[0][1]
+        self.play(row.bounce_anim(0, height=_jump(row)), run_time=1.0)
+
+    def _setup_right_branch(self):
+        kid = self.kids[1]
+        t = kid[0].get_center() + DOWN * CHILD_DY
+        (self.gkid,), (self.gline,), self.w_anims = self._branch(kid[1], list(kid), [t])
+
+    # w : the right case branches down once more: a copy, WORST typed under it,
+    #     scored all green, WORST moved under it, and the winning bounce
+    @subscene
+    def right_branch(self):
+        self._setup_right_branch()
+        self.add(self.gline, self.gkid)
+        self.play(*self.w_anims, run_time=1.2)
+        self.w_anims = None
+        self.grow = self._typed_row(self.gkid[-1])
+        self.grow.type_word(self, 0, PAIR[1], 0.65, per_letter=key_cues(self), appear=True)
+        self.grow.reveal(self, 0, ALL_GREEN, 1.6)
+        w = self.pwords[1]
+        self.play(w.animate.move_to(self._under(w, [self.grow])), run_time=1.0)
+        self.play(self.grow.bounce_anim(0, height=_jump(self.grow)), run_time=1.0)

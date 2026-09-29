@@ -208,12 +208,17 @@ class WordleBoard(VGroup):
         the rest. Pass the SAME full-row code every time; the positions select from
         it, so no caller ever decodes a code itself. None flips the whole row.
         """
+        scene.play(self.reveal_anim(row, code, lag_ratio, cols), run_time=run_time)
+
+    def reveal_anim(self, row, code, lag_ratio=0.45, cols=None):
+        """`reveal`'s animation, unplayed — to join a larger play (scene 07 scores two
+        rows at once)."""
         trits = [(code // 3 ** (self.n_cols - 1 - i)) % 3 for i in range(self.n_cols)]
         if cols is None:
             cols = range(self.n_cols)
         flips = [TileFlip(self.tiles[row][i], self.letters[row][i], TILE_STATE[trits[i]])
                  for i in cols]
-        scene.play(LaggedStart(*flips, lag_ratio=lag_ratio), run_time=run_time)
+        return LaggedStart(*flips, lag_ratio=lag_ratio)
 
     def unscore(self, row, lag_ratio=0.45):
         """The reverse of `reveal`: `row`'s tiles flip back to their TYPED look (empty
@@ -271,6 +276,11 @@ class WordleBoard(VGroup):
         started. `there_and_back` ends its rate function at 0, so the row returns
         to exactly its starting position by construction rather than by arithmetic.
         """
+        scene.play(self.bounce_anim(row, height, lag_ratio), run_time=run_time)
+
+    def bounce_anim(self, row, height=0.35, lag_ratio=0.12):
+        """`bounce`'s animation, unplayed — to join a larger play (scene 07 fades a
+        word out while the row jumps)."""
         ups = []
         for i in range(self.n_cols):
             parts = [self.tiles[row][i]]
@@ -278,7 +288,7 @@ class WordleBoard(VGroup):
                 parts.append(self.letters[row][i])
             ups.append(VGroup(*parts).animate(rate_func=there_and_back)
                        .shift(UP * height))
-        scene.play(LaggedStart(*ups, lag_ratio=lag_ratio), run_time=run_time)
+        return LaggedStart(*ups, lag_ratio=lag_ratio)
 
 
 def get_board(**kwargs):
