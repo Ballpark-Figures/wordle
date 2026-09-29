@@ -27726,6 +27726,211 @@
      "apnea"
     ]
    }
+  ],
+  "first:0:after:0:third": [
+   {
+    "code": 0,
+    "tiles": [
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "size": 53,
+    "members": [
+     "block",
+     "bloom",
+     "blown",
+     "bobby",
+     "bongo",
+     "booby",
+     "boozy",
+     "buggy",
+     "bulky",
+     "bully",
+     "bunny",
+     "buxom",
+     "clock",
+     "clown",
+     "cluck",
+     "clump",
+     "clung",
+     "colon",
+     "coyly",
+     "gloom",
+     "golly",
+     "gully",
+     "gumbo",
+     "gummy",
+     "guppy",
+     "jolly",
+     "jumbo",
+     "jumpy",
+     "knock",
+     "knoll",
+     "known",
+     "lobby",
+     "loopy",
+     "lowly",
+     "lucky",
+     "lumpy",
+     "mogul",
+     "mucky",
+     "mummy",
+     "nobly",
+     "nylon",
+     "pluck",
+     "plumb",
+     "plump",
+     "plunk",
+     "polyp",
+     "poppy",
+     "pulpy",
+     "puppy",
+     "pygmy",
+     "wooly",
+     "woozy",
+     "young"
+    ]
+   },
+   {
+    "code": 27,
+    "tiles": [
+     0,
+     1,
+     0,
+     0,
+     0
+    ],
+    "size": 22,
+    "members": [
+     "bough",
+     "bunch",
+     "conch",
+     "couch",
+     "cough",
+     "glyph",
+     "gulch",
+     "hobby",
+     "holly",
+     "humph",
+     "hunch",
+     "hunky",
+     "lunch",
+     "lymph",
+     "lynch",
+     "mulch",
+     "munch",
+     "nymph",
+     "pooch",
+     "pouch",
+     "punch",
+     "vouch"
+    ]
+   },
+   {
+    "code": 1,
+    "tiles": [
+     0,
+     0,
+     0,
+     0,
+     1
+    ],
+    "size": 17,
+    "members": [
+     "buddy",
+     "condo",
+     "dodgy",
+     "dolly",
+     "dowdy",
+     "downy",
+     "dully",
+     "dummy",
+     "dumpy",
+     "godly",
+     "goody",
+     "moldy",
+     "moody",
+     "muddy",
+     "oddly",
+     "pudgy",
+     "woody"
+    ]
+   },
+   {
+    "code": 2,
+    "tiles": [
+     0,
+     0,
+     0,
+     0,
+     2
+    ],
+    "size": 9,
+    "members": [
+     "blond",
+     "blood",
+     "bound",
+     "cloud",
+     "could",
+     "mound",
+     "pound",
+     "would",
+     "wound"
+    ]
+   },
+   {
+    "code": 54,
+    "tiles": [
+     0,
+     2,
+     0,
+     0,
+     0
+    ],
+    "size": 7,
+    "members": [
+     "chock",
+     "chuck",
+     "chump",
+     "chunk",
+     "ghoul",
+     "phony",
+     "whoop"
+    ]
+   },
+   {
+    "code": 28,
+    "tiles": [
+     0,
+     1,
+     0,
+     0,
+     1
+    ],
+    "size": 3,
+    "members": [
+     "dough",
+     "duchy",
+     "howdy"
+    ]
+   },
+   {
+    "code": 29,
+    "tiles": [
+     0,
+     1,
+     0,
+     0,
+     2
+    ],
+    "size": 1,
+    "members": [
+     "hound"
+    ]
+   }
   ]
  },
  "chain_edge": {

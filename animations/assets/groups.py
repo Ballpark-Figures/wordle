@@ -333,6 +333,10 @@ def _pack(bs, left, right, top, bottom, center_last=False):
         return out
 
     def height(f):
+        # a block wider than the region fits nowhere: the shelves would still
+        # take it (alone on a row) and it would spill off the sides
+        if max(b["w"] for b in bs) * f > right - left:
+            return math.inf
         return sum(max(bs[k]["h"] * f for k in sh) for sh in shelves(f)) + \
             gap * (len(shelves(f)) - 1)
 
@@ -376,35 +380,47 @@ def ranked_layout(data, guess, left, right=REGION_HALF_W, top=DOT_REGION_TOP,
 
 
 # ── words packed by size (07) ─────────────────────────────────────────────────
-def _word_block(n, header):
+WORD_ASPECTS = np.geomspace(0.2, 5.0, 33)   # grid shapes tried: columns ~ sqrt(n * a)
+
+
+def _word_block(n, heads, aspect):
     """A block of `n` words at scale 1 (GROUP_SCALE words, 04's CELL_GAP/CELL_DY
-    pitches), in a grid whose AREA is square-ish — the words are wide, so fewer
-    columns than sqrt(n) — optionally under a scored row HEADER_W wide (04's)."""
+    pitches) under a stack of `heads` scored rows, each HEADER_W wide (04's). The
+    grid has about sqrt(n * aspect * dy / (ww + cg)) columns — aspect 1 makes its
+    AREA square-ish."""
     ww, cg, dy = WORD_W * GROUP_SCALE, CELL_GAP, CELL_DY
-    nc = max(1, math.ceil(math.sqrt(n * dy / (ww + cg))))
+    nc = min(n, max(1, math.ceil(math.sqrt(n * aspect * dy / (ww + cg)))))
     nr = math.ceil(n / nc)
-    hh = HEADER_W * row_aspect() + WORD_HEAD_GAP if header else 0.0
-    return dict(nc=nc, nr=nr, hh=hh,
-                w=max(nc * ww + (nc - 1) * cg, HEADER_W if header else 0.0) + WORD_PAD,
+    rh = HEADER_W * row_aspect()
+    hh = heads * (rh + WORD_HEAD_GAP)
+    return dict(nc=nc, nr=nr, hh=hh, rh=rh,
+                w=max(nc * ww + (nc - 1) * cg, HEADER_W if heads else 0.0) + WORD_PAD,
                 h=nr * dy + hh + WORD_PAD)
 
 
 def ranked_word_layout(groups, left, right=REGION_HALF_W, top=DOT_REGION_TOP,
-                       bottom=REGION_BOT, header=True):
+                       bottom=REGION_BOT, heads=1):
     """07: `groups` (in the order given — pass them largest first) as WORD blocks,
-    packed as `ranked_layout` packs dot blocks, the last row centred; with `header`
-    each block has a scored row atop it, HEADER_W wide at GROUP_SCALE (04's
-    proportion). One block alone sits centred at the top of the region.
+    packed as `ranked_layout` packs dot blocks, the last row centred; each block
+    under a stack of `heads` scored rows, HEADER_W wide at GROUP_SCALE (04's
+    proportion). The grid shape is the one of WORD_ASPECTS (the same for every
+    block) that gives the LARGEST words. One block alone sits centred at the top.
 
-    Returns (slots {word: centre}, word scale, header centres, header widths)."""
-    bs = [_word_block(g["size"], header) for g in groups]
-    f, centres = _pack(bs, left, right, top, bottom, center_last=True)
+    Returns (slots {word: centre}, word scale, [[header centre, top first] per
+    block], header width)."""
+    best = None
+    for a in WORD_ASPECTS:
+        bs = [_word_block(g["size"], heads, a) for g in groups]
+        f, centres = _pack(bs, left, right, top, bottom, center_last=True)
+        if best is None or f > best[0]:
+            best = (f, centres, bs)
+    f, centres, bs = best
     ww, cg, dy = WORD_W * GROUP_SCALE, CELL_GAP, CELL_DY
-    slots, heads, widths = {}, [], []
+    slots, hds = {}, []
     for g, b, (bx, by) in zip(groups, bs, centres):
         top_y = by + (b["h"] - WORD_PAD) * f / 2
-        heads.append(np.array([bx, top_y - (b["hh"] - WORD_HEAD_GAP) * f / 2, 0.0]))
-        widths.append(HEADER_W * f)
+        hds.append([np.array([bx, top_y - (k * (b["rh"] + WORD_HEAD_GAP) + b["rh"] / 2) * f,
+                              0.0]) for k in range(heads)])
         gy = top_y - b["hh"] * f                     # top of the word grid
         nc, n = b["nc"], g["size"]
         for k, word in enumerate(g["members"]):
@@ -412,7 +428,7 @@ def ranked_word_layout(groups, left, right=REGION_HALF_W, top=DOT_REGION_TOP,
             n_in_row = min(nc, n - i * nc)
             slots[word] = np.array([bx + (j - (n_in_row - 1) / 2) * (ww + cg) * f,
                                     gy - (i + 0.5) * dy * f, 0.0])
-    return slots, GROUP_SCALE * f, heads, widths
+    return slots, GROUP_SCALE * f, hds, HEADER_W * f
 
 
 def enter_from_beyond(mob, origin=ENTER_FROM, dist=ENTER_DIST):

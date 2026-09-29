@@ -20,10 +20,11 @@ Provenance:
                            the words shown (alphabetical)
   full                   — scene 06b/c: EVERY group of each FULL_GUESSES guess, all
                            members, largest first (ties by code)
-  sub                    — scene 07e: one group of a guess split by a second guess,
-                           "<first>:<code>:<second>" -> every subgroup, all members,
-                           largest first (ties by code); codes are the SECOND
-                           guess's pattern against each member
+  sub                    — scene 07e/g: one group split by the next guess. Key
+                           "<g1>:<code1>[:<g2>:<code2>…]:<next>" -> every subgroup
+                           of the answers giving code_i to g_i for every i, all
+                           members, largest first (ties by code); codes are
+                           <next>'s pattern against each member
 
 THE GUESSES: the first is "the topmost guess" of the list (04d), read from
 guess.txt, never typed; PIGGY and CODES are the script's own choices (04e).
@@ -74,7 +75,8 @@ EDGE_MAX = 9                      # largest group hung off an edge
 COLUMN = 12                       # answers in the on-screen column (scene N_ROWS)
 FULL_GUESSES = ["group", "trace", "roate", "arise", "aurei",   # guesses whose EVERY group is cached (06b/c's dots)
                 "first"]                                       # 07c, the script's own choice
-SUBGROUPS = [("first", 0, "after")]   # 07e: FIRST's all-gray group split by AFTER (the script's words)
+SUBGROUPS = [("first", 0, "after"),               # 07e: FIRST's all-gray group split by AFTER
+             ("first", 0, "after", 0, "third")]   # 07g: then THIRD (the script's words)
 
 
 def _read(name):
@@ -165,10 +167,11 @@ def _build():
                    for g in FULL_GUESSES}
     # 07e: one group split by a second guess — every subgroup, whole
     out["sub"] = {}
-    for g1, code, g2 in SUBGROUPS:
-        pool = [a for a in answers if wordle.pattern(g1, a) == code]
-        out["sub"][f"{g1}:{code}:{g2}"] = sorted(
-            partition(g2, pool), key=lambda grp: (-grp["size"], grp["code"]))
+    for path in SUBGROUPS:
+        steps, nxt = list(zip(path[:-1:2], path[1::2])), path[-1]
+        pool = [a for a in answers if all(wordle.pattern(g, a) == c for g, c in steps)]
+        out["sub"][":".join(map(str, path))] = sorted(
+            partition(nxt, pool), key=lambda grp: (-grp["size"], grp["code"]))
     # 04e: each guess regroups what the one before it left in its INTERIOR ovals —
     # edge words stand for "the rest", and counting them swamped every group
     shown = _words(out["groups"][order[0]])
