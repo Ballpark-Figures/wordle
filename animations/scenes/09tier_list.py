@@ -1,10 +1,11 @@
 """SCENE 09 — the Hangman video, the poll, and the tier list carried over to Wordle.
 
 BEAT MAP (one subscene per Script.md beat)
-  a hangman_video — @still: dark-mode YouTube watch page for "I Tried to Solve
-                    Hangman" (VO 1: "My last video was about Hangman…")
-  b poll          — @still: the dark-mode community poll (VO 2: "…I posted this poll
-                    3 days before the Hangman video came out.")
+  a hangman_video — the dark-mode YouTube watch page for "I Tried to Solve Hangman"
+                    fades in (VO 1: "My last video was about Hangman…")
+  b poll          — a swipe: the watch page slides off to the LEFT as the dark-mode
+                    community poll page slides in from the RIGHT (VO 2: "…I posted
+                    this poll 3 days before the Hangman video came out.")
   c hangman_tiers — the poll page fades out; the Hangman tier list fades in with the
                     title "Hangman Tier List" at the top (VO 3)
   d wordle_tiers  — hangman list + title slide LEFT; a copy MORPHS into the Wordle
@@ -18,7 +19,7 @@ REUSE MAP
                   morph_into; the LIST_SCALE / LEFT_X / RIGHT_X / LIST_Y / title height,
                   title style (30pt bold BLACK) and the arrow are hangman 17c's
   background      WordleScene (BG_COLOR, the tier-list world's light blue); the two
-                  stills cover it with their own full-frame YouTube page
+                  YouTube pages cover it with their own full-frame page
 
 NUMBERS / ORDERINGS — all SOURCED
   video title / channel / views / age / duration: assets/youtube_data (analytics DB,
@@ -30,7 +31,7 @@ NUMBERS / ORDERINGS — all SOURCED
 d's ROW MAP: hangman TOP → wordle TOP▲, and each hangman HIGH/MID/LOW half onto the
 wordle half of the same name; wordle TOP▼ (no hangman counterpart) fades in.
 
-Render:  render 09a / 09b (PNGs)   render 09c --fast / 09d --fast
+Render:  render 09a --fast (…09d)  /  render 09 sub  for the whole scene
 """
 from pathlib import Path
 import sys
@@ -61,6 +62,7 @@ class Scene09(WordleScene):
     """The Hangman video, the poll, and the tier list. See the module docstring."""
 
     def setup_scene(self):
+        self.video_page = self.poll_page = None
         self.hang = self.hang_title = None
         self.wordle = self.wordle_title = None
         self.arrow = None
@@ -70,15 +72,31 @@ class Scene09(WordleScene):
         return crisp_text(text, font_size=30, color=TITLE_COLOR, weight=BOLD,
                           baseline_at=(x, TITLE_BASELINE))
 
-    # a : dark-mode watch page for the Hangman video
-    @still
-    def hangman_video(self):
-        self.add(youtube_watch(**HANGMAN_VIDEO, dark=True))
+    # a : dark-mode watch page for the Hangman video fades in
+    def _setup_hangman_video(self):
+        self.video_page = youtube_watch(**HANGMAN_VIDEO, dark=True)
 
-    # b : the dark-mode community poll
-    @still
+    @subscene
+    def hangman_video(self):
+        self._setup_hangman_video()
+        self.play(FadeIn(self.video_page), run_time=0.8)
+
+    # b : swipe — the watch page slides off LEFT as the poll page slides in from RIGHT
+    def _setup_poll(self):
+        # page backing a touch WIDER than the frame so it overlaps the watch page
+        # mid-swipe (abutting edges leave an anti-aliased seam of background)
+        self.poll_page = youtube_poll(**POLL, width=12.0, dark=True, page=True,
+                                      frame_w=config.frame_width + 0.1)
+        self.poll_page.shift(RIGHT * config.frame_width)       # start just off-frame
+
+    @subscene
     def poll(self):
-        self.add(youtube_poll(**POLL, width=12.0, dark=True, page=True))
+        self._setup_poll()
+        self.add(self.poll_page)
+        self.play(self.video_page.animate.shift(LEFT * config.frame_width),
+                  self.poll_page.animate.shift(LEFT * config.frame_width), run_time=1.0)
+        self.remove(self.video_page)
+        self.video_page = None
 
     # c : the poll page leaves; the Hangman tier list + its title fade in
     def _setup_hangman_tiers(self):
@@ -89,7 +107,8 @@ class Scene09(WordleScene):
     @subscene
     def hangman_tiers(self):
         self._setup_hangman_tiers()
-        self.play(*[FadeOut(m) for m in self.mobjects], run_time=0.6)
+        self.play(FadeOut(self.poll_page), run_time=0.6)
+        self.poll_page = None
         self.play(FadeIn(self.hang, self.hang_title), run_time=0.8)
 
     # d : hangman list slides left; a copy morphs into the Wordle list; arrow after
