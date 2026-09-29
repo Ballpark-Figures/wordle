@@ -1,0 +1,12 @@
+# greens objective=may-lose topk=8000 depth=5 guesses=12972 answers=2315
+word,badges,prob,depth,status,seconds
+roate,418,0.18056,5,exact,1141.7
+rolag,,,5,cut,510.4
+lardy,542,0.23413,5,exact,583.6
+raise,,,5,cut,882.2
+eyass,,,5,cut,910.8
+raile,,,5,cut,100.4
+boets,,,5,cut,1055.6
+dript,570,0.24622,5,exact,1214.0
+armed,430,0.18575,5,exact,758.5
+entry,,,5,cut,0.0

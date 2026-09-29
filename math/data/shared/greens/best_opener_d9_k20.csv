@@ -1,0 +1,22 @@
+# greens objective=may-lose topk=20 depth=9 guesses=12972 answers=2315
+word,badges,prob,depth,status,seconds
+roate,192,0.08294,9,exact,2.2
+orate,193,0.08337,9,exact,0.2
+artel,,,9,cut,0.4
+later,,,9,cut,0.5
+ratel,,,9,cut,0.5
+alter,,,9,cut,0.6
+realo,,,9,cut,0.7
+arles,,,9,cut,0.7
+taler,,,9,cut,0.8
+ariel,,,9,cut,0.9
+aesir,,,9,cut,0.9
+irate,,,9,cut,1.1
+raile,198,0.08553,9,exact,1.1
+raise,,,9,cut,1.2
+arise,226,0.09762,9,exact,1.3
+snare,219,0.09460,9,exact,1.3
+raine,196,0.08467,9,exact,1.4
+arose,217,0.09374,9,exact,1.4
+saner,228,0.09849,9,exact,1.8
+soare,246,0.10626,9,exact,1.7

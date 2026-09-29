@@ -1,0 +1,4 @@
+# greens objective=may-lose topk=2 depth=7 guesses=12972 answers=2315
+word,badges,prob,depth,status,seconds
+roate,117,0.05054,7,exact,0.4
+raise,,,7,cut,0.2

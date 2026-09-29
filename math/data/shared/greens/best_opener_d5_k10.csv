@@ -1,0 +1,12 @@
+# greens objective=may-lose topk=10 depth=5 guesses=12972 answers=2315
+word,badges,prob,depth,status,seconds
+roate,165,0.07127,5,exact,0.7
+orate,171,0.07387,5,exact,0.0
+ariel,,,5,cut,0.2
+raile,178,0.07689,5,exact,0.3
+irate,,,5,cut,0.4
+raine,170,0.07343,5,exact,0.4
+raise,,,5,cut,0.4
+arise,199,0.08596,5,exact,0.4
+arose,186,0.08035,5,exact,0.5
+soare,205,0.08855,5,exact,0.6
