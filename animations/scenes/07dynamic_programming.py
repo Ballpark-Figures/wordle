@@ -54,14 +54,18 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                    FIRST scored --GGG, its line, BURST and WORST under it
                    (the user's pick; BURST is guessed first)           (07q, VO 6)
   r type_burst   — BURST typed below FIRST                            (07r, VO 6)
-  s branch_two   — the case rises to the top as two copies branch off, left
-                   and right, a line from BURST's R to each, anchored  (07s, VO 6)
-  t score_both   — BURST scored in both: all green left, --GGG right   (07t, VO 6)
-  u move_words   — BURST under the left case, WORST under the right   (07u, VO 6)
-  v left_win     — the left case's winning bounce as BURST fades       (07v, VO 6)
-  w right_branch — the right case branches down again, the black WORST
+  s branch_score — ONE play for the script's s, t and u (user's call): the
+                   case rises to the top as two copies branch off, left
+                   and right, a line from BURST's R to each; each BURST
+                   flips to its scoring on the way (all green left, --GGG
+                   right); BURST and WORST glide under their cases (07s-u, VO 6)
+  t left_win     — the left case's winning bounce as BURST fades       (07v, VO 6)
+  u right_branch — the right case branches down again, the black WORST
                    coming down with it; WORST typed, scored all green,
                    winning bounce as the black WORST fades             (07w, VO 6)
+
+  NB from s on the LETTERS run behind the script's: three script beats (s, t, u)
+  are one subscene, so the script's v is subscene t and its w is u.
 
 REUSE MAP — every element and the one source it comes from:
   board, typing, reveal   assets/board.py `get_board`, `type_word` (its
@@ -107,6 +111,7 @@ from config import *
 from assets.board import get_board, WordleBoard, STROKE, TILE, GAP
 from assets.pigpen import PigpenWord
 from assets.keys import key_cues
+from assets.flip import Flip, flip, row_parts
 from assets.groups import (ranked_layout, ranked_word_layout, scored_row, HEADER_W,
                            GUESS_SCALE, GUESS_Y, HEAD_ROW_GAP, row_aspect, enter_from_beyond,
                            edge_out)
@@ -192,9 +197,7 @@ class Scene07(WordleBoardScene):
     fresh_win — the word fades; FRESH bounces
     pair_swap — FRESH's case out left, the BURST/WORST case in from the right
     type_burst — BURST typed under FIRST
-    branch_two — two copies branch off, left and right
-    score_both — BURST scored all green on the left, --GGG on the right
-    move_words — BURST and WORST under their cases
+    branch_score — rise, branch, score both BURSTs, words under, all at once
     left_win — the left case bounces
     right_branch — the right case branches down: WORST typed, scored, bounces
     """
@@ -669,48 +672,55 @@ class Scene07(WordleBoardScene):
                 rate_func=linear))
         return copies, lines, anims
 
-    def _setup_branch_two(self):
-        """The case rises to TREE_Y as it branches, its line from the top shortening
-        with it, to leave room below for the tree."""
-        y = TREE_Y - CHILD_DY
-        rise = UP * (TREE_Y - self.pcase.get_center()[1])
-        self.kids, self.kid_lines, self.s_anims = self._branch(
-            self.prow, [self.pcase, self.prow], [[-CHILD_DX, y, 0], [CHILD_DX, y, 0]], rise)
-        top, r0 = self.pline.get_start(), _r(self.pcase)
-        self.s_anims += [VGroup(self.pcase, self.prow).animate.shift(rise),
-                         UpdateFromAlphaFunc(self.pline, lambda m, a: m.put_start_and_end_on(
-                             top, r0 + rise * smooth(a)), rate_func=linear)]
-
-    # s : the case rises to the top as it branches into two copies, left and right,
-    #     each FIRST then BURST, lines from BURST's R to each
-    @subscene
-    def branch_two(self):
-        self._setup_branch_two()
-        self.add(*self.kid_lines, *self.kids)
-        self.play(*self.s_anims, run_time=1.5)
-        self.remove(VGroup(self.pcase, self.prow))
-        self.add(self.pcase, self.prow, *self.prow.letters[0])
-        self.s_anims = None
-
-    # t : BURST scored in both: all green on the left (the answer is BURST), --GGG on
-    #     the right (the answer is WORST)
-    @subscene
-    def score_both(self):
-        (l_first, l_row), (r_first, r_row) = self.kids
-        self.play(l_row.reveal_anim(0, ALL_GREEN), r_row.reveal_anim(0, CROSS),
-                  run_time=1.6)
-
     def _under(self, word, rows):
         """Where `word` sits under the case `rows`."""
         return rows[-1].get_bottom() + DOWN * (WORD_GAP + word.height / 2)
 
-    # u : BURST under the left case, WORST under the right
-    @subscene
-    def move_words(self):
-        self.play(*[w.animate.move_to(self._under(w, k)) for w, k in zip(self.pwords, self.kids)],
-                  run_time=1.2)
+    def _setup_branch_score(self):
+        """ONE play (user's call, merging the script's s, t and u): the case rises to
+        TREE_Y, its line from the top shortening with it; two copies branch off, left
+        and right, a line from BURST's R to each; each copy's BURST flips to its
+        scoring AS it travels — all green on the left (the answer is BURST), --GGG
+        on the right (the answer is WORST); and BURST and WORST glide under their
+        cases."""
+        y = TREE_Y - CHILD_DY
+        rise = UP * (TREE_Y - self.pcase.get_center()[1])
+        pitch = self.prow.get_center() - self.pcase.get_center()
+        targets = [np.array([-CHILD_DX, y, 0]), np.array([CHILD_DX, y, 0])]
+        firsts, self.kid_lines, self.s_anims = self._branch(
+            self.prow, [self.pcase], targets, rise)
+        top, r0 = self.pline.get_start(), _r(self.pcase)
+        self.s_anims += [VGroup(self.pcase, self.prow).animate.shift(rise),
+                         UpdateFromAlphaFunc(self.pline, lambda m, a: m.put_start_and_end_on(
+                             top, r0 + rise * smooth(a)), rate_func=linear)]
+        # each copy's BURST: a copy of the typed row flipping into its scored row
+        # while travelling to its place (flip.Flip's travel, as 06's switches)
+        self.s_olds, self.s_flips, scored = [], [], []
+        for t, code in zip(targets, (ALL_GREEN, CROSS)):
+            old = self.prow.copy()
+            new = scored_row(PAIR[0], code, self.prow.width, t + pitch)
+            self.s_olds.append(old)
+            self.s_flips.append(Flip(old, new, parts=(row_parts(old), row_parts(new)),
+                                     travel=True))
+            scored.append(new)
+        self.s_anims += [w.animate.move_to(self._under(w, [new]))
+                         for w, new in zip(self.pwords, scored)]
+        self.kids = [VGroup(f[0], new) for f, new in zip(firsts, scored)]
+        self.s_firsts = [f[0] for f in firsts]
 
-    # v : the left case (all green) does the winning bounce as BURST under it fades
+    # s : one play — the case rises as two copies branch off left and right, each
+    #     BURST flipping to its scoring on the way, BURST and WORST gliding under
+    #     their cases (the script's s, t and u together)
+    @subscene
+    def branch_score(self):
+        self._setup_branch_score()
+        self.add(*self.kid_lines, *self.s_firsts, *self.s_olds)
+        flip(self, self.s_flips, 1.8, extra=self.s_anims)
+        self.remove(VGroup(self.pcase, self.prow))
+        self.add(self.pcase, self.prow, *self.prow.letters[0], *self.s_firsts)
+        self.s_anims = self.s_olds = self.s_flips = self.s_firsts = None
+
+    # t (script v) : the left case (all green) does the winning bounce as BURST under it fades
     @subscene
     def left_win(self):
         row = self.kids[0][1]
@@ -728,7 +738,7 @@ class Scene07(WordleBoardScene):
         w = self.pwords[1]
         self.w_anims.append(w.animate.move_to(self._under(w, [self.grow])))
 
-    # w : the right case branches down once more, WORST (black) coming down with it;
+    # u (script w) : the right case branches down once more, WORST (black) coming down with it;
     #     WORST typed under the copy, scored all green, and the winning bounce as
     #     the black WORST fades
     @subscene
