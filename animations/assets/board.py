@@ -41,8 +41,9 @@ class TileFlip(Animation):
     the real flip does.
     """
 
-    def __init__(self, tile, letter, fill, **kwargs):
+    def __init__(self, tile, letter, fill, stroke=None, **kwargs):
         self.tile, self.letter, self.fill = tile, letter, fill
+        self.stroke = fill if stroke is None else stroke   # the new face's border
         self.h_tile = tile.height
         self.h_letter = letter.height if letter is not None else 0.0
         self.center = tile.get_center()
@@ -55,7 +56,7 @@ class TileFlip(Animation):
         scale = max(abs(np.cos(np.pi * a)), 1e-3)
         if a >= 0.5 and not self._swapped:      # past the midpoint: the tile has
             self._swapped = True                # turned over, so show the new face
-            self.tile.set_fill(self.fill, opacity=1.0).set_stroke(self.fill, STROKE)
+            self.tile.set_fill(self.fill, opacity=1.0).set_stroke(self.stroke, STROKE)
         self.tile.stretch_to_fit_height(self.h_tile * scale)
         self.tile.move_to(self.center)
         if self.letter is not None and self.h_letter:
@@ -213,6 +214,14 @@ class WordleBoard(VGroup):
         flips = [TileFlip(self.tiles[row][i], self.letters[row][i], TILE_STATE[trits[i]])
                  for i in cols]
         scene.play(LaggedStart(*flips, lag_ratio=lag_ratio), run_time=run_time)
+
+    def unscore(self, row, lag_ratio=0.45):
+        """The reverse of `reveal`: `row`'s tiles flip back to their TYPED look (empty
+        fill, filled border). Returns the animation, so it can join a larger play —
+        scene 07 rewinds a whole sequence in one."""
+        flips = [TileFlip(self.tiles[row][i], self.letters[row][i], TILE_EMPTY_FILL,
+                          stroke=TILE_FILLED_BORDER) for i in range(self.n_cols)]
+        return LaggedStart(*flips, lag_ratio=lag_ratio)
 
     # ── growing past six rows ──────────────────────────────────────────────────
     def add_row(self, scene, run_time, height, center=ORIGIN):

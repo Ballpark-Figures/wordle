@@ -79,7 +79,7 @@ from assets.board import get_board, STROKE
 from assets.pigpen import PigpenWord
 from assets.keys import key_cues
 from assets.groups import (ranked_layout, ranked_word_layout, scored_row, HEADER_W,
-                           GUESS_SCALE, HEAD_ROW_GAP, row_aspect, enter_from_beyond,
+                           GUESS_SCALE, GUESS_Y, HEAD_ROW_GAP, row_aspect, enter_from_beyond,
                            edge_out)
 from assets import lists_data
 
@@ -96,6 +96,24 @@ SPLITS = {AFTER: DATA["sub"][f"{FIRST}:{KEEP[FIRST]}:{AFTER}"],
 DOT_COLOR = WHITE                  # 06's dots
 CORNER_BUFF = 0.3                  # 06's corner word's gap to the frame's edges
 CORNER_MARGIN = 0.35               # 06's clear space right of the corner word
+ALL_GREEN = 242                    # pattern code of the all-green reply (FIRST is an answer)
+LINE_W = 1.5                       # branch lines (hangman 18's tree edges: white, behind)
+LINE_BUFF = 0.08                   # gap between a line's end and the row it meets
+OFF_CLEAR = 0.3                    # how far past the top edge things leaving go
+GREEN_Y = -2.3                     # j: the all-green FIRST row, bottom centre
+WORD_Y = -3.4                      # j: its one word, under it
+WIN_SCALE = 0.8                    # that word's size (1 = scene 04's list size)
+GLOW_LAYERS, GLOW_BUFF, GLOW_STEP, GLOW_OPACITY = 8, 0.04, 0.05, 0.12
+
+
+def _glow(mob, color):
+    """A soft halo behind `mob`: GLOW_LAYERS rounded rectangles, each a little
+    larger and all faint, so they sum to a falloff."""
+    return VGroup(*[SurroundingRectangle(mob, buff=GLOW_BUFF + GLOW_STEP * i,
+                                         corner_radius=GLOW_BUFF + GLOW_STEP * i,
+                                         stroke_width=0, fill_color=color,
+                                         fill_opacity=GLOW_OPACITY)
+                    for i in range(GLOW_LAYERS)]).set_z_index(-1)
 
 
 def _corner():
@@ -146,19 +164,24 @@ class Scene07(WordleBoardScene):
         for row in b.target.rows[1:]:
             row.set_opacity(0)
         self.col_left = corner[0] + w / 2 + CORNER_MARGIN
-        groups, spots, rows, widths, r = ranked_layout(DATA, FIRST, left=self.col_left)
-        assert len(spots) == sum(g["size"] for g in groups) == DATA["n_answers"]
-        self.dots = {wd: Dot(point=c, radius=r, color=DOT_COLOR) for wd, c in spots.items()}
-        # each group — its scored row and its dots — as one unit, keyed by code
-        self.units = {}
-        for g, c, wd in zip(groups, rows, widths):
-            row = scored_row(FIRST, g["code"], wd, c, stroke=STROKE * min(1.0, wd / HEADER_W))
-            self.units[g["code"]] = (row, g["members"])
+        self.dots, self.units = self._first_groups()
         # every group starts beyond the frame, out along the ray through its spot
         self.incoming = []
         for row, members in self.units.values():
             grp = VGroup(row, *[self.dots[m] for m in members])
             self.incoming.append((grp, enter_from_beyond(grp)))
+
+    def _first_groups(self):
+        """c's end state, built: every answer a dot, every group of FIRST a unit
+        (scored row, members) keyed by code, laid out as 06 ends. Also h's target."""
+        groups, spots, rows, widths, r = ranked_layout(DATA, FIRST, left=self.col_left)
+        assert len(spots) == sum(g["size"] for g in groups) == DATA["n_answers"]
+        dots = {wd: Dot(point=c, radius=r, color=DOT_COLOR) for wd, c in spots.items()}
+        units = {g["code"]: (scored_row(FIRST, g["code"], wd, c,
+                                        stroke=STROKE * min(1.0, wd / HEADER_W)),
+                             g["members"])
+                 for g, c, wd in zip(groups, rows, widths)}
+        return dots, units
 
     # c : the board shrinks into the corner, the other rows fading out, as FIRST's
     #     groups come in, sorted by size — the end of scene 06's style
@@ -301,3 +324,148 @@ class Scene07(WordleBoardScene):
         self._setup_split(THIRD)
         self.board.type_word(self, 2, THIRD, 0.65, per_letter=key_cues(self), appear=True)
         self._split(2.0)
+
+    # ── back to FIRST's groups, and FIRST's own branch (h-l) ──────────────────
+    def _setup_rewind(self):
+        """h's target is c's end state, rebuilt. What is on screen goes back into
+        it: the kept block's first FIRST row turns into the yellow-T row, every other
+        stacked row folds into that row and fades; the words shrink into their dots;
+        everything that left comes back from beyond its nearest edge; the board's
+        later rows fade, and FIRST flips back to typed."""
+        self.dots, self.units = self._first_groups()
+        target = self.units[KEEP[FIRST]][0]
+        heads = [r for _, st, nw in self.blocks for r in (*st, nw)]
+        first_row = heads.pop(0)
+        self.r_anims = [Transform(first_row, target)]
+        self.r_gone = [first_row, *heads, *self.words.values()]
+        self.r_swap = (first_row, target)
+        k = target.width
+        self.r_anims += [h.animate.scale(k / h.width).move_to(target).set_opacity(0)
+                         for h in heads]
+        # the words on screen shrink into their own dots, which grow out of them
+        for wd, m in self.words.items():
+            d = self.dots[wd]
+            d.generate_target()
+            d.move_to(m).set_opacity(0)
+            self.r_anims += [m.animate.scale(d.width / m.width).move_to(d.target)
+                             .set_opacity(0), MoveToTarget(d)]
+        # everything else comes back from beyond its nearest edge, as it left: the
+        # other groups whole (d), the rest of the kept group by AFTER subgroup (f)
+        back = [VGroup(row, *[self.dots[m] for m in ms])
+                for c, (row, ms) in self.units.items() if c != KEEP[FIRST]]
+        back += [VGroup(*[self.dots[m] for m in g["members"]])
+                 for g in SPLITS[AFTER] if g["code"] != KEEP[AFTER]]
+        for grp in back:
+            home = grp.get_center()
+            grp.move_to(edge_out(grp))
+            self.r_anims.append(grp.animate.move_to(home))
+        self.r_back = back
+        # the board: AFTER and THIRD fade, FIRST turns back over
+        b = self.board
+        later = [m for r in (1, 2) for m in (*b.tiles[r], *b.letters[r])]
+        self.r_anims += [m.animate.set_opacity(0) for m in later] + [b.unscore(0)]
+        self.r_later = later
+        self.blocks = self.words = None
+
+    # h : quickly back to FIRST and its groups — the reverse of d-g in one play
+    @subscene
+    def rewind(self):
+        self._setup_rewind()
+        self.play(*self.r_anims, run_time=1.5)
+        first_row, target = self.r_swap
+        self.remove(*self.r_gone, *self.r_later, *self.r_back)
+        self.add(target, *self.dots.values(), *[row for row, _ in self.units.values()])
+        # FIRST on the left is one row from here on; the rest of the board is done
+        b = self.board
+        self.left = VGroup(*b.tiles[0], *b.letters[0])
+        self.remove(b)
+        self.add(self.left)
+        self.r_anims = self.r_gone = self.r_swap = self.r_back = self.r_later = None
+        self.board = None
+
+    def _setup_branches(self):
+        start = self.left.get_right() + RIGHT * LINE_BUFF
+        self.lines = {c: Line(start, row.get_left() + LEFT * LINE_BUFF, color=WHITE,
+                              stroke_width=LINE_W).set_z_index(-1)
+                      for c, (row, _) in self.units.items()}
+
+    # i : a line from the left FIRST to every coloured FIRST, one after another
+    @subscene
+    def branches(self):
+        self._setup_branches()
+        self.play(LaggedStart(*[Create(l) for l in self.lines.values()], lag_ratio=0.02),
+                  run_time=2.0)
+
+    def _setup_all_green(self):
+        X, Y = config.frame_x_radius, config.frame_y_radius
+        self.g_row, members = self.units.pop(ALL_GREEN)
+        (win,) = members
+        # everything else goes off the top, each group with its line
+        self.g_up = []
+        for c, (row, ms) in self.units.items():
+            grp = VGroup(row, *[self.dots[m] for m in ms], self.lines.pop(c))
+            self.g_up.append((grp, UP * (Y + OFF_CLEAR - grp.get_bottom()[1])))
+        self.left.generate_target()
+        self.left.target.move_to([0, GUESS_Y, 0])
+        self.g_row.generate_target()
+        self.g_row.target.scale(self.left.width / self.g_row.width).move_to([0, GREEN_Y, 0])
+        for t in self.g_row.target.tiles[0]:
+            t.set_stroke(width=STROKE)
+        # the all-green group's one dot becomes its word, growing out of the dot
+        self.g_dot = self.dots[win]
+        self.g_word = PigpenWord(win, revealed=True).scale(WIN_SCALE) \
+            .move_to([0, WORD_Y, 0])
+        self.g_word.generate_target()
+        self.g_word.scale(self.g_dot.width / self.g_word.width).move_to(self.g_dot) \
+            .set_opacity(0)
+        self.g_line = self.lines.pop(ALL_GREEN)
+        self.g_line_new = Line(self.left.target.get_bottom() + DOWN * LINE_BUFF,
+                               self.g_row.target.get_top() + UP * LINE_BUFF,
+                               color=WHITE, stroke_width=LINE_W).set_z_index(-1)
+        self.units = self.dots = self.lines = None
+
+    # j : all but the all-green group off the top; the left FIRST to the top centre,
+    #     the all-green FIRST to the bottom centre, its dot turning into the word
+    @subscene
+    def all_green(self):
+        self._setup_all_green()
+        self.add(self.g_word)
+        self.play(*[grp.animate.shift(v) for grp, v in self.g_up],
+                  MoveToTarget(self.left), MoveToTarget(self.g_row),
+                  MoveToTarget(self.g_word),
+                  self.g_dot.animate.move_to(self.g_word.target).set_opacity(0),
+                  Transform(self.g_line, self.g_line_new),
+                  run_time=2.0)
+        self.remove(*[grp for grp, _ in self.g_up], self.g_dot)
+        self.g_up = self.g_dot = self.g_line_new = None
+
+    def _setup_green_centre(self):
+        Y = config.frame_y_radius
+        self.k_up = UP * (Y + OFF_CLEAR - self.left.get_bottom()[1])
+        self.g_row.generate_target()
+        self.g_row.target.move_to(ORIGIN)
+        # the line now runs out of the top of the frame, to the parent that has gone
+        self.k_line = Line(self.g_row.target.get_top() + UP * LINE_BUFF, [0, Y + OFF_CLEAR, 0],
+                           color=WHITE, stroke_width=LINE_W).set_z_index(-1)
+
+    # k : the original FIRST off the top; the green FIRST to the centre, a line
+    #     running out of the top of it
+    @subscene
+    def green_centre(self):
+        self._setup_green_centre()
+        self.play(self.left.animate.shift(self.k_up), MoveToTarget(self.g_row),
+                  Transform(self.g_line, self.k_line), run_time=1.5)
+        self.remove(self.left)
+        self.left = self.k_line = self.k_up = None
+
+    def _setup_glow(self):
+        self.glow = _glow(self.g_row, TILE_STATE[2])
+
+    # l : the FIRST at the bottom vanishes; the green FIRST glows
+    @subscene
+    def green_glow(self):
+        self._setup_glow()
+        self.play(FadeOut(self.g_word), run_time=0.5)
+        self.remove(self.g_word)
+        self.g_word = None
+        self.play(FadeIn(self.glow), run_time=1.0)
