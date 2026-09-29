@@ -71,8 +71,9 @@ class TilePop(Animation):
     `there_and_back` in `bounce`.
     """
 
-    def __init__(self, tile, letter, bump=0.10, **kwargs):
+    def __init__(self, tile, letter, bump=0.10, appear=False, **kwargs):
         self.tile, self.letter, self.bump = tile, letter, bump
+        self.appear = appear            # the tile itself is hidden until its letter lands
         self.t_h, self.t_w = tile.height, tile.width
         self.l_h, self.l_w = letter.height, letter.width
         self.center = tile.get_center()
@@ -85,6 +86,9 @@ class TilePop(Animation):
         # moment the first one was typed. A member that has not reached its lag
         # offset yet sits at alpha 0, which is exactly "not typed".
         self.letter.set_opacity(1.0 if alpha > 0 else 0.0)
+        if self.appear:                 # same alpha rule for the tile's own visibility
+            self.tile.set_fill(opacity=1.0 if alpha > 0 else 0.0)
+            self.tile.set_stroke(opacity=1.0 if alpha > 0 else 0.0)
         if alpha > 0:
             self.tile.set_stroke(TILE_FILLED_BORDER, STROKE)
         s = 1 + self.bump * np.sin(np.pi * self.rate_func(alpha))
@@ -122,7 +126,8 @@ class WordleBoard(VGroup):
         return t
 
     # ── typing ────────────────────────────────────────────────────────────────
-    def type_word(self, scene, row, word, run_time, per_letter=None, key_gap=None):
+    def type_word(self, scene, row, word, run_time, per_letter=None, key_gap=None,
+                  appear=False):
         """Type `word` into `row`, one letter at a time, left to right.
 
         TWO WAYS TO TIME IT. By default `run_time` is the whole word and the pops
@@ -137,6 +142,10 @@ class WordleBoard(VGroup):
         so ten little plays round ten times: MEASURED at 60fps, a word asked to take
         0.65s actually took 0.749s — 15% long, and enough to leave a length-matched
         typing bed ending before the letters stop. One LaggedStart rounds once.
+
+        `appear=True` hides the row's TILES too, each one appearing from nowhere
+        as its letter lands — for a board whose empty rows are not on screen
+        (scene 07). Off by default, so every other caller is unchanged.
 
         `per_letter(i, ch, at)` fires for each letter with its OFFSET IN SECONDS from
         the start of the word, so the scene can place a sound precisely with
@@ -162,6 +171,9 @@ class WordleBoard(VGroup):
         # cut to about that, or it plays on after the word already looks typed.
         for i, ch in enumerate(word):
             tile = self.tiles[row][i]
+            if appear:
+                tile.set_fill(opacity=0.0).set_stroke(opacity=0.0)
+                scene.add(tile)
             letter = self._letter(ch, tile)
             letter.set_opacity(0)              # TilePop reveals it on its turn
             self.letters[row][i] = letter
@@ -174,7 +186,7 @@ class WordleBoard(VGroup):
                 # i * run_time / (2n - 1). Using the even spacing instead fired every
                 # cue progressively later than the letter it belonged to.
                 per_letter(i, ch, at(i))
-        pops = [TilePop(self.tiles[row][i], self.letters[row][i])
+        pops = [TilePop(self.tiles[row][i], self.letters[row][i], appear=appear)
                 for i in range(len(word))]
         scene.play(LaggedStart(*pops, lag_ratio=lag), run_time=total)
 
@@ -262,6 +274,20 @@ class WordleBoard(VGroup):
 
 def get_board(**kwargs):
     return WordleBoard(**kwargs)
+
+
+def get_typed_row(word):
+    """One typed, UNSCORED row, static: exactly what `type_word` leaves behind, built
+    directly — and what a revealed pigpen.PigpenWord looks like, minus the hidden
+    glyphs (so `set_opacity` on the whole row cannot show them). Scene 08's callouts."""
+    row = WordleBoard(rows=1, cols=len(word))
+    for i, ch in enumerate(word):
+        tile = row.tiles[0][i]
+        tile.set_stroke(TILE_FILLED_BORDER, STROKE)
+        letter = row._letter(ch, tile)
+        row.letters[0][i] = letter
+        row.add(letter)
+    return row
 
 
 def get_scored_row(word, code):

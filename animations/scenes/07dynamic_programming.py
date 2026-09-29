@@ -5,24 +5,28 @@ Talking head THE sits between 06 and here, so the frame starts empty and the boa
 fades in. The script's 07 is not finished yet (it stops at 07g), so no beat clears
 the frame at the end.
 
-THE BOARD NEVER MOVES. It sits in the top-left corner, scaled so its first row is
-exactly scene 06's corner word — same place, same size — so FIRST is typed where
-06's openers stood, and the groups use 06's region right of it.
+THE BOARD starts centred at full size. Once FIRST is typed (c) it shrinks into the
+top-left corner so its first row is exactly scene 06's corner word — same place,
+same size — while every other row fades out; the groups then use 06's region right
+of it. A later guess's tiles appear from nowhere as its letters are typed.
 
 BEAT MAP — one subscene per Script.md beat, letters matching:
 
-  a show_board   — the board fades in, in the corner                  (07a, VO 1)
+  a show_board   — the empty board fades in, centred                  (07a, VO 1)
   b type_first   — FIRST typed into row 0                             (07b, VO 1)
-  c first_groups — FIRST's groups come in from beyond the frame, in the
-                   style of the end of scene 06: every group, sorted by
-                   size, dots under a scored FIRST row                 (07c, VO 1)
+  c first_groups — the board shrinks into the corner, its FIRST row where
+                   06's corner word was, the other rows fading out; FIRST's
+                   groups come in from beyond the frame, in the style of
+                   the end of scene 06: every group, sorted by size, dots
+                   under a scored FIRST row                            (07c, VO 1)
   d all_gray     — the board's FIRST flips all gray; then ONE play: every
                    other group leaves by its nearest edge, the all-gray
                    FIRST row moves to the top middle of the column, and its
                    dots travel there, turning into the words          (07d, VO 2)
-  e after_split  — AFTER typed into row 1; the words regroup into AFTER's
-                   subgroups, the FIRST row flying to the top of each;
-                   then a scored AFTER row under each FIRST            (07e, VO 2)
+  e after_split  — AFTER typed into row 1, its tiles appearing as typed;
+                   the words regroup into AFTER's subgroups, the FIRST row
+                   flying to the top of each with a scored AFTER row
+                   fading in under it as it goes                       (07e, VO 2)
   f after_gray   — the board's AFTER flips all gray; then ONE play: every
                    other subgroup leaves by its nearest edge, the all-gray
                    one's FIRST/AFTER pair moves to the top middle and its
@@ -31,7 +35,8 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                    subgroup under FIRST, AFTER and a scored THIRD      (07g, VO 2)
 
 REUSE MAP — every element and the one source it comes from:
-  board, typing, reveal   assets/board.py `get_board`, `type_word`, `reveal` (02)
+  board, typing, reveal   assets/board.py `get_board`, `type_word` (its
+                          `appear=True` for rows not on screen), `reveal` (02)
   keystroke sfx           assets/keys.py `key_cues` (02, 97)
   corner position         06's corner word: GUESS_SCALE, CORNER_BUFF from the edges
   sorted dot groups (c)   assets/groups.py `ranked_layout` + `scored_row`, dots
@@ -40,8 +45,8 @@ REUSE MAP — every element and the one source it comes from:
   exits (d, f)            assets/groups.py `edge_out` — 06's switches
   word groups (d-g)       assets/groups.py `ranked_word_layout` — 04's word
                           pitches and header proportion, packed as 06 packs dots
-  regroup (e, g)          04i: words move to their new slots in one play, then
-                          the new scored rows FadeIn
+  regroup (e, g)          04i's word move; the new scored rows fade in DURING
+                          it, travelling with the stack (user's call)
   answer words            assets/pigpen.py `PigpenWord(revealed=True)`
   colours                 BOARD_NAVY via WordleBoardScene; tiles config.py TILE_*
   groups, subgroups       assets/lists_data.py -> lists_cache.json `full["first"]`,
@@ -72,7 +77,8 @@ from assets.board import get_board, STROKE
 from assets.pigpen import PigpenWord
 from assets.keys import key_cues
 from assets.groups import (ranked_layout, ranked_word_layout, scored_row, HEADER_W,
-                           GUESS_SCALE, enter_from_beyond, edge_out)
+                           GUESS_SCALE, WORD_HEAD_GAP, row_aspect, enter_from_beyond,
+                           edge_out)
 from assets import lists_data
 
 DATA = lists_data.load()
@@ -95,9 +101,9 @@ def _corner():
 
 class Scene07(WordleBoardScene):
     """BEAT MAP
-    show_board — the board fades in, in the corner
+    show_board — the empty board fades in, centred
     type_first — FIRST typed
-    first_groups — FIRST's groups in, 06's sorted dot style
+    first_groups — board to the corner, other rows out; FIRST's groups in
     all_gray — FIRST flips all gray; only the all-gray group stays, as words
     after_split — AFTER typed; the words split into AFTER's subgroups
     after_gray — AFTER flips all gray; only the all-gray subgroup stays
@@ -107,17 +113,10 @@ class Scene07(WordleBoardScene):
     def setup_scene(self):
         pass
 
-    def _setup_show_board(self):
-        corner, w = _corner()
-        self.board = get_board()
-        self.board.scale(w / self.board.rows[0].width)
-        self.board.shift(corner - self.board.rows[0].get_center())
-        self.col_left = corner[0] + w / 2 + CORNER_MARGIN
-
-    # a : the board fades in, its first row where 06's corner word was
+    # a : the empty board fades in, centred
     @subscene
     def show_board(self):
-        self._setup_show_board()
+        self.board = get_board()
         self.play(FadeIn(self.board), run_time=0.8)
 
     # b : FIRST typed into row 0
@@ -126,6 +125,16 @@ class Scene07(WordleBoardScene):
         self.board.type_word(self, 0, FIRST, 0.65, per_letter=key_cues(self))
 
     def _setup_first_groups(self):
+        # the board's move: scale about its centre by k, then shift by v, so its
+        # first row lands on 06's corner word
+        corner, w = _corner()
+        b = self.board
+        self.k = w / b.rows[0].width
+        self.pivot = b.get_center()
+        self.v = corner - (self.pivot + self.k * (b.rows[0].get_center() - self.pivot))
+        self.row0 = VGroup(b.rows[0], *b.letters[0])
+        self.others = VGroup(*b.rows[1:])
+        self.col_left = corner[0] + w / 2 + CORNER_MARGIN
         groups, spots, rows, widths, r = ranked_layout(DATA, FIRST, left=self.col_left)
         assert len(spots) == sum(g["size"] for g in groups) == DATA["n_answers"]
         self.dots = {wd: Dot(point=c, radius=r, color=DOT_COLOR) for wd, c in spots.items()}
@@ -140,11 +149,18 @@ class Scene07(WordleBoardScene):
             grp = VGroup(row, *[self.dots[m] for m in members])
             self.incoming.append((grp, enter_from_beyond(grp)))
 
-    # c : FIRST's groups come in, sorted by size — the end of scene 06's style
+    # c : the board shrinks into the corner, the other rows fading out, as FIRST's
+    #     groups come in, sorted by size — the end of scene 06's style
     @subscene
     def first_groups(self):
         self._setup_first_groups()
-        self.play(*[grp.animate.move_to(c) for grp, c in self.incoming], run_time=2.0)
+        self.play(self.row0.animate.scale(self.k, about_point=self.pivot).shift(self.v),
+                  self.others.animate.scale(self.k, about_point=self.pivot).shift(self.v)
+                  .set_opacity(0),
+                  *[grp.animate.move_to(c) for grp, c in self.incoming], run_time=2.0)
+        # drop the wrappers play() added; the rows stay in the board (hidden)
+        self.remove(self.row0, self.others)
+        self.row0 = self.others = None
         # unwrap the slide-in groups, so every row and dot is top-level
         for grp, _ in self.incoming:
             self.remove(grp)
@@ -211,7 +227,8 @@ class Scene07(WordleBoardScene):
     # ── splitting by the next guess (e, g) ────────────────────────────────────
     def _setup_split(self, guess):
         """The words regrouped by `guess`: every subgroup under a copy of the stack
-        (the stack itself goes to the first) and a new scored `guess` row."""
+        (the stack itself goes to the first) and a new scored `guess` row, which
+        starts invisible one row under the stack, at its size, and travels with it."""
         sub = SPLITS[guess]
         assert sum(g["size"] for g in sub) == len(self.words)
         n = len(self.stack) + 1
@@ -222,28 +239,35 @@ class Scene07(WordleBoardScene):
         self.s_stacks = [[scored_row(self.stack_words[k], ALL_GRAY, hw, c)
                           for k, c in enumerate(h[:-1])] for h in hds]
         self.s_new = [scored_row(guess, g["code"], hw, h[-1]) for g, h in zip(sub, hds)]
+        ow = self.stack[-1].width                         # the stack's row width now
+        start = self.stack[-1].get_center() + \
+            DOWN * ow * (row_aspect() + WORD_HEAD_GAP / HEADER_W)
+        for r in self.s_new:
+            r.generate_target()
+            r.scale(ow / r.width).move_to(start).set_opacity(0)
         self.blocks = [(g, st, nw) for g, st, nw in zip(sub, self.s_stacks, self.s_new)]
 
     def _split(self, run_time):
-        """The regroup — words to their subgroups, the stack to the first and copies
-        to the rest — then the new rows FadeIn (04i)."""
+        """ONE play: words to their subgroups, the stack to the first and copies to
+        the rest, and each new row fading in as it travels with its stack."""
         first, rest = self.s_stacks[0], self.s_stacks[1:]
+        self.add(*self.s_new)
         self.play(*[m.animate.scale(self.s_f).move_to(self.s_slots[wd])
                     for wd, m in self.words.items()],
                   *[Transform(o, n) for o, n in zip(self.stack, first)],
                   *[TransformFromCopy(o, n) for st in rest for o, n in zip(self.stack, st)],
+                  *[MoveToTarget(r) for r in self.s_new],
                   run_time=run_time)
         self.remove(*self.stack)
         self.add(*first)
-        self.play(*[FadeIn(r) for r in self.s_new], run_time=0.8)
         self.stack = self.s_stacks = self.s_new = self.s_slots = None
 
-    # e : AFTER typed into row 1; the words regroup into AFTER's subgroups, FIRST
-    #     over each; then a scored AFTER row under each FIRST
+    # e : AFTER typed into row 1, its tiles appearing as typed; the words regroup
+    #     into AFTER's subgroups, FIRST over each, a scored AFTER fading in under it
     @subscene
     def after_split(self):
         self._setup_split(AFTER)
-        self.board.type_word(self, 1, AFTER, 0.65, per_letter=key_cues(self))
+        self.board.type_word(self, 1, AFTER, 0.65, per_letter=key_cues(self), appear=True)
         self._split(2.0)
 
     def _setup_after_gray(self):
@@ -264,10 +288,10 @@ class Scene07(WordleBoardScene):
         self.board.reveal(self, 1, ALL_GRAY, 1.6)
         self._focus(2.0)
 
-    # g : THIRD typed into row 2; the words regroup into THIRD's subgroups, FIRST
-    #     and AFTER over each; then a scored THIRD row under each
+    # g : THIRD typed into row 2, its tiles appearing as typed; the words regroup
+    #     into THIRD's subgroups, FIRST and AFTER over each, a scored THIRD fading in
     @subscene
     def third_split(self):
         self._setup_split(THIRD)
-        self.board.type_word(self, 2, THIRD, 0.65, per_letter=key_cues(self))
+        self.board.type_word(self, 2, THIRD, 0.65, per_letter=key_cues(self), appear=True)
         self._split(2.0)
