@@ -21,8 +21,8 @@ BEAT MAP (one subscene per Script.md beat)
   g low_1         — the 1+ low-tier layer grows up over the bars, with a legend
                     row (Yahtzee 07's overlay style; no row for the whole chart) (VO 6)
   h low_2         — the 2+ layer grows up over it; its legend row appears    (VO 6)
-  i low_3         — the 3+ layer, POPPED: it grows up exaggerated, holds, then
-                    settles to its true height, so its shape can be seen      (VO 6)
+  i low_3         — the 3+ layer, POPPED: it grows up exaggerated and straight
+                    back down to its true height, so its shape can be seen    (VO 6)
   j list_center   — the histogram, its layers and legend fall/fade away; the list
                     returns to the centre at full brightness                 (VO 7)
   k doubles       — the list morphs into the list WITH DOUBLES: LOW splits into
@@ -31,15 +31,6 @@ BEAT MAP (one subscene per Script.md beat)
   m dup_1 / n dup_2 / o dup_3 — the duplicate-letter layers, as g-i (o popped) (VO 8)
   p restore       — the duplicate layers fall back to the axis, legend out   (VO 8)
   q vowel_3 / r vowel_4 — the distinct-vowel layers, as g-h (r popped)       (VO 9)
-
-  THE TEST (the user's, 2026-09-29; not in the script yet), one beat each:
-  s whole_graph   — the vowel layers fall away
-  t test_low      — every opener with a low-tier letter grows up over the bars
-  u pull_low      — they leave downward, PULLING THE CHART DOWN: each bar's top falls
-                    by its layer's height, leaving the openers without one
-  v recenter_low  — the bars left stretch back up to the full height
-  w/x/y           — the same for the openers LEFT with a duplicate letter
-  z/za/zb         — the same for the openers LEFT with 3+ distinct vowels
 
 REUSE MAP
   watch page      bpkfigures.youtube_card.youtube_watch (as hangman 93youtube_test c)
@@ -79,9 +70,7 @@ LAYOUT CHOICES, flagged: the Wordle title fades with the Hangman list in e (colu
 names only the list going to the corner); the lighter panel colour on the navy is
 BOARD_NAVY with 22% white; layer colours ORANGE / RED / PURPLE, in nesting order
 (yahtzee 07 used ORANGE then RED); a double's small copy sits on the full copy's
-baseline; LOW■ grows out of the old LOW▼ with LOW▼. THE TEST: "recentre" read as a
-VERTICAL rescale (the tallest bar left back to the histogram's tallest), the axis
-unchanged; the test layers carry no legend; every test layer is orange.
+baseline; LOW■ grows out of the old LOW▼ with LOW▼.
 
 THE SEAM (e): 08's histogram lives in a view 27x the 16-wide frame. Everything before
 e is laid out in the ordinary frame, so at e's first instant the camera moves to the
@@ -116,14 +105,10 @@ from assets.word_stacks import StacksCamera
 from assets.histogram_view import (HistogramChrome, full_stacks, layer_bars, to_view,
                                    design, K, CENTER, WIDTH, HEIGHT, SQUASH, BAR_COLOR,
                                    TALLEST)
-from assets.word_stacks import STEP
 
 HANGMAN_VIDEO = yt_get("hangman")
 POLL = poll_get("wordle")
-_SUB = subhist_data.load()
-LAYERS = _SUB["layers"]
-CASCADE = _SUB["cascade"]
-TOTAL = _SUB["total"]
+LAYERS = subhist_data.load()["layers"]
 
 # ── tier lists (hangman 17c's layout) ─────────────────────────────────────────
 LIST_SCALE = 0.62
@@ -138,7 +123,7 @@ LOW_TIERS = {6, 7}                               # LOW▲, LOW▼ — the user's
 # ── the histogram beats (design coordinates, 16 x 9) ──────────────────────────
 CORNER_SCALE = 0.40               # the tier list in the corner
 CORNER_UR = (7.7, 2.3)            # its top-RIGHT corner (bars short there)
-LEGEND_UL = (-7.4, 2.9)           # the legend's top-left corner (bars short there too)
+LEGEND_GAP = 0.35                 # the legend's right edge to the corner list's left
 PANEL_ON_NAVY = interpolate_color(BOARD_NAVY, WHITE, 0.22)   # e on: lighter panels
 LAYER_COLORS = [ACCENT_ORANGE, ACCENT_RED, ACCENT_PURPLE]    # outermost first
 POP_FRAC = 0.35                   # a popped layer's tallest bar, over the histogram's
@@ -165,8 +150,6 @@ class Scene09(MovingCameraScene, WordleScene):
         self.arrow = None
         self.navy = self.stacks = self.chrome = self.legend = None
         self.layers = []
-        self.plain = self.test_layer = self.left = None
-        self.scale = 1.0
 
     def _title(self, text, x):
         # on a shared BASELINE, so "Hangman" (descender) and "Wordle" share one line
@@ -277,23 +260,36 @@ class Scene09(MovingCameraScene, WordleScene):
         self.stacks = self.chrome = self.legend = None
         self.layers = []
 
-    def _legend_row(self, color, text, i):
-        """Legend row `i` — yahtzee's make_hist_legend look, in white. There is no row
-        for the whole histogram (the user's call)."""
+    @staticmethod
+    def _legend_swatch_row(color, text):
         sw = Square(side_length=0.22, fill_color=color, fill_opacity=1.0, stroke_width=0)
         txt = crisp_text(text, font_size=FONT_SIZE_SM, color=WHITE)
         txt.next_to(sw, RIGHT, buff=0.15)
-        row = VGroup(sw, txt)
+        return VGroup(sw, txt)
+
+    def _legend_row(self, color, text, i):
+        """Legend row `i` — yahtzee's make_hist_legend look, in white. There is no row
+        for the whole histogram (the user's call). Every legend sits in ONE place: on
+        the right, just LEFT of the corner tier list and top-aligned with it (the
+        user's call) — also in m-r, when the list is gone. Its left edge is fixed by
+        the WIDEST row of any legend, so rows line up and nothing reaches the list."""
+        row = self._legend_swatch_row(color, text)
+        widest = max(self._legend_swatch_row(WHITE, t).width
+                     for labels in LEGEND_LABELS.values() for t in labels)
+        corner = tl.filled_list(td.WORDLE_LETTERS, names=td.WORDLE_NAMES,
+                                scale=CORNER_SCALE).move_to([*CORNER_UR, 0],
+                                                            aligned_edge=UR)
+        left = corner.get_left()[0] - LEGEND_GAP - widest
         pitch = row.height + 0.18
-        row.move_to([LEGEND_UL[0], LEGEND_UL[1] - i * pitch, 0], aligned_edge=UL)
+        row.move_to([left, CORNER_UR[1] - i * pitch, 0], aligned_edge=UL)
         return to_view(row)
 
     def _layer(self, family, i, run_time, pop=False):
         """Layer `i` of `family` grows up over the bars (over any layer before it) and
         its legend row fades in. `pop`, for a layer too thin to see: every bar grows
         to a height that makes the tallest POP_FRAC of the histogram's (the same
-        factor for all, so the shape reads), holds, then SETTLES to its true height;
-        `run_time` covers all three (0.8 : 0.4 : 0.8)."""
+        factor for all, so the shape reads), then straight back down to its true
+        height, no pause at the top; `run_time` covers both halves."""
         counts = np.array(LAYERS[family][i]["counts"], dtype=float)
         row = self._legend_row(LAYER_COLORS[i], LEGEND_LABELS[family][i], i)
         if self.legend is None:
@@ -310,10 +306,9 @@ class Scene09(MovingCameraScene, WordleScene):
         layer = layer_bars(counts * k, LAYER_COLORS[i])
         self.add(layer)
         self.layers.append(layer)
-        grow_bars(self, layer, 0.8 * r, extra=[FadeIn(row)])
-        self.wait(0.4 * r)
+        grow_bars(self, layer, 1.0 * r, extra=[FadeIn(row)])
         self.play(*[b.animate.stretch(1 / k, dim=1, about_edge=DOWN) for b in layer],
-                  run_time=0.8 * r)
+                  run_time=1.0 * r)
 
     def _drop_layers(self, run_time):
         """Every layer falls back to the axis; the legend fades; the bars stay."""
@@ -432,99 +427,3 @@ class Scene09(MovingCameraScene, WordleScene):
     def vowel_4(self):
         self._layer("vowel", 1, 2.0, pop=True)
 
-    # ── s-zb: the TEST — each property's openers pulled out of the chart in turn ──
-    #    The bars become plain rectangles here (identical to the stacks' look — a bar
-    #    is its words' slices with no gaps), since a stack cannot lose words. Heights
-    #    are counts x STEP x SQUASH x self.scale, self.scale growing at each recentre.
-    def _unit(self):
-        return STEP * SQUASH * self.scale
-
-    def _to_plain_bars(self):
-        """Swap the stacks for plain bars of the same heights, where they sit in the
-        drawing order (under the chrome), with no visible change."""
-        self.scale = 1.0
-        self.left = np.array(TOTAL, dtype=float)
-        self.plain = layer_bars(self.left, BAR_COLOR)
-        self.remove(self.stacks)
-        self.add(self.plain)
-        self.bring_to_back(self.plain)
-        self.bring_to_back(self.navy)
-        self.stacks = None
-
-    def _test_layer(self, step, color, run_time):
-        """The openers `CASCADE[step]` removes grow up over the bars left."""
-        counts = np.array(CASCADE[step]["removed"], dtype=float) * self.scale
-        self.test_layer = layer_bars(counts, color)
-        self.add(self.test_layer)
-        grow_bars(self, self.test_layer, run_time)
-
-    def _pull(self, step, run_time):
-        """The layer leaves DOWNWARD, fading, and PULLS THE BARS DOWN WITH IT: each bar's
-        top falls by its layer bar's height, to the openers left."""
-        self.left = np.array(CASCADE[step]["left"], dtype=float)
-        u = self._unit()
-        bars = [b.animate.stretch_to_fit_height(max(n * u, 1e-3), about_edge=DOWN)
-                for b, n in zip(self.plain, self.left)]
-        out = [b.animate.shift(DOWN * b.height).set_opacity(0) for b in self.test_layer]
-        self.play(*bars, *out, run_time=run_time)
-        self.remove(self.test_layer, *self.test_layer)
-        self.test_layer = None
-
-    def _recenter(self, run_time):
-        """Stretch the bars left back up, so the tallest is as tall as the whole
-        histogram's tallest was."""
-        k = TALLEST / (self.left.max() * self.scale)   # heights are already scaled
-        self.scale *= k
-        self.play(*[b.animate.stretch(k, dim=1, about_edge=DOWN) for b in self.plain],
-                  run_time=run_time)
-
-    # s : the vowel layers fall away — the whole graph again
-    @subscene
-    def whole_graph(self):
-        self._drop_layers(1.0)
-
-    # t : every opener with a low-tier letter, over the bars
-    @subscene
-    def test_low(self):
-        self._to_plain_bars()
-        self._test_layer(0, LAYER_COLORS[0], 1.0)
-
-    # u : they leave, pulling the chart down with them
-    @subscene
-    def pull_low(self):
-        self._pull(0, 1.5)
-
-    # v : recentre — the bars left stretch back up to full height
-    @subscene
-    def recenter_low(self):
-        self._recenter(1.0)
-
-    # w : of those left, every opener with a duplicate letter
-    @subscene
-    def test_dup(self):
-        self._test_layer(1, LAYER_COLORS[0], 1.0)
-
-    # x : they leave, pulling the chart down
-    @subscene
-    def pull_dup(self):
-        self._pull(1, 1.5)
-
-    # y : recentre
-    @subscene
-    def recenter_dup(self):
-        self._recenter(1.0)
-
-    # z : of those left, every opener with 3+ distinct vowels
-    @subscene
-    def test_vowel(self):
-        self._test_layer(2, LAYER_COLORS[0], 1.0)
-
-    # za : they leave, pulling the chart down
-    @subscene
-    def pull_vowel(self):
-        self._pull(2, 1.5)
-
-    # zb : recentre
-    @subscene
-    def recenter_vowel(self):
-        self._recenter(1.0)

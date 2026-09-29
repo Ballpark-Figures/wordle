@@ -12,12 +12,6 @@ asserts it reproduces the layer sizes that notebook printed (its cells 13, 14, 1
 Each layer is contained in the one before it, which is ASSERTED (the notebook's
 _check_nested), so a nested bar can never stand taller than its parent.
 
-THE CASCADE (09's closing test): the same three conditions REMOVED IN TURN — first
-every opener with 1+ low-tier tile, then, of those left, every one with 1+ duplicate,
-then, of those left, every one with 3+ distinct vowels. For each step the cache holds
-the removed set's counts and the counts LEFT, per bar; the build asserts that
-left + removed is the bar before the step, bar by bar.
-
 For every layer the cache holds its words and its COUNT PER BAR, aligned to
 histogram_cache.json's bars (one entry per distinct bin, ascending) — the heights the
 scene draws. Nothing in the scene counts anything.
@@ -72,22 +66,6 @@ def _build():
                            "counts": [per.get(b, 0) for b in bar_bins]})
         assert [l["n"] for l in layers] == NOTEBOOK[fam], (fam, [l["n"] for l in layers])
         out["layers"][fam] = layers
-
-    # the cascade: remove each family's FIRST layer from what is left, in turn
-    per_bar = lambda ws: [Counter(b for w, b in zip(words, bins) if w in ws).get(bb, 0)
-                          for bb in bar_bins]
-    left = set(words)
-    out["total"] = per_bar(left)
-    out["cascade"] = []
-    for fam in ("low", "dup", "vowel"):
-        t = thresholds[fam][0]
-        gone = {w for w in left if feats[fam](w) >= t}
-        before = per_bar(left)
-        left = left - gone
-        step = {"family": fam, "min": t, "removed": per_bar(gone),
-                "left": per_bar(left), "n_removed": len(gone), "n_left": len(left)}
-        assert [a + b for a, b in zip(step["removed"], step["left"])] == before
-        out["cascade"].append(step)
     return out
 
 
@@ -105,7 +83,4 @@ if __name__ == "__main__":
     for fam, layers in d["layers"].items():
         print(f"  {fam}: " + ", ".join(f"{l['min']}+ n={l['n']} (tallest bar "
                                         f"{max(l['counts'])})" for l in layers))
-    for st in d["cascade"]:
-        print(f"  cascade {st['family']} {st['min']}+: removed {st['n_removed']}, "
-              f"left {st['n_left']}")
     print(f"wrote {CACHE}")
