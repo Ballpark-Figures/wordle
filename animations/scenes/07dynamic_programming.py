@@ -44,6 +44,12 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                    with it) to the centre, its line running out the top (07k, VO 4)
   l green_win    — the bottom word fades; the green FIRST does the winning
                    row's bounce (02's win), in place of a glow (user's call) (07l, VO 4)
+  m case_swap    — the green case off to the left, FRESH's case in from the
+                   right: FIRST scored G-YG-, its line out the top, FRESH
+                   under it (FRESH is the user's pick)                 (07m, VO 5)
+  n type_fresh   — FRESH typed below that FIRST, tiles appearing as typed (07n, VO 5)
+  o score_fresh  — FRESH scored, all green                            (07o, VO 5)
+  p fresh_win    — the bottom word fades; FRESH does the win bounce   (07p, VO 5)
 
 REUSE MAP — every element and the one source it comes from:
   board, typing, reveal   assets/board.py `get_board`, `type_word` (its
@@ -86,7 +92,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 
 from config import *
-from assets.board import get_board, STROKE
+from assets.board import get_board, WordleBoard, STROKE, TILE, GAP
 from assets.pigpen import PigpenWord
 from assets.keys import key_cues
 from assets.groups import (ranked_layout, ranked_word_layout, scored_row, HEADER_W,
@@ -111,6 +117,11 @@ ALL_GREEN = 242                    # pattern code of the all-green reply (FIRST 
 LINE_W = 1.5                       # branch lines (hangman 18's tree edges: white, behind)
 OFF_CLEAR = 0.3                    # how far past the top edge things leaving go
 K_FLY = 3.0                        # k: how many frame heights FIRST shoots up
+SINGLE = "fresh"                   # m-p: the one-word group shown (user's pick of
+SINGLE_CODE = 177                  #   FIRST's 25) and FIRST's score against it, G-YG-
+CASE_WORD_Y = -2.0                 # m: that case's word, below the row typed in n
+BOUNCE_H = 0.35                    # board.bounce's default height, for a full-size tile
+SWAP_DIST = 16.0                   # m: how far the cases travel (a frame width)
 GREEN_Y = -2.3                     # j: the all-green FIRST row, bottom centre
 WORD_Y = -3.4                      # j: its one word, under it
 WIN_SCALE = 0.8                    # that word's size (1 = scene 04's list size)
@@ -126,6 +137,12 @@ def _r(row):
 def _line(a, b):
     """A branch line from `a` to `b`: white, thin, behind the tiles (hangman 18's edges)."""
     return Line(a, b, color=WHITE, stroke_width=LINE_W).set_z_index(-1)
+
+
+def _jump(row):
+    """The win bounce's height for `row`: the board's default, scaled with the tiles,
+    so a small row does not jump over the row above it."""
+    return BOUNCE_H * row.tiles[0][0].height / TILE
 
 
 def _corner():
@@ -149,6 +166,10 @@ class Scene07(WordleBoardScene):
     all_green — FIRST top centre, the all-green FIRST and its word bottom centre
     green_centre — top FIRST off; green FIRST and word to the centre
     green_win — the word fades; the green FIRST bounces
+    case_swap — green case out left, FRESH's case in from the right
+    type_fresh — FRESH typed under FIRST
+    score_fresh — FRESH scored all green
+    fresh_win — the word fades; FRESH bounces
     """
 
     def setup_scene(self):
@@ -514,4 +535,53 @@ class Scene07(WordleBoardScene):
         self.play(FadeOut(self.g_word), run_time=0.5)
         self.remove(self.g_word)
         self.g_word = None
-        self.g_row.bounce(self, 0, 1.0)
+        self.g_row.bounce(self, 0, 1.0, height=_jump(self.g_row))
+
+    # ── a one-word group: guess the word and finish in two (m-p) ──────────────
+    def _setup_case_swap(self):
+        """FRESH's case, built at the centre as the green case stands now: FIRST
+        scored as FRESH scores it, its line out of the top, FRESH under it. It comes
+        in from the right as the green case leaves left."""
+        X, Y = config.frame_x_radius, config.frame_y_radius
+        self.case = scored_row(FIRST, SINGLE_CODE, self.g_row.width, ORIGIN)
+        self.case_line = _line([0, Y + OFF_CLEAR, 0], _r(self.case))
+        self.case_word = PigpenWord(SINGLE, revealed=True).scale(WIN_SCALE) \
+            .move_to([0, CASE_WORD_Y, 0])
+        self.m_away = LEFT * SWAP_DIST
+        self.m_in = VGroup(self.case, self.case_line, self.case_word).shift(RIGHT * SWAP_DIST)
+
+    # m : the green FIRST off to the left with its line, as FRESH's case comes in
+    #     from the right
+    @subscene
+    def case_swap(self):
+        self._setup_case_swap()
+        self.play(VGroup(self.g_row, self.g_line).animate.shift(self.m_away),
+                  self.m_in.animate.shift(self.m_away), run_time=1.5)
+        self.remove(self.g_row, self.g_line, self.m_in)
+        self.add(self.case, self.case_line, self.case_word)
+        self.g_row = self.g_line = self.m_in = self.m_away = None
+
+    def _setup_type_fresh(self):
+        """An empty row the case's size, under it at the board's row spacing."""
+        self.guess2 = WordleBoard(rows=1, cols=5)
+        self.guess2.scale(self.case.width / self.guess2.width)
+        self.guess2.next_to(self.case, DOWN, buff=self.case.tiles[0][0].height * GAP / TILE)
+
+    # n : FRESH typed below FIRST, its tiles appearing as typed
+    @subscene
+    def type_fresh(self):
+        self._setup_type_fresh()
+        self.guess2.type_word(self, 0, SINGLE, 0.65, per_letter=key_cues(self), appear=True)
+
+    # o : FRESH scored — all green
+    @subscene
+    def score_fresh(self):
+        self.guess2.reveal(self, 0, ALL_GREEN, 1.6)
+
+    # p : the word at the bottom vanishes; FRESH does the winning row's bounce (as l)
+    @subscene
+    def fresh_win(self):
+        self.play(FadeOut(self.case_word), run_time=0.5)
+        self.remove(self.case_word)
+        self.case_word = None
+        self.guess2.bounce(self, 0, 1.0, height=_jump(self.guess2))
