@@ -58,6 +58,7 @@ DOT_PITCH = 0.16           # dot spacing, before any fit-to-frame
 DOT_FRAC = 0.32            # dot radius / pitch
 DOT_PAD = 0.2              # footprint padding round a dot cluster
 DOT_HEAD_GAP = 0.08        # between a scored row and its dots (x pitch-scale)
+RANK_GAP = 0.05            # between blocks in the sorted layout (DOT_PAD adds more)
 DOT_BLOCK_GAP = 0.12       # least clear space between two dot groups
 NEAR_SIGMA = 1.0           # spread of the candidates clustered round a target
 DOT_REGION_TOP = 4.2       # the guess has left by then: dots take the whole frame,
@@ -241,6 +242,38 @@ def row_aspect():
     return ROW_ASPECT
 
 
+def _dot_block(g):
+    """A dot group's block at scale 1: its dots in a square-ish grid (nc columns,
+    nr rows) under its scored row, sqrt(size) pitches wide; w and h include
+    DOT_PAD."""
+    p, asp, n = DOT_PITCH, row_aspect(), g["size"]
+    nc = math.ceil(math.sqrt(n))
+    nr = math.ceil(n / nc)
+    rw = p * math.sqrt(n)
+    return dict(nc=nc, nr=nr, rw=rw, rh=rw * asp,
+                w=max(nc * p, rw) + DOT_PAD, h=nr * p + rw * asp + DOT_HEAD_GAP + DOT_PAD)
+
+
+def _fill(groups, bs, centres, f):
+    """Every block's dots and row, the blocks centred at `centres`, all at scale
+    `f`. Dots fill each grid row by row, left to right, in member order. Returns
+    (dots {word: centre}, row centres, row widths, dot radius)."""
+    p = DOT_PITCH
+    dots, rows, widths = {}, [], []
+    for g, b, (bx, by) in zip(groups, bs, centres):
+        top = by + b["h"] * f / 2 - DOT_PAD * f / 2
+        rows.append(np.array([bx, top - b["rh"] * f / 2, 0.0]))
+        widths.append(b["rw"] * f)
+        gy = top - (b["rh"] + DOT_HEAD_GAP) * f          # top of the dot grid
+        nc, n = b["nc"], g["size"]
+        for k, word in enumerate(g["members"]):
+            i, j = divmod(k, nc)
+            n_in_row = min(nc, n - i * nc)
+            dots[word] = np.array([bx + (j - (n_in_row - 1) / 2) * p * f,
+                                   gy - (i + 0.5) * p * f, 0.0])
+    return dots, rows, widths, DOT_FRAC * p * f
+
+
 def dot_layout(data, guess, seed=None, blocked=(), anchors=None):
     """06b: EVERY group of `guess` (lists_data's `full`), each answer a dot in a
     square-ish grid, the group's scored row atop it, sqrt(size) dot pitches wide —
@@ -260,17 +293,7 @@ def dot_layout(data, guess, seed=None, blocked=(), anchors=None):
     Returns (groups, dots {word: centre}, row centres, row widths, dot radius) —
     groups in lists_data's order, the two lists in the same order."""
     groups = data["full"][guess]
-    p, asp = DOT_PITCH, row_aspect()
-
-    def block(g):
-        n = g["size"]
-        nc = math.ceil(math.sqrt(n))
-        nr = math.ceil(n / nc)
-        rw = p * math.sqrt(n)
-        return dict(nc=nc, nr=nr, rw=rw, rh=rw * asp,
-                    w=max(nc * p, rw) + DOT_PAD, h=nr * p + rw * asp + DOT_HEAD_GAP + DOT_PAD)
-
-    bs = [block(g) for g in groups]
+    bs = [_dot_block(g) for g in groups]
     targets = None
     if anchors is not None:           # a row's spot, as its box's centre (unshrunk)
         targets = [None if g["code"] not in anchors else
@@ -279,16 +302,56 @@ def dot_layout(data, guess, seed=None, blocked=(), anchors=None):
     f, centres, _ = _scatter([(b["w"], b["h"]) for b in bs], [],
                              seed or f"06:{guess}:dots", block_gap=DOT_BLOCK_GAP,
                              region_top=DOT_REGION_TOP, blocked=blocked, targets=targets)
-    dots, rows, widths = {}, [], []
-    for g, b, (bx, by) in zip(groups, bs, centres):
-        top = by + b["h"] * f / 2 - DOT_PAD * f / 2
-        rows.append(np.array([bx, top - b["rh"] * f / 2, 0.0]))
-        widths.append(b["rw"] * f)
-        gy = top - (b["rh"] + DOT_HEAD_GAP) * f          # top of the dot grid
-        nc, n = b["nc"], g["size"]
-        for k, word in enumerate(g["members"]):
-            i, j = divmod(k, nc)
-            n_in_row = min(nc, n - i * nc)
-            dots[word] = np.array([bx + (j - (n_in_row - 1) / 2) * p * f,
-                                   gy - (i + 0.5) * p * f, 0.0])
-    return groups, dots, rows, widths, DOT_FRAC * p * f
+    return (groups, *_fill(groups, bs, centres, f))
+
+
+def ranked_layout(data, guess, left, right=REGION_HALF_W, top=DOT_REGION_TOP,
+                  bottom=REGION_BOT):
+    """06, the SORTED version: every group of `guess` as a dot block (as
+    `dot_layout`), packed in reading order BY SIZE — largest first, left to right
+    along a row, then the next row down — inside x in [left, right], y in [bottom,
+    top]. Blocks in a row are top-aligned (so their scored rows line up) and spread
+    to fill the row's width, the last row excepted; one scale for everything, the
+    largest that fits. Ties in size keep lists_data's order (by pattern code).
+
+    Returns what `dot_layout` does, groups in rank order; the dots dict is in that
+    order too (group by group, each grid row by row), which is the SEQUENCE the
+    scene moves dots along."""
+    groups = sorted(data["full"][guess], key=lambda g: (-g["size"], g["code"]))
+    bs = [_dot_block(g) for g in groups]
+    gap = RANK_GAP
+
+    def shelves(f):
+        out, cur, x = [], [], 0.0
+        for k, b in enumerate(bs):
+            w = b["w"] * f
+            if cur and x + gap + w > right - left:
+                out.append(cur)
+                cur, x = [], 0.0
+            x += (gap if cur else 0.0) + w
+            cur.append(k)
+        out.append(cur)
+        return out
+
+    def height(f):
+        return sum(max(bs[k]["h"] * f for k in sh) for sh in shelves(f)) + \
+            gap * (len(shelves(f)) - 1)
+
+    lo, hi = 0.01, 3.0                         # the largest scale that fits
+    for _ in range(40):
+        mid = (lo + hi) / 2
+        lo, hi = (mid, hi) if height(mid) <= top - bottom else (lo, mid)
+    f = lo
+    centres = [None] * len(bs)
+    y = top
+    rows_of = shelves(f)
+    for i, sh in enumerate(rows_of):
+        ws = [bs[k]["w"] * f for k in sh]
+        spare = (right - left) - sum(ws) - gap * (len(sh) - 1)
+        g_eff = gap + (spare / (len(sh) - 1) if len(sh) > 1 and i < len(rows_of) - 1 else 0)
+        x = left
+        for k, w in zip(sh, ws):
+            centres[k] = (x + w / 2, y - bs[k]["h"] * f / 2)
+            x += w + g_eff
+        y -= max(bs[k]["h"] * f for k in sh) + gap
+    return (groups, *_fill(groups, bs, centres, f))
