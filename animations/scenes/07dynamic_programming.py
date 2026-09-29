@@ -60,9 +60,10 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                    flips to its scoring on the way (all green left, --GGG
                    right); BURST and WORST glide under their cases (07s-u, VO 6)
   t left_win     — the left case's winning bounce as BURST fades       (07v, VO 6)
-  u right_branch — the right case branches down again, the black WORST
-                   coming down with it; WORST typed, scored all green,
-                   winning bounce as the black WORST fades             (07w, VO 6)
+  u right_branch — WORST typed under the right case's BURST; a copy of the
+                   case branches straight down, its WORST flipping to
+                   all green on the way, the black WORST coming down
+                   with it; winning bounce as the black WORST fades    (07w, VO 6)
 
   NB from s on the LETTERS run behind the script's: three script beats (s, t, u)
   are one subscene, so the script's v is subscene t and its w is u.
@@ -199,7 +200,7 @@ class Scene07(WordleBoardScene):
     type_burst — BURST typed under FIRST
     branch_score — rise, branch, score both BURSTs, words under, all at once
     left_win — the left case bounces
-    right_branch — the right case branches down: WORST typed, scored, bounces
+    right_branch — WORST typed; a copy branches down, WORST scoring as it goes
     """
 
     def setup_scene(self):
@@ -703,7 +704,9 @@ class Scene07(WordleBoardScene):
             self.s_flips.append(Flip(old, new, parts=(row_parts(old), row_parts(new)),
                                      travel=True))
             scored.append(new)
-        self.s_anims += [w.animate.move_to(self._under(w, [new]))
+        # the words land a row lower than directly under their cases, leaving room
+        # for the next guess's row (as r's words did)
+        self.s_anims += [w.animate.move_to(self._under(w, [new]) + pitch)
                          for w, new in zip(self.pwords, scored)]
         self.kids = [VGroup(f[0], new) for f, new in zip(firsts, scored)]
         self.s_firsts = [f[0] for f in firsts]
@@ -729,26 +732,38 @@ class Scene07(WordleBoardScene):
         self.remove(self.pwords[0])
 
     def _setup_right_branch(self):
-        kid = self.kids[1]
-        t = kid[0].get_center() + DOWN * CHILD_DY
-        (self.gkid,), (self.gline,), self.w_anims = self._branch(kid[1], list(kid), [t])
-        # the row WORST will be typed into, where it will be once the branch lands,
-        # and WORST travelling down to sit under it as the branch comes down
-        self.grow = self._typed_row(kid[1].copy().shift(t - kid[0].get_center()))
-        w = self.pwords[1]
-        self.w_anims.append(w.animate.move_to(self._under(w, [self.grow])))
+        """The row WORST is typed into, under the right case's BURST — where the black
+        WORST left room for it (s)."""
+        self.wrow = self._typed_row(self.kids[1][1])
 
-    # u (script w) : the right case branches down once more, WORST (black) coming down with it;
-    #     WORST typed under the copy, scored all green, and the winning bounce as
-    #     the black WORST fades
+    def _branch_down(self):
+        """After WORST is typed: a copy of the whole case branching straight down, a
+        line from the typed WORST's R to the copy's FIRST R; the copy's WORST flips
+        to all green AS it travels (as s's BURSTs did); the black WORST comes down to
+        sit under it. Built here, not in setup, since the copy needs WORST's letters."""
+        first, burst = self.kids[1]
+        v = DOWN * CHILD_DY
+        (copy,), (self.gline,), anims = self._branch(self.wrow, [first], [first.get_center() + v])
+        self.gfirst = copy[0]
+        old = self.wrow.copy()
+        self.gwin = scored_row(PAIR[1], ALL_GREEN, self.wrow.width, self.wrow.get_center() + v)
+        w = self.pwords[1]
+        self.add(self.gline, self.gfirst, old)
+        flip(self, [Flip(old, self.gwin, parts=(row_parts(old), row_parts(self.gwin)),
+                         travel=True)],
+             1.5, extra=[*anims, burst.copy().animate.shift(v),
+                         w.animate.move_to(self._under(w, [self.gwin]))])
+        self.add(self.gfirst)
+
+    # u (script w) : WORST typed under the right case's BURST; then a copy of the
+    #     case branches straight down, its WORST flipping to all green on the way and
+    #     the black WORST coming down with it; the winning bounce as the black WORST
+    #     fades (user's call: the same shape as r and s)
     @subscene
     def right_branch(self):
         self._setup_right_branch()
-        self.add(self.gline, self.gkid)
-        self.play(*self.w_anims, run_time=1.2)
-        self.w_anims = None
-        self.grow.type_word(self, 0, PAIR[1], 0.65, per_letter=key_cues(self), appear=True)
-        self.grow.reveal(self, 0, ALL_GREEN, 1.6)
-        self.play(FadeOut(self.pwords[1]), self.grow.bounce_anim(0, height=_jump(self.grow)),
+        self.wrow.type_word(self, 0, PAIR[1], 0.65, per_letter=key_cues(self), appear=True)
+        self._branch_down()
+        self.play(FadeOut(self.pwords[1]), self.gwin.bounce_anim(0, height=_jump(self.gwin)),
                   run_time=1.0)
         self.remove(self.pwords[1])
