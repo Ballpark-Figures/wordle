@@ -34,9 +34,10 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   g third_split  — THIRD typed into row 2; the same split as e, each
                    subgroup under FIRST, AFTER and a scored THIRD      (07g, VO 2)
   h rewind       — quickly back to c's end state, d-g reversed in one play (07h, VO 3)
-  i branches     — row by row of the layout: lines from the left FIRST to
-                   that row's FIRSTs are drawn, then its groups leave off
-                   the top with their lines; the all-green group stays (07i, VO 4)
+  i branches     — lines from the left FIRST's R to every coloured FIRST's R,
+                   all drawn at once; then every group but the all-green
+                   one goes up off the top at once, the lines stretching
+                   with them, still anchored to FIRST             (07i, VO 4)
   j all_green    — the left FIRST to the top centre, the all-green FIRST to
                    the bottom centre, its dot growing into the word    (07j, VO 4)
   k green_centre — the top FIRST off the top; the green FIRST (its word
@@ -108,12 +109,23 @@ CORNER_BUFF = 0.3                  # 06's corner word's gap to the frame's edges
 CORNER_MARGIN = 0.35               # 06's clear space right of the corner word
 ALL_GREEN = 242                    # pattern code of the all-green reply (FIRST is an answer)
 LINE_W = 1.5                       # branch lines (hangman 18's tree edges: white, behind)
-LINE_BUFF = 0.08                   # gap between a line's end and the row it meets
 OFF_CLEAR = 0.3                    # how far past the top edge things leaving go
 K_FLY = 3.0                        # k: how many frame heights FIRST shoots up
 GREEN_Y = -2.3                     # j: the all-green FIRST row, bottom centre
 WORD_Y = -3.4                      # j: its one word, under it
 WIN_SCALE = 0.8                    # that word's size (1 = scene 04's list size)
+
+
+def _r(row):
+    """The centre of `row`'s R tile — the middle tile — where every branch line ends.
+    Takes a scored row (board.get_scored_row) or the left FIRST (its five tiles first)."""
+    tiles = row.tiles[0] if hasattr(row, "tiles") else row
+    return tiles[2].get_center()
+
+
+def _line(a, b):
+    """A branch line from `a` to `b`: white, thin, behind the tiles (hangman 18's edges)."""
+    return Line(a, b, color=WHITE, stroke_width=LINE_W).set_z_index(-1)
 
 
 def _corner():
@@ -133,7 +145,7 @@ class Scene07(WordleBoardScene):
     after_narrow — AFTER flips to A, T yellow; only that subgroup stays
     third_split — THIRD typed; the words split into THIRD's subgroups
     rewind — back to FIRST and its groups
-    branches — lines to each layout row's FIRSTs, then that row leaves
+    branches — every line at once, then every group but the all-green up
     all_green — FIRST top centre, the all-green FIRST and its word bottom centre
     green_centre — top FIRST off; green FIRST and word to the centre
     green_win — the word fades; the green FIRST bounces
@@ -389,51 +401,39 @@ class Scene07(WordleBoardScene):
         self.board = None
 
     def _setup_branches(self):
-        """A line from the left FIRST to every coloured FIRST, drawn one ROW OF THE
-        LAYOUT at a time (user's call): each row's lines are drawn, then that row's
-        groups leave off the top, all but the all-green group. The lines STAY
-        ANCHORED to the left FIRST (user's call): a leaving group's line stretches
-        up off the frame with it, and every line follows FIRST from then on. A
-        layout row is the groups whose scored rows share a top edge (they are
-        top-aligned)."""
+        """A line from the left FIRST to every coloured FIRST, all drawn at once;
+        then every group but the all-green one goes off the top at once (user's
+        call). Every line runs R TO R — the centre of the left FIRST's R tile to the
+        centre of the row's (user's call), behind the tiles — and STAYS ANCHORED: a
+        leaving group's line stretches up off the frame with it, and every line
+        follows FIRST from then on."""
         Y = config.frame_y_radius
-        start = self.left.get_right() + RIGHT * LINE_BUFF
-        self.lines = {c: Line(start, row.get_left() + LEFT * LINE_BUFF, color=WHITE,
-                              stroke_width=LINE_W).set_z_index(-1)
-                      for c, (row, _) in self.units.items()}
-        shelves = {}
-        for c, (row, _) in self.units.items():
-            shelves.setdefault(round(row.get_top()[1], 3), []).append(c)
-        self.shelves = []
-        for top in sorted(shelves, reverse=True):
-            codes = shelves[top]
-            up = []
-            for c in codes:
-                if c == ALL_GREEN:
-                    continue
-                row, ms = self.units[c]
-                grp = VGroup(row, *[self.dots[m] for m in ms])
-                up.append((grp, UP * (Y + OFF_CLEAR - grp.get_bottom()[1]), self.lines[c]))
-            self.shelves.append(([self.lines[c] for c in codes], up))
+        start = _r(self.left)
+        self.lines = {c: _line(start, _r(row)) for c, (row, _) in self.units.items()}
+        self.up = []
+        for c, (row, ms) in self.units.items():
+            if c == ALL_GREEN:
+                continue
+            grp = VGroup(row, *[self.dots[m] for m in ms])
+            self.up.append((grp, UP * (Y + OFF_CLEAR - grp.get_bottom()[1]), self.lines[c]))
         self.units = {ALL_GREEN: self.units[ALL_GREEN]}
         # the lines to groups that have left: off the frame, still anchored to FIRST
         self.gone = [l for c, l in self.lines.items() if c != ALL_GREEN]
         self.lines = {ALL_GREEN: self.lines[ALL_GREEN]}
 
-    # i : row by row of the layout: the lines to that row's FIRSTs are drawn, then
-    #     its groups leave off the top with their lines; the all-green one stays
+    # i : every line drawn at once; then everything but the all-green group goes up
+    #     off the top at once, the lines staying anchored to FIRST
     @subscene
     def branches(self):
         self._setup_branches()
-        for lines, up in self.shelves:
-            self.play(LaggedStart(*[Create(l) for l in lines], lag_ratio=0.1), run_time=0.6)
-            if up:
-                self.play(*[grp.animate.shift(v) for grp, v, _ in up],
-                          *[l.animate.put_start_and_end_on(l.get_start(), l.get_end() + v)
-                            for _, v, l in up],
-                          run_time=0.6)
-                self.remove(*[grp for grp, _, _ in up])
-        self.shelves = None
+        self.play(*[Create(l) for l in self.gone], Create(self.lines[ALL_GREEN]),
+                  run_time=1.0)
+        self.play(*[grp.animate.shift(v) for grp, v, _ in self.up],
+                  *[l.animate.put_start_and_end_on(l.get_start(), l.get_end() + v)
+                    for _, v, l in self.up],
+                  run_time=1.2)
+        self.remove(*[grp for grp, _, _ in self.up])
+        self.up = None
 
     def _setup_all_green(self):
         self.g_row, members = self.units.pop(ALL_GREEN)
@@ -452,11 +452,10 @@ class Scene07(WordleBoardScene):
         self.g_word.scale(self.g_dot.width / self.g_word.width).move_to(self.g_dot) \
             .set_opacity(0)
         self.g_line = self.lines.pop(ALL_GREEN)
-        # the lines to the groups that left keep their far ends and follow FIRST
-        self.g_start = self.left.target.get_right() + RIGHT * LINE_BUFF
-        self.g_line_new = Line(self.left.target.get_bottom() + DOWN * LINE_BUFF,
-                               self.g_row.target.get_top() + UP * LINE_BUFF,
-                               color=WHITE, stroke_width=LINE_W).set_z_index(-1)
+        # every line keeps R to R: the lines to the groups that left keep their far
+        # ends and follow FIRST's R; the green one follows both R's
+        self.g_start = _r(self.left.target)
+        self.g_line_new = _line(self.g_start, _r(self.g_row.target))
         self.units = self.dots = self.lines = None
 
     # j : the left FIRST to the top centre, the all-green FIRST to the bottom centre,
@@ -482,14 +481,18 @@ class Scene07(WordleBoardScene):
         self.k_up = UP * (K_FLY * 2 * Y)
         # the green FIRST to the centre, its word under it moving with it
         self.k_shift = ORIGIN - self.g_row.get_center()
-        # the line now runs out of the top of the frame, to the parent that has gone;
-        # built top to bottom like the line it replaces, or the Transform turns it over
-        self.k_line = Line([0, Y + OFF_CLEAR, 0],
-                           self.g_row.get_top() + self.k_shift + UP * LINE_BUFF,
-                           color=WHITE, stroke_width=LINE_W).set_z_index(-1)
+        # the connecting line's two ends each ride their own R, at their own pace
+        self.k_ends = (_r(self.left), _r(self.g_row))
+
+    def _connect(self, alpha):
+        """k's connecting line at `alpha`: its top end on the top FIRST's R (rush_into,
+        as that FIRST moves), its bottom end on the green R (smooth)."""
+        top, bot = self.k_ends
+        self.g_line.put_start_and_end_on(top + self.k_up * rush_into(alpha),
+                                         bot + self.k_shift * smooth(alpha))
 
     # k : the original FIRST off the top; the green FIRST to the centre with its word
-    #     under it, a line running out of the top of it
+    #     under it, the line from it running out of the top after the old FIRST
     @subscene
     def green_centre(self):
         self._setup_green_centre()
@@ -497,9 +500,11 @@ class Scene07(WordleBoardScene):
                   *[l.animate(rate_func=rush_into).shift(self.k_up) for l in self.gone],
                   self.g_row.animate.shift(self.k_shift),
                   self.g_word.animate.shift(self.k_shift),
-                  Transform(self.g_line, self.k_line), run_time=1.5)
+                  UpdateFromAlphaFunc(self.g_line, lambda m, a: self._connect(a),
+                                      rate_func=linear),
+                  run_time=1.5)
         self.remove(self.left, *self.gone)
-        self.left = self.gone = self.k_line = self.k_up = self.k_shift = None
+        self.left = self.gone = self.k_ends = self.k_up = self.k_shift = None
 
     # l : the FIRST at the bottom vanishes; the green FIRST gets the winning row's
     #     bounce (02's and 97's emphasis for a win, in place of the script's glow —
