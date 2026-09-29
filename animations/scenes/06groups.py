@@ -23,13 +23,20 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                    slide in                                              (06c, VO 1)
   d roate        — the same switch to ROATE, with "n. Obsolete variant of
                    rote" fading in under the corner word during the shuffle (06d, VO 2)
+  e arise        — the same switch to ARISE; ROATE's definition fades out and
+                   the other four tied words (RAISE, AESIR, REAIS, SERAI, three
+                   with definitions) fade in at the bottom left          (06e, VO 3)
+  f aurei        — the same switch to AUREI; the ARISE list fades out, AUREI's
+                   definition fades in under it and URAEI with its own at the
+                   bottom right                                          (06f, VO 4)
 
 REUSE MAP — every element and the one source it comes from:
   group layout (a)      assets/groups.py `layout(chain=True, header=True)`
   answer words, guess   assets/pigpen.py `PigpenWord(revealed=True)`, sized as 04i
   scored CODES rows     assets/groups.py `scored_headers` (a), `scored_row` (b, c)
   the flip to TRACE/ROATE  assets/pigpen.py `reletter` — GlyphFlip, letter to letter
-  ROATE's definition    crisp_text, white, FadeIn; words verbatim from column 2
+  definitions, lists    crisp_text, white, FadeIn; words verbatim from column 2,
+                        italics from the Doc; listed words are PigpenWord rows
   dot layout (b)        assets/groups.py `dot_layout`: 04's scatter, every group
   guess on top          GUESS_Y / GUESS_SCALE from assets/groups.py, as 04e
   colours               BOARD_NAVY via WordleBoardScene; tiles config.py TILE_*
@@ -45,9 +52,15 @@ LAYOUT CHOICES, flagged:
   - With CODES moved to the top-left corner, the dot groups spread over the WHOLE
     frame (groups.py DOT_REGION_TOP) but for that corner (user's call).
   - The corner label keeps its 06a size.
-  - ROATE's definition: 28pt white, two lines ("n. Obsolete" / "variant of
-    rote", each narrower than ROATE), left-aligned under the corner word, "n" and
-    "rote" italic as in the Doc; the ROATE dot layout keeps its box clear too.
+  - Definitions are broken into lines BY HAND (GLOSSES), left-aligned under their
+    word: 28pt under the corner word, 20pt under a listed word. Italics are
+    the Doc's ("n", and "rote" in ROATE's). ROATE's comes out "n. Obsolete" /
+    "variant of rote".
+  - The listed tied words (06e bottom left, 06f bottom right) are decoded tile
+    rows at 0.8 of scene 04's list size, in the script's order.
+  - Notes belong to the corner word they annotate: when it flips, its notes fade
+    out during the shuffle as the new word's fade in. (The script does not say
+    whether the ARISE list stays into 06f; it goes with ARISE.)
   - A switch (c, d) is kept calm (user's call): a pattern both words make keeps
     its row where it was (pattern anchoring, groups.py `anchors`), and rows leave
     and arrive by their NEAREST edge. 06b's entrances still come radially.
@@ -57,13 +70,14 @@ LAYOUT CHOICES, flagged:
     (scipy linear_sum_assignment), so most move only locally. MEASURED for
     CODES to TRACE: median dot move 1.31 (5.85 with each dot tied to its word),
     90% under 2.47; the matching takes ~4 s at setup.
-  - The corner word (and ROATE's definition) keep CORNER_MARGIN of clear space
-    round them; no dot or row enters it.
+  - The corner word and every note keep CORNER_MARGIN of clear space round them;
+    no dot or row enters it.
   - What enters comes from beyond the frame's edge, a group's row and hidden
     members together, along the line from the group region's centre out through
     where they land.
 """
 from pathlib import Path
+import re
 import sys
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -80,13 +94,28 @@ from scipy.optimize import linear_sum_assignment
 DATA = lists_data.load()
 GUESS = DATA["guesses"][2]                         # codes — 04e's last guess
 TRACE = "trace"            # 06c's word — the script's own choice
-ROATE = "roate"            # 06d's word — the script's own choice
+ROATE = "roate"            # 06d-f's words — the script's own choices
+ARISE = "arise"
+AUREI = "aurei"
+ARISE_TIES = ["raise", "aesir", "reais", "serai"]   # 06e's list, the script's order
+AUREI_TIES = ["uraei"]                              # 06f, bottom right
 # 06d's definition, verbatim from the script, on two lines so it is no wider than
-# ROATE; the Doc italicises "n" and "rote" (slices are character ranges per line)
-GLOSS = [("n. Obsolete", ["[0:1]"]), ("variant of rote", ["[11:15]"])]
+# the definitions, verbatim from the script, broken into lines by hand (automatic
+# wrapping left "n." or one word alone on a line), with the words the Doc italicises
+GLOSSES = {
+    "roate": (["n. Obsolete", "variant of rote"], ["n", "rote"]),
+    "aesir": (["n. A group of Norse Gods", "associated with war"], ["n"]),
+    "reais": (["n. Plural of Real", "(Brazilian currency)"], ["n"]),
+    "serai": (["n. A palace or inn", "(Turkey/Middle East)"], ["n"]),
+    "aurei": (["n. Plural of Aureus", "(Roman gold coin)"], ["n"]),
+    "uraei": (["n. Representation of", "the sacred asp", "(ancient Egypt)"], ["n"]),
+}
 GLOSS_LINE_BUFF = 0.1
-GLOSS_FS = 28
-GLOSS_BUFF = 0.15          # between the corner word and its definition
+GLOSS_FS = 28              # under the corner word
+GLOSS_BUFF = 0.15          # between a word and its definition
+LIST_SCALE = 0.8           # a listed word's size (1 = scene 04's list size)
+LIST_FS = 20               # a listed word's definition
+LIST_GAP = 0.25            # between two listed entries
 
 DOT_COLOR = WHITE
 ENTER_FROM = np.array([0.0, (DOT_REGION_TOP + REGION_BOT) / 2, 0.0])
@@ -103,15 +132,42 @@ def _keepout(mob):
     return ((c[0], c[1]), mob.width + 2 * CORNER_MARGIN, mob.height + 2 * CORNER_MARGIN)
 
 
+def _gloss(lines, italic, font_size):
+    """A definition, one crisp_text per line, left-aligned; whole words in
+    `italic` set italic."""
+    def slices(line):
+        return {f"[{m.start()}:{m.end()}]": ITALIC for it in italic
+                for m in re.finditer(rf"\b{re.escape(it)}\b", line)}
+    return VGroup(*[crisp_text(l, font_size=font_size, color=WHITE, t2s=slices(l))
+                    for l in lines]).arrange(DOWN, buff=GLOSS_LINE_BUFF, aligned_edge=LEFT)
+
+
+def _entries(words):
+    """A column of listed words, each a decoded tile row with its definition (if the
+    script gives one) under it; left-aligned."""
+    out = []
+    for w in words:
+        row = PigpenWord(w, revealed=True).scale(LIST_SCALE)
+        if w in GLOSSES:
+            g = _gloss(*GLOSSES[w], LIST_FS)
+            out.append(VGroup(row, g.next_to(row, DOWN, buff=GLOSS_BUFF, aligned_edge=LEFT)))
+        else:
+            out.append(VGroup(row))
+    return VGroup(*out).arrange(DOWN, buff=LIST_GAP, aligned_edge=LEFT)
+
+
 class Scene06(WordleBoardScene):
     """BEAT MAP
     codes_groups — CODES's groups, decoded and scored, held
     dots — words to dots; all 98 groups on the frame, rows sized by sqrt(size)
     trace — CODES flips to TRACE; the dots regroup into TRACE's 150 groups
     roate — TRACE flips to ROATE, the dots regroup; its definition fades in
+    arise — ROATE flips to ARISE; the other four tied words at the bottom left
+    aurei — ARISE flips to AUREI with its definition; URAEI at the bottom right
     """
 
     def setup_scene(self):
+        self.notes = []            # definitions / lists beside the corner word (d-f)
         self.guess = PigpenWord(GUESS, revealed=True).scale(GUESS_SCALE) \
             .move_to([0, GUESS_Y, 0])
         slots, gscale, heads, groups = layout(DATA, GUESS, header=True, chain=True)
@@ -276,18 +332,54 @@ class Scene06(WordleBoardScene):
         self._flip(1.0)
         self._regroup(2.0)
 
-    def _setup_roate(self):
-        self.gloss = VGroup(*[crisp_text(line, font_size=GLOSS_FS, color=WHITE,
-                                         t2s={k: ITALIC for k in ital})
-                              for line, ital in GLOSS]) \
-            .arrange(DOWN, buff=GLOSS_LINE_BUFF, aligned_edge=LEFT)
-        self.gloss.next_to(self.guess, DOWN, buff=GLOSS_BUFF, aligned_edge=LEFT)
-        self._setup_switch(ROATE, [_keepout(VGroup(self.guess, self.gloss))])
+    # ── notes: a definition under a word, a list of words (06d-f) ─────────────
+    def _setup_notes(self, word, notes, blocked):
+        """The switch to `word`, with `notes` (placed mobjects) replacing the notes
+        on screen; the new layout keeps `blocked` clear."""
+        self.old_notes, self.notes = self.notes, notes
+        self._setup_switch(word, blocked)
 
-    # d : TRACE turns over to ROATE and the dots regroup, the same way; then the
-    #     definition under ROATE
+    def _switch_notes(self, flip_run_time, regroup_run_time):
+        """Flip, then shuffle with the old notes fading out and the new fading in."""
+        self._flip(flip_run_time)
+        self._regroup(regroup_run_time,
+                      extra=[*[FadeOut(n) for n in self.old_notes],
+                             *[FadeIn(n) for n in self.notes]])
+        self.old_notes = None
+
+    def _setup_roate(self):
+        gloss = _gloss(*GLOSSES[ROATE], GLOSS_FS) \
+            .next_to(self.guess, DOWN, buff=GLOSS_BUFF, aligned_edge=LEFT)
+        self._setup_notes(ROATE, [gloss], [_keepout(VGroup(self.guess, gloss))])
+
+    # d : TRACE turns over to ROATE and the dots regroup, the same way; its
+    #     definition fades in during the shuffle
     @subscene
     def roate(self):
         self._setup_roate()
-        self._flip(1.0)
-        self._regroup(2.0, extra=[FadeIn(self.gloss)])
+        self._switch_notes(1.0, 2.0)
+
+    def _setup_arise(self):
+        ties = _entries(ARISE_TIES).to_corner(DL, buff=CORNER_BUFF)
+        self._setup_notes(ARISE, [ties], [self.corner_box, _keepout(ties)])
+
+    # e : ROATE turns over to ARISE and the dots regroup; ROATE's definition fades
+    #     out and the other four tied words fade in at the bottom left
+    @subscene
+    def arise(self):
+        self._setup_arise()
+        self._switch_notes(1.0, 2.0)
+
+    def _setup_aurei(self):
+        gloss = _gloss(*GLOSSES[AUREI], GLOSS_FS) \
+            .next_to(self.guess, DOWN, buff=GLOSS_BUFF, aligned_edge=LEFT)
+        other = _entries(AUREI_TIES).to_corner(DR, buff=CORNER_BUFF)
+        self._setup_notes(AUREI, [gloss, other],
+                          [_keepout(VGroup(self.guess, gloss)), _keepout(other)])
+
+    # f : ARISE turns over to AUREI and the dots regroup; the ARISE list fades out,
+    #     AUREI's definition fades in, and URAEI with its own at the bottom right
+    @subscene
+    def aurei(self):
+        self._setup_aurei()
+        self._switch_notes(1.0, 2.0)
