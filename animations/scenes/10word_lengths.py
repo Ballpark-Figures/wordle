@@ -10,10 +10,11 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                    strategy grows in: rows 1-6, one bar each, count inside  (VO 1)
   b game_third   — bar 3 turns green; a mini board of SALET, NORTH, THIRD,
                    already scored, fades in above bar 3                      (VO 1)
-  c game_wheel   — bar 4 turns green; a mini board of SALET, BEVOR, CHIMP,
-                   WHEEL fades in below bar 3                                (VO 1)
-  d wheel_center — the chart and the THIRD board fade as the background turns
-                   navy; the WHEEL board moves to the middle at full size    (VO 1)
+  c game_wheel   — bar 3 back to grey, bar 4 green; a mini board of SALET,
+                   BEVOR, CHIMP, WHEEL fades in below bar 3                  (VO 1)
+  d wheel_center — bar 4 back to grey; the chart and the THIRD board fade as
+                   the background turns navy; the WHEEL board moves to the
+                   middle at full size                                       (VO 1)
   (VO 2 — the word-length discussion — has no subscene in the script yet.)
 
 REUSE MAP — every element and the one source it comes from:
@@ -39,8 +40,8 @@ in the real Wordle stats screen's capitals.
 LAYOUT (the user's): the chart follows Wordle's stats screen — title flush left with
 the row numbers, row numbers and counts one size, bars close together. Both boards
 start a little right of bar 4's end: THIRD's above bar 3, WHEEL's below it. Boards
-have only as many rows as the game used. Bar 3 stays green through c (not asked to
-turn back).
+have only as many rows as the game used. A bar is green only during its own game's
+beat (the user's): 3 in b, 4 in c.
 """
 from pathlib import Path
 import sys
@@ -80,8 +81,9 @@ class Scene10(WordleDarkScene):
     """BEAT MAP
     distribution — SALET's guess-distribution chart grows in
     game_third — bar 3 green; SALET's scored game for THIRD fades in above it
-    game_wheel — bar 4 green; SALET's scored game for WHEEL fades in below bar 3
-    wheel_center — chart and THIRD board leave, bg to navy; WHEEL board to the middle
+    game_wheel — bar 3 grey, bar 4 green; SALET's game for WHEEL fades in below bar 3
+    wheel_center — bar 4 grey; chart and THIRD board leave, bg to navy; WHEEL board
+                   to the middle
     """
 
     def setup_scene(self):
@@ -117,9 +119,8 @@ class Scene10(WordleDarkScene):
             board.align_to(bar3.get_top() + UP * BOARD_GAP_Y, DOWN)
         return board
 
-    def _green(self, n):
-        return self.chart.bar_of[n].animate.set_fill(TILE_CORRECT) \
-                                           .set_stroke(TILE_CORRECT)
+    def _bar_color(self, n, color):
+        return self.chart.bar_of[n].animate.set_fill(color).set_stroke(color)
 
     # a : SALET's guess distribution grows in
     @subscene
@@ -134,18 +135,23 @@ class Scene10(WordleDarkScene):
     @subscene
     def game_third(self):
         self.board_third = self._setup_board("third", below=False)
-        self.play(self._green("3"), FadeIn(self.board_third), run_time=0.8)
+        self.play(self._bar_color("3", TILE_CORRECT), FadeIn(self.board_third),
+                  run_time=0.8)
 
-    # c : bar 4 turns green; SALET's game for WHEEL fades in below bar 3
+    # c : bar 3 back to grey, bar 4 green; SALET's game for WHEEL fades in below bar 3
     @subscene
     def game_wheel(self):
         self.board_wheel = self._setup_board("wheel", below=True)
-        self.play(self._green("4"), FadeIn(self.board_wheel), run_time=0.8)
+        self.play(self._bar_color("3", TILE_ABSENT), self._bar_color("4", TILE_CORRECT),
+                  FadeIn(self.board_wheel), run_time=0.8)
 
-    # d : the chart and THIRD's board leave as the background turns navy; WHEEL's
-    #     board to the middle
+    # d : bar 4 back to grey; the chart and THIRD's board leave as the background
+    #     turns navy; WHEEL's board to the middle
     @subscene
     def wheel_center(self):
+        # its own play: bar 4 is part of the chart, so recolouring it inside the
+        # FadeOut would put two animations on one mobject
+        self.play(self._bar_color("4", TILE_ABSENT), run_time=0.5)
         self.play(FadeOut(self.chart), FadeOut(self.board_third),
                   bg_to(self, BOARD_NAVY), run_time=1.0)
         self.play(self.board_wheel.animate.scale(1 / BOARD_SCALE).move_to(ORIGIN),
