@@ -20,6 +20,10 @@ Provenance:
                            the words shown (alphabetical)
   full                   — scene 06b/c: EVERY group of each FULL_GUESSES guess, all
                            members, largest first (ties by code)
+  sub                    — scene 07e: one group of a guess split by a second guess,
+                           "<first>:<code>:<second>" -> every subgroup, all members,
+                           largest first (ties by code); codes are the SECOND
+                           guess's pattern against each member
 
 THE GUESSES: the first is "the topmost guess" of the list (04d), read from
 guess.txt, never typed; PIGGY and CODES are the script's own choices (04e).
@@ -68,7 +72,9 @@ CHAIN_MAX = 16                    # largest group the carry-over rule may show
 N_EDGE = 8                        # edge groups cached (the scene uses as many as fit)
 EDGE_MAX = 9                      # largest group hung off an edge
 COLUMN = 12                       # answers in the on-screen column (scene N_ROWS)
-FULL_GUESSES = ["group", "trace", "roate", "arise", "aurei"]   # guesses whose EVERY group is cached (06b/c's dots)
+FULL_GUESSES = ["group", "trace", "roate", "arise", "aurei",   # guesses whose EVERY group is cached (06b/c's dots)
+                "first"]                                       # 07c, the script's own choice
+SUBGROUPS = [("first", 0, "after")]   # 07e: FIRST's all-gray group split by AFTER (the script's words)
 
 
 def _read(name):
@@ -132,10 +138,10 @@ def _build():
     out = {"n_answers": len(answers), "n_guesses": len(guesses),
            "answers": answers, "guesses_head": guesses[:HEAD], "guesses": order,
            "groups": {}, "chain": {}}
-    def partition(g):
+    def partition(g, pool=answers):
         assert g in guesses, f"{g} is not a legal guess"
         by_code = {}
-        for a in answers:                          # answers is alphabetical, so
+        for a in pool:                             # pool is alphabetical, so
             by_code.setdefault(wordle.pattern(g, a), []).append(a)   # members are too
         return [{"code": int(c), "tiles": [(c // 3 ** (4 - i)) % 3 for i in range(5)],
                  "size": len(m), "members": m} for c, m in by_code.items()]
@@ -157,6 +163,12 @@ def _build():
     out["full"] = {g: sorted(full.get(g) or partition(g),
                              key=lambda grp: (-grp["size"], grp["code"]))
                    for g in FULL_GUESSES}
+    # 07e: one group split by a second guess — every subgroup, whole
+    out["sub"] = {}
+    for g1, code, g2 in SUBGROUPS:
+        pool = [a for a in answers if wordle.pattern(g1, a) == code]
+        out["sub"][f"{g1}:{code}:{g2}"] = sorted(
+            partition(g2, pool), key=lambda grp: (-grp["size"], grp["code"]))
     # 04e: each guess regroups what the one before it left in its INTERIOR ovals —
     # edge words stand for "the rest", and counting them swamped every group
     shown = _words(out["groups"][order[0]])
@@ -168,7 +180,7 @@ def _build():
         out.setdefault("carry", {})[g] = [len(shown & now), len(shown), len(now)]
         shown = now
     # every group any scene shows is whole — never a part standing for the whole
-    for key in ("groups", "groups_edge", "chain", "chain_edge", "full"):
+    for key in ("groups", "groups_edge", "chain", "chain_edge", "full", "sub"):
         for g, grps in out[key].items():
             for grp in grps:
                 assert len(grp["members"]) == grp["size"], (key, g, grp["code"])

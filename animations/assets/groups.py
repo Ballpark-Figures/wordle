@@ -63,6 +63,13 @@ DOT_BLOCK_GAP = 0.12       # least clear space between two dot groups
 NEAR_SIGMA = 1.0           # spread of the candidates clustered round a target
 DOT_REGION_TOP = 4.2       # the guess has left by then: dots take the whole frame,
                            # as far from the top as REGION_BOT is from the bottom
+WORD_PAD = 0.3             # footprint padding round a packed word block (07)
+WORD_HEAD_GAP = 0.08       # between a packed block's scored row and its words (07)
+
+# ── groups entering and leaving (06b-f, 07) ───────────────────────────────────
+ENTER_FROM = np.array([0.0, (DOT_REGION_TOP + REGION_BOT) / 2, 0.0])
+ENTER_DIST = 10.0          # how far beyond its spot an entering group starts
+EDGE_CLEAR = 0.3           # how far past its nearest edge a leaving thing goes
 ROW_ASPECT = None          # a scored row's height / width, measured on first use
 
 
@@ -305,20 +312,12 @@ def dot_layout(data, guess, seed=None, blocked=(), anchors=None):
     return (groups, *_fill(groups, bs, centres, f))
 
 
-def ranked_layout(data, guess, left, right=REGION_HALF_W, top=DOT_REGION_TOP,
-                  bottom=REGION_BOT):
-    """06, the SORTED version: every group of `guess` as a dot block (as
-    `dot_layout`), packed in reading order BY SIZE — largest first, left to right
-    along a row, then the next row down — inside x in [left, right], y in [bottom,
-    top]. Blocks in a row are top-aligned (so their scored rows line up) and spread
-    to fill the row's width, the last row excepted; one scale for everything, the
-    largest that fits. Ties in size keep lists_data's order (by pattern code).
-
-    Returns what `dot_layout` does, groups in rank order; the dots dict is in that
-    order too (group by group, each grid row by row), which is the SEQUENCE the
-    scene moves dots along."""
-    groups = sorted(data["full"][guess], key=lambda g: (-g["size"], g["code"]))
-    bs = [_dot_block(g) for g in groups]
+def _pack(bs, left, right, top, bottom, center_last=False):
+    """Shelf-pack blocks (dicts with w, h at scale 1) in reading order inside x in
+    [left, right], y in [bottom, top]: left to right along a row, then the next row
+    down; blocks in a row top-aligned and spread to fill the row's width, the last
+    row excepted (centred instead with `center_last`). One scale for everything, the
+    largest that fits. Returns (scale, block centres)."""
     gap = RANK_GAP
 
     def shelves(f):
@@ -348,10 +347,90 @@ def ranked_layout(data, guess, left, right=REGION_HALF_W, top=DOT_REGION_TOP,
     for i, sh in enumerate(rows_of):
         ws = [bs[k]["w"] * f for k in sh]
         spare = (right - left) - sum(ws) - gap * (len(sh) - 1)
-        g_eff = gap + (spare / (len(sh) - 1) if len(sh) > 1 and i < len(rows_of) - 1 else 0)
-        x = left
+        last = i == len(rows_of) - 1
+        g_eff = gap + (spare / (len(sh) - 1) if len(sh) > 1 and not last else 0)
+        x = left + (spare / 2 if last and center_last else 0.0)
         for k, w in zip(sh, ws):
             centres[k] = (x + w / 2, y - bs[k]["h"] * f / 2)
             x += w + g_eff
         y -= max(bs[k]["h"] * f for k in sh) + gap
+    return f, centres
+
+
+def ranked_layout(data, guess, left, right=REGION_HALF_W, top=DOT_REGION_TOP,
+                  bottom=REGION_BOT):
+    """06, the SORTED version: every group of `guess` as a dot block (as
+    `dot_layout`), packed in reading order BY SIZE — largest first, left to right
+    along a row, then the next row down — inside x in [left, right], y in [bottom,
+    top]. Blocks in a row are top-aligned (so their scored rows line up) and spread
+    to fill the row's width, the last row excepted; one scale for everything, the
+    largest that fits. Ties in size keep lists_data's order (by pattern code).
+
+    Returns what `dot_layout` does, groups in rank order; the dots dict is in that
+    order too (group by group, each grid row by row), which is the SEQUENCE the
+    scene moves dots along."""
+    groups = sorted(data["full"][guess], key=lambda g: (-g["size"], g["code"]))
+    bs = [_dot_block(g) for g in groups]
+    f, centres = _pack(bs, left, right, top, bottom)
     return (groups, *_fill(groups, bs, centres, f))
+
+
+# ── words packed by size (07) ─────────────────────────────────────────────────
+def _word_block(n, header):
+    """A block of `n` words at scale 1 (GROUP_SCALE words, 04's CELL_GAP/CELL_DY
+    pitches), in a grid whose AREA is square-ish — the words are wide, so fewer
+    columns than sqrt(n) — optionally under a scored row HEADER_W wide (04's)."""
+    ww, cg, dy = WORD_W * GROUP_SCALE, CELL_GAP, CELL_DY
+    nc = max(1, math.ceil(math.sqrt(n * dy / (ww + cg))))
+    nr = math.ceil(n / nc)
+    hh = HEADER_W * row_aspect() + WORD_HEAD_GAP if header else 0.0
+    return dict(nc=nc, nr=nr, hh=hh,
+                w=max(nc * ww + (nc - 1) * cg, HEADER_W if header else 0.0) + WORD_PAD,
+                h=nr * dy + hh + WORD_PAD)
+
+
+def ranked_word_layout(groups, left, right=REGION_HALF_W, top=DOT_REGION_TOP,
+                       bottom=REGION_BOT, header=True):
+    """07: `groups` (in the order given — pass them largest first) as WORD blocks,
+    packed as `ranked_layout` packs dot blocks, the last row centred; with `header`
+    each block has a scored row atop it, HEADER_W wide at GROUP_SCALE (04's
+    proportion). One block alone sits centred at the top of the region.
+
+    Returns (slots {word: centre}, word scale, header centres, header widths)."""
+    bs = [_word_block(g["size"], header) for g in groups]
+    f, centres = _pack(bs, left, right, top, bottom, center_last=True)
+    ww, cg, dy = WORD_W * GROUP_SCALE, CELL_GAP, CELL_DY
+    slots, heads, widths = {}, [], []
+    for g, b, (bx, by) in zip(groups, bs, centres):
+        top_y = by + (b["h"] - WORD_PAD) * f / 2
+        heads.append(np.array([bx, top_y - (b["hh"] - WORD_HEAD_GAP) * f / 2, 0.0]))
+        widths.append(HEADER_W * f)
+        gy = top_y - b["hh"] * f                     # top of the word grid
+        nc, n = b["nc"], g["size"]
+        for k, word in enumerate(g["members"]):
+            i, j = divmod(k, nc)
+            n_in_row = min(nc, n - i * nc)
+            slots[word] = np.array([bx + (j - (n_in_row - 1) / 2) * (ww + cg) * f,
+                                    gy - (i + 0.5) * dy * f, 0.0])
+    return slots, GROUP_SCALE * f, heads, widths
+
+
+def enter_from_beyond(mob, origin=ENTER_FROM, dist=ENTER_DIST):
+    """Move `mob` `dist` further out along the ray from `origin` through it — where
+    a group entering the frame starts (06b's radial slide-in). Returns the spot it
+    left, for `mob.animate.move_to(home)`."""
+    home = mob.get_center()
+    d = home - origin
+    mob.shift(d / (np.linalg.norm(d) or 1.0) * dist)
+    return home
+
+
+def edge_out(mob, clear=EDGE_CLEAR):
+    """Just beyond the frame edge NEAREST `mob`, straight out — how a group leaves
+    (06's switches), so none crosses the frame."""
+    c = mob.get_center()
+    X, Y = config.frame_x_radius, config.frame_y_radius
+    gaps = [(X - c[0], RIGHT, mob.width), (X + c[0], LEFT, mob.width),
+            (Y - c[1], UP, mob.height), (Y + c[1], DOWN, mob.height)]
+    d, v, size = min(gaps, key=lambda g: g[0])
+    return c + v * (d + size / 2 + clear)

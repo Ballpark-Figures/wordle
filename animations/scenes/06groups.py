@@ -41,6 +41,7 @@ REUSE MAP — every element and the one source it comes from:
   scored rows           assets/groups.py `scored_headers` (a), `scored_row` (b-f)
   sorted dot layout     assets/groups.py `ranked_layout` (b-f)
   every flip            assets/flip.py `flip` — anything into anything
+  entrances, exits      assets/groups.py `enter_from_beyond` (b), `edge_out` (c-f)
   definitions, lists    crisp_text, white, FadeIn; words verbatim from column 2,
                         italics from the Doc; listed words are PigpenWord rows
   guess on top          GUESS_Y / GUESS_SCALE from assets/groups.py, as 04i
@@ -88,7 +89,7 @@ from assets.board import STROKE
 from assets.pigpen import PigpenWord
 from assets.flip import Flip, flip, row_parts
 from assets.groups import (layout, scored_headers, scored_row, ranked_layout, GUESS_Y,
-                           GUESS_SCALE, HEADER_W, REGION_BOT, DOT_REGION_TOP)
+                           GUESS_SCALE, HEADER_W, enter_from_beyond, edge_out)
 from assets import lists_data
 
 DATA = lists_data.load()
@@ -119,11 +120,8 @@ LIST_FS = 20               # a listed word's definition
 LIST_GAP = 0.25            # between two listed entries
 
 DOT_COLOR = WHITE
-ENTER_FROM = np.array([0.0, (DOT_REGION_TOP + REGION_BOT) / 2, 0.0])
-ENTER_DIST = 10.0          # how far beyond its spot an entering group starts
 CORNER_BUFF = 0.3          # the corner label's gap to the frame's edges
 CORNER_MARGIN = 0.35       # clear space kept round the corner word (and definition)
-EDGE_CLEAR = 0.3           # how far past its nearest edge a switch's row goes
 
 
 def _gloss(lines, italic, font_size):
@@ -208,10 +206,7 @@ class Scene06(WordleBoardScene):
                          *[self.dots[w] for w in g["members"] if w not in self.words])
             if not len(grp):
                 continue
-            d = grp.get_center() - ENTER_FROM
-            d = d / (np.linalg.norm(d) or 1.0)
-            self.incoming.append((grp, grp.get_center()))
-            grp.shift(d * ENTER_DIST)
+            self.incoming.append((grp, enter_from_beyond(grp)))
 
     # b : every word shrinks into a dot; then all 98 groups onto the frame, sorted
     #     by size, each GROUP row sqrt(size) dot pitches wide; GROUP to the corner
@@ -271,17 +266,7 @@ class Scene06(WordleBoardScene):
         # the slots only `word` has start just beyond their nearest edge
         self.enter = [(row, row.get_center()) for row in self.t_rows[n:]]
         for row, home in self.enter:
-            row.move_to(self._edge_out(row))
-
-    def _edge_out(self, mob):
-        """Just beyond the frame edge NEAREST `mob`, straight out — a switch's rows
-        leave and arrive this way, so none crosses the frame."""
-        c = mob.get_center()
-        X, Y = config.frame_x_radius, config.frame_y_radius
-        gaps = [(X - c[0], RIGHT, mob.width), (X + c[0], LEFT, mob.width),
-                (Y - c[1], UP, mob.height), (Y + c[1], DOWN, mob.height)]
-        d, v, size = min(gaps, key=lambda g: g[0])
-        return c + v * (d + size / 2 + EDGE_CLEAR)
+            row.move_to(edge_out(row))
 
     def _switch(self, run_time, extra=()):
         """All at once: the corner word and every shared slot flip (the slots while
@@ -291,7 +276,7 @@ class Scene06(WordleBoardScene):
         flip(self, self.flips, run_time, extra=[
             *extra,
             *[d.animate.move_to(c).scale(self.t_scale) for d, c in self.moves],
-            *[row.animate.move_to(self._edge_out(row)) for row in self.leave],
+            *[row.animate.move_to(edge_out(row)) for row in self.leave],
             *[row.animate.move_to(home) for row, home in self.enter]])
         self.remove(*self.leave)
         self.guess, self.slots = self.t_word, self.t_rows
