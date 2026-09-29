@@ -26,3 +26,38 @@ _spec.loader.exec_module(_mod)
 WORDLE_LETTERS = list(_mod.TIERS)
 WORDLE_NAMES = [(w, a) for w in ("TOP", "HIGH", "MID", "LOW") for a in ("up", "down")]
 assert len(WORDLE_NAMES) == len(WORDLE_LETTERS), "tier names and tiers disagree"
+
+# ── the Wordle list WITH DOUBLES (09k) ────────────────────────────────────────
+# The singles and doubles ranked together: the greedy order in
+# math/data/shared/tiers/order_r2_top1000.csv (max_repeat=2 — the file carries the
+# ORDER; the tier CUTS are editorial). The user's cuts (2026-09-29): LOW splits in
+# three — LOW▲ everything up to V, LOW■ (a square) everything up to SS, LOW▼
+# everything up to Q — and every token after Q is not shown. The six tiers above
+# LOW are math/tiers.py's, unchanged. A token is a letter or a double ("ee").
+_ORDER_R2 = Path(__file__).resolve().parents[2] / "math" / "data" / "shared" / "tiers" \
+    / "order_r2_top1000.csv"
+LOW_CUTS = ["v", "ss", "q"]          # the LAST token of LOW▲, LOW■, LOW▼
+
+
+def _double_rows():
+    lines = [l for l in _ORDER_R2.read_text().splitlines() if l and not l.startswith("#")]
+    order = [l.split(",")[1] for l in lines[1:]]
+    upper = [list(t.lower()) for t in WORDLE_LETTERS[:6]]
+    first_low = len([c for t in upper for c in t])
+    assert sorted(order[:first_low]) == sorted(c for t in upper for c in t), \
+        "order_r2's top tokens are not math/tiers.py's upper six tiers"
+    rows, i = [], first_low
+    for cut in LOW_CUTS:
+        j = order.index(cut) + 1
+        rows.append(order[i:j])
+        i = j
+    singles = lambda r: {t for t in r if len(t) == 1}
+    assert singles(rows[0]) | singles(rows[1]) == set(WORDLE_LETTERS[6].lower()), rows
+    assert singles(rows[2]) == set(WORDLE_LETTERS[7].lower()), rows
+    return [[c.upper() for c in t] for t in WORDLE_LETTERS[:6]] + \
+        [[t.upper() for t in r] for r in rows]
+
+
+WORDLE_DOUBLE_LETTERS = _double_rows()
+WORDLE_DOUBLE_NAMES = WORDLE_NAMES[:6] + [("LOW", "up"), ("LOW", "square"),
+                                          ("LOW", "down")]
