@@ -28,7 +28,7 @@ import random
 import numpy as np
 
 from config import *
-from assets.board import get_scored_row, STROKE
+from assets.board import get_scored_row, STROKE, TILE, GAP
 from assets.pigpen import WORD_W
 
 # ── the guess, top centre ─────────────────────────────────────────────────────
@@ -64,7 +64,9 @@ NEAR_SIGMA = 1.0           # spread of the candidates clustered round a target
 DOT_REGION_TOP = 4.2       # the guess has left by then: dots take the whole frame,
                            # as far from the top as REGION_BOT is from the bottom
 WORD_PAD = 0.3             # footprint padding round a packed word block (07)
-WORD_HEAD_GAP = 0.08       # between a packed block's scored row and its words (07)
+WORD_HEAD_GAP = 0.08       # between a packed block's scored rows and its words (07)
+HEAD_ROW_GAP = GAP / TILE  # between two stacked scored rows, per row height — the
+                           # board's own row spacing (07)
 
 # ── groups entering and leaving (06b-f, 07) ───────────────────────────────────
 ENTER_FROM = np.array([0.0, (DOT_REGION_TOP + REGION_BOT) / 2, 0.0])
@@ -392,7 +394,7 @@ def _word_block(n, heads, aspect):
     nc = min(n, max(1, math.ceil(math.sqrt(n * aspect * dy / (ww + cg)))))
     nr = math.ceil(n / nc)
     rh = HEADER_W * row_aspect()
-    hh = heads * (rh + WORD_HEAD_GAP)
+    hh = heads * rh + (heads - 1) * rh * HEAD_ROW_GAP + WORD_HEAD_GAP if heads else 0.0
     return dict(nc=nc, nr=nr, hh=hh, rh=rh,
                 w=max(nc * ww + (nc - 1) * cg, HEADER_W if heads else 0.0) + WORD_PAD,
                 h=nr * dy + hh + WORD_PAD)
@@ -419,7 +421,7 @@ def ranked_word_layout(groups, left, right=REGION_HALF_W, top=DOT_REGION_TOP,
     slots, hds = {}, []
     for g, b, (bx, by) in zip(groups, bs, centres):
         top_y = by + (b["h"] - WORD_PAD) * f / 2
-        hds.append([np.array([bx, top_y - (k * (b["rh"] + WORD_HEAD_GAP) + b["rh"] / 2) * f,
+        hds.append([np.array([bx, top_y - (k * b["rh"] * (1 + HEAD_ROW_GAP) + b["rh"] / 2) * f,
                               0.0]) for k in range(heads)])
         gy = top_y - b["hh"] * f                     # top of the word grid
         nc, n = b["nc"], g["size"]

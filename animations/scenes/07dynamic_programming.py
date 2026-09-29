@@ -79,7 +79,7 @@ from assets.board import get_board, STROKE
 from assets.pigpen import PigpenWord
 from assets.keys import key_cues
 from assets.groups import (ranked_layout, ranked_word_layout, scored_row, HEADER_W,
-                           GUESS_SCALE, WORD_HEAD_GAP, row_aspect, enter_from_beyond,
+                           GUESS_SCALE, HEAD_ROW_GAP, row_aspect, enter_from_beyond,
                            edge_out)
 from assets import lists_data
 
@@ -247,7 +247,7 @@ class Scene07(WordleBoardScene):
         self.s_new = [scored_row(guess, g["code"], hw, h[-1]) for g, h in zip(sub, hds)]
         ow = self.stack[-1].width                         # the stack's row width now
         start = self.stack[-1].get_center() + \
-            DOWN * ow * (row_aspect() + WORD_HEAD_GAP / HEADER_W)
+            DOWN * ow * row_aspect() * (1 + HEAD_ROW_GAP)
         for r in self.s_new:
             r.generate_target()
             r.scale(ow / r.width).move_to(start).set_opacity(0)
