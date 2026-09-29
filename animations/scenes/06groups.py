@@ -28,7 +28,7 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                    with definitions) fade in at the bottom left          (06e, VO 3)
   f aurei        — the same switch to AUREI; the ARISE list fades out, AUREI's
                    definition fades in under it and URAEI with its own at the
-                   bottom right                                          (06f, VO 4)
+                   bottom left                                           (06f, VO 4)
 
 REUSE MAP — every element and the one source it comes from:
   group layout (a)      assets/groups.py `layout(chain=True, header=True)`
@@ -56,7 +56,7 @@ LAYOUT CHOICES, flagged:
     word: 28pt under the corner word, 20pt under a listed word. Italics are
     the Doc's ("n", and "rote" in ROATE's). ROATE's comes out "n. Obsolete" /
     "variant of rote".
-  - The listed tied words (06e bottom left, 06f bottom right) are decoded tile
+  - The listed tied words (06e and 06f, bottom left) are decoded tile
     rows at 0.8 of scene 04's list size, in the script's order.
   - Notes belong to the corner word they annotate: when it flips, its notes fade
     out during the shuffle as the new word's fade in. (The script does not say
@@ -98,17 +98,18 @@ ROATE = "roate"            # 06d-f's words — the script's own choices
 ARISE = "arise"
 AUREI = "aurei"
 ARISE_TIES = ["raise", "aesir", "reais", "serai"]   # 06e's list, the script's order
-AUREI_TIES = ["uraei"]                              # 06f, bottom right
+AUREI_TIES = ["uraei"]                              # 06f, bottom left
 # 06d's definition, verbatim from the script, on two lines so it is no wider than
-# the definitions, verbatim from the script, broken into lines by hand (automatic
-# wrapping left "n." or one word alone on a line), with the words the Doc italicises
+# the definitions, verbatim from the script, broken into lines by hand so no line
+# is wider than the word above it (only "n. Representation" is, being one word),
+# with the words the Doc italicises
 GLOSSES = {
     "roate": (["n. Obsolete", "variant of rote"], ["n", "rote"]),
-    "aesir": (["n. A group of Norse Gods", "associated with war"], ["n"]),
-    "reais": (["n. Plural of Real", "(Brazilian currency)"], ["n"]),
-    "serai": (["n. A palace or inn", "(Turkey/Middle East)"], ["n"]),
-    "aurei": (["n. Plural of Aureus", "(Roman gold coin)"], ["n"]),
-    "uraei": (["n. Representation of", "the sacred asp", "(ancient Egypt)"], ["n"]),
+    "aesir": (["n. A group of", "Norse Gods", "associated", "with war"], ["n"]),
+    "reais": (["n. Plural of", "Real (Brazilian", "currency)"], ["n"]),
+    "serai": (["n. A palace or", "inn (Turkey/", "Middle East)"], ["n"]),
+    "aurei": (["n. Plural of", "Aureus (Roman", "gold coin)"], ["n"]),
+    "uraei": (["n. Representation", "of the sacred", "asp (ancient", "Egypt)"], ["n"]),
 }
 GLOSS_LINE_BUFF = 0.1
 GLOSS_FS = 28              # under the corner word
@@ -163,7 +164,7 @@ class Scene06(WordleBoardScene):
     trace — CODES flips to TRACE; the dots regroup into TRACE's 150 groups
     roate — TRACE flips to ROATE, the dots regroup; its definition fades in
     arise — ROATE flips to ARISE; the other four tied words at the bottom left
-    aurei — ARISE flips to AUREI with its definition; URAEI at the bottom right
+    aurei — ARISE flips to AUREI with its definition; URAEI at the bottom left
     """
 
     def setup_scene(self):
@@ -373,12 +374,12 @@ class Scene06(WordleBoardScene):
     def _setup_aurei(self):
         gloss = _gloss(*GLOSSES[AUREI], GLOSS_FS) \
             .next_to(self.guess, DOWN, buff=GLOSS_BUFF, aligned_edge=LEFT)
-        other = _entries(AUREI_TIES).to_corner(DR, buff=CORNER_BUFF)
+        other = _entries(AUREI_TIES).to_corner(DL, buff=CORNER_BUFF)
         self._setup_notes(AUREI, [gloss, other],
                           [_keepout(VGroup(self.guess, gloss)), _keepout(other)])
 
     # f : ARISE turns over to AUREI and the dots regroup; the ARISE list fades out,
-    #     AUREI's definition fades in, and URAEI with its own at the bottom right
+    #     AUREI's definition fades in, and URAEI with its own at the bottom left
     @subscene
     def aurei(self):
         self._setup_aurei()
