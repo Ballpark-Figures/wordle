@@ -5,13 +5,25 @@
   "question": "I'm working on a Wordle video.  Other than the optimal strategy (which will definitely be in there), what would you most like to see?",
   "votes": "2.1K votes",
   "options": [
-   ["Hard Mode", 44],
-   ["Different word lengths", 20],
-   ["Choosing words that are hard to guess", 31],
-   ["Other (eg other variants, different word list). Post in comments", 5]
+   [
+    "Hard Mode",
+    44
+   ],
+   [
+    "Different word lengths",
+    20
+   ],
+   [
+    "Choosing words that are hard to guess",
+    31
+   ],
+   [
+    "Other (eg other variants, different word list). Post in comments",
+    5
+   ]
   ],
   "likes": "101",
-  "avatar": "youtube_media/bpk_avatar.png",
+  "avatar": "youtube_media/bpk_logo.png",
   "source": "transcribed by hand from a screenshot of the live poll (dark mode, logged in as the channel), 2026-09-29 12:14. YouTube's Data API has no community-post endpoint, so there is no automated route; percentages and the vote count are exactly as YouTube displayed them (rounded by YouTube)."
  }
 }

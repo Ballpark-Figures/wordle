@@ -26,6 +26,7 @@ _ANALYTICS = Path(__file__).resolve().parents[3] / "analytics"
 
 # tracked videos to cache: short scene key -> YouTube video id
 VIDEOS = {"hangman": "ApdLgfgfh5o"}   # Ballpark Figures — "I Tried to Solve Hangman"
+OWN_CHANNEL = {"hangman"}           # keys whose channel is ours (use bpk_logo.png)
 
 
 def _fmt_views(n):
@@ -106,6 +107,10 @@ def build():
         for field, suffix in (("thumbnail", "thumb"), ("avatar", "avatar")):
             rel = f"youtube_media/{key}_{suffix}.png"
             out[key][field] = rel if (media / f"{key}_{suffix}.png").exists() else None
+        # our OWN channel's avatar is the sharp logo render (youtube_media/logo_avatar.py),
+        # not YouTube's 800-px copy, which reads pixelated at full-screen size
+        if key in OWN_CHANNEL:
+            out[key]["avatar"] = "youtube_media/bpk_logo.png"
     conn.close()
     CACHE.write_text(json.dumps(out, indent=1))
     return out
