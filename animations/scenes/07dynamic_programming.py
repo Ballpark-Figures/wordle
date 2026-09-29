@@ -110,6 +110,7 @@ ALL_GREEN = 242                    # pattern code of the all-green reply (FIRST 
 LINE_W = 1.5                       # branch lines (hangman 18's tree edges: white, behind)
 LINE_BUFF = 0.08                   # gap between a line's end and the row it meets
 OFF_CLEAR = 0.3                    # how far past the top edge things leaving go
+K_FLY = 3.0                        # k: how many frame heights FIRST shoots up
 GREEN_Y = -2.3                     # j: the all-green FIRST row, bottom centre
 WORD_Y = -3.4                      # j: its one word, under it
 WIN_SCALE = 0.8                    # that word's size (1 = scene 04's list size)
@@ -390,9 +391,11 @@ class Scene07(WordleBoardScene):
     def _setup_branches(self):
         """A line from the left FIRST to every coloured FIRST, drawn one ROW OF THE
         LAYOUT at a time (user's call): each row's lines are drawn, then that row's
-        groups leave off the top with their lines, all but the all-green group,
-        which stays with its line. A layout row is the groups whose scored rows
-        share a top edge (they are top-aligned)."""
+        groups leave off the top, all but the all-green group. The lines STAY
+        ANCHORED to the left FIRST (user's call): a leaving group's line stretches
+        up off the frame with it, and every line follows FIRST from then on. A
+        layout row is the groups whose scored rows share a top edge (they are
+        top-aligned)."""
         Y = config.frame_y_radius
         start = self.left.get_right() + RIGHT * LINE_BUFF
         self.lines = {c: Line(start, row.get_left() + LEFT * LINE_BUFF, color=WHITE,
@@ -409,10 +412,12 @@ class Scene07(WordleBoardScene):
                 if c == ALL_GREEN:
                     continue
                 row, ms = self.units[c]
-                grp = VGroup(row, *[self.dots[m] for m in ms], self.lines[c])
-                up.append((grp, UP * (Y + OFF_CLEAR - grp.get_bottom()[1])))
+                grp = VGroup(row, *[self.dots[m] for m in ms])
+                up.append((grp, UP * (Y + OFF_CLEAR - grp.get_bottom()[1]), self.lines[c]))
             self.shelves.append(([self.lines[c] for c in codes], up))
         self.units = {ALL_GREEN: self.units[ALL_GREEN]}
+        # the lines to groups that have left: off the frame, still anchored to FIRST
+        self.gone = [l for c, l in self.lines.items() if c != ALL_GREEN]
         self.lines = {ALL_GREEN: self.lines[ALL_GREEN]}
 
     # i : row by row of the layout: the lines to that row's FIRSTs are drawn, then
@@ -423,8 +428,11 @@ class Scene07(WordleBoardScene):
         for lines, up in self.shelves:
             self.play(LaggedStart(*[Create(l) for l in lines], lag_ratio=0.1), run_time=0.6)
             if up:
-                self.play(*[grp.animate.shift(v) for grp, v in up], run_time=0.6)
-                self.remove(*[grp for grp, _ in up])
+                self.play(*[grp.animate.shift(v) for grp, v, _ in up],
+                          *[l.animate.put_start_and_end_on(l.get_start(), l.get_end() + v)
+                            for _, v, l in up],
+                          run_time=0.6)
+                self.remove(*[grp for grp, _, _ in up])
         self.shelves = None
 
     def _setup_all_green(self):
@@ -444,6 +452,8 @@ class Scene07(WordleBoardScene):
         self.g_word.scale(self.g_dot.width / self.g_word.width).move_to(self.g_dot) \
             .set_opacity(0)
         self.g_line = self.lines.pop(ALL_GREEN)
+        # the lines to the groups that left keep their far ends and follow FIRST
+        self.g_start = self.left.target.get_right() + RIGHT * LINE_BUFF
         self.g_line_new = Line(self.left.target.get_bottom() + DOWN * LINE_BUFF,
                                self.g_row.target.get_top() + UP * LINE_BUFF,
                                color=WHITE, stroke_width=LINE_W).set_z_index(-1)
@@ -459,13 +469,17 @@ class Scene07(WordleBoardScene):
                   MoveToTarget(self.g_word),
                   self.g_dot.animate.move_to(self.g_word.target).set_opacity(0),
                   Transform(self.g_line, self.g_line_new),
+                  *[l.animate.put_start_and_end_on(self.g_start, l.get_end())
+                    for l in self.gone],
                   run_time=2.0)
         self.remove(self.g_dot)
-        self.g_dot = self.g_line_new = None
+        self.g_dot = self.g_line_new = self.g_start = None
 
     def _setup_green_centre(self):
         Y = config.frame_y_radius
-        self.k_up = UP * (Y + OFF_CLEAR - self.left.get_bottom()[1])
+        # FIRST shoots off the top, far past it (user's call): K_FLY frame heights up,
+        # accelerating, its lines going with it
+        self.k_up = UP * (K_FLY * 2 * Y)
         # the green FIRST to the centre, its word under it moving with it
         self.k_shift = ORIGIN - self.g_row.get_center()
         # the line now runs out of the top of the frame, to the parent that has gone;
@@ -479,12 +493,13 @@ class Scene07(WordleBoardScene):
     @subscene
     def green_centre(self):
         self._setup_green_centre()
-        self.play(self.left.animate.shift(self.k_up),
+        self.play(self.left.animate(rate_func=rush_into).shift(self.k_up),
+                  *[l.animate(rate_func=rush_into).shift(self.k_up) for l in self.gone],
                   self.g_row.animate.shift(self.k_shift),
                   self.g_word.animate.shift(self.k_shift),
                   Transform(self.g_line, self.k_line), run_time=1.5)
-        self.remove(self.left)
-        self.left = self.k_line = self.k_up = self.k_shift = None
+        self.remove(self.left, *self.gone)
+        self.left = self.gone = self.k_line = self.k_up = self.k_shift = None
 
     # l : the FIRST at the bottom vanishes; the green FIRST gets the winning row's
     #     bounce (02's and 97's emphasis for a win, in place of the script's glow —
