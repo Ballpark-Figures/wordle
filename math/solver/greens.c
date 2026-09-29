@@ -1136,7 +1136,8 @@ static void usage(void) {
       "  --seed-incumbent V  --sweep only: start the incumbent at V instead of\n"
       "                    solving a first opener serially.  V must be a badge count\n"
       "                    some REAL strategy inside this search already achieves\n"
-      "                    (a smaller beam, or a shallower cap).  Every opener\n"
+      "                    (a smaller beam at the SAME depth -- the beam is not\n"
+      "                    monotone in depth).  Every opener\n"
       "                    worth >= V is still solved and reported exactly; if none\n"
       "                    is, the run says so and reports no winner.\n"
       "  --data DIR        data root (default ./data)\n"
@@ -1525,8 +1526,8 @@ int main(int argc, char **argv) {
         incumbent = seed_inc;
         nbest = 0;
         seeded = 1;
-        printf("seed: incumbent starts at %d of %d (a value a smaller beam or a "
-               "shallower cap already achieves); openers below it are cut, not solved\n",
+        printf("seed: incumbent starts at %d of %d (a value "
+               "a smaller beam at this depth already achieves); openers below it are cut, not solved\n",
                seed_inc, NA);
     } else if (seed_inc) {
         printf("seed: %d is not above the resumed incumbent %d, so it changes nothing\n",
