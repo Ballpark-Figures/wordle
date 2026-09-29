@@ -31,6 +31,9 @@ BEAT MAP (one subscene per Script.md beat)
   m dup_1 / n dup_2 / o dup_3 — the duplicate-letter layers, as g-i (o popped) (VO 8)
   p restore       — the duplicate layers fall back to the axis, legend out   (VO 8)
   q vowel_3 / r vowel_4 — the distinct-vowel layers, as g-h (r popped)       (VO 9)
+  s to_black      — everything fades out as the navy page turns Wordle's black
+                    (WORDLE_BG), the background scene 10 opens on (the user's
+                    call, 2026-09-29; not a script beat)
 
 REUSE MAP
   watch page      bpkfigures.youtube_card.youtube_watch (as hangman 93youtube_test c)
@@ -426,4 +429,11 @@ class Scene09(MovingCameraScene, WordleScene):
     @subscene
     def vowel_4(self):
         self._layer("vowel", 1, 2.0, pop=True)
+
+    # s : everything fades as the navy page turns Wordle's black — scene 10 opens on it
+    @subscene
+    def to_black(self):
+        rest = [m for m in self.mobjects if m is not self.navy]
+        self.play(FadeOut(*rest), self.navy.animate.set_fill(WORDLE_BG),
+                  run_time=1.2)
 
