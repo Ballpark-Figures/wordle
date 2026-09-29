@@ -1,22 +1,23 @@
 """Scene 06 — the candidates for best opener, read off the colour groups. Navy
 background.
 
-Talking head THD sits between 05 and here, so CODES's groups are up from frame 0
-(setup_scene): 04e's CODES groups (the carry-over set), but DECODED and with a
-scored CODES row atop each, as 04i does for PIGGY — so the frame is NOT 04e's
+Talking head THD sits between 05 and here, so GROUP's groups are up from frame 0
+(setup_scene), decoded, with a scored GROUP row atop each, chosen and laid out
+as 04i does for PIGGY (size targets, whole groups hung off the edges)
 exactly (the header room re-seeds the scatter). No pigpen anywhere in this scene.
-The script says PIGGY; CODES, arranged as in 04e, is the user's call (2026-09-28).
+The script says PIGGY; GROUP, for scene 06 only, is the user's call (2026-09-28;
+it was CODES arranged as in 04e before that — GROUP has no 04 arrangement).
 
 BEAT MAP — one subscene per Script.md beat, letters matching:
 
-  a codes_groups — CODES's groups, decoded, scored rows on top, held    (06a, VO 1)
+  a group_groups — GROUP's groups, decoded, scored rows on top, held    (06a, VO 1)
   b dots         — every answer word shrinks into a dot; then all 98 groups
-                   come onto the frame, each scored CODES row resized to
+                   come onto the frame, each scored GROUP row resized to
                    sqrt(size) dot pitches wide. The dots and rows on screen
                    move to their new spots; everything else (every hidden
                    member, every group that was off screen) slides in from
-                   beyond the edge; CODES moves to the top-left corner  (06b, VO 1)
-  c trace        — the corner CODES and every CODES row turn over to TRACE
+                   beyond the edge; GROUP moves to the top-left corner  (06b, VO 1)
+  c trace        — the corner GROUP and every GROUP row turn over to TRACE
                    (a shared pattern keeps its colours, so only the letters
                    change); then every dot moves to its TRACE group, the rows
                    TRACE never makes slide off, the rows only TRACE makes
@@ -31,14 +32,14 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                    bottom left                                           (06f, VO 4)
 
 REUSE MAP — every element and the one source it comes from:
-  group layout (a)      assets/groups.py `layout(chain=True, header=True)`
+  group layout (a)      assets/groups.py `layout(header=True)` — 04i's rule
   answer words, guess   assets/pigpen.py `PigpenWord(revealed=True)`, sized as 04i
-  scored CODES rows     assets/groups.py `scored_headers` (a), `scored_row` (b, c)
+  scored GROUP rows     assets/groups.py `scored_headers` (a), `scored_row` (b, c)
   the flip to TRACE/ROATE  assets/pigpen.py `reletter` — GlyphFlip, letter to letter
   definitions, lists    crisp_text, white, FadeIn; words verbatim from column 2,
                         italics from the Doc; listed words are PigpenWord rows
   dot layout (b)        assets/groups.py `dot_layout`: 04's scatter, every group
-  guess on top          GUESS_Y / GUESS_SCALE from assets/groups.py, as 04e
+  guess on top          GUESS_Y / GUESS_SCALE from assets/groups.py, as 04i
   colours               BOARD_NAVY via WordleBoardScene; tiles config.py TILE_*
   groups                assets/lists_data.py -> lists_cache.json `full`, from
                         math/wordle.py `pattern`
@@ -49,7 +50,7 @@ LAYOUT CHOICES, flagged:
   - Dots are WHITE (the letters' colour); the script names no colour.
   - A dot row's tile stroke shrinks in proportion to its width against 04i's
     header width HEADER_W (capped at the board's STROKE), or tiny rows are all stroke.
-  - With CODES moved to the top-left corner, the dot groups spread over the WHOLE
+  - With GROUP moved to the top-left corner, the dot groups spread over the WHOLE
     frame (groups.py DOT_REGION_TOP) but for that corner (user's call).
   - The corner label keeps its 06a size.
   - Definitions are broken into lines BY HAND (GLOSSES), left-aligned under their
@@ -68,7 +69,8 @@ LAYOUT CHOICES, flagged:
     call): every group always has exactly as many dots as answers, but a switch
     matches the dots on screen to the new slots by least total squared distance
     (scipy linear_sum_assignment), so most move only locally. MEASURED for
-    CODES to TRACE: median dot move 1.31 (5.85 with each dot tied to its word),
+    CODES to TRACE (when 06 opened on CODES): median dot move 1.31 (5.85 with
+    each dot tied to its word),
     90% under 2.47; the matching takes ~4 s at setup.
   - The corner word and every note keep CORNER_MARGIN of clear space round them;
     no dot or row enters it.
@@ -92,7 +94,7 @@ from assets import lists_data
 from scipy.optimize import linear_sum_assignment
 
 DATA = lists_data.load()
-GUESS = DATA["guesses"][2]                         # codes — 04e's last guess
+GUESS = "group"            # 06a's word — the user's choice, scene 06 only
 TRACE = "trace"            # 06c's word — the script's own choice
 ROATE = "roate"            # 06d-f's words — the script's own choices
 ARISE = "arise"
@@ -159,9 +161,9 @@ def _entries(words):
 
 class Scene06(WordleBoardScene):
     """BEAT MAP
-    codes_groups — CODES's groups, decoded and scored, held
+    group_groups — GROUP's groups, decoded and scored, held
     dots — words to dots; all 98 groups on the frame, rows sized by sqrt(size)
-    trace — CODES flips to TRACE; the dots regroup into TRACE's 150 groups
+    trace — GROUP flips to TRACE; the dots regroup into TRACE's 150 groups
     roate — TRACE flips to ROATE, the dots regroup; its definition fades in
     arise — ROATE flips to ARISE; the other four tied words at the bottom left
     aurei — ARISE flips to AUREI with its definition; URAEI at the bottom left
@@ -171,7 +173,7 @@ class Scene06(WordleBoardScene):
         self.notes = []            # definitions / lists beside the corner word (d-f)
         self.guess = PigpenWord(GUESS, revealed=True).scale(GUESS_SCALE) \
             .move_to([0, GUESS_Y, 0])
-        slots, gscale, heads, groups = layout(DATA, GUESS, header=True, chain=True)
+        slots, gscale, heads, groups = layout(DATA, GUESS, header=True)
         self.words = {w: PigpenWord(w, revealed=True).scale(gscale).move_to(c)
                       for w, c in slots.items()}
         self.heads = dict(zip((g["code"] for g in groups),
@@ -183,9 +185,9 @@ class Scene06(WordleBoardScene):
                                 config.frame_y_radius - CORNER_BUFF - h / 2, 0.0])
         self.corner_box = _keepout(self.guess.copy().move_to(self.corner))
 
-    # a : CODES's groups, held — its VO plays over the framework's holds
+    # a : GROUP's groups, held — its VO plays over the framework's holds
     @subscene
-    def codes_groups(self):
+    def group_groups(self):
         pass
 
     def _setup_dots(self):
@@ -216,7 +218,7 @@ class Scene06(WordleBoardScene):
             grp.shift(d * ENTER_DIST)
 
     # b : every word shrinks into a dot; then all 98 groups onto the frame, each
-    #     CODES row sqrt(size) dot pitches wide; CODES to the top-left corner
+    #     GROUP row sqrt(size) dot pitches wide; GROUP to the top-left corner
     @subscene
     def dots(self):
         self._setup_dots()
@@ -325,7 +327,7 @@ class Scene06(WordleBoardScene):
         self.t_word = self.stay = self.leave = self.enter = self.t_rows = None
         self.moves = self.t_dots = None
 
-    # c : CODES turns over to TRACE, in the corner and on every row; then the dots
+    # c : GROUP turns over to TRACE, in the corner and on every row; then the dots
     #     regroup into TRACE's groups, rows leaving and arriving
     @subscene
     def trace(self):

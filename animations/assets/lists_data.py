@@ -61,13 +61,14 @@ WORDS = os.path.join(HERE, "..", "..", "math", "data", "shared", "words")
 
 HEAD = 20                         # guess-list lines cached (the scene shows fewer)
 SCRIPT_GUESSES = ["piggy", "codes"]
+SCENE6_GUESSES = ["group"]        # 06a's opening guess (user's call): size targets
 TARGETS = [1, 1, 2, 3, 4, 5, 7, 9, 12, 16]   # size-target rule: one group each
 CHAIN_GROUPS = 10                 # carry-over rule: most groups shown
 CHAIN_MAX = 16                    # largest group the carry-over rule may show
 N_EDGE = 8                        # edge groups cached (the scene uses as many as fit)
 EDGE_MAX = 9                      # largest group hung off an edge
 COLUMN = 12                       # answers in the on-screen column (scene N_ROWS)
-FULL_GUESSES = ["codes", "trace", "roate", "arise", "aurei"]   # guesses whose EVERY group is cached (06b/c's dots)
+FULL_GUESSES = ["group", "trace", "roate", "arise", "aurei"]   # guesses whose EVERY group is cached (06b/c's dots)
 
 
 def _read(name):
@@ -146,6 +147,12 @@ def _build():
     # size-target selections start from the answer column (04d, 04i)
     column = set(answers[:COLUMN])
     out["groups_edge"] = {g: _edges(full[g], out["groups"][g], column) for g in order}
+    # 06a: a fresh guess with nothing before it on screen — size targets, and edge
+    # groups simply the largest that fit whole
+    for g in SCENE6_GUESSES:
+        full[g] = partition(g)
+        out["groups"][g] = _pick(full[g])
+        out["groups_edge"][g] = _edges(full[g], out["groups"][g], set())
     # 06b/c: every group of each dotted guess, largest first
     out["full"] = {g: sorted(full.get(g) or partition(g),
                              key=lambda grp: (-grp["size"], grp["code"]))
@@ -188,7 +195,7 @@ if __name__ == "__main__":
                   f"{' '.join(grp['members'])}")
 
     print(f"{data['n_answers']} answers, {data['n_guesses']} guesses")
-    for g in data["guesses"]:
+    for g in data["guesses"] + SCENE6_GUESSES:
         show(f"{g.upper()} (size targets)", data["groups"][g])
         show("  + edge groups", data["groups_edge"][g])
     for g in SCRIPT_GUESSES:
