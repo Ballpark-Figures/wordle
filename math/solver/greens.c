@@ -1133,6 +1133,12 @@ static void usage(void) {
       "  --topk K, -k K    beam: recurse into the K evenest splitters at every\n"
       "                    branching point, the ROOT included -- so it examines K\n"
       "                    OPENERS too, and reports the best of THOSE, not of 12972.\n"
+      "  --seed-incumbent V  --sweep only: start the incumbent at V instead of\n"
+      "                    solving a first opener serially.  V must be a badge count\n"
+      "                    some REAL strategy inside this search already achieves\n"
+      "                    (a smaller beam, or a shallower cap).  Every opener\n"
+      "                    worth >= V is still solved and reported exactly; if none\n"
+      "                    is, the run says so and reports no winner.\n"
       "  --data DIR        data root (default ./data)\n"
       "  --guess-list/--answer-list/--patterns FILE    restricted runs (the gate)\n");
 }
@@ -1144,6 +1150,7 @@ int main(int argc, char **argv) {
     const char *outpath = NULL, *treedir = NULL, *ttload = NULL, *ttsave = NULL;
     const char *guesslist = NULL, *answerlist = NULL, *patpath = NULL;
     int depth = 6, ttbits = 28, threads = 0, sweep = 0, noout = 0;
+    int seed_inc = 0;                     /* 0 = no seed: solve a first opener */
 
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--opener") && i + 1 < argc) {
@@ -1163,6 +1170,10 @@ int main(int argc, char **argv) {
             TOPK = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--must-win")) MUSTWIN = 1;   /* the default */
         else if (!strcmp(argv[i], "--may-lose")) MUSTWIN = 0;
+        else if (!strcmp(argv[i], "--seed-incumbent") && i + 1 < argc) {
+            seed_inc = atoi(argv[++i]);
+            if (seed_inc < 1) { fprintf(stderr, "--seed-incumbent must be >= 1\n"); return 1; }
+        }
         else if (!strcmp(argv[i], "--data") && i + 1 < argc) datadir = argv[++i];
         else if (!strcmp(argv[i], "--guess-list") && i + 1 < argc) guesslist = argv[++i];
         else if (!strcmp(argv[i], "--answer-list") && i + 1 < argc) answerlist = argv[++i];
@@ -1183,6 +1194,10 @@ int main(int argc, char **argv) {
         return 1;
     }
     if (!nopen && !sweep) { usage(); return 1; }
+    if (seed_inc && !sweep) {
+        fprintf(stderr, "--seed-incumbent only means something to --sweep\n");
+        return 1;
+    }
     /* A run whose answer goes nowhere is a run that has to be repeated.  The
      * wrapper always passes --out; refusing without it is what stops a bare
      * command line printing a multi-hour result to a terminal and saving it
@@ -1497,6 +1512,27 @@ int main(int argc, char **argv) {
                            ndone, incumbent, nbest);
     }
 
+    /* SEEDED: the incumbent starts at a value some real strategy inside this
+     * search is already known to achieve, so the walk cuts against it from the
+     * first opener.  Nothing worth >= the seed can be lost: the root cut is
+     * `bound < incumbent` and solve_opener only abandons an opener that provably
+     * falls BELOW its floor, so an opener equalling or beating the seed is still
+     * solved exactly and still reported.  The tie list starts EMPTY -- the seed
+     * is a number, not an opener of this run -- so if nothing reaches it the
+     * final report says exactly that instead of naming a winner. */
+    int seeded = 0;
+    if (seed_inc > incumbent) {
+        incumbent = seed_inc;
+        nbest = 0;
+        seeded = 1;
+        printf("seed: incumbent starts at %d of %d (a value a smaller beam or a "
+               "shallower cap already achieves); openers below it are cut, not solved\n",
+               seed_inc, NA);
+    } else if (seed_inc) {
+        printf("seed: %d is not above the resumed incumbent %d, so it changes nothing\n",
+               seed_inc, incumbent);
+    }
+
     double t0 = now_s();
     printf("sweep: %d openers %s; reporting the best of them\n", nord,
            TOPK > 0 ? "by ascending sum of squared bins (--topk)"
@@ -1507,7 +1543,7 @@ int main(int argc, char **argv) {
      * incumbent, and with N threads starting at once the first N openers all run
      * with no incumbent at all -- so one opener solved up front is worth more
      * than the thread it costs, and it prices the run in its first line. */
-    for (int i = 0; i < nord && nbest == 0; i++) {
+    for (int i = 0; i < nord && nbest == 0 && !seeded; i++) {
         int g = (int)(ord[i] & 0xFFFFF);
         if (done[g]) continue;
         Ctx *c0 = calloc(1, sizeof(Ctx));
@@ -1617,6 +1653,15 @@ int main(int argc, char **argv) {
                                now_s() - t0, GWORD[g], v, NA, (double)v / NA, dt);
                         fflush(stdout);
                     } else if (v == incumbent) {
+                        /* Under a seed the first opener to EQUAL it is this
+                         * run's first winner of its own, and needs its tree
+                         * like any new best -- unseeded, nbest is never 0 here. */
+                        if (nbest == 0) {
+                            newbest = 1;
+                            printf("[%7.0fs] %s  badges=%d of %d  prob=%.5f  REACHES SEED  %6.1fs\n",
+                                   now_s() - t0, GWORD[g], v, NA, (double)v / NA, dt);
+                            fflush(stdout);
+                        }
                         bestlist[nbest++] = g;
                     }
                 }
@@ -1645,6 +1690,14 @@ int main(int argc, char **argv) {
         printf("BEST OF THE %d OPENERS EXAMINED, not of all %d, and every value is a\n"
                "LOWER bound on that opener's true optimum -- the beam only ever finds\n"
                "strategies, never proves one best.\n", nord, NG);
+    if (seeded && nbest == 0)
+        /* Deliberately NOT the `badges = ` line: that line names a result of
+         * THIS run, and here there is none -- only a proof that nothing examined
+         * reached the seed. */
+        printf("no opener examined reached the seed of %d of %d: this run proves every\n"
+               "one of them is below it, and names no winner of its own\n",
+               incumbent, NA);
+    else
     printf("badges = %d of %d  (%.5f of answers), %d openers tied\n",
            incumbent, NA, (double)incumbent / NA, nbest);
     for (int i = 0; i < nbest; i++) printf("  %s\n", GWORD[bestlist[i]]);

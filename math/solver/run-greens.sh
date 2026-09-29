@@ -69,6 +69,7 @@ THREADS=18          # 18 cores here (6 performance + 12 efficiency)
 TTBITS=28           # 8.6 GB of 24 GB
 TOPK=0              # 0 = the exact search; K = beam width at every node
 MUSTWIN=1           # 1 = must-win (default); 0 = the badge question
+SEED=""             # "" = none; "auto" = best contained run; N = explicit
 OPENERS=()
 
 while [ $# -gt 0 ]; do
@@ -80,6 +81,7 @@ while [ $# -gt 0 ]; do
         -k|--topk) TOPK="$2";    shift 2 ;;
         --must-win) MUSTWIN=1;   shift ;;
         --may-lose) MUSTWIN=0;   shift ;;
+        --seed)    SEED="$2";    shift 2 ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
     esac
 done
@@ -185,8 +187,66 @@ if [ ${#OPENERS[@]} -gt 0 ]; then
     exit "${PIPESTATUS[0]}"
 fi
 
+# --seed: START THE INCUMBENT AT A VALUE ANOTHER RUN ALREADY ACHIEVED.
+#
+# Sound only when that run's strategy lies INSIDE this search, and that means a
+# SMALLER BEAM AT THE SAME DEPTH (K' <= K -- every node's top K' splitters are
+# among its top K, the root included) under the same objective and word lists.
+#
+# A SHALLOWER CAP IS NOT CONTAINED, although it looks it.  A strategy winning
+# within D' wins within D in the GAME, but not inside the BEAM: at one guess
+# left the rule plays a candidate outright (greens.py `depth == 1`), a word the
+# top-K splitters at a deeper node usually exclude.  So the beamed value is NOT
+# monotone in depth -- measured: d4 K=3 finds 141 where d5..d11 K=3 find 139,
+# and the reference shows the same on small cases -- while it IS monotone in K
+# (0 of 900 opener x depth cases broke it).  Seeding across depths would inject
+# values this beam cannot reach, and every run would report none reached.
+#
+# `auto` takes the best exact row of every such run on disk, partial or
+# finished, excluding this run's own file (its rows are the resume's business).
+# The binary guarantees
+# nothing worth >= the seed is lost; what changes is that a run reaching
+# nothing at or above it names NO winner -- and the `.seed` sidecar is what
+# lets a reader tell that apart from a run whose best is its highest row.
+SEEDARGS=()
+if [ -n "$SEED" ]; then
+    OBJ=$([ "$MUSTWIN" -eq 1 ] && echo must-win || echo may-lose)
+    if [ "$SEED" = auto ]; then
+        PICK=$(for f in "$SHR"/best_opener_d*_k*.csv; do
+                   [ "$f" = "$OUT" ] && continue
+                   awk -F, -v obj="$OBJ" -v D="$DEPTH" -v K="$TOPK" -v f="$f" '
+                       NR == 1 {
+                           if ($0 !~ /^# greens /) exit
+                           for (i = 1; i <= split($0, t, " "); i++) {
+                               split(t[i], kv, "="); s[kv[1]] = kv[2]
+                           }
+                           ok = s["objective"] == obj && s["guesses"] == 12972 &&
+                                s["answers"] == 2315 && s["depth"] + 0 == D + 0 &&
+                                s["topk"] + 0 >= 1 && (K + 0 == 0 || s["topk"] + 0 <= K + 0)
+                           if (!ok) exit
+                           next
+                       }
+                       $5 == "exact" && $2 + 0 > b { b = $2 + 0; w = $1 }
+                       END { if (b) print b, f, w }' "$f"
+               done | sort -n -k1,1 | tail -1)
+        if [ -z "$PICK" ]; then
+            echo "seed: no contained run on disk, so no seed" | tee -a "$LOG"
+        else
+            set -- $PICK
+            SEEDV=$1; SEEDSRC="$(basename "$2") $3"
+        fi
+    else
+        SEEDV=$SEED; SEEDSRC="given on the command line"
+    fi
+    if [ -n "${SEEDV:-}" ]; then
+        SEEDARGS=(--seed-incumbent "$SEEDV")
+        echo "seed: $SEEDV from $SEEDSRC" | tee -a "$LOG"
+        echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] seed=$SEEDV from=$SEEDSRC" >> "$OUT.seed"
+    fi
+fi
+
 echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] greens: opener screen, $SUF $WARM" | tee -a "$LOG"
-./solver/greens --sweep "${KARGS[@]+"${KARGS[@]}"}" \
+./solver/greens --sweep "${KARGS[@]+"${KARGS[@]}"}" "${SEEDARGS[@]+"${SEEDARGS[@]}"}" \
     --out "$OUT" \
     --trees "$TREES" \
     --depth "$DEPTH" \

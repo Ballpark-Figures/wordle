@@ -955,6 +955,26 @@ its state arithmetic against `strspace.py` over a shared deterministic walk — 
   must never share a file.
 - **COST IS UNMEASURED as of 2026-09-03.** Price it with one named opener before
   launching the screen.
+- **`run-greens.sh --seed auto` STARTS THE INCUMBENT AT A SMALLER K's BEST, SAME
+  DEPTH** (added 2026-09-29, user's call; `greens --seed-incumbent V`). It skips
+  the serial first opener, and most of a run's CPU goes on openers that end up
+  CUT (75% on d9 K=11000), which a high incumbent cuts sooner. Anything worth
+  >= the seed is still solved and reported exactly; if NOTHING reaches it the run
+  names no winner and says so, and the `<csv>.seed` sidecar records the seed and
+  its source -- **a seeded CSV's highest row is NOT its result without checking
+  the sidecar.** Gated in `checkgreens.py` section 10 (seed below / at / above
+  the true best), mutation-tested.
+  - **SAME DEPTH ONLY, because the beam is NOT monotone in depth.** At one guess
+    left the rule plays a candidate outright (`greens.py` `depth == 1`), which the
+    top-K splitters at a deeper node usually exclude -- so d4 K=3 finds 141 where
+    d5-d11 K=3 find 139, and the reference shows it on small cases. It IS monotone
+    in K (0 of 900 reference cases broke it). A cross-depth seed would be a value
+    this beam cannot reach.
+  - **UNEXPLAINED, 2026-09-29: the C is NOT K-monotone on the full lists** --
+    `seise` scores 1050 at d6 K=9000 and 1046 at K=10000, which the reference
+    never does. Not yet chased. Under a seed it would show as "none reached".
+- **The seed opener's context was freed BEFORE its tree was written** until
+  2026-09-29: harmless by luck on macOS, a segfault on every fresh Linux sweep.
 
 ## Absurdle (adversarial Wordle) — OUR word lists, NOT Absurdle's
 - **The host never commits to a word.** It holds a CANDIDATE SET (initially the answer
@@ -4671,3 +4691,9 @@ a correction to one is invisible to the rest.
 
 ## Style
 - Uses `bpkfigures` style + the local `config.py` for colors/fonts.
+- **EVERY dictionary definition on screen ("n. Obsolete variant of rote") goes
+  through `animations/assets/gloss.py` `gloss(lines, font_size, italic=...)`, never a
+  bare `crisp_text`.** The helper italicises the leading part of speech ("n.", "v.",
+  "adj." …) itself, so it cannot be forgotten; `italic` is only for further words the
+  Doc italicises (ROATE's "rote"). (User's call, 2026-09-29: 08's TARSE definition was
+  built by hand and lost its italic "n".)

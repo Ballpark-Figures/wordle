@@ -55,7 +55,8 @@ OPTTURNS = os.path.join(MATH, "solver", "optturns")
 
 FAILS = []
 COVER = {"yellow line": 0, "yellow-free line": 0, "infeasible opener": 0,
-         "must-win below plain": 0, "tied openers": 0, "beam below exact": 0}
+         "must-win below plain": 0, "tied openers": 0, "beam below exact": 0,
+         "seed saved work": 0, "seed above best": 0}
 
 
 def fail(msg):
@@ -431,7 +432,8 @@ def check_binds(answers, guesses, depths, openers, values):
 _BEST = re.compile(r"^badges = (\d+) of (\d+)")
 
 
-def run_sweep(apath, gpath, ppath, depth, outpath=None, topk=0, must_win=False):
+def run_sweep(apath, gpath, ppath, depth, outpath=None, topk=0, must_win=False,
+              extra=(), want_stdout=False):
     cmd = [SOLVER, "--sweep", "--answer-list", apath, "--guess-list", gpath,
            "--patterns", ppath, "--depth", str(depth),
            "--out", outpath] if outpath else [
@@ -441,10 +443,11 @@ def run_sweep(apath, gpath, ppath, depth, outpath=None, topk=0, must_win=False):
     if topk:
         cmd += ["--topk", str(topk)]
     cmd += ["--must-win"] if must_win else ["--may-lose"]
+    cmd += list(extra)
     p = subprocess.run(cmd, capture_output=True, text=True, cwd=MATH)
     if p.returncode != 0:
         fail("greens --sweep exited %d: %s" % (p.returncode, p.stderr.strip()[-400:]))
-        return None, []
+        return (None, [], "") if want_stdout else (None, [])
     best, ties, collecting = None, [], False
     for line in p.stdout.splitlines():
         m = _BEST.match(line)
@@ -456,7 +459,79 @@ def run_sweep(apath, gpath, ppath, depth, outpath=None, topk=0, must_win=False):
                 ties.append(line.strip())
             else:
                 collecting = False
+    if want_stdout:
+        return best, ties, p.stdout
     return best, ties
+
+
+_SOLVED = re.compile(r"^(\d+) openers solved exactly")
+
+
+def check_seed(tmp, answers, guesses, depth, topk=0, must_win=False):
+    """--seed-incumbent starts the walk at a value instead of a solved opener.
+
+    The claim it rests on: an opener worth >= the seed is never lost, because the
+    only cuts are `bound < incumbent` and `value < floor`.  So against the
+    unseeded screen (itself checked against an exhaustive scan in section 6):
+      - a seed BELOW the best must give the same best and the same tie list;
+      - a seed EQUAL to the best must too, and must write the winner's tree,
+        which the walk otherwise only does on a strict improvement;
+      - a seed ABOVE the best must name NO winner and say so, and must not
+        write any row at or above the seed.
+    Coverage: the equal seed must actually save work, or it is not doing
+    anything the check can see.
+    """
+    tag = "must-win" if must_win else "plain"
+    print("10. --seed-incumbent, against the unseeded screen  (%s, K=%s)"
+          % (tag, topk or "exact"))
+    apath, gpath, ppath = build_case(tmp, answers, guesses, "e")
+    best, ties, out0 = run_sweep(apath, gpath, ppath, depth, topk=topk,
+                                 must_win=must_win, want_stdout=True)
+    if best is None:
+        return
+    solved0 = next((int(m.group(1)) for m in map(_SOLVED.match, out0.splitlines()) if m), None)
+    for v in sorted({max(1, best - 3), best, best + 1}):
+        csv = os.path.join(tmp, "seed_%d.csv" % v)
+        tdir = os.path.join(tmp, "seed_%d_trees" % v)
+        for p in (csv,):
+            if os.path.exists(p):
+                os.remove(p)
+        if os.path.isdir(tdir):
+            for f in os.listdir(tdir):
+                os.remove(os.path.join(tdir, f))
+        b, t, out = run_sweep(apath, gpath, ppath, depth, outpath=csv, topk=topk,
+                              must_win=must_win, want_stdout=True,
+                              extra=["--seed-incumbent", str(v), "--trees", tdir])
+        rows = [l.split(",") for l in open(csv).read().splitlines()[2:]]
+        valued = [int(r[1]) for r in rows if len(r) > 1 and r[1]]
+        if v <= best:
+            if (b, sorted(t)) != (best, sorted(ties)):
+                fail("seed %d (best %d): seeded screen gives %s/%s, unseeded %s/%s"
+                     % (v, best, b, sorted(t), best, sorted(ties)))
+                continue
+            trees = sorted(f[:-7] for f in os.listdir(tdir)) if os.path.isdir(tdir) else []
+            if not set(trees) & set(ties):
+                fail("seed %d: no tree written for any winner %s (trees: %s)"
+                     % (v, sorted(ties), trees))
+            if v == best:
+                solved = next((int(m.group(1)) for m in map(_SOLVED.match,
+                               out.splitlines()) if m), None)
+                if solved is not None and solved0 is not None and solved < solved0:
+                    COVER["seed saved work"] += 1
+                print("   seed %-4d = best: same best %d and %d tied, tree written, "
+                      "%s openers solved vs %s unseeded" % (v, b, len(t), solved, solved0))
+            else:
+                print("   seed %-4d < best: same best %d and %d tied" % (v, b, len(t)))
+        else:
+            if b is not None:
+                fail("seed %d above the best %d still reports a winner at %d" % (v, best, b))
+            elif "no opener examined reached the seed" not in out:
+                fail("seed %d above the best %d: no 'reached the seed' notice" % (v, best))
+            elif any(x >= v for x in valued):
+                fail("seed %d: CSV holds a value >= the seed, %s" % (v, max(valued)))
+            else:
+                COVER["seed above best"] += 1
+                print("   seed %-4d > best: no winner named, says so, no row reaches it" % v)
 
 
 def check_sweep(tmp, answers, guesses, depth, must_win=False):
@@ -639,6 +714,11 @@ def main():
         check_sweep(tmp, small, guesses, max(depths), must_win=mw)
         check_beam(tmp, answers, guesses, max(depths), openers, must_win=mw)
         check_beam_sweep(tmp, answers, guesses, max(depths), 5, must_win=mw)
+        check_seed(tmp, answers, guesses, max(depths), must_win=mw)
+        check_seed(tmp, answers, guesses, max(depths), topk=5, must_win=mw)
+        # the small set has ties, and a seed equal to a tied best is the case
+        # where the tie list must be rebuilt from nothing
+        check_seed(tmp, small, guesses, max(depths), must_win=mw)
     check_resume(tmp, small, guesses, max(depths))
 
     print("\ncoverage: " + ", ".join("%s %d" % (k, v) for k, v in COVER.items()))
