@@ -54,13 +54,14 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                    FIRST scored --GGG, its line, BURST and WORST under it
                    (the user's pick; BURST is guessed first)           (07q, VO 6)
   r type_burst   — BURST typed below FIRST                            (07r, VO 6)
-  s branch_two   — two copies of the case branch off, left and right, a
-                   line from BURST's R to each, anchored as they go    (07s, VO 6)
+  s branch_two   — the case rises to the top as two copies branch off, left
+                   and right, a line from BURST's R to each, anchored  (07s, VO 6)
   t score_both   — BURST scored in both: all green left, --GGG right   (07t, VO 6)
   u move_words   — BURST under the left case, WORST under the right   (07u, VO 6)
-  v left_win     — the left case's winning bounce                     (07v, VO 6)
-  w right_branch — the right case branches down again: WORST typed,
-                   scored all green, moved under, winning bounce       (07w, VO 6)
+  v left_win     — the left case's winning bounce as BURST fades       (07v, VO 6)
+  w right_branch — the right case branches down again, the black WORST
+                   coming down with it; WORST typed, scored all green,
+                   winning bounce as the black WORST fades             (07w, VO 6)
 
 REUSE MAP — every element and the one source it comes from:
   board, typing, reveal   assets/board.py `get_board`, `type_word` (its
@@ -136,11 +137,10 @@ SWAP_DIST = 16.0                   # m, q: how far the cases travel (a frame wid
 PAIR = ("burst", "worst")          # q-w: the two-word group (user's pick of FIRST's 18)
 PAIR_CODE = 26                     #   FIRST's score against both, --GGG; BURST is
 CROSS = DATA["cross"]["burst:worst"]   # guessed first; its score against WORST
-TREE_Y = 2.6                       # q: the pair case's FIRST row
+TREE_Y = 2.6                       # s: the pair case's FIRST row once it rises
 CHILD_DY = 2.2                     # s, w: a branch's drop, FIRST row to FIRST row
 CHILD_DX = 3.5                     # s: the two branches' distance from the centre
-PAIR_WORD_Y = -1.0                 # q: the two words, side by side under the case
-PAIR_WORD_DX = 1.3
+PAIR_WORD_DX = 1.3                 # q: the two words, side by side at CASE_WORD_Y
 WORD_GAP = 0.25                    # u, w: a word's gap under the case it moves to
 GREEN_Y = -2.3                     # j: the all-green FIRST row, bottom centre
 WORD_Y = -3.4                      # j: its one word, under it
@@ -623,10 +623,10 @@ class Scene07(WordleBoardScene):
 
     def _setup_pair_swap(self):
         X, Y = config.frame_x_radius, config.frame_y_radius
-        self.pcase = scored_row(FIRST, PAIR_CODE, self.case.width, [0, TREE_Y, 0])
+        self.pcase = scored_row(FIRST, PAIR_CODE, self.case.width, ORIGIN)
         self.pline = _line([0, Y + OFF_CLEAR, 0], _r(self.pcase))
         self.pwords = [PigpenWord(w, revealed=True).scale(WIN_SCALE)
-                       .move_to([sx * PAIR_WORD_DX, PAIR_WORD_Y, 0])
+                       .move_to([sx * PAIR_WORD_DX, CASE_WORD_Y, 0])
                        for w, sx in zip(PAIR, (-1, 1))]
         self.q_out = VGroup(self.case, self.guess2, self.case_line)
         self.q_in = VGroup(self.pcase, self.pline, *self.pwords).shift(RIGHT * SWAP_DIST)
@@ -647,11 +647,12 @@ class Scene07(WordleBoardScene):
         self.prow = self._typed_row(self.pcase)
         self.prow.type_word(self, 0, PAIR[0], 0.65, per_letter=key_cues(self), appear=True)
 
-    def _branch(self, parent, rows, targets):
+    def _branch(self, parent, rows, targets, rise=ORIGIN):
         """Copies of the case `rows` (top first), each sliding from where the case is
         to its target FIRST-row centre, each with a line from `parent`'s R to the
-        copy's FIRST R that stays anchored as it goes. Returns (copies, lines, the
-        play's animations)."""
+        copy's FIRST R that stays anchored as it goes. `rise` is how far the case
+        itself moves meanwhile (its copies' targets are absolute). Returns (copies,
+        lines, the play's animations)."""
         copies, lines, anims = [], [], []
         src = _r(parent)
         for t in targets:
@@ -663,22 +664,32 @@ class Scene07(WordleBoardScene):
             anims.append(c.animate.shift(v))
             r0 = _r(rows[0])
             anims.append(UpdateFromAlphaFunc(
-                line, lambda m, a, r0=r0, v=v: m.put_start_and_end_on(src, r0 + v * smooth(a)),
+                line, lambda m, a, r0=r0, v=v: m.put_start_and_end_on(
+                    src + rise * smooth(a), r0 + v * smooth(a)),
                 rate_func=linear))
         return copies, lines, anims
 
     def _setup_branch_two(self):
+        """The case rises to TREE_Y as it branches, its line from the top shortening
+        with it, to leave room below for the tree."""
         y = TREE_Y - CHILD_DY
+        rise = UP * (TREE_Y - self.pcase.get_center()[1])
         self.kids, self.kid_lines, self.s_anims = self._branch(
-            self.prow, [self.pcase, self.prow], [[-CHILD_DX, y, 0], [CHILD_DX, y, 0]])
+            self.prow, [self.pcase, self.prow], [[-CHILD_DX, y, 0], [CHILD_DX, y, 0]], rise)
+        top, r0 = self.pline.get_start(), _r(self.pcase)
+        self.s_anims += [VGroup(self.pcase, self.prow).animate.shift(rise),
+                         UpdateFromAlphaFunc(self.pline, lambda m, a: m.put_start_and_end_on(
+                             top, r0 + rise * smooth(a)), rate_func=linear)]
 
-    # s : the case branches into two copies, left and right, each FIRST then BURST,
-    #     lines from BURST's R to each
+    # s : the case rises to the top as it branches into two copies, left and right,
+    #     each FIRST then BURST, lines from BURST's R to each
     @subscene
     def branch_two(self):
         self._setup_branch_two()
         self.add(*self.kid_lines, *self.kids)
         self.play(*self.s_anims, run_time=1.5)
+        self.remove(VGroup(self.pcase, self.prow))
+        self.add(self.pcase, self.prow, *self.prow.letters[0])
         self.s_anims = None
 
     # t : BURST scored in both: all green on the left (the answer is BURST), --GGG on
@@ -699,28 +710,35 @@ class Scene07(WordleBoardScene):
         self.play(*[w.animate.move_to(self._under(w, k)) for w, k in zip(self.pwords, self.kids)],
                   run_time=1.2)
 
-    # v : the left case (all green) does the winning bounce
+    # v : the left case (all green) does the winning bounce as BURST under it fades
     @subscene
     def left_win(self):
         row = self.kids[0][1]
-        self.play(row.bounce_anim(0, height=_jump(row)), run_time=1.0)
+        self.play(FadeOut(self.pwords[0]), row.bounce_anim(0, height=_jump(row)),
+                  run_time=1.0)
+        self.remove(self.pwords[0])
 
     def _setup_right_branch(self):
         kid = self.kids[1]
         t = kid[0].get_center() + DOWN * CHILD_DY
         (self.gkid,), (self.gline,), self.w_anims = self._branch(kid[1], list(kid), [t])
+        # the row WORST will be typed into, where it will be once the branch lands,
+        # and WORST travelling down to sit under it as the branch comes down
+        self.grow = self._typed_row(kid[1].copy().shift(t - kid[0].get_center()))
+        w = self.pwords[1]
+        self.w_anims.append(w.animate.move_to(self._under(w, [self.grow])))
 
-    # w : the right case branches down once more: a copy, WORST typed under it,
-    #     scored all green, WORST moved under it, and the winning bounce
+    # w : the right case branches down once more, WORST (black) coming down with it;
+    #     WORST typed under the copy, scored all green, and the winning bounce as
+    #     the black WORST fades
     @subscene
     def right_branch(self):
         self._setup_right_branch()
         self.add(self.gline, self.gkid)
         self.play(*self.w_anims, run_time=1.2)
         self.w_anims = None
-        self.grow = self._typed_row(self.gkid[-1])
         self.grow.type_word(self, 0, PAIR[1], 0.65, per_letter=key_cues(self), appear=True)
         self.grow.reveal(self, 0, ALL_GREEN, 1.6)
-        w = self.pwords[1]
-        self.play(w.animate.move_to(self._under(w, [self.grow])), run_time=1.0)
-        self.play(self.grow.bounce_anim(0, height=_jump(self.grow)), run_time=1.0)
+        self.play(FadeOut(self.pwords[1]), self.grow.bounce_anim(0, height=_jump(self.grow)),
+                  run_time=1.0)
+        self.remove(self.pwords[1])
