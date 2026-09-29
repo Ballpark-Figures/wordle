@@ -33,6 +33,16 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                    words regrow to fill the column                    (07f, VO 2)
   g third_split  — THIRD typed into row 2; the same split as e, each
                    subgroup under FIRST, AFTER and a scored THIRD      (07g, VO 2)
+  h rewind       — quickly back to c's end state, d-g reversed in one play (07h, VO 3)
+  i branches     — row by row of the layout: lines from the left FIRST to
+                   that row's FIRSTs are drawn, then its groups leave off
+                   the top with their lines; the all-green group stays (07i, VO 4)
+  j all_green    — the left FIRST to the top centre, the all-green FIRST to
+                   the bottom centre, its dot growing into the word    (07j, VO 4)
+  k green_centre — the top FIRST off the top; the green FIRST (its word
+                   with it) to the centre, its line running out the top (07k, VO 4)
+  l green_win    — the bottom word fades; the green FIRST does the winning
+                   row's bounce (02's win), in place of a glow (user's call) (07l, VO 4)
 
 REUSE MAP — every element and the one source it comes from:
   board, typing, reveal   assets/board.py `get_board`, `type_word` (its
@@ -103,17 +113,6 @@ OFF_CLEAR = 0.3                    # how far past the top edge things leaving go
 GREEN_Y = -2.3                     # j: the all-green FIRST row, bottom centre
 WORD_Y = -3.4                      # j: its one word, under it
 WIN_SCALE = 0.8                    # that word's size (1 = scene 04's list size)
-GLOW_LAYERS, GLOW_BUFF, GLOW_STEP, GLOW_OPACITY = 8, 0.04, 0.05, 0.12
-
-
-def _glow(mob, color):
-    """A soft halo behind `mob`: GLOW_LAYERS rounded rectangles, each a little
-    larger and all faint, so they sum to a falloff."""
-    return VGroup(*[SurroundingRectangle(mob, buff=GLOW_BUFF + GLOW_STEP * i,
-                                         corner_radius=GLOW_BUFF + GLOW_STEP * i,
-                                         stroke_width=0, fill_color=color,
-                                         fill_opacity=GLOW_OPACITY)
-                    for i in range(GLOW_LAYERS)]).set_z_index(-1)
 
 
 def _corner():
@@ -132,6 +131,11 @@ class Scene07(WordleBoardScene):
     after_split — AFTER typed; the words split into AFTER's subgroups
     after_narrow — AFTER flips to A, T yellow; only that subgroup stays
     third_split — THIRD typed; the words split into THIRD's subgroups
+    rewind — back to FIRST and its groups
+    branches — lines to each layout row's FIRSTs, then that row leaves
+    all_green — FIRST top centre, the all-green FIRST and its word bottom centre
+    green_centre — top FIRST off; green FIRST and word to the centre
+    green_win — the word fades; the green FIRST bounces
     """
 
     def setup_scene(self):
@@ -384,27 +388,48 @@ class Scene07(WordleBoardScene):
         self.board = None
 
     def _setup_branches(self):
+        """A line from the left FIRST to every coloured FIRST, drawn one ROW OF THE
+        LAYOUT at a time (user's call): each row's lines are drawn, then that row's
+        groups leave off the top with their lines, all but the all-green group,
+        which stays with its line. A layout row is the groups whose scored rows
+        share a top edge (they are top-aligned)."""
+        Y = config.frame_y_radius
         start = self.left.get_right() + RIGHT * LINE_BUFF
         self.lines = {c: Line(start, row.get_left() + LEFT * LINE_BUFF, color=WHITE,
                               stroke_width=LINE_W).set_z_index(-1)
                       for c, (row, _) in self.units.items()}
+        shelves = {}
+        for c, (row, _) in self.units.items():
+            shelves.setdefault(round(row.get_top()[1], 3), []).append(c)
+        self.shelves = []
+        for top in sorted(shelves, reverse=True):
+            codes = shelves[top]
+            up = []
+            for c in codes:
+                if c == ALL_GREEN:
+                    continue
+                row, ms = self.units[c]
+                grp = VGroup(row, *[self.dots[m] for m in ms], self.lines[c])
+                up.append((grp, UP * (Y + OFF_CLEAR - grp.get_bottom()[1])))
+            self.shelves.append(([self.lines[c] for c in codes], up))
+        self.units = {ALL_GREEN: self.units[ALL_GREEN]}
+        self.lines = {ALL_GREEN: self.lines[ALL_GREEN]}
 
-    # i : a line from the left FIRST to every coloured FIRST, one after another
+    # i : row by row of the layout: the lines to that row's FIRSTs are drawn, then
+    #     its groups leave off the top with their lines; the all-green one stays
     @subscene
     def branches(self):
         self._setup_branches()
-        self.play(LaggedStart(*[Create(l) for l in self.lines.values()], lag_ratio=0.02),
-                  run_time=2.0)
+        for lines, up in self.shelves:
+            self.play(LaggedStart(*[Create(l) for l in lines], lag_ratio=0.1), run_time=0.6)
+            if up:
+                self.play(*[grp.animate.shift(v) for grp, v in up], run_time=0.6)
+                self.remove(*[grp for grp, _ in up])
+        self.shelves = None
 
     def _setup_all_green(self):
-        X, Y = config.frame_x_radius, config.frame_y_radius
         self.g_row, members = self.units.pop(ALL_GREEN)
         (win,) = members
-        # everything else goes off the top, each group with its line
-        self.g_up = []
-        for c, (row, ms) in self.units.items():
-            grp = VGroup(row, *[self.dots[m] for m in ms], self.lines.pop(c))
-            self.g_up.append((grp, UP * (Y + OFF_CLEAR - grp.get_bottom()[1])))
         self.left.generate_target()
         self.left.target.move_to([0, GUESS_Y, 0])
         self.g_row.generate_target()
@@ -424,48 +449,49 @@ class Scene07(WordleBoardScene):
                                color=WHITE, stroke_width=LINE_W).set_z_index(-1)
         self.units = self.dots = self.lines = None
 
-    # j : all but the all-green group off the top; the left FIRST to the top centre,
-    #     the all-green FIRST to the bottom centre, its dot turning into the word
+    # j : the left FIRST to the top centre, the all-green FIRST to the bottom centre,
+    #     its dot turning into the word (the other groups left during i)
     @subscene
     def all_green(self):
         self._setup_all_green()
         self.add(self.g_word)
-        self.play(*[grp.animate.shift(v) for grp, v in self.g_up],
-                  MoveToTarget(self.left), MoveToTarget(self.g_row),
+        self.play(MoveToTarget(self.left), MoveToTarget(self.g_row),
                   MoveToTarget(self.g_word),
                   self.g_dot.animate.move_to(self.g_word.target).set_opacity(0),
                   Transform(self.g_line, self.g_line_new),
                   run_time=2.0)
-        self.remove(*[grp for grp, _ in self.g_up], self.g_dot)
-        self.g_up = self.g_dot = self.g_line_new = None
+        self.remove(self.g_dot)
+        self.g_dot = self.g_line_new = None
 
     def _setup_green_centre(self):
         Y = config.frame_y_radius
         self.k_up = UP * (Y + OFF_CLEAR - self.left.get_bottom()[1])
-        self.g_row.generate_target()
-        self.g_row.target.move_to(ORIGIN)
-        # the line now runs out of the top of the frame, to the parent that has gone
-        self.k_line = Line(self.g_row.target.get_top() + UP * LINE_BUFF, [0, Y + OFF_CLEAR, 0],
+        # the green FIRST to the centre, its word under it moving with it
+        self.k_shift = ORIGIN - self.g_row.get_center()
+        # the line now runs out of the top of the frame, to the parent that has gone;
+        # built top to bottom like the line it replaces, or the Transform turns it over
+        self.k_line = Line([0, Y + OFF_CLEAR, 0],
+                           self.g_row.get_top() + self.k_shift + UP * LINE_BUFF,
                            color=WHITE, stroke_width=LINE_W).set_z_index(-1)
 
-    # k : the original FIRST off the top; the green FIRST to the centre, a line
-    #     running out of the top of it
+    # k : the original FIRST off the top; the green FIRST to the centre with its word
+    #     under it, a line running out of the top of it
     @subscene
     def green_centre(self):
         self._setup_green_centre()
-        self.play(self.left.animate.shift(self.k_up), MoveToTarget(self.g_row),
+        self.play(self.left.animate.shift(self.k_up),
+                  self.g_row.animate.shift(self.k_shift),
+                  self.g_word.animate.shift(self.k_shift),
                   Transform(self.g_line, self.k_line), run_time=1.5)
         self.remove(self.left)
-        self.left = self.k_line = self.k_up = None
+        self.left = self.k_line = self.k_up = self.k_shift = None
 
-    def _setup_glow(self):
-        self.glow = _glow(self.g_row, TILE_STATE[2])
-
-    # l : the FIRST at the bottom vanishes; the green FIRST glows
+    # l : the FIRST at the bottom vanishes; the green FIRST gets the winning row's
+    #     bounce (02's and 97's emphasis for a win, in place of the script's glow —
+    #     user's call to swap)
     @subscene
-    def green_glow(self):
-        self._setup_glow()
+    def green_win(self):
         self.play(FadeOut(self.g_word), run_time=0.5)
         self.remove(self.g_word)
         self.g_word = None
-        self.play(FadeIn(self.glow), run_time=1.0)
+        self.g_row.bounce(self, 0, 1.0)
