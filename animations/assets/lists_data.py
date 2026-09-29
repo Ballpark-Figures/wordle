@@ -75,8 +75,11 @@ EDGE_MAX = 9                      # largest group hung off an edge
 COLUMN = 12                       # answers in the on-screen column (scene N_ROWS)
 FULL_GUESSES = ["group", "trace", "roate", "arise", "aurei",   # guesses whose EVERY group is cached (06b/c's dots)
                 "first"]                                       # 07c, the script's own choice
-SUBGROUPS = [("first", 0, "after"),               # 07e: FIRST's all-gray group split by AFTER
-             ("first", 0, "after", 0, "third")]   # 07g: then THIRD (the script's words)
+# 07e: FIRST's yellow-T group (code 1) split by AFTER; 07g: AFTER's largest subgroup
+# there, A and T yellow (code 90), split by THIRD. The words are the script's; the
+# groups the user's call (2026-09-29) — AFTER can never be all gray once T is known.
+SUBGROUPS = [("first", 1, "after"),
+             ("first", 1, "after", 90, "third")]
 
 
 def _read(name):
