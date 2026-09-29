@@ -1,12 +1,15 @@
-"""Fetch + pre-process channel avatars for the mock YouTube UI, into committed PNGs
-beside this file (<key>_avatar.png), circle-cropped so manim's ImageMobject shows
-them directly. Run with the RENDER venv (it ships Pillow):
+"""Fetch + pre-process images for the mock YouTube UI, into committed PNGs beside
+this file: for each VIDEOS entry its rounded thumbnail (<key>_thumb.png) and its
+channel's avatar (<key>_avatar.png); for each CHANNELS entry just the avatar. Masked
+so manim's ImageMobject shows them directly (rounded corners / circle crop). Run with
+the RENDER venv (it ships Pillow):
 
     .venv/bin/python animations/assets/youtube_media/fetch.py
 
 The avatar URL comes from the YouTube Data API (`channels.list` by handle),
-authenticated with the `YOUTUBE_API_KEY` in `analytics/.env` — the same route as
-hangman's youtube_media/fetch.py. Refresh rarely; an avatar changes seldom.
+`videos.list` for thumbnails, authenticated with the `YOUTUBE_API_KEY` in
+`analytics/.env` — the same route as hangman's youtube_media/fetch.py. Refresh
+rarely. Keep VIDEOS in step with assets/youtube_data.VIDEOS.
 """
 import io
 import json
@@ -19,6 +22,7 @@ from PIL import Image, ImageDraw, ImageOps
 OUT = Path(__file__).resolve().parent
 _ENV = Path(__file__).resolve().parents[4] / "analytics" / ".env"
 CHANNELS = {"bpk": "@BPKFigures"}   # key -> channel handle
+VIDEOS = {"hangman": "ApdLgfgfh5o"}  # key -> video id (Ballpark Figures, "I Tried to Solve Hangman")
 
 
 def _api_key():
@@ -49,6 +53,19 @@ def _best(thumbnails):
     raise RuntimeError("no thumbnail sizes returned")
 
 
+def _rounded(img, frac=0.045):
+    w, h = img.size
+    mask = Image.new("L", (w, h), 0)
+    ImageDraw.Draw(mask).rounded_rectangle(
+        [0, 0, w - 1, h - 1], radius=int(min(w, h) * frac), fill=255)
+    img.putalpha(mask)
+    return img
+
+
+def _open(data):
+    return Image.open(io.BytesIO(data)).convert("RGBA")
+
+
 def _circle(img):
     img = ImageOps.fit(img, (min(img.size),) * 2)     # center-crop to square
     s = img.size[0]
@@ -64,6 +81,14 @@ if __name__ == "__main__":
         if not items:
             raise RuntimeError(f"no channel found for handle {handle!r}")
         chan = items[0]["snippet"]
-        avatar = _circle(Image.open(io.BytesIO(_get(_best(chan["thumbnails"])))).convert("RGBA"))
+        avatar = _circle(_open(_get(_best(chan["thumbnails"]))))
         avatar.save(OUT / f"{key}_avatar.png")
         print(f"{key}: {chan['title']!r} -> {key}_avatar.png {avatar.size}")
+    for key, vid in VIDEOS.items():
+        v = _api("videos", part="snippet", id=vid)["items"][0]["snippet"]
+        chan = _api("channels", part="snippet", id=v["channelId"])["items"][0]["snippet"]
+        thumb = _rounded(_open(_get(_best(v["thumbnails"]))))
+        thumb.save(OUT / f"{key}_thumb.png")
+        avatar = _circle(_open(_get(_best(chan["thumbnails"]))))
+        avatar.save(OUT / f"{key}_avatar.png")
+        print(f"{key}: {v['title']!r} -> {key}_thumb.png {thumb.size}, {key}_avatar.png {avatar.size}")
