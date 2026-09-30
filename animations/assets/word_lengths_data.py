@@ -29,6 +29,10 @@ Provenance for everything it writes:
                  those screened. The build asserts the file is in descending
                  `singles` order and that each triple has each vowel exactly once,
                  so its six vowel tiles are exactly the six on the board.
+  lengths      — 10i's table rows, "3 to max that we have": every L with a
+                 math/data/shared/optlen<L>/ result directory (the hello-wordl length
+                 sweeps), plus 5, which is the NYT problem above rather than hello's.
+                 Asserted contiguous from 3.
 """
 import csv
 import gzip
@@ -51,6 +55,16 @@ TILE = {"b": 0, "y": 1, "g": 2}
 TRIPLES = os.path.join(MATH, "data", "shared", "singletons", "triple_singletons.csv")
 VOWELS = "aeiouy"
 N_TRIPLES = 3
+
+
+def _lengths():
+    shared = os.path.join(MATH, "data", "shared")
+    have = {int(d[len("optlen"):]) for d in os.listdir(shared)
+            if d.startswith("optlen") and d[len("optlen"):].isdigit()}
+    have.add(5)
+    out = list(range(3, max(have) + 1))
+    assert set(out) == have, f"lengths with results are not contiguous from 3: {have}"
+    return out
 
 
 def _vowel_triples():
@@ -108,7 +122,8 @@ def _build():
 
     return {"opener": OPENER, "total": total, "answers": N_ANSWERS,
             "distribution": {str(n): c for n, c in counts.items()},
-            "games": games, "vowel_triples": _vowel_triples()}
+            "games": games, "vowel_triples": _vowel_triples(),
+            "lengths": _lengths()}
 
 
 def load():

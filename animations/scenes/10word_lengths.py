@@ -26,6 +26,11 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   g audio        — AUDIO in the first word, E in the middle of the second
                    (the script says U; the user's correction)                (VO 3)
   h crypt        — CRYPT in the third word                                   (VO 3)
+  i table        — the boxes fade out; a table comes in: Word Length / Best
+                   Opener / Average Guesses, one row per length, 3 to 11 (the
+                   longest with results) — only the lengths filled          (VO 4)
+  j salet_row    — SALET typed into length 5's row as tiles, then 3.42       (VO 4)
+  (VO 5 has no subscene in the script yet.)
   EVERY LETTER CHANGE IS A FLIP (the user's): a tile turns over and shows its new
   letter, or none — nothing slides or morphs. Only tiles that change flip, left to
   right, top to bottom. Every tile has the same border.
@@ -56,6 +61,12 @@ NUMBERS — all SOURCED, from assets/word_lengths_data.py -> word_lengths_cache.
 ON-SCREEN TEXT beyond column 2 (the user's call): the "GUESS DISTRIBUTION" title,
 in the real Wordle stats screen's capitals.
 
+THE TABLE MIXES WORD LISTS, as the script asks: length 5 is SALET on the NYT lists
+(the rest of this video's problem); every other length is hello wordl's lists
+(math/data/shared/LENGTHS.md), a different curation. Its averages are also optima
+under different depth caps, per length. The table rows are
+word_lengths_data's `lengths` (every length with a result directory).
+
 LAYOUT (the user's): the chart follows Wordle's stats screen — title flush left with
 the row numbers, row numbers and counts one size, bars close together. Both boards
 start a little right of bar 4's end: THIRD's above bar 3, WHEEL's below it. Boards
@@ -70,7 +81,8 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 
 from config import *
 from bpkfigures.bar_graph import get_bar_chart, grow_bars
-from assets.board import get_scored_row, GAP, TileFlip
+from assets.board import get_board, get_scored_row, GAP, TileFlip
+from assets.keys import key_cues
 from assets.background import bg_to
 from assets import word_lengths_data
 
@@ -133,6 +145,29 @@ BOARD_H = {**_word_at("audio", 0), (1, 2): "e", **_word_at(CRYPT, 2)}
 for _b in [BOARD_D] + BOARDS_E + [BOARD_F, BOARD_G, BOARD_H]:
     assert set(VOWELS) <= set(_b.values()), _b
 
+# ── i-j: the word-length table ────────────────────────────────────────────────
+LENGTHS = DATA["lengths"]                 # 3 .. the longest length with results
+HEADERS = ["Word Length", "Best Opener", "Average Guesses"]
+HEADER_Y = 3.4                            # header row's centre
+ROW_Y0 = 2.55                             # first data row's centre
+ROW_DY = 0.72
+LEN_X = -5.6                              # Word Length column's centre
+OPENER_X = -3.9                           # Best Opener column's LEFT edge (tiles
+                                          # left-aligned, so every word starts there)
+AVG_X = 5.3                               # Average Guesses column's centre
+TABLE_TILE_SCALE = 0.6                    # opener tiles vs a full board tile
+HEADER_SIZE = 28
+CELL_SIZE = 30
+
+
+def _row_y(L):
+    return ROW_Y0 - LENGTHS.index(L) * ROW_DY
+
+
+def _avg(total, answers):
+    """An average guess count as shown in the table: 2 dp, the VO's "3.18"."""
+    return f"{total / answers:.2f}"
+
 
 class Scene10(WordleDarkScene):
     """BEAT MAP
@@ -145,6 +180,8 @@ class Scene10(WordleDarkScene):
     adieu — flips to ADIEU / O mid row 2 / Y end of row 3
     audio — flips to AUDIO / E mid row 2
     crypt — flips to CRYPT in row 3
+    table — boxes out; the word-length table in, lengths only
+    salet_row — SALET typed in as tiles, 3.42 beside it
     """
 
     def setup_scene(self):
@@ -310,3 +347,38 @@ class Scene10(WordleDarkScene):
     @subscene
     def crypt(self):
         self._flip_to(BOARD_H, 1.2)
+
+    # i : the boxes fade out; the table comes in — headers, then a row per length
+    def _setup_table(self):
+        cell = lambda t, size, **kw: crisp_text(t, font_size=size, color=WHITE, **kw)
+        heads = [cell(h, HEADER_SIZE, weight=BOLD) for h in HEADERS]
+        heads[0].move_to([LEN_X, HEADER_Y, 0])
+        heads[1].move_to([0, HEADER_Y, 0]).align_to(np.array([OPENER_X, 0, 0]), LEFT)
+        heads[2].move_to([AVG_X, HEADER_Y, 0])
+        self.table_head = VGroup(*heads)
+        self.table_rows = VGroup(*[cell(str(L), CELL_SIZE).move_to([LEN_X, _row_y(L), 0])
+                                   for L in LENGTHS])
+
+    @subscene
+    def table(self):
+        self._setup_table()
+        self.play(FadeOut(*self.mobjects), run_time=0.8)
+        self.upper = self.board_wheel = self.shown = self.board = None
+        self.play(FadeIn(self.table_head), run_time=0.5)
+        self.play(LaggedStart(*[FadeIn(r, shift=UP * 0.3) for r in self.table_rows],
+                              lag_ratio=0.12), run_time=1.2)
+
+    # j : SALET typed into its row's boxes, then its average
+    def _setup_salet_row(self):
+        self.row5 = get_board(rows=1, cols=5).scale(TABLE_TILE_SCALE)
+        self.row5.move_to([0, _row_y(5), 0]).align_to(np.array([OPENER_X, 0, 0]), LEFT)
+        self.avg5 = crisp_text(_avg(DATA["total"], DATA["answers"]),
+                               font_size=CELL_SIZE, color=WHITE)
+        self.avg5.move_to([AVG_X, _row_y(5), 0])
+
+    @subscene
+    def salet_row(self):
+        self._setup_salet_row()
+        self.row5.type_word(self, 0, DATA["opener"], 0.65, per_letter=key_cues(self),
+                            appear=True)
+        self.play(FadeIn(self.avg5), run_time=0.5)
