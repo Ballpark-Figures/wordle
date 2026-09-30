@@ -154,10 +154,11 @@
     },
     "4": {
       "opener": "tale",
-      "total": null,
+      "total": 9825,
       "answers": 2347,
-      "depth": 19,
-      "source": "optlen4/trees_d19/tale.txt.gz"
+      "depth": 10,
+      "deepest": 7,
+      "source": "optlen4/k200/trees_d10/tale.txt.gz"
     },
     "5": {
       "opener": "salet",
@@ -270,6 +271,41 @@
       ],
       "source": "optlen3/k300/trees_d12/ras.txt.gz"
     },
-    "4": null
+    "4": {
+      "answer": "sinh",
+      "guesses": [
+        {
+          "word": "tale",
+          "code": 0,
+          "tiles": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "word": "dorp",
+          "code": 0,
+          "tiles": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "word": "sinh",
+          "code": 80,
+          "tiles": [
+            2,
+            2,
+            2,
+            2
+          ]
+        }
+      ],
+      "source": "optlen4/k200/trees_d10/tale.txt.gz"
+    }
   }
 }

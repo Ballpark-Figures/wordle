@@ -42,9 +42,9 @@ Provenance for everything it writes:
                    3   best of the --topk beams (k100-300 agree), depth 12 — an UPPER
                        BOUND, from a restricted search
                    4   TALE, the winner of an exact search that examined only 4 of
-                       4030 openers (at depth 6); its TOTAL from its own tree solved
-                       at the solver's largest cap, 19 (the user's call: no depth
-                       restriction). BLANK until solver/run-length-tree.sh has run
+                       4030 openers (at depth 6); its TOTAL from its own tree --
+                       for now the --topk 200 beam's (cap 10, deepest line 7), an
+                       UPPER BOUND, until the exact uncapped tree replaces it
                    5   SALET on the NYT lists (the rest of this module), depth 6
                    6   best of the first 819 of 15787 openers, depth 5 — PROVISIONAL
                        (LENGTHS.md); the 7-11 rule would pick DISTAL at depth 4
@@ -84,9 +84,12 @@ N_TRIPLES = 3
 TABLE_SOURCES = {
     3: ("optlen3/k300/opener_totals_d12_ssq.csv", "total"),
     # 4: TALE (the exact search's winner over the 4 openers it examined), its total
-    #    from its OWN tree solved at the solver's largest cap, 19 -- the user wants
-    #    no depth restriction here, and the row must be the corner path's strategy
-    4: ("optlen4/trees_d19/tale.txt.gz", "tree"),
+    #    from its OWN tree, so the row is the corner path's strategy. For now that
+    #    is the --topk 200 beam's tree (cap 10, deepest line 7, so the cap did not
+    #    bind; a beam, so an UPPER BOUND -- k300 gives the same 9825). The user's
+    #    call, "until we make the fix": the exact uncapped tree
+    #    (run-length-tree.sh --depth max -> optlen4/trees_d19/) replaces it here.
+    4: ("optlen4/k200/trees_d10/tale.txt.gz", "tree"),
     6: ("optlen6/opener_totals_d5_ssq.csv", "total"),
     7: ("optlen7/opener_totals_escalating_lb.csv", "depth"),
     8: ("optlen8/opener_totals_escalating_lb.csv", "depth"),
@@ -134,11 +137,11 @@ def _table(opener_total):
 # length -> that row's tree (under math/data/shared), for 10t / 10v's all-grey path.
 # Each must be the tree OF THE TABLE'S ROW: same opener, and its lines' costs must
 # sum to the row's total (asserted). Length 4's comes from solver/run-length-tree.sh
-# (the exact solver, TALE, --depth max = 19); until that run exists the path is a
-# STUB (None), and so is the row's average.
+# (for now the k200 beam's tree; see TABLE_SOURCES). A missing tree is a STUB
+# (None), and so is its row's average.
 GREY_TREES = {
     3: "optlen3/k300/trees_d12/ras.txt.gz",
-    4: "optlen4/trees_d19/tale.txt.gz",
+    4: "optlen4/k200/trees_d10/tale.txt.gz",
 }
 
 
