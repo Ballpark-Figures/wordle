@@ -129,6 +129,7 @@ TITLE_SIZE = 28
 BOARD_SCALE = 0.7
 BOARD_GAP_X = 0.8            # boards start this far right of bar 4's end
 BOARD_GAP_Y = 0.4            # THIRD this far above bar 3, WHEEL this far below
+BOARD_Z = 4                  # d: the WHEEL board's tiles in front of the chart
 
 # ── d-h: what each of the three rows' tiles shows, {(row, position): letter} ──
 # Every change of letter is a FLIP (board.TileFlip's swap_to): the tile turns over
@@ -295,6 +296,14 @@ class Scene10(WordleDarkScene):
                           [c.labels, c.values, c.title]
         self.upper = VGroup(*self.board_wheel[:-1])      # SALET, BEVOR, CHIMP
         self.wheel_row = self.board_wheel[-1]
+        # IN FRONT of everything it passes over on its way to the middle (the
+        # chart's counts sit at z 1): tiles above that, letters above the tiles
+        for row in self.board_wheel:
+            for tile in row.tiles[0]:
+                tile.set_z_index(BOARD_Z)
+            for letter in row.letters[0]:
+                if letter is not None:
+                    letter.set_z_index(BOARD_Z + 1)
         # full tile size, with the three rows that stay centred in the frame
         self.k = 1 / BOARD_SCALE
         self.pivot = self.board_wheel.get_center()
@@ -312,7 +321,7 @@ class Scene10(WordleDarkScene):
     def _new_letter(self, r, i, ch, tile):
         """A letter for tile (r, i), built on `tile`'s pose, hidden until its flip."""
         letter = self.upper[r]._letter(ch, tile)
-        letter.set_opacity(0)
+        letter.set_opacity(0).set_z_index(BOARD_Z + 1)
         self.upper[r].add(letter)
         self.add(letter)
         return letter
