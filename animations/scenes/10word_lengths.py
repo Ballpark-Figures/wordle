@@ -32,11 +32,16 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   j salet_row    — SALET typed into length 5's row as tiles, then 3.42       (VO 4)
   k avg_6 / l opener_6 / m avg_7 / n opener_7 — one cell each               (VO 5)
   o both_8 / p both_9 / q both_10 / r both_11 — average, then opener        (VO 5)
-  s avg_4 / t opener_4 — t then plays TALE's all-grey path (its tree's longest
-                   all-grey line, to the answer) in the top-right corner at the
-                   table's tile size, each row typed then quick-flipped     (VO 6)
-  u avg_3 / v opener_3 — u fades 4's path as 3's average comes in; v plays
-                   RAS's path the same way                                  (VO 7)
+  s avg_4 / t opener_4                                                        (VO 6)
+  u path_4       — TALE's all-grey path (its tree's longest all-grey line, to
+                   the answer) played out in the top-right corner at the
+                   table's tile size, each row typed then quick-flipped.
+                   NOT A SCRIPT BEAT YET (the user's): the Doc needs a matching
+                   beat after 10t, or every letter from here on is one off   (VO 6)
+  v avg_3        — 3's average comes in as 4's path fades                  (VO 7)
+  w opener_3                                                                  (VO 7)
+  x path_3       — RAS's all-grey path, the same way. Also not a script beat
+                   yet: needs one after the opener_3 beat                    (VO 7)
   j and o-r fill a whole row the same way: average, then opener.
   An average fades in; an opener is TYPED in as tiles, as SALET is, its letters
   coloured vowel red / consonant blue (hangman's rule, Y a vowel — the user's).
@@ -212,7 +217,10 @@ class Scene10(WordleDarkScene):
     salet_row — SALET typed in as tiles, 3.42 beside it
     avg_6, opener_6, avg_7, opener_7 — one cell each
     both_8, both_9, both_10, both_11 — average then opener
-    avg_4, opener_4, avg_3, opener_3 — one cell each
+    avg_4, opener_4 — one cell each
+    path_4 — TALE's all-grey path played out in the corner
+    avg_3, opener_3 — one cell each (4's path fades with the average)
+    path_3 — RAS's all-grey path played out in the corner
     """
 
     def setup_scene(self):
@@ -495,24 +503,31 @@ class Scene10(WordleDarkScene):
     def avg_4(self):
         self._fill_avg(4, 0.5)
 
-    # t : length 4's opener, then its tree's all-grey path played out in the
-    #     top-right corner
+    # t : length 4's opener
     @subscene
     def opener_4(self):
         self._fill_opener(4, 0.52)
+
+    # u : length 4's tree's all-grey path played out in the top-right corner
+    @subscene
+    def path_4(self):
         self.path4 = self._setup_corner(4)
         if self.path4 is not None:          # a stub if the TALE tree is missing
             self._play_corner(self.path4, 4, 0.52, 0.4)
 
-    # u : length 3's average, as length 4's path fades from the corner
+    # v : length 3's average, as length 4's path fades from the corner
     @subscene
     def avg_3(self):
         out = [] if self.path4 is None else [FadeOut(self.path4)]
         self._fill_avg(3, 0.5, extra=out)
         self.path4 = None
 
-    # v : length 3's opener, then its tree's all-grey path replacing 4's in the corner
+    # w : length 3's opener
     @subscene
     def opener_3(self):
         self._fill_opener(3, 0.39)
+
+    # x : length 3's tree's all-grey path played out in the corner
+    @subscene
+    def path_3(self):
         self._play_corner(self._setup_corner(3), 3, 0.39, 0.4)
