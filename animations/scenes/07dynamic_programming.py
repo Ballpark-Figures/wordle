@@ -209,7 +209,7 @@ AVG_NUM_BUFF = 0.3                 # between "Guesses" and the number
 AVG_BUFF = 0.35                    # from the frame's top-right corner
 AVG_GREEN = TILE_CORRECT           # an optimal tree's number (the others' are white):
                                    #   the tiles' green, as the winning rows
-FULL_ROOT_W = 3.0                  # zc: SALET's width; every node's goes as sqrt(answers)
+FULL_ROOT_W = 4.2                  # zc: SALET's width; every node's goes as sqrt(answers)
 FULL_R = 4.25                      # zc: (vertical) distance of a one-answer node from the
                                    #   centre; a node of n answers sits at
                                    #   FULL_R * log(N / n) / log(N) -- the bigger the group,
