@@ -209,11 +209,14 @@ AVG_NUM_BUFF = 0.3                 # between "Guesses" and the number
 AVG_BUFF = 0.35                    # from the frame's top-right corner
 AVG_GREEN = TILE_CORRECT           # an optimal tree's number (the others' are white):
                                    #   the tiles' green, as the winning rows
-FULL_ROOT_W = 1.6                  # zc: SALET's width; every node's goes as sqrt(answers)
-FULL_RADII = {1: 1.1, 2: 2.1, 3: 3.1, 4: 3.9, 5: 4.35}   # zc: each level's (vertical) radius
+FULL_ROOT_W = 3.0                  # zc: SALET's width; every node's goes as sqrt(answers)
+FULL_R = 4.25                      # zc: (vertical) distance of a one-answer node from the
+                                   #   centre; a node of n answers sits at
+                                   #   FULL_R * log(N / n) / log(N) -- the bigger the group,
+                                   #   the nearer the middle (user's call), not level rings
 FULL_X_STRETCH = 1.75              # zc: the ellipses' width / height (the frame's shape)
 FULL_START = math.pi / 2           # zc: where the first branch sits (straight up)
-FULL_LINE_W, FULL_LINE_OPACITY = 0.5, 0.35   # zc: the branch lines
+FULL_LINE_W, FULL_LINE_OPACITY = 0.4, 0.2    # zc: the branch lines
 FULL_LETTER_W = 0.35               # zc: rows narrower than this get no letters
 THUMB_CASE = 0.3                   # y: the group waiting in a corner
 THUMB_TREE = 0.2                   # z: the finished tree waiting in a corner, small
@@ -1328,9 +1331,11 @@ class Scene07(WordleBoardScene):
     # SALET (the optimal opener) in black at the centre; around it every colouring
     # of SALET with the optimal next guess under it in black; around those the next
     # colourings and guesses, out to the wins. Each node's width goes as the SQUARE
-    # ROOT of the answers in its group (user's spec). Levels on concentric ellipses
-    # (the frame is wider than tall); each node at the middle of an angle
-    # proportional to its answers. A still to experiment on: no animation yet.
+    # ROOT of the answers in its group (user's spec). No level rings: a node's
+    # distance from the centre falls with its group's size (log scale), so big groups
+    # sit near the middle and the wins at the edge, on ellipses (the frame is wider
+    # than tall); each node at the middle of an angle proportional to its answers.
+    # A still to experiment on: no animation yet.
     def _full_row(self, word, code, width, centre):
         """A row `width` wide at `centre`: `word` scored as `code`, or typed (black)
         when `code` is None. Real letters only when wide enough to read; below
@@ -1363,7 +1368,7 @@ class Scene07(WordleBoardScene):
                 n = len(kid["answers"])
                 span = (a1 - a0) * n / sum(len(k["answers"]) for k in node["kids"])
                 mid = a + span / 2
-                r = FULL_RADII[depth]
+                r = FULL_R * math.log(total / n) / math.log(total)
                 c = np.array([r * FULL_X_STRETCH * math.cos(mid), r * math.sin(mid), 0.0])
                 w = k_w * math.sqrt(n)
                 if kid["node"] is None:                       # a win: the green row
