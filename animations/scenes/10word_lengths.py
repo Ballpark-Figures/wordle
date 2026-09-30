@@ -14,21 +14,21 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                    BEVOR, CHIMP, WHEEL fades in below bar 3                  (VO 1)
   d wheel_center — ONE play: bar 4 greys as the chart and the THIRD board fade,
                    the background turns navy, and the WHEEL board grows to the
-                   middle with its WHEEL row fading, every tile going black,
-                   every letter fading but the A (SALET), E V O (BEVOR), I
-                   (CHIMP) and T, and T becoming Y, V becoming U (the user's) (VO 1)
-  e triple_vowels — the six vowels move, one play each, through where the three
-                   best all-six-vowel triples in the singletons ranking put
-                   them: CURSE PAINT GODLY, CURSE POINT BADLY, BIONT CARSE
+                   middle with its WHEEL row fading while every other tile
+                   FLIPS to black, keeping only the A (SALET), E O (BEVOR) and
+                   I (CHIMP), the T flipping to Y and the V to U (the user's) (VO 1)
+  e triple_vowels — the tiles flip, one play each, through where the three best
+                   all-six-vowel triples in the singletons ranking put the
+                   vowels: CURSE PAINT GODLY, CURSE POINT BADLY, BIONT CARSE
                    DUPLY                                                     (VO 2)
-  f adieu        — A I E U into ADIEU's positions in the first word as its D
-                   lands, O to the middle of the second, Y to the end of the
-                   third                                                     (VO 3)
-  g audio        — A U D I O into AUDIO's positions, E to the middle of the
-                   second word (the script says U; the user's correction)    (VO 3)
-  h crypt        — Y into the middle of the third word as C R P T land
-                   around it, spelling CRYPT                                 (VO 3)
-  Letters move in ONE play per arrangement; every tile has the same border.
+  f adieu        — ADIEU in the first word, O in the middle of the second, Y at
+                   the end of the third                                      (VO 3)
+  g audio        — AUDIO in the first word, E in the middle of the second
+                   (the script says U; the user's correction)                (VO 3)
+  h crypt        — CRYPT in the third word                                   (VO 3)
+  EVERY LETTER CHANGE IS A FLIP (the user's): a tile turns over and shows its new
+  letter, or none — nothing slides or morphs. Only tiles that change flip, left to
+  right, top to bottom. Every tile has the same border.
 
 REUSE MAP — every element and the one source it comes from:
   chart          bpkfigures.bar_graph.get_bar_chart(orientation="horizontal",
@@ -40,6 +40,8 @@ REUSE MAP — every element and the one source it comes from:
   boards         assets/board.py get_scored_row, one per guess, stacked at the
                  board's own GAP and scaled down
   background     assets/background.py bg_to (promoted from scene 01's _bg_to)
+  letter flips   assets/board.py TileFlip, with the swap_to / to_center / to_scale
+                 options added for this scene (off by default)
 
 NUMBERS — all SOURCED, from assets/word_lengths_data.py -> word_lengths_cache.json:
   counts per row   SALET's committed optimal tree (constrained to 6 guesses),
@@ -68,7 +70,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 
 from config import *
 from bpkfigures.bar_graph import get_bar_chart, grow_bars
-from assets.board import get_scored_row, GAP, TilePop
+from assets.board import get_scored_row, GAP, TileFlip
 from assets.background import bg_to
 from assets import word_lengths_data
 
@@ -93,47 +95,43 @@ BOARD_SCALE = 0.7
 BOARD_GAP_X = 0.8            # boards start this far right of bar 4's end
 BOARD_GAP_Y = 0.4            # THIRD this far above bar 3, WHEEL this far below
 
-# ── d: WHEEL's board, down to its vowels ──────────────────────────────────────
-# (row, position) of each letter that stays, in SALET / BEVOR / CHIMP: the A; the
-# E, V, O; the I — and the T. T and V then become Y and U (the user's call), so
-# the three rows hold all six vowels, spread across the three guesses.
-KEEP = {0: {1, 4}, 1: {1, 2, 3}, 2: {2}}
-MORPH = {(0, 4): "y", (1, 2): "u"}
+# ── d-h: what each of the three rows' tiles shows, {(row, position): letter} ──
+# Every change of letter is a FLIP (board.TileFlip's swap_to): the tile turns over
+# and shows its new letter, or none, on the new face.
+VOWELS = "aeiouy"                # Y a vowel, the video's convention
 _ROWS = [g["word"] for g in DATA["games"]["wheel"]["guesses"][:3]]
 assert _ROWS == ["salet", "bevor", "chimp"], _ROWS
-assert [_ROWS[r][i] for (r, i) in MORPH] == ["t", "v"]
-
-# ── e-h: where the six vowels go, (row, position) per vowel ───────────────────
-VOWELS = "aeiouy"                # Y a vowel, the video's convention
 
 
 def _vowels_in(word, row):
-    return {c: (row, i) for i, c in enumerate(word) if c in VOWELS}
+    return {(row, i): c for i, c in enumerate(word) if c in VOWELS}
 
 
+def _word_at(word, row):
+    return {(row, i): c for i, c in enumerate(word)}
+
+
+# d: SALET / BEVOR / CHIMP down to their vowels — the A; the E, O; the I — with the
+#    T and the V flipping to Y and U (the user's call), so the three rows hold all
+#    six vowels, spread across the three guesses
+BOARD_D = {(0, 1): "a", (0, 4): "y", (1, 1): "e", (1, 2): "u", (1, 3): "o",
+           (2, 2): "i"}
+assert [_ROWS[0][4], _ROWS[1][2]] == ["t", "v"]
+assert all(_ROWS[r][i] == c for (r, i), c in BOARD_D.items() if c not in "yu")
 # e: the best all-six-vowel triples in the singletons ranking (sourced), in rank
-#    order — the vowels rearrange through each in turn
+#    order — the vowels flip through each in turn
 TRIPLES = [t["words"] for t in DATA["vowel_triples"]]
-LAYOUT_TRIPLES = []
-for _t in TRIPLES:
-    _l = {}
-    for _r, _w in enumerate(_t):
-        _l.update(_vowels_in(_w, _r))
-    LAYOUT_TRIPLES.append(_l)
-# f: ADIEU in the first word (its D lands as the vowels move), O mid second word,
-#    Y ending the third (Script.md 10f)
-LAYOUT_ADIEU = {**_vowels_in("adieu", 0), "d": (0, "adieu".index("d")),
-                "o": (1, 2), "y": (2, 4)}
-# g: AUDIO, its D moving over with it; E mid second word (the user's correction of
-#    the script's "U")
-LAYOUT_AUDIO = {**_vowels_in("audio", 0), "d": (0, "audio".index("d")),
-                "e": (1, 2), "y": (2, 4)}
-# h: Y mid third word, the rest spelling CRYPT
+BOARDS_E = [{k: v for r, w in enumerate(t) for k, v in _vowels_in(w, r).items()}
+            for t in TRIPLES]
+# f: ADIEU in the first word, O mid second word, Y ending the third (Script.md 10f)
+BOARD_F = {**_word_at("adieu", 0), (1, 2): "o", (2, 4): "y"}
+# g: AUDIO, E mid second word (the user's correction of the script's "U")
+BOARD_G = {**_word_at("audio", 0), (1, 2): "e", (2, 4): "y"}
+# h: AUDIO / E / CRYPT
 CRYPT = "crypt"
-LAYOUT_CRYPT = {**LAYOUT_AUDIO, "y": (2, CRYPT.index("y"))}
-for _l in LAYOUT_TRIPLES + [LAYOUT_ADIEU, LAYOUT_AUDIO, LAYOUT_CRYPT]:
-    assert set(VOWELS) <= set(_l) <= set(VOWELS + "d"), _l
-    assert len(set(_l.values())) == len(_l), _l
+BOARD_H = {**_word_at("audio", 0), (1, 2): "e", **_word_at(CRYPT, 2)}
+for _b in [BOARD_D] + BOARDS_E + [BOARD_F, BOARD_G, BOARD_H]:
+    assert set(VOWELS) <= set(_b.values()), _b
 
 
 class Scene10(WordleDarkScene):
@@ -142,11 +140,11 @@ class Scene10(WordleDarkScene):
     game_third — bar 3 green; SALET's scored game for THIRD fades in above it
     game_wheel — bar 3 grey, bar 4 green; SALET's game for WHEEL fades in below bar 3
     wheel_center — chart and THIRD board leave, bg to navy, WHEEL board to the
-                   middle minus its WHEEL row; tiles black, vowels kept; T->Y, V->U
-    triple_vowels — vowels through the top three all-six-vowel triples' positions
-    adieu — vowels to ADIEU as D lands / O mid row 2 / Y end of row 3
-    audio — vowels and D to AUDIO / E mid row 2
-    crypt — Y mid row 3, C R P T land: CRYPT
+                   middle minus its WHEEL row, tiles flipping to black vowels
+    triple_vowels — flips through the top three all-six-vowel triples' vowels
+    adieu — flips to ADIEU / O mid row 2 / Y end of row 3
+    audio — flips to AUDIO / E mid row 2
+    crypt — flips to CRYPT in row 3
     """
 
     def setup_scene(self):
@@ -210,8 +208,8 @@ class Scene10(WordleDarkScene):
 
     # d : ONE play — bar 4 greys as the chart and THIRD's board fade, the background
     #     turns navy, and WHEEL's board grows to the middle with its WHEEL row
-    #     fading, its tiles going black, every letter but the vowels (and T, V)
-    #     fading, and T becoming Y and V becoming U, all at the same time
+    #     fading, while EVERY tile of the other three rows flips to Wordle's empty
+    #     black, showing BOARD_D's letter (or none) on its new face
     def _setup_wheel_center(self):
         c = self.chart
         bar4 = c.bar_of["4"]
@@ -226,102 +224,89 @@ class Scene10(WordleDarkScene):
         self.pivot = self.board_wheel.get_center()
         grown = self.upper.copy().scale(self.k, about_point=self.pivot)
         self.to_mid = ORIGIN - grown.get_center()
-        # Y and U, built on the tiles' END pose so they morph in place as they move
         grown.shift(self.to_mid)
-        self.morph_to = {(r, i): self.upper[r]._letter(ch, grown[r].tiles[0][i])
-                         for (r, i), ch in MORPH.items()}
+        self.end_center = {(r, i): grown[r].tiles[0][i].get_center()
+                           for r in range(3) for i in range(5)}
+        # BOARD_D's letters, built on the tiles' END pose; each flip shows its own
+        self.shown = {}                     # (row, position) -> the letter showing
+        self.new_d = {}
+        for (r, i), ch in BOARD_D.items():
+            self.new_d[(r, i)] = self._new_letter(r, i, ch, grown[r].tiles[0][i])
+
+    def _new_letter(self, r, i, ch, tile):
+        """A letter for tile (r, i), built on `tile`'s pose, hidden until its flip."""
+        letter = self.upper[r]._letter(ch, tile)
+        letter.set_opacity(0)
+        self.upper[r].add(letter)
+        self.add(letter)
+        return letter
+
+    def _flip(self, r, i, new, **kwargs):
+        """Tile (r, i) flips to the empty black face showing `new` (or nothing)."""
+        tile = self.upper[r].tiles[0][i]
+        old = self.shown.get((r, i))
+        self.shown[(r, i)] = new
+        return TileFlip(tile, old, TILE_EMPTY_FILL, stroke=TILE_FILLED_BORDER,
+                        swap_to=new, **kwargs)
 
     def _move(self, m):
         """`m`'s animation to its place in the grown, centred board."""
         return m.animate.scale(self.k, about_point=self.pivot).shift(self.to_mid)
 
-    def _board_anims(self):
-        """Every tile and letter of the three rows that stay, ONE animation each:
-        moved, tiles to Wordle's empty black, letters not in KEEP faded, T and V
-        morphed. EVERY tile gets the same (typed) border, the one TilePop gives a
-        tile a letter lands in, so the board stays uniform (the user's)."""
-        anims = []
-        for r, row in enumerate(self.upper):
-            for i in range(5):
-                keep = i in KEEP[r]
-                anims.append(self._move(row.tiles[0][i]).set_fill(TILE_EMPTY_FILL)
-                             .set_stroke(TILE_FILLED_BORDER))
-                letter = row.letters[0][i]
-                if (r, i) in self.morph_to:
-                    anims.append(Transform(letter, self.morph_to[(r, i)]))
-                elif keep:
-                    anims.append(self._move(letter))
-                else:
-                    anims.append(self._move(letter).set_opacity(0))
-        return anims
-
     @subscene
     def wheel_center(self):
         self._setup_wheel_center()
         bar4 = self.chart.bar_of["4"]
+        self.shown = {(r, i): self.upper[r].letters[0][i]
+                      for r in range(3) for i in range(5)}
+        flips = [self._flip(r, i, self.new_d.get((r, i)),
+                            to_center=self.end_center[(r, i)], to_scale=self.k)
+                 for r in range(3) for i in range(5)]
         self.play(bar4.animate.set_fill(TILE_ABSENT, opacity=0)
                       .set_stroke(TILE_ABSENT, opacity=0),
                   FadeOut(*self.chart_rest), FadeOut(self.board_third),
                   bg_to(self, BOARD_NAVY),
                   self._move(self.wheel_row).set_opacity(0),
-                  *self._board_anims(),
-                  run_time=1.2)
+                  *flips, run_time=1.2)
         self.remove(self.chart, bar4, self.board_third, self.wheel_row)
         self.board_wheel.remove(self.wheel_row)
-        self.chart = self.board_third = self.wheel_row = None
-        # the six vowel letters, by character, for e-h to move around
-        self.placed = {MORPH.get((r, i), _ROWS[r][i]): self.upper[r].letters[0][i]
-                       for r, keep in KEEP.items() for i in keep}
-        assert sorted(self.placed) == sorted(VOWELS)
-        # above EVERY row's tiles: a letter moving to a lower row would otherwise
-        # pass under that row's tiles, which are drawn after its own
-        for letter in self.placed.values():
-            letter.set_z_index(1)
+        self.chart = self.board_third = self.wheel_row = self.new_d = None
+        self.board = BOARD_D
 
-    # ── e-h: the six vowels moved between the three rows ──────────────────────
-    def _tile(self, r, i):
-        return self.upper[r].tiles[0][i]
+    # ── e-h: the three rows flip from one board to the next ───────────────────
+    def _flip_to(self, board, run_time, lag=0.1):
+        """ONE play: every tile whose letter differs between the current board and
+        `board` flips to show its new one, left to right, top to bottom."""
+        flips = []
+        for r in range(3):
+            for i in range(5):
+                ch = board.get((r, i))
+                if ch == self.board.get((r, i)):
+                    continue
+                new = None if ch is None else \
+                    self._new_letter(r, i, ch, self.upper[r].tiles[0][i])
+                flips.append(self._flip(r, i, new))
+        self.board = board
+        self.play(LaggedStart(*flips, lag_ratio=lag), run_time=run_time)
 
-    def _land(self, r, i, ch):
-        """A new letter `ch` typed into tile (r, i): returns its TilePop, the same
-        pop board.type_word gives a typed letter."""
-        row, tile = self.upper[r], self._tile(r, i)
-        letter = row._letter(ch, tile)
-        letter.set_opacity(0).set_z_index(1)       # TilePop reveals it on its turn
-        row.letters[0][i] = letter
-        row.add(letter)
-        self.add(letter)
-        return letter, TilePop(tile, letter)
-
-    def _arrange(self, layout, run_time, extra=()):
-        """ONE play: every placed letter to its (row, position) in `layout`, with
-        `extra` (letters landing) alongside."""
-        anims = [self.placed[ch].animate.move_to(self._tile(r, i).get_center())
-                 for ch, (r, i) in layout.items() if ch in self.placed]
-        self.play(*anims, *extra, run_time=run_time)
-
-    # e : the vowels through the positions of the best three all-six-vowel triples
+    # e : the vowels flip through the best three all-six-vowel triples' positions
     @subscene
     def triple_vowels(self):
-        self._arrange(LAYOUT_TRIPLES[0], 1.2)
-        self._arrange(LAYOUT_TRIPLES[1], 1.2)
-        self._arrange(LAYOUT_TRIPLES[2], 1.2)
+        self._flip_to(BOARDS_E[0], 1.2)
+        self._flip_to(BOARDS_E[1], 1.2)
+        self._flip_to(BOARDS_E[2], 1.2)
 
-    # f : ADIEU in the first word as its D lands, O mid second word, Y ending the
-    #     third
+    # f : ADIEU in the first word, O mid second word, Y ending the third
     @subscene
     def adieu(self):
-        d, pop = self._land(*LAYOUT_ADIEU["d"], "d")
-        self._arrange(LAYOUT_ADIEU, 1.2, extra=[pop])
-        self.placed["d"] = d
+        self._flip_to(BOARD_F, 1.2)
 
-    # g : AUDIO in the first word, D moving with it, E mid second word (Y stays)
+    # g : AUDIO in the first word, E mid second word (Y stays)
     @subscene
     def audio(self):
-        self._arrange(LAYOUT_AUDIO, 1.2)
+        self._flip_to(BOARD_G, 1.2)
 
-    # h : Y into the middle of the third word as C R P T land around it: CRYPT
+    # h : CRYPT in the third word
     @subscene
     def crypt(self):
-        pops = [self._land(2, i, ch)[1] for i, ch in enumerate(CRYPT) if ch != "y"]
-        self._arrange(LAYOUT_CRYPT, 1.0, extra=[LaggedStart(*pops, lag_ratio=0.25)])
+        self._flip_to(BOARD_H, 1.2)

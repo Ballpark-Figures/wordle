@@ -39,17 +39,44 @@ class TileFlip(Animation):
     `alpha` drives the height by |cos(pi*alpha)|, so it reaches zero exactly at the
     half-way point — which is where the fill is swapped, hiding the change the way
     the real flip does.
+
+    THREE OPTIONAL EXTRAS, all off by default (and then the flip is exactly what it
+    always was), added for scene 10, which changes LETTERS by flipping:
+      swap_to    a letter to show on the new face, or None for a blank one. The old
+                 letter is hidden and this one shown at the midpoint, the same moment
+                 the colour changes. It must already be in the scene (at opacity 0),
+                 built at the tile's END pose; the flip positions it.
+      to_center  the tile travels here during the flip (a board moving as it flips)
+      to_scale   the tile (and its letters) grow by this factor during the flip
     """
 
-    def __init__(self, tile, letter, fill, stroke=None, **kwargs):
+    _KEEP = object()                     # swap_to's default: the letter stays
+
+    def __init__(self, tile, letter, fill, stroke=None, swap_to=_KEEP,
+                 to_center=None, to_scale=1.0, **kwargs):
         self.tile, self.letter, self.fill = tile, letter, fill
         self.stroke = fill if stroke is None else stroke   # the new face's border
         self.h_tile = tile.height
+        self.w_tile = tile.width
         self.h_letter = letter.height if letter is not None else 0.0
         self.center = tile.get_center()
         self._swapped = False
-        group = VGroup(tile) if letter is None else VGroup(tile, letter)
-        super().__init__(group, **kwargs)
+        self.swap = swap_to is not TileFlip._KEEP
+        self.new = swap_to if self.swap else None
+        self.end = self.center if to_center is None else np.array(to_center)
+        self.k = to_scale
+        self.moves = to_center is not None or to_scale != 1.0
+        # each letter's size as a fraction of its tile's, the new one's taken
+        # against the tile's END size, which is the pose it was built at
+        self.ratios = {}
+        if letter is not None:
+            self.ratios[id(letter)] = (letter.width / self.w_tile,
+                                       letter.height / self.h_tile)
+        if self.new is not None:
+            self.ratios[id(self.new)] = (self.new.width / (self.w_tile * self.k),
+                                         self.new.height / (self.h_tile * self.k))
+        parts = [tile] + [m for m in (letter, self.new) if m is not None]
+        super().__init__(VGroup(*parts), **kwargs)
 
     def interpolate_mobject(self, alpha):
         a = self.rate_func(alpha)
@@ -57,11 +84,30 @@ class TileFlip(Animation):
         if a >= 0.5 and not self._swapped:      # past the midpoint: the tile has
             self._swapped = True                # turned over, so show the new face
             self.tile.set_fill(self.fill, opacity=1.0).set_stroke(self.stroke, STROKE)
-        self.tile.stretch_to_fit_height(self.h_tile * scale)
-        self.tile.move_to(self.center)
-        if self.letter is not None and self.h_letter:
-            self.letter.stretch_to_fit_height(self.h_letter * scale)
-            self.letter.move_to(self.center)
+        if not self.swap and not self.moves:    # the plain scored flip, unchanged
+            self.tile.stretch_to_fit_height(self.h_tile * scale)
+            self.tile.move_to(self.center)
+            if self.letter is not None and self.h_letter:
+                self.letter.stretch_to_fit_height(self.h_letter * scale)
+                self.letter.move_to(self.center)
+            return
+        f = 1 + (self.k - 1) * a                # size along the way
+        center = self.center + (self.end - self.center) * a
+        self.tile.stretch_to_fit_height(self.h_tile * f * scale)
+        self.tile.stretch_to_fit_width(self.w_tile * f)
+        self.tile.move_to(center)
+        if self.swap:
+            shown = self.letter if a < 0.5 else self.new
+            for m in (self.letter, self.new):
+                if m is not None:
+                    m.set_opacity(1.0 if m is shown else 0.0)
+        else:
+            shown = self.letter
+        if shown is not None:
+            rw, rh = self.ratios[id(shown)]
+            shown.stretch_to_fit_height(max(rh * self.h_tile * f * scale, 1e-4))
+            shown.stretch_to_fit_width(rw * self.w_tile * f)
+            shown.move_to(center)
 
 
 class TilePop(Animation):
