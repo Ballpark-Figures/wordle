@@ -374,7 +374,7 @@ class Scene07(WordleBoardScene):
             ncols = [ys.count(max(ys))]          # the top row is always full
         slots, s, hds, hw = ranked_word_layout([group], self.col_left, heads=len(guesses),
                                                ncols=ncols)
-        self.f_stack = [scored_row(g, KEEP[g], hw, c) for g, c in zip(guesses, hds[0])]
+        self.f_stack = [scored_row(g, KEEP[g], hw[0], c) for g, c in zip(guesses, hds[0])]
         self.f_old, self.f_leaving, self.f_dots = stack, leaving, dots
         if dots is None:
             self.f_moves = [m.animate.scale(s / self.w_scale).move_to(slots[wd])
@@ -435,9 +435,10 @@ class Scene07(WordleBoardScene):
         assert set(slots) == set(self.words)
         self.s_slots, self.s_f = slots, s / self.w_scale
         self.w_scale = s
-        self.s_stacks = [[scored_row(self.stack_words[k], KEEP[self.stack_words[k]], hw, c)
-                          for k, c in enumerate(h[:-1])] for h in hds]
-        self.s_new = [scored_row(guess, g["code"], hw, h[-1]) for g, h in zip(sub, hds)]
+        # each subgroup's stack is as wide as its own word grid (user's call)
+        self.s_stacks = [[scored_row(self.stack_words[k], KEEP[self.stack_words[k]], w, c)
+                          for k, c in enumerate(h[:-1])] for h, w in zip(hds, hw)]
+        self.s_new = [scored_row(guess, g["code"], w, h[-1]) for g, h, w in zip(sub, hds, hw)]
         ow = self.stack[-1].width                         # the stack's row width now
         start = self.stack[-1].get_center() + \
             DOWN * ow * row_aspect() * (1 + HEAD_ROW_GAP)
