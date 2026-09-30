@@ -12,11 +12,11 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                    already scored, fades in above bar 3                      (VO 1)
   c game_wheel   — bar 3 back to grey, bar 4 green; a mini board of SALET,
                    BEVOR, CHIMP, WHEEL fades in below bar 3                  (VO 1)
-  d wheel_center — at once: bar 4 greys as the chart and the THIRD board fade,
+  d wheel_center — ONE play: bar 4 greys as the chart and the THIRD board fade,
                    the background turns navy, and the WHEEL board grows to the
-                   middle with its WHEEL row fading. Then every tile goes black,
-                   keeping only the A (SALET), E V O (BEVOR), I (CHIMP) and the
-                   T; then T becomes Y and V becomes U (the user's)          (VO 1)
+                   middle with its WHEEL row fading, every tile going black,
+                   every letter fading but the A (SALET), E V O (BEVOR), I
+                   (CHIMP) and T, and T becoming Y, V becoming U (the user's) (VO 1)
   (VO 2 — the word-length discussion — has no subscene in the script yet.)
 
 REUSE MAP — every element and the one source it comes from:
@@ -157,10 +157,10 @@ class Scene10(WordleDarkScene):
         self.play(self._bar_color("3", TILE_ABSENT), self._bar_color("4", TILE_CORRECT),
                   FadeIn(self.board_wheel), run_time=0.8)
 
-    # d : all at once — bar 4 greys as the chart and THIRD's board fade, the
-    #     background turns navy, and WHEEL's board grows to the middle with its WHEEL
-    #     row fading; then the tiles go black, keeping only the vowels (and T, V);
-    #     then T becomes Y and V becomes U
+    # d : ONE play — bar 4 greys as the chart and THIRD's board fade, the background
+    #     turns navy, and WHEEL's board grows to the middle with its WHEEL row
+    #     fading, its tiles going black, every letter but the vowels (and T, V)
+    #     fading, and T becoming Y and V becoming U, all at the same time
     def _setup_wheel_center(self):
         c = self.chart
         bar4 = c.bar_of["4"]
@@ -175,28 +175,35 @@ class Scene10(WordleDarkScene):
         self.pivot = self.board_wheel.get_center()
         grown = self.upper.copy().scale(self.k, about_point=self.pivot)
         self.to_mid = ORIGIN - grown.get_center()
+        # Y and U, built on the tiles' END pose so they morph in place as they move
+        grown.shift(self.to_mid)
+        self.morph_to = {(r, i): self.upper[r]._letter(ch, grown[r].tiles[0][i])
+                         for (r, i), ch in MORPH.items()}
 
-    def _black_tiles(self, run_time):
-        """Every tile to Wordle's empty black; letters not in KEEP fade out. A tile
-        keeping its letter gets the typed border, the others the empty one."""
+    def _move(self, m):
+        """`m`'s animation to its place in the grown, centred board."""
+        return m.animate.scale(self.k, about_point=self.pivot).shift(self.to_mid)
+
+    def _board_anims(self):
+        """Every tile and letter of the three rows that stay, ONE animation each:
+        moved, tiles to Wordle's empty black, letters not in KEEP faded, T and V
+        morphed. A tile keeping its letter gets the typed border, the others the
+        empty one."""
         anims = []
         for r, row in enumerate(self.upper):
             for i in range(5):
                 keep = i in KEEP[r]
                 border = TILE_FILLED_BORDER if keep else TILE_EMPTY_BORDER
-                anims.append(row.tiles[0][i].animate.set_fill(TILE_EMPTY_FILL)
+                anims.append(self._move(row.tiles[0][i]).set_fill(TILE_EMPTY_FILL)
                              .set_stroke(border))
-                if not keep:
-                    anims.append(FadeOut(row.letters[0][i]))
-        self.play(*anims, run_time=run_time)
-
-    def _morph_letters(self, run_time):
-        anims = []
-        for (r, i), ch in MORPH.items():
-            row = self.upper[r]
-            new = row._letter(ch, row.tiles[0][i])
-            anims.append(Transform(row.letters[0][i], new))
-        self.play(*anims, run_time=run_time)
+                letter = row.letters[0][i]
+                if (r, i) in self.morph_to:
+                    anims.append(Transform(letter, self.morph_to[(r, i)]))
+                elif keep:
+                    anims.append(self._move(letter))
+                else:
+                    anims.append(self._move(letter).set_opacity(0))
+        return anims
 
     @subscene
     def wheel_center(self):
@@ -206,13 +213,9 @@ class Scene10(WordleDarkScene):
                       .set_stroke(TILE_ABSENT, opacity=0),
                   FadeOut(*self.chart_rest), FadeOut(self.board_third),
                   bg_to(self, BOARD_NAVY),
-                  self.upper.animate.scale(self.k, about_point=self.pivot)
-                      .shift(self.to_mid),
-                  self.wheel_row.animate.scale(self.k, about_point=self.pivot)
-                      .shift(self.to_mid).set_opacity(0),
+                  self._move(self.wheel_row).set_opacity(0),
+                  *self._board_anims(),
                   run_time=1.2)
         self.remove(self.chart, bar4, self.board_third, self.wheel_row)
         self.board_wheel.remove(self.wheel_row)
         self.chart = self.board_third = self.wheel_row = None
-        self._black_tiles(1.0)
-        self._morph_letters(0.8)
