@@ -59,7 +59,7 @@ the user's "(Win Rate)" subtitle, which is what the bare percentages mean. Tick
 numbers are part of the number line.
 
 LAYOUT CHOICES, flagged:
-  - The line runs off both frame edges with arrow tips (user's call). It opens on
+  - The line runs straight off both frame edges, no arrow tips (user's call). It opens on
     3..6 across x -6..6 (user's call: left at 3, the same 3-wide range as the earlier
     1..4 opening).
   - The zoom out keeps 3 where it was (3..2500), so the anchor does not jump; at that
@@ -153,7 +153,8 @@ class Scene13(WordleBoardScene):
 
     # a : the number line, 3 to 6, extending both ways; the title
     def _setup_show_line(self):
-        self.line = ZoomLine(3, 6, y=LINE_Y, min_label_step=1)
+        self.line = ZoomLine(3, 6, y=LINE_Y, min_label_step=1, tips=False,
+                             ends_buff=-0.1)
         self.title = crisp_text(TITLE, color=WHITE, font_size=FONT_SIZE_LG)
         self.title.to_edge(UP, buff=TITLE_BUFF)
         self.subtitle = crisp_text(SUBTITLE, color=WHITE, font_size=FONT_SIZE_MD)
