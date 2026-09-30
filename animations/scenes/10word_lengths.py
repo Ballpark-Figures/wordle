@@ -26,8 +26,8 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   g audio        — AUDIO in the first word, E in the middle of the second
                    (the script says U; the user's correction)                (VO 3)
   h crypt        — CRYPT in the third word                                   (VO 3)
-  i table        — the boxes fade out; a table comes in: Word Length / Best
-                   Opener / Average Guesses, one row per length, 3 to 11 (the
+  i table        — the boxes fade out; a table comes in: Word Length /
+                   Average Guesses / Best Opener, one row per length, 3 to 11 (the
                    longest with results) — only the lengths filled          (VO 4)
   j salet_row    — SALET typed into length 5's row as tiles, then 3.42       (VO 4)
   (VO 5 has no subscene in the script yet.)
@@ -147,14 +147,14 @@ for _b in [BOARD_D] + BOARDS_E + [BOARD_F, BOARD_G, BOARD_H]:
 
 # ── i-j: the word-length table ────────────────────────────────────────────────
 LENGTHS = DATA["lengths"]                 # 3 .. the longest length with results
-HEADERS = ["Word Length", "Best Opener", "Average Guesses"]
+HEADERS = ["Word Length", "Average Guesses", "Best Opener"]
 HEADER_Y = 3.4                            # header row's centre
 ROW_Y0 = 2.55                             # first data row's centre
 ROW_DY = 0.72
-LEN_X = -5.6                              # Word Length column's centre
-OPENER_X = -3.9                           # Best Opener column's LEFT edge (tiles
+LEN_X = -5.7                              # Word Length column's centre
+AVG_X = -1.8                              # Average Guesses column's centre
+OPENER_X = 0.6                            # Best Opener column's LEFT edge (tiles
                                           # left-aligned, so every word starts there)
-AVG_X = 5.3                               # Average Guesses column's centre
 TABLE_TILE_SCALE = 0.6                    # opener tiles vs a full board tile
 HEADER_SIZE = 28
 CELL_SIZE = 30
@@ -353,8 +353,8 @@ class Scene10(WordleDarkScene):
         cell = lambda t, size, **kw: crisp_text(t, font_size=size, color=WHITE, **kw)
         heads = [cell(h, HEADER_SIZE, weight=BOLD) for h in HEADERS]
         heads[0].move_to([LEN_X, HEADER_Y, 0])
-        heads[1].move_to([0, HEADER_Y, 0]).align_to(np.array([OPENER_X, 0, 0]), LEFT)
-        heads[2].move_to([AVG_X, HEADER_Y, 0])
+        heads[1].move_to([AVG_X, HEADER_Y, 0])
+        heads[2].move_to([0, HEADER_Y, 0]).align_to(np.array([OPENER_X, 0, 0]), LEFT)
         self.table_head = VGroup(*heads)
         self.table_rows = VGroup(*[cell(str(L), CELL_SIZE).move_to([LEN_X, _row_y(L), 0])
                                    for L in LENGTHS])
