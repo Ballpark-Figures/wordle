@@ -208,5 +208,68 @@
       "depth": 3,
       "source": "optlen11/opener_totals_escalating_lb.csv"
     }
+  },
+  "grey_paths": {
+    "3": {
+      "answer": "why",
+      "guesses": [
+        {
+          "word": "ras",
+          "code": 0,
+          "tiles": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "word": "bed",
+          "code": 0,
+          "tiles": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "word": "top",
+          "code": 0,
+          "tiles": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "word": "gum",
+          "code": 0,
+          "tiles": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "word": "lin",
+          "code": 0,
+          "tiles": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "word": "why",
+          "code": 26,
+          "tiles": [
+            2,
+            2,
+            2
+          ]
+        }
+      ],
+      "source": "optlen3/k300/trees_d12/ras.txt.gz"
+    },
+    "4": null
   }
 }

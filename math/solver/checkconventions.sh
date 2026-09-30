@@ -38,9 +38,11 @@ done
 
 # ------------------------------------------------------------- 2. wrappers save
 echo "2. every wrapper persists its results"
+# --trees counts as persisting: a tree file is a durable result, and its lines'
+# costs sum to the total (run-length-tree.sh, whose single-opener path has no CSV).
 for w in solver/run-*.sh; do
     n=$(basename "$w")
-    grep -q -- '--out' "$w" || bad "$n does not pass --out"
+    grep -q -- '--out\|--trees' "$w" || bad "$n does not pass --out (or --trees)"
     grep -q 'tee'        "$w" || bad "$n does not tee a log"
 done
 [ "$fail" -eq 0 ] && echo "   ok   all $(ls solver/run-*.sh | wc -l | tr -d ' ') wrappers pass --out and tee"

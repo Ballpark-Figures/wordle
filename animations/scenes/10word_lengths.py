@@ -32,9 +32,12 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   j salet_row    — SALET typed into length 5's row as tiles, then 3.42       (VO 4)
   k avg_6 / l opener_6 / m avg_7 / n opener_7 — one cell each               (VO 5)
   o both_8 / p both_9 / q both_10 / r both_11 — average, then opener        (VO 5)
-  s avg_4 / t opener_4                                                        (VO 6)
-  u avg_3 / v opener_3                                                        (VO 7)
-  An average fades in; an opener is TYPED in as tiles, as SALET is.
+  s avg_4 / t opener_4 — t then puts TALE's all-grey path (its tree's longest
+                   all-grey line, to the answer) in the top-right corner    (VO 6)
+  u avg_3 / v opener_3 — v swaps in RAS's all-grey path in its place       (VO 7)
+  j and o-r fill a whole row the same way: average, then opener.
+  An average fades in; an opener is TYPED in as tiles, as SALET is, its letters
+  coloured vowel red / consonant blue (hangman's rule, Y a vowel — the user's).
   EVERY LETTER CHANGE IS A FLIP (the user's): a tile turns over and shows its new
   letter, or none — nothing slides or morphs. Only tiles that change flip, left to
   right, top to bottom. Every tile has the same border.
@@ -49,6 +52,8 @@ REUSE MAP — every element and the one source it comes from:
   boards         assets/board.py get_scored_row, one per guess, stacked at the
                  board's own GAP and scaled down
   background     assets/background.py bg_to (promoted from scene 01's _bg_to)
+  table letters  bpkfigures.tier_list.tile_color (hangman's vowel/consonant colours
+                 for letters on a dark panel), via board.type_word's letter_color
   letter flips   assets/board.py TileFlip, with the swap_to / to_center / to_scale
                  options added for this scene (off by default)
 
@@ -91,6 +96,7 @@ from config import *
 from bpkfigures.bar_graph import get_bar_chart, grow_bars
 from assets.board import get_board, get_scored_row, GAP, TileFlip
 from assets.keys import key_cues
+from bpkfigures.tier_list import tile_color
 from assets.background import bg_to
 from assets import word_lengths_data
 
@@ -169,6 +175,12 @@ CELL_SIZE = 30
 
 
 TABLE = {int(L): t for L, t in DATA["table"].items()}
+GREY_PATHS = {int(L): p for L, p in DATA["grey_paths"].items()}
+# the corner the all-grey paths sit in: top-right, clear of the header and of the
+# longer openers' rows (row 7's SALTINE ends at x 4.8)
+CORNER_UR = (7.6, 4.2)
+CORNER_W = 3.0
+CORNER_H = 4.1
 assert sorted(TABLE) == LENGTHS
 
 
@@ -397,13 +409,30 @@ class Scene10(WordleDarkScene):
         row = get_board(rows=1, cols=L).scale(TABLE_TILE_SCALE)
         row.move_to([0, _row_y(L), 0]).align_to(np.array([OPENER_X, 0, 0]), LEFT)
         row.type_word(self, 0, TABLE[L]["opener"], run_time,
-                      per_letter=key_cues(self), appear=True)
+                      per_letter=key_cues(self), appear=True,
+                      letter_color=tile_color)
 
-    # j : SALET typed into its row's boxes, then its average
+    def _fill_both(self, L, avg_run_time, opener_run_time):
+        """A whole row, as every row filled in one beat is: average, then opener."""
+        self._fill_avg(L, avg_run_time)
+        self._fill_opener(L, opener_run_time)
+
+    def _corner_path(self, L):
+        """Length L's all-grey path as a scored board in the top-right corner, or
+        None while it is still a stub in the data (see word_lengths_data)."""
+        gp = GREY_PATHS[L]
+        if gp is None:
+            return None
+        rows = [get_scored_row(g["word"], g["code"]) for g in gp["guesses"]]
+        board = VGroup(*rows).arrange(DOWN, buff=GAP)
+        board.scale(min(CORNER_W / board.width, CORNER_H / board.height, 1.0))
+        board.align_to(np.array([CORNER_UR[0], CORNER_UR[1], 0]), UR)
+        return board
+
+    # j : SALET's row, the same way as every other whole row
     @subscene
     def salet_row(self):
-        self._fill_opener(5, 0.65)
-        self._fill_avg(5, 0.5)
+        self._fill_both(5, 0.5, 0.65)
 
     # k : length 6's average
     @subscene
@@ -428,43 +457,46 @@ class Scene10(WordleDarkScene):
     # o : both for 8
     @subscene
     def both_8(self):
-        self._fill_avg(8, 0.5)
-        self._fill_opener(8, 1.04)
+        self._fill_both(8, 0.5, 1.04)
 
     # p : both for 9
     @subscene
     def both_9(self):
-        self._fill_avg(9, 0.5)
-        self._fill_opener(9, 1.17)
+        self._fill_both(9, 0.5, 1.17)
 
     # q : both for 10
     @subscene
     def both_10(self):
-        self._fill_avg(10, 0.5)
-        self._fill_opener(10, 1.3)
+        self._fill_both(10, 0.5, 1.3)
 
     # r : both for 11
     @subscene
     def both_11(self):
-        self._fill_avg(11, 0.5)
-        self._fill_opener(11, 1.43)
+        self._fill_both(11, 0.5, 1.43)
 
     # s : length 4's average
     @subscene
     def avg_4(self):
         self._fill_avg(4, 0.5)
 
-    # t : length 4's opener
+    # t : length 4's opener, then its tree's all-grey path in the top-right corner
     @subscene
     def opener_4(self):
         self._fill_opener(4, 0.52)
+        self.path4 = self._corner_path(4)
+        if self.path4 is not None:          # a stub until the TALE tree exists
+            self.play(FadeIn(self.path4), run_time=0.8)
 
     # u : length 3's average
     @subscene
     def avg_3(self):
         self._fill_avg(3, 0.5)
 
-    # v : length 3's opener
+    # v : length 3's opener, then its tree's all-grey path replacing 4's in the corner
     @subscene
     def opener_3(self):
         self._fill_opener(3, 0.39)
+        path3 = self._corner_path(3)
+        out = [] if self.path4 is None else [FadeOut(self.path4)]
+        self.play(*out, FadeIn(path3), run_time=0.8)
+        self.path4 = None

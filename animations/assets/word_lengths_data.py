@@ -47,6 +47,10 @@ Provenance for everything it writes:
                        (LENGTHS.md); the 7-11 rule would pick DISTAL at depth 4
                    7-11 COMPLETE and exact: fewest worst-case guesses first, then
                        lowest total (LENGTHS.md)
+  grey_paths   — 10t / 10v's corner boards: the longest line of the row's own tree
+                 (GREY_TREES) on which every reply is all grey, ending on its answer.
+                 The build asserts the tree opens with the row's opener and sums to
+                 its total, so the path is from the strategy the row reports.
 """
 import csv
 import gzip
@@ -102,6 +106,54 @@ def _table(opener_total):
         out[L] = {"opener": r["word"], "total": int(r["total"]), "answers": answers,
                   "depth": int(r["depth"]), "source": rel}
     return {str(L): out[L] for L in sorted(out)}
+
+
+# length -> that row's tree (under math/data/shared), for 10t / 10v's all-grey path.
+# Each must be the tree OF THE TABLE'S ROW: same opener, and its lines' costs must
+# sum to the row's total (asserted). Length 4's comes from solver/run-length-tree.sh
+# (the exact solver, TALE, depth 6); until that run exists the path is a STUB (None).
+GREY_TREES = {
+    3: "optlen3/k300/trees_d12/ras.txt.gz",
+    4: "optlen4/trees_d6/tale.txt.gz",
+}
+
+
+def _grey_paths(table):
+    """Each tree's ALL-GREY PATH: its longest line on which every reply is all grey,
+    ending on that line's answer. Every tile re-checked against wordle.pattern."""
+    sys.path.insert(0, MATH)
+    import wordle
+    shared = os.path.join(MATH, "data", "shared")
+    out = {}
+    for L, rel in GREY_TREES.items():
+        path = os.path.join(shared, rel)
+        row = table[str(L)]
+        if not os.path.exists(path):
+            print(f"STUB: no tree at {rel} -- length {L}'s all-grey path is empty. "
+                  f"Run solver/run-length-tree.sh, then re-run this module.")
+            out[str(L)] = None
+            continue
+        best, total = None, 0
+        with gzip.open(path, "rt") as f:
+            for raw in f:
+                parts = raw.split()
+                answer, n, moves = parts[0], int(parts[1]), parts[2:]
+                assert moves[0] == row["opener"], (rel, raw)
+                assert len(moves) == 2 * n - 1 and moves[-1] == answer, raw
+                total += n
+                if all(p == "b" * L for p in moves[1::2]) and \
+                        (best is None or len(moves) > len(best)):
+                    best = moves
+        assert total == row["total"], (rel, total, row["total"])
+        guesses = []
+        answer = best[-1]
+        for g, p in zip(best[0::2], best[1::2] + ["g" * L]):
+            tiles = [TILE[c] for c in p]
+            code = sum(t * 3 ** (L - 1 - i) for i, t in enumerate(tiles))
+            assert code == wordle.pattern(g, answer), (rel, g, answer)
+            guesses.append({"word": g, "code": code, "tiles": tiles})
+        out[str(L)] = {"answer": answer, "guesses": guesses, "source": rel}
+    return out
 
 
 def _lengths():
@@ -170,7 +222,8 @@ def _build():
     return {"opener": OPENER, "total": total, "answers": N_ANSWERS,
             "distribution": {str(n): c for n, c in counts.items()},
             "games": games, "vowel_triples": _vowel_triples(),
-            "lengths": _lengths(), "table": _table(total)}
+            "lengths": _lengths(), "table": (table := _table(total)),
+            "grey_paths": _grey_paths(table)}
 
 
 def load():
@@ -198,4 +251,8 @@ if __name__ == "__main__":
     for L, t in data["table"].items():
         print(f"  {L:>2}  {t['opener'].upper():<12} {t['total'] / t['answers']:.2f}  "
               f"depth {t['depth']:<2}  {t['source']}")
+    for L, gp in data["grey_paths"].items():
+        if gp:
+            print(f"  all-grey path, length {L}: "
+                  + " ".join(g["word"].upper() for g in gp["guesses"]))
     print(f"\nwrote {CACHE}")

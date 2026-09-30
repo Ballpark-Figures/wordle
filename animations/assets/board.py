@@ -163,8 +163,8 @@ class WordleBoard(VGroup):
                       stroke_color=TILE_EMPTY_BORDER,
                       fill_color=TILE_EMPTY_FILL, fill_opacity=1.0)
 
-    def _letter(self, ch, tile):
-        t = crisp_text(ch.upper(), color=TILE_TEXT, weight=BOLD)
+    def _letter(self, ch, tile, color=TILE_TEXT):
+        t = crisp_text(ch.upper(), color=color, weight=BOLD)
         # Sized off the tile's CURRENT height, not TILE, so a letter typed into a
         # board that has been shrunk (scene 03's growing column) fits its tile.
         # Identical to TILE * LETTER_FRAC on an unscaled board.
@@ -174,7 +174,7 @@ class WordleBoard(VGroup):
 
     # ── typing ────────────────────────────────────────────────────────────────
     def type_word(self, scene, row, word, run_time, per_letter=None, key_gap=None,
-                  appear=False):
+                  appear=False, letter_color=None):
         """Type `word` into `row`, one letter at a time, left to right.
 
         TWO WAYS TO TIME IT. By default `run_time` is the whole word and the pops
@@ -198,12 +198,17 @@ class WordleBoard(VGroup):
         the start of the word, so the scene can place a sound precisely with
         `self.sfx(name, at=offset)` rather than relying on when the call happens.
         The asset owns no sound policy; the scene does.
+
+        `letter_color(ch)` colours each typed letter (scene 10's vowel/consonant
+        table, via bpkfigures.tier_list.tile_color). None keeps TILE_TEXT, so every
+        other caller is unchanged.
         """
-        anim, total = self.type_anim(scene, row, word, run_time, per_letter, key_gap, appear)
+        anim, total = self.type_anim(scene, row, word, run_time, per_letter, key_gap, appear,
+                                     letter_color)
         scene.play(anim, run_time=total)
 
     def type_anim(self, scene, row, word, run_time, per_letter=None, key_gap=None,
-                  appear=False):
+                  appear=False, letter_color=None):
         """`type_word` unplayed: the letters are made and put on the scene (hidden),
         and (animation, the run_time to play it for) comes back — so several words
         can be typed in ONE play (scene 07 types a row of final answers at once).
@@ -230,7 +235,8 @@ class WordleBoard(VGroup):
             if appear:
                 tile.set_fill(opacity=0.0).set_stroke(opacity=0.0)
                 scene.add(tile)
-            letter = self._letter(ch, tile)
+            letter = self._letter(ch, tile) if letter_color is None else \
+                self._letter(ch, tile, color=letter_color(ch))
             letter.set_opacity(0)              # TilePop reveals it on its turn
             self.letters[row][i] = letter
             self.add(letter)
