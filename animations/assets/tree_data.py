@@ -38,7 +38,8 @@ GROUPS = [7, 225]     # FIRST's --- G Y (TEASE's group) and G G Y - - (FIERY's),
 TRIT = {"b": 0, "y": 1, "g": 2}
 # 07zb: one group's optimal trees with a forced next guess, from
 # math/solver/run-subgroup-tree.sh -- (results dir, the forced guesses in order)
-SUBTREES = [("first_30_cap6", ["after", "again", "other", "plane"])]
+SUBTREES = [("first_30_cap6", ["after", "again", "other", "plane"]),   # BYBYB, 48 answers
+            ("first_8_cap6", ["after", "again", "other", "bagel"])]    # BBBGG, 14 (in use)
 SUBTREE_DIR = os.path.join(HERE, "..", "..", "math", "data", "shared", "subtree")
 
 

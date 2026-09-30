@@ -75,11 +75,12 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   x fiery_tree   — TEASE's tree shrinks into the top-left corner as FIERY's
                    group comes to the root; then its tree grows the same (07z, VO 7)
 
-  y big_case     — everything off to the left; FIRST's BYBYB group (48 words,
-                   code 30) in from the right, the words in a grid     (07za, VO 8)
+  y big_case     — everything off to the left; FIRST's BBBGG group (14 words,
+                   code 8; the user's pick over the script's 48-word BYBYB) in
+                   from the right, the words in a grid                 (07za, VO 8)
 
-  z big_trees    — the optimal tree for the 48 words after each forced next
-                   guess in turn, AFTER, AGAIN, OTHER then PLANE (the
+  z big_trees    — the optimal tree for the 14 words after each forced next
+                   guess in turn, AFTER, AGAIN, OTHER then BAGEL (the
                    optimal one), grown level by level, laid out the ordinary
                    way (user's call: see what goes wrong); trees from
                    solver/run-subgroup-tree.sh                         (07zb, VO 8)
@@ -123,6 +124,7 @@ LAYOUT CHOICES, flagged:
     words simply regrow into the bigger grid.
 """
 from pathlib import Path
+import math
 import sys
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -140,7 +142,7 @@ from assets import lists_data, tree_data
 
 DATA = lists_data.load()
 TREES = tree_data.load()["first"]      # x-z: two of FIRST's groups, from its optimal tree
-TREES_SUB = tree_data.load()["subtree"]  # zb: the 48-word group after four forced guesses
+TREES_SUB = tree_data.load()["subtree"]  # zb: a group's trees after four forced guesses
 FIRST, AFTER, THIRD = "first", "after", "third"   # the script's own words
 # the group each guess narrows to (pattern codes, position 0 most significant) —
 # the user's calls, 2026-09-29, in place of the script's all gray: FIRST's yellow T
@@ -180,10 +182,15 @@ KID_PITCH = 2.6                    # y, z: between two branches
 ROOT_Y = 3.8                       # y, z: the root's FIRST row
 CHILD_Y = 1.6                      # y, z: a branch's FIRST row
 CHILD_DROP = 2.6                   # y, z: a branch down to its win, FIRST to FIRST
-WORDS_Y = -3.45                    # y, z: the words' block, bottom middle, before branching
-BIG_CODE = 30                      # za: FIRST's - Y - Y - group, 48 words (the script's BYBYB)
+WORDS_Y = -1.5                     # y, z: the words' block, middle, before branching —
+                                   #   below where the branches land, no lower (user's call)
+BIG_CODE = 8                       # za: FIRST's - - - G G group, 14 words (the user's pick,
+                                   #   in place of the script's 48-word BYBYB)
+BIG_TREES = "first_8_cap6"         # zb: its trees, from solver/run-subgroup-tree.sh
+BIG_GUESSES = ("after", "again", "other", "bagel")   # zb: the script's three, then the
+                                   #   optimal next guess (BAGEL, in place of BYBYB's PLANE)
 BIG_Y = 2.2                        # za: its FIRST row
-BIG_COLS = 8                       # za: its words, a grid of BIG_COLS columns ...
+BIG_COLS = 8                       # za: its words, a grid of at most BIG_COLS columns ...
 BIG_WORD_W, BIG_DX, BIG_DY = 1.35, 1.6, 0.5   # ... this wide, this far apart
 BIG_WORDS_Y = 1.0                  # za: the grid's top row
 BIG_EDGE = 0.3                     # zb: margin at the frame's sides
@@ -249,8 +256,8 @@ class Scene07(WordleBoardScene):
     six_cases — the two 6-word groups in from the right
     tease_tree — FIERY's group to a corner; TEASE's tree grows
     fiery_tree — TEASE's tree to a corner; FIERY's tree grows
-    big_case — FIRST's 48-word BYBYB group in from the right
-    big_trees — the optimal tree after AFTER, AGAIN, OTHER, then PLANE
+    big_case — FIRST's 14-word BBBGG group in from the right
+    big_trees — the optimal tree after AFTER, AGAIN, OTHER, then BAGEL
     """
 
     def setup_scene(self):
@@ -1043,9 +1050,9 @@ class Scene07(WordleBoardScene):
         self._tree_down(fiery, 1.5)
         self._tree_wins(fiery, 1.0)
 
-    # ── the largest groups: a 48-word one (script za-zb) ──────────────────────
+    # ── a bigger group: the 14-word BBBGG (script za-zb) ──────────────────────
     def _setup_big_case(self):
-        """FIRST's BYBYB group (48 words) as a case at the centre, as the others
+        """FIRST's BBBGG group (14 words) as a case at the centre, as the others
         came in: FIRST scored, its line out of the top, every one of its words in a
         grid under it (alphabetical). Everything on screen leaves to the left."""
         Y = config.frame_y_radius
@@ -1053,16 +1060,22 @@ class Scene07(WordleBoardScene):
         self.big = scored_row(FIRST, BIG_CODE, self.pcase.width, [0, BIG_Y, 0])
         self.big_line = _line([0, Y + OFF_CLEAR, 0], _r(self.big))
         self.big_words = []
+        # as few rows as BIG_COLS allows, filled evenly (14 words: two rows of 7), a
+        # short last row centred, as the word groups elsewhere are
+        n = len(g["members"])
+        nr = math.ceil(n / BIG_COLS)
+        nc = math.ceil(n / nr)
         for k, w in enumerate(g["members"]):
-            i, j = divmod(k, BIG_COLS)
+            i, j = divmod(k, nc)
+            in_row = min(nc, n - i * nc)
             self.big_words.append(
                 PigpenWord(w, revealed=True).scale(BIG_WORD_W / WORD_W)
-                .move_to([(j - (BIG_COLS - 1) / 2) * BIG_DX, BIG_WORDS_Y - i * BIG_DY, 0]))
+                .move_to([(j - (in_row - 1) / 2) * BIG_DX, BIG_WORDS_Y - i * BIG_DY, 0]))
         self.za_old = VGroup(*self._leaves())
         self.za_in = VGroup(self.big, self.big_line, *self.big_words).shift(RIGHT * SWAP_DIST)
 
-    # y (script za) : FIERY's tree and TEASE's off to the left; FIRST's BYBYB group,
-    #     all 48 words, in from the right
+    # y (script za) : FIERY's tree and TEASE's off to the left; FIRST's BBBGG group
+    #     (the user's pick over the script's BYBYB), all 14 words, in from the right
     @subscene
     def big_case(self):
         self._setup_big_case()
@@ -1072,7 +1085,7 @@ class Scene07(WordleBoardScene):
         self.add(self.big_line, self.big, *self.big_words)
         self.za_old = self.za_in = self.cases = None
 
-    # ── the 48-word group's optimal trees after four forced guesses (script zb) ─
+    # ── the group's optimal trees after four forced guesses (script zb) ────────
     # Laid out the ordinary way (user's call: "fit the tree normally and see what
     # goes wrong"): every branch a full stack of rows, the answers spread evenly
     # across the frame, each branch over the middle of its answers. The same steps
@@ -1115,7 +1128,7 @@ class Scene07(WordleBoardScene):
                 yield from self._big_leaves(kid["node"])
 
     def _big_words_grid(self):
-        """The 48 words in za's grid, as za built them."""
+        """The group's words in za's grid, as za built them."""
         return [w.copy() for w in self.big_grid]
 
     def _big_root(self, tree, run_time):
@@ -1207,7 +1220,7 @@ class Scene07(WordleBoardScene):
 
     def _big_tree(self, guess):
         """One forced guess's whole tree, level by level."""
-        tree = TREES_SUB[f"first_30_cap6:{guess}"]
+        tree = TREES_SUB[f"{BIG_TREES}:{guess}"]
         xs, rw, ys = self._big_layout(tree)
         frontier = self._big_root(tree, 1.0)
         while frontier:
@@ -1216,8 +1229,8 @@ class Scene07(WordleBoardScene):
             frontier = self._big_type(kids, 0.65)
 
     def _big_reset(self, run_time):
-        """Back to the root alone, for the next forced guess: the tree fades, the 48
-        words fade back in, in za's grid."""
+        """Back to the root alone, for the next forced guess: the tree fades, the
+        group's words fade back in, in za's grid."""
         keep = {id(m) for m in (self.big, self.big_line) for m in m.get_family()}
         gone = [m for m in self._leaves() if id(m) not in keep]
         self.big_words = self._big_words_grid()
@@ -1226,14 +1239,15 @@ class Scene07(WordleBoardScene):
         self.remove(*gone)
 
     # z (script zb) : the optimal tree after each forced guess in turn -- AFTER,
-    #     AGAIN, OTHER, then PLANE (the optimal one) -- grown level by level
+    #     AGAIN, OTHER, then BAGEL (the optimal one) -- grown level by level
     @subscene
     def big_trees(self):
         self.big_grid = [w.copy() for w in self.big_words]
-        self._big_tree("after")
+        after, again, other, best = BIG_GUESSES
+        self._big_tree(after)
         self._big_reset(1.0)
-        self._big_tree("again")
+        self._big_tree(again)
         self._big_reset(1.0)
-        self._big_tree("other")
+        self._big_tree(other)
         self._big_reset(1.0)
-        self._big_tree("plane")
+        self._big_tree(best)

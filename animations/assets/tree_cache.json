@@ -3765,6 +3765,1089 @@
      }
     }
    ]
+  },
+  "first_8_cap6:after": {
+   "guess": "after",
+   "kids": [
+    {
+     "code": 9,
+     "answers": [
+      "boost",
+      "ghost",
+      "joust"
+     ],
+     "node": {
+      "guess": "boost",
+      "kids": [
+       {
+        "code": 26,
+        "answers": [
+         "ghost"
+        ],
+        "node": {
+         "guess": "ghost",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "ghost"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 62,
+        "answers": [
+         "joust"
+        ],
+        "node": {
+         "guess": "joust",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "joust"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "boost"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 12,
+     "answers": [
+      "guest",
+      "chest",
+      "quest"
+     ],
+     "node": {
+      "guess": "guest",
+      "kids": [
+       {
+        "code": 26,
+        "answers": [
+         "chest"
+        ],
+        "node": {
+         "guess": "chest",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "chest"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 80,
+        "answers": [
+         "quest"
+        ],
+        "node": {
+         "guess": "quest",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "quest"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "guest"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 90,
+     "answers": [
+      "blast",
+      "coast",
+      "toast",
+      "boast"
+     ],
+     "node": {
+      "guess": "blast",
+      "kids": [
+       {
+        "code": 26,
+        "answers": [
+         "coast",
+         "toast"
+        ],
+        "node": {
+         "guess": "coast",
+         "kids": [
+          {
+           "code": 80,
+           "answers": [
+            "toast"
+           ],
+           "node": {
+            "guess": "toast",
+            "kids": [
+             {
+              "code": 242,
+              "answers": [
+               "toast"
+              ],
+              "node": null
+             }
+            ]
+           }
+          },
+          {
+           "code": 242,
+           "answers": [
+            "coast"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 188,
+        "answers": [
+         "boast"
+        ],
+        "node": {
+         "guess": "boast",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "boast"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "blast"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 93,
+     "answers": [
+      "beast",
+      "least",
+      "yeast"
+     ],
+     "node": {
+      "guess": "beast",
+      "kids": [
+       {
+        "code": 80,
+        "answers": [
+         "least",
+         "yeast"
+        ],
+        "node": {
+         "guess": "least",
+         "kids": [
+          {
+           "code": 80,
+           "answers": [
+            "yeast"
+           ],
+           "node": {
+            "guess": "yeast",
+            "kids": [
+             {
+              "code": 242,
+              "answers": [
+               "yeast"
+              ],
+              "node": null
+             }
+            ]
+           }
+          },
+          {
+           "code": 242,
+           "answers": [
+            "least"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "beast"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 171,
+     "answers": [
+      "angst"
+     ],
+     "node": {
+      "guess": "angst",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "angst"
+        ],
+        "node": null
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "first_8_cap6:again": {
+   "guess": "again",
+   "kids": [
+    {
+     "code": 0,
+     "answers": [
+      "joust",
+      "chest",
+      "quest",
+      "boost"
+     ],
+     "node": {
+      "guess": "joust",
+      "kids": [
+       {
+        "code": 8,
+        "answers": [
+         "chest"
+        ],
+        "node": {
+         "guess": "chest",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "chest"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 17,
+        "answers": [
+         "quest"
+        ],
+        "node": {
+         "guess": "quest",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "quest"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 62,
+        "answers": [
+         "boost"
+        ],
+        "node": {
+         "guess": "boost",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "boost"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "joust"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 18,
+     "answers": [
+      "toast",
+      "coast",
+      "yeast",
+      "least",
+      "boast",
+      "blast",
+      "beast"
+     ],
+     "node": {
+      "guess": "belch",
+      "kids": [
+       {
+        "code": 0,
+        "answers": [
+         "toast"
+        ],
+        "node": {
+         "guess": "toast",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "toast"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 3,
+        "answers": [
+         "coast"
+        ],
+        "node": {
+         "guess": "coast",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "coast"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 54,
+        "answers": [
+         "yeast"
+        ],
+        "node": {
+         "guess": "yeast",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "yeast"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 63,
+        "answers": [
+         "least"
+        ],
+        "node": {
+         "guess": "least",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "least"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 162,
+        "answers": [
+         "boast"
+        ],
+        "node": {
+         "guess": "boast",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "boast"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 171,
+        "answers": [
+         "blast"
+        ],
+        "node": {
+         "guess": "blast",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "blast"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 216,
+        "answers": [
+         "beast"
+        ],
+        "node": {
+         "guess": "beast",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "beast"
+           ],
+           "node": null
+          }
+         ]
+        }
+       }
+      ]
+     }
+    },
+    {
+     "code": 27,
+     "answers": [
+      "ghost",
+      "guest"
+     ],
+     "node": {
+      "guess": "ghost",
+      "kids": [
+       {
+        "code": 170,
+        "answers": [
+         "guest"
+        ],
+        "node": {
+         "guess": "guest",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "guest"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "ghost"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 190,
+     "answers": [
+      "angst"
+     ],
+     "node": {
+      "guess": "angst",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "angst"
+        ],
+        "node": null
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "first_8_cap6:other": {
+   "guess": "other",
+   "kids": [
+    {
+     "code": 27,
+     "answers": [
+      "angst",
+      "blast"
+     ],
+     "node": {
+      "guess": "angst",
+      "kids": [
+       {
+        "code": 89,
+        "answers": [
+         "blast"
+        ],
+        "node": {
+         "guess": "blast",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "blast"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "angst"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 30,
+     "answers": [
+      "quest",
+      "guest",
+      "beast",
+      "yeast",
+      "least"
+     ],
+     "node": {
+      "guess": "agley",
+      "kids": [
+       {
+        "code": 3,
+        "answers": [
+         "quest"
+        ],
+        "node": {
+         "guess": "quest",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "quest"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 30,
+        "answers": [
+         "guest"
+        ],
+        "node": {
+         "guess": "guest",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "guest"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 84,
+        "answers": [
+         "beast"
+        ],
+        "node": {
+         "guess": "beast",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "beast"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 85,
+        "answers": [
+         "yeast"
+        ],
+        "node": {
+         "guess": "yeast",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "yeast"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 93,
+        "answers": [
+         "least"
+        ],
+        "node": {
+         "guess": "least",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "least"
+           ],
+           "node": null
+          }
+         ]
+        }
+       }
+      ]
+     }
+    },
+    {
+     "code": 39,
+     "answers": [
+      "chest"
+     ],
+     "node": {
+      "guess": "chest",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "chest"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 108,
+     "answers": [
+      "boast",
+      "joust",
+      "coast",
+      "toast",
+      "boost"
+     ],
+     "node": {
+      "guess": "boast",
+      "kids": [
+       {
+        "code": 62,
+        "answers": [
+         "joust"
+        ],
+        "node": {
+         "guess": "joust",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "joust"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 80,
+        "answers": [
+         "coast",
+         "toast"
+        ],
+        "node": {
+         "guess": "coast",
+         "kids": [
+          {
+           "code": 80,
+           "answers": [
+            "toast"
+           ],
+           "node": {
+            "guess": "toast",
+            "kids": [
+             {
+              "code": 242,
+              "answers": [
+               "toast"
+              ],
+              "node": null
+             }
+            ]
+           }
+          },
+          {
+           "code": 242,
+           "answers": [
+            "coast"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 224,
+        "answers": [
+         "boost"
+        ],
+        "node": {
+         "guess": "boost",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "boost"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "boast"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 117,
+     "answers": [
+      "ghost"
+     ],
+     "node": {
+      "guess": "ghost",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "ghost"
+        ],
+        "node": null
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "first_8_cap6:bagel": {
+   "guess": "bagel",
+   "kids": [
+    {
+     "code": 0,
+     "answers": [
+      "joust"
+     ],
+     "node": {
+      "guess": "joust",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "joust"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 3,
+     "answers": [
+      "chest",
+      "quest"
+     ],
+     "node": {
+      "guess": "chest",
+      "kids": [
+       {
+        "code": 26,
+        "answers": [
+         "quest"
+        ],
+        "node": {
+         "guess": "quest",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "quest"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "chest"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 9,
+     "answers": [
+      "ghost"
+     ],
+     "node": {
+      "guess": "ghost",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "ghost"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 12,
+     "answers": [
+      "guest"
+     ],
+     "node": {
+      "guess": "guest",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "guest"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 27,
+     "answers": [
+      "coast",
+      "toast"
+     ],
+     "node": {
+      "guess": "coast",
+      "kids": [
+       {
+        "code": 80,
+        "answers": [
+         "toast"
+        ],
+        "node": {
+         "guess": "toast",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "toast"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "coast"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 30,
+     "answers": [
+      "yeast"
+     ],
+     "node": {
+      "guess": "yeast",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "yeast"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 31,
+     "answers": [
+      "least"
+     ],
+     "node": {
+      "guess": "least",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "least"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 45,
+     "answers": [
+      "angst"
+     ],
+     "node": {
+      "guess": "angst",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "angst"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 162,
+     "answers": [
+      "boost"
+     ],
+     "node": {
+      "guess": "boost",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "boost"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 189,
+     "answers": [
+      "boast"
+     ],
+     "node": {
+      "guess": "boast",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "boast"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 190,
+     "answers": [
+      "blast"
+     ],
+     "node": {
+      "guess": "blast",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "blast"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 192,
+     "answers": [
+      "beast"
+     ],
+     "node": {
+      "guess": "beast",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "beast"
+        ],
+        "node": null
+       }
+      ]
+     }
+    }
+   ]
   }
  }
 }
