@@ -65,6 +65,7 @@ DOT_REGION_TOP = 4.2       # the guess has left by then: dots take the whole fra
                            # as far from the top as REGION_BOT is from the bottom
 WORD_PAD = 0.3             # footprint padding round a packed word block (07)
 WORD_HEAD_GAP = 0.08       # between a packed block's scored rows and its words (07)
+HEAD_MAX_COLS = 3          # a word block's rows are at most this many word columns wide (07)
 HEAD_ROW_GAP = GAP / TILE  # between two stacked scored rows, per row height — the
                            # board's own row spacing (07)
 
@@ -399,7 +400,8 @@ WORD_ASPECTS = np.geomspace(0.2, 5.0, 33)   # grid shapes tried: columns ~ sqrt(
 def _word_block(n, heads, aspect, nc=None):
     """A block of `n` words at scale 1 (GROUP_SCALE words, 04's CELL_GAP/CELL_DY
     pitches) under a stack of `heads` scored rows, each AS WIDE AS THE WORD GRID --
-    sized by its group, as c's rows span their dots (user's call). The grid has about
+    sized by its group, as c's rows span their dots (user's call) -- but never
+    wider than HEAD_MAX_COLS columns of words. The grid has about
     sqrt(n * aspect * dy / (ww + cg)) columns — aspect 1 makes its AREA square-ish.
     `nc` fixes the column count instead."""
     ww, cg, dy = WORD_W * GROUP_SCALE, CELL_GAP, CELL_DY
@@ -407,9 +409,10 @@ def _word_block(n, heads, aspect, nc=None):
         nc = min(n, max(1, math.ceil(math.sqrt(n * aspect * dy / (ww + cg)))))
     nr = math.ceil(n / nc)
     gw = nc * ww + (nc - 1) * cg
-    rh = gw * row_aspect()
+    hw = min(gw, HEAD_MAX_COLS * ww + (HEAD_MAX_COLS - 1) * cg)   # capped (user's call)
+    rh = hw * row_aspect()
     hh = heads * rh + (heads - 1) * rh * HEAD_ROW_GAP + WORD_HEAD_GAP if heads else 0.0
-    return dict(nc=nc, nr=nr, hh=hh, rh=rh, gw=gw, w=gw + WORD_PAD,
+    return dict(nc=nc, nr=nr, hh=hh, rh=rh, gw=hw, w=gw + WORD_PAD,
                 h=nr * dy + hh + WORD_PAD)
 
 
