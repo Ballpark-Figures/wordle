@@ -20,15 +20,15 @@ Provenance for everything it writes:
                  10c WHEEL), in game_data.py's format so the same board code draws
                  them. Tiles are the tree's recorded patterns, and the build asserts
                  each one equals math/wordle.py `pattern(guess, answer)` recomputed.
-  vowel_triple — 10e's "top 3-word starter that contains all 6 vowels": the FIRST
-                 row, in file order, of math/data/shared/singletons/triple_singletons.csv
+  vowel_triples — 10e's "top 3-word starters that contain all 6 vowels": the FIRST
+                 N_TRIPLES (3, the user's call) rows, in file order, of math/data/shared/singletons/triple_singletons.csv
                  whose three words between them use every one of A E I O U Y (Y a
                  vowel, the video's convention). That file ranks blind triples by
                  singleton count (the user's choice of ranking) and is the top
                  100000 of a GREEDY screen, so this is the best such triple among
                  those screened. The build asserts the file is in descending
-                 `singles` order and that the triple has each vowel exactly once, so
-                 its six vowel tiles are exactly the six on the board.
+                 `singles` order and that each triple has each vowel exactly once,
+                 so its six vowel tiles are exactly the six on the board.
 """
 import csv
 import gzip
@@ -50,20 +50,24 @@ GAMES = ["third", "wheel"]
 TILE = {"b": 0, "y": 1, "g": 2}
 TRIPLES = os.path.join(MATH, "data", "shared", "singletons", "triple_singletons.csv")
 VOWELS = "aeiouy"
+N_TRIPLES = 3
 
 
-def _vowel_triple():
+def _vowel_triples():
     rows = list(csv.DictReader(open(TRIPLES)))
     singles = [int(r["singles"]) for r in rows]
     assert all(a >= b for a, b in zip(singles, singles[1:])), "not in ranked order"
+    out = []
     for rank, r in enumerate(rows, 1):
         words = [r["word1"], r["word2"], r["word3"]]
         if set(VOWELS) <= set("".join(words)):
             joined = "".join(words)
             assert sorted(c for c in joined if c in VOWELS) == sorted(VOWELS), words
-            return {"words": words, "rank": rank, "of": len(rows),
-                    "singles": int(r["singles"])}
-    raise AssertionError("no triple uses all six vowels")
+            out.append({"words": words, "rank": rank, "of": len(rows),
+                        "singles": int(r["singles"])})
+            if len(out) == N_TRIPLES:
+                return out
+    raise AssertionError(f"fewer than {N_TRIPLES} triples use all six vowels")
 
 
 def _build():
@@ -104,7 +108,7 @@ def _build():
 
     return {"opener": OPENER, "total": total, "answers": N_ANSWERS,
             "distribution": {str(n): c for n, c in counts.items()},
-            "games": games, "vowel_triple": _vowel_triple()}
+            "games": games, "vowel_triples": _vowel_triples()}
 
 
 def load():
@@ -125,7 +129,7 @@ if __name__ == "__main__":
         print(f"{answer.upper()}: " + "  ".join(
             f"{g['word'].upper()} {''.join('bYG'[t] for t in g['tiles'])}"
             for g in game["guesses"]))
-    t = data["vowel_triple"]
-    print(f"vowel triple: {' '.join(t['words']).upper()}  (rank {t['rank']} of "
-          f"{t['of']}, {t['singles']} singles)")
+    for t in data["vowel_triples"]:
+        print(f"vowel triple: {' '.join(t['words']).upper()}  (rank {t['rank']} of "
+              f"{t['of']}, {t['singles']} singles)")
     print(f"\nwrote {CACHE}")

@@ -101,14 +101,36 @@
       ]
     }
   },
-  "vowel_triple": {
-    "words": [
-      "curse",
-      "paint",
-      "godly"
-    ],
-    "rank": 365,
-    "of": 100000,
-    "singles": 1625
-  }
+  "vowel_triples": [
+    {
+      "words": [
+        "curse",
+        "paint",
+        "godly"
+      ],
+      "rank": 365,
+      "of": 100000,
+      "singles": 1625
+    },
+    {
+      "words": [
+        "curse",
+        "point",
+        "badly"
+      ],
+      "rank": 380,
+      "of": 100000,
+      "singles": 1624
+    },
+    {
+      "words": [
+        "biont",
+        "carse",
+        "duply"
+      ],
+      "rank": 478,
+      "of": 100000,
+      "singles": 1617
+    }
+  ]
 }
