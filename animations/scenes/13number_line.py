@@ -12,7 +12,7 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   d no_repeats    — the Random (no repeats) marker at 1158                 (13d, VO 3)
   e until_single  — the line zooms in, the leftmost dot (3.42) at the left and the
                     new 6.90 dot at the right (1158 and 2315 slide off);
-                    the Random Until Single Answer marker at 6.90          (13e, VO 4)
+                    the Random Until One Answer marker at 6.90             (13e, VO 4)
   f compatible    — the Random Compatible Answers marker at 4.08, below
                     the line                                               (13f, VO 5)
 
@@ -189,11 +189,11 @@ class Scene13(WordleBoardScene):
         self._pop_in(m, 0.4)
 
     # e : zoom in, the leftmost dot at the left, the new 6.90 dot at the right; 1158 and 2315
-    #     slide off; Random Until Single Answer at 6.90
+    #     slide off; Random Until One Answer at 6.90 (script: "Single"; user's call)
     @subscene
     def until_single(self):
         left = min(m.value for m in self.line.markers)
-        m = self._marker(6.90, ["Random Until", "Single Answer", "59.30%"])
+        m = self._marker(6.90, ["Random Until", "One Answer", "59.30%"])
         self._zoom_pop(left, m.value, m, 2.0, 0.4, 0.5)
 
     # f : Random Compatible Answers at 4.08, below the line
