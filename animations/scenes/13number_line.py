@@ -1,7 +1,7 @@
 """Scene 13 — random strategies on a number line of average guesses. Navy background.
 
 Scene 12 ends with the frame cleared, so everything here fades in. Talking head THI
-follows, so l ends with the whole line on screen.
+follows, so m ends with the whole line on screen.
 
 BEAT MAP — one subscene per Script.md beat, letters matching:
 
@@ -22,11 +22,11 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                     VALUE                                                  (13h, VO 5)
   i value         — the same: VALUE, BBYYG, 5 left, hops to FLUTE          (13i, VO 5)
   j flute         — the same: FLUTE, GGGBG, 2 left, hops to FLUKE          (13j, VO 5)
-                    (FLUKE's own typed, all-green turn waits on its beat in the Doc)
-  k back_to_line  — the typed rows and the words fade out as the number line, its
-                    markers and the title fade back in                     (13k, VO 5)
-  l compatible    — the Random Compatible Answers marker at 4.08, below
-                    the line                                               (13l, VO 5)
+  k fluke         — FLUKE typed and flips GGGGG; FLUKE alone is left       (13k, VO 5)
+  l back_to_line  — the typed rows and the words fade out as the number line, its
+                    markers and the title fade back in                     (13l, VO 5)
+  m compatible    — the Random Compatible Answers marker at 4.08, below
+                    the line                                               (13m, VO 5)
 
 REUSE MAP — every element, the one source it comes from, and how it enters:
   number line, ticks,   bpkfigures/number_line.py `ZoomLine` (new, for number lines
@@ -59,14 +59,16 @@ REUSE MAP — every element, the one source it comes from, and how it enters:
   typed rows (g-j)      a one-row WordleBoard per word, tiles appearing as typed —
                         07n's type_fresh (07dynamic_programming.py:790), each row under
                         the last at the board's row spacing (07's `_typed_row`); the
-                        first at 04i's GUESS_Y, GUESS_SCALE wide (assets/groups.py);
+                        first at 04i's GUESS_Y, TOP_SCALE wide (bigger than 04i's
+                        GUESS_SCALE, user's call);
                         typing `type_word` + assets/keys.py `key_cues`; flips `reveal`
                         at 02's 1.6s. No board (user's call)
   compatible words      assets/pigpen.py `PigpenWord(revealed=True)` — 04's answer
-                        words — gridded by assets/groups.py `grid_cells` at 04's
-                        CELL_GAP / CELL_DY pitches (relative to GROUP_SCALE), scaled
-                        to fill the right-hand region; tile strokes thinned by 12's
-                        rule for small rows
+                        words — laid out by assets/groups.py `ranked_word_layout`
+                        (07d-g's: the grid shape that gives the LARGEST words in the
+                        region, last row centred), NOT grid_cells' square grid (user's
+                        call: words should fill the space); capped at list size; tile
+                        strokes thinned by 12's rule for small rows
   words in (g)          plain FadeIn of the whole grid, below the typed rows (04i's
                         guess-on-top, groups-below arrangement)
   words ruled out       12's `_shrink_out` (06b's exit); survivors move and grow to
@@ -105,17 +107,18 @@ LAYOUT CHOICES, flagged:
   - 4.08's label hangs BELOW the line: above, it would overlap 3.42's. Its stem
     runs from the dot through the tick labels; a tick label it crosses is dropped.
   - Markers: a white dot and stem, running into the card (user's call: boxed text).
-  - 13g-j (user's calls, 2026-09-30): ONE BEAT PER WORD, each ending by selecting
+  - 13g-k (user's calls, 2026-09-30): ONE BEAT PER WORD, each ending by selecting
     the next word (the word the script names in that beat), and each flipping its
     REAL colouring — the script's h-j colourings are the SELECTED word's. The typed
     words stack at the top middle, like a board without its empty rows; the
     compatible answers grid below. Each turn ends with 10 quick highlights, 9
     random and the last on the next guess.
-  - The grid's region is fixed, below the room five typed rows take, so the words
-    never move to make way for a new row.
+  - The grid's region runs from one row's room below the typed rows to the frame's
+    bottom, so the next word is always typed into clear space; each regrid (after a
+    flip) moves down into the region for the new count of rows.
   - Every compatible answer is shown, all 332 after DICEY (so they are small), in
     the answer list's alphabetical order.
-  - k crossfades the rows and words out and the line in, in one play.
+  - l crossfades the rows and words out and the line in, in one play.
   - Each win rate is coloured red -> green, very nonlinearly (user's call): the
     colour position is t = 1 - (1 - rate)^P with P set so t = 0.5 at WIN_MID (98%),
     i.e. a power law in the LOSS rate. The colour runs round the hue wheel from
@@ -135,9 +138,8 @@ from config import *
 from bpkfigures.number_line import ZoomLine
 from bpkfigures.highlight import highlight
 from assets.board import STROKE, GAP, TILE, WordleBoard, get_typed_row
-from assets.groups import (HEADER_W, GROUP_SCALE, CELL_GAP, CELL_DY, GUESS_Y,
-                           GUESS_SCALE, grid_cells)
-from assets.pigpen import PigpenWord
+from assets.groups import HEADER_W, GUESS_Y, ranked_word_layout
+from assets.pigpen import PigpenWord, WORD_W     # the list-size word ranked_word_layout sizes by
 from assets.keys import key_cues
 from assets import random_game_data
 
@@ -154,10 +156,10 @@ CARD_PAD = 0.22           # the marker cards' margin round their text
 CARD_RADIUS = 0.25        # the cards' corner rounding
 WIN_LOW, WIN_HIGH = LIGHT_RED, LIGHT_GREEN
 WIN_MID = 0.98            # the win rate that sits halfway from red to green
-GAME_ROWS = 5             # g-j: room is kept for this many typed rows
+TOP_SCALE = 1.7           # g-j: the typed rows' size, as a PigpenWord scale
 GRID_X = (-7.6, 7.6)      # g-j: the compatible-answer grid's region, below the rows
-GRID_BOTTOM = -4.2
-ROWS_GRID_GAP = 0.35      # between the lowest typed row's room and the grid
+GRID_BOTTOM = -4.3
+ROWS_GRID_GAP = 0.3       # between the room for the next typed row and the grid
 GRID_MAX_SCALE = 1.0      # a gridded word is never bigger than 04's list size
 
 
@@ -193,6 +195,7 @@ class Scene13(WordleBoardScene):
     guess — GUESS's turn; hops to VALUE
     value — VALUE's turn; hops to FLUTE
     flute — FLUTE's turn; hops to FLUKE
+    fluke — FLUKE's turn, all green
     back_to_line — rows and words out, line back
     compatible — 4.08, below the line
     """
@@ -201,25 +204,29 @@ class Scene13(WordleBoardScene):
         pass
 
     # ── the game (g-j) ────────────────────────────────────────────────────────
-    def _grid(self, words):
-        """{word: (centre, scale)} for `words` gridded by grid_cells in the region."""
-        n = len(words)
-        nc = max(1, math.ceil(math.sqrt(n)))
-        nr = math.ceil(n / nc)
-        ww = self.word_w                            # a word's width at scale 1
-        cg, dy = CELL_GAP / GROUP_SCALE, CELL_DY / GROUP_SCALE
-        rw, rh = GRID_X[1] - GRID_X[0], self.grid_top - GRID_BOTTOM
-        s = min(rw / (nc * ww + (nc - 1) * cg), rh / (nr * dy), GRID_MAX_SCALE)
-        cx, cy = sum(GRID_X) / 2, (self.grid_top + GRID_BOTTOM) / 2
-        return {w: (np.array([cx + ox * (ww + cg) * s, cy + oy * dy * s, 0.0]), s)
-                for w, (ox, oy) in zip(words, grid_cells(n))}
+    def _grid(self, words, k):
+        """{word: (centre, PigpenWord scale)} for turn k's compatible `words`:
+        07's `ranked_word_layout` (the shape giving the largest words) in the region
+        below the room for turn k+1's row, capped at list size and kept top-aligned."""
+        top = GUESS_Y - self.row_h / 2 - (k + 1) * self.pitch - ROWS_GRID_GAP
+        slots, sc, _, _ = ranked_word_layout([{"size": len(words), "members": words}],
+                                             GRID_X[0], GRID_X[1], top, GRID_BOTTOM,
+                                             heads=0)
+        width = WORD_W * sc                         # the layout's word width
+        f = min(1.0, self.word_w * GRID_MAX_SCALE / width)
+        pts = np.array([slots[w] for w in words])
+        cx, ty = pts[:, 0].mean(), pts[:, 1].max()
+        return {w: (np.array([cx + (slots[w][0] - cx) * f,
+                              ty + (slots[w][1] - ty) * f, 0.0]),
+                    width * f / self.word_w)
+                for w in words}
 
     def _new_row(self):
         """An empty one-row board for the next typed word: the first at 04i's
-        GUESS_Y, GUESS_SCALE wide; each later one under the last at the board's
+        GUESS_Y, TOP_SCALE wide; each later one under the last at the board's
         row spacing (07's `_typed_row`)."""
         row = WordleBoard(rows=1, cols=5)
-        row.scale(self.word_w * GUESS_SCALE / row.width)
+        row.scale(self.word_w * TOP_SCALE / row.width)
         if not self.rows:
             row.move_to([0, GUESS_Y, 0])
         else:
@@ -230,12 +237,10 @@ class Scene13(WordleBoardScene):
     def _setup_game(self):
         self.word_w = PigpenWord("salet", revealed=True).width
         self.rows = []
-        pitch = self.word_w * GUESS_SCALE / (5 * TILE + 4 * GAP) * (TILE + GAP)
-        row_h = pitch * TILE / (TILE + GAP)
-        room_bottom = GUESS_Y - row_h / 2 - (GAME_ROWS - 1) * pitch
-        self.grid_top = room_bottom - ROWS_GRID_GAP
+        self.pitch = self.word_w * TOP_SCALE / (5 * TILE + 4 * GAP) * (TILE + GAP)
+        self.row_h = self.pitch * TILE / (TILE + GAP)
         self.words, self.wscale = {}, {}
-        for w, (c, sc) in self._grid(GAME["alive"][0]).items():
+        for w, (c, sc) in self._grid(GAME["alive"][0], 0).items():
             m = PigpenWord(w, revealed=True).scale(sc).move_to(c)
             for t in m.tiles:
                 t.set_stroke(width=_word_stroke(m.width))
@@ -260,7 +265,7 @@ class Scene13(WordleBoardScene):
         """The words turn k rules out shrink away; the rest move to their cells."""
         keep = GAME["alive"][k]
         anims = []
-        for w, (c, sc) in self._grid(keep).items():
+        for w, (c, sc) in self._grid(keep, k).items():
             m = self.words[w]
             f = sc / self.wscale[w]
             anims.append(m.animate.scale(f).move_to(c))
@@ -391,7 +396,12 @@ class Scene13(WordleBoardScene):
     def flute(self):
         self._turn(3, 0.65, 1.6, 1.0, 0.12)
 
-    # k : back to the timeline — the rows and words out, the line and title in
+    # k : FLUKE's turn (GGGGG); FLUKE alone is left
+    @subscene
+    def fluke(self):
+        self._turn(4, 0.65, 1.6, 1.0, 0.12)
+
+    # l : back to the timeline — the rows and words out, the line and title in
     @subscene
     def back_to_line(self):
         out = [*self.rows, *self.words.values()]
@@ -402,7 +412,7 @@ class Scene13(WordleBoardScene):
                   run_time=1.2)
         self.rows, self.words, self.wscale, self.mark = [], {}, {}, None
 
-    # l : Random Compatible Answers at 4.08, below the line
+    # m : Random Compatible Answers at 4.08, below the line
     @subscene
     def compatible(self):
         m = self._marker(4.08, ["Random", "Compatible", "Answers", "98.20%"],

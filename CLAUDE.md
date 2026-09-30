@@ -4703,9 +4703,15 @@ a correction to one is invisible to the rest.
 - **EVERY grid of words — a group's members, under a guess or on their own — goes
   through `animations/assets/groups.py` `grid_cells(n)`**: scene 04's rule, ceil(sqrt(n))
   columns, filled row by row, a short last row centred (6 words = 3+3, 14 = 4+4+4+2).
-  Never pick a column count by hand. The ONE deliberate exception is
-  `ranked_word_layout` (07d-g), whose grid shape is searched for the largest words
-  (user's call). (Bit us 2026-09-30: scene 07 hardcoded 3 columns, then 8, then
+  Never pick a column count by hand. The deliberate exception is a word grid meant
+  to FILL A REGION: that goes through `ranked_word_layout`, whose grid shape is
+  searched for the largest words (07d-g, and 13g-k's compatible answers). The user,
+  2026-09-30: the square grid "makes a lot more sense for dots than for 5-letter
+  words" — at 04's pitches ceil(sqrt(n)) columns makes a grid ~5x wider than tall, so
+  a big set (13g's 332) is capped by the frame's width and unreadable however much
+  height is free. `ranked_word_layout` sizes by `pigpen.WORD_W` (the LIST-size word),
+  NOT `word_stacks.WORD_W` (the full board row) — mixing them overlaps every word.
+  (Bit us 2026-09-30: scene 07 hardcoded 3 columns, then 8, then
   "fill rows evenly", giving 8+6 and then 7+7 grids the video uses nowhere else.)
 - **EVERY dictionary definition on screen ("n. Obsolete variant of rote") goes
   through `animations/assets/gloss.py` `gloss(lines, font_size, italic=...)`, never a
