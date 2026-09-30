@@ -13,22 +13,24 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   e until_single  — the line zooms in, the leftmost dot (3.42) at the left and the
                     new 6.90 dot at the right (1158 and 2315 slide off);
                     the Random Until One Answer marker at 6.90             (13e, VO 4)
-  f pan_up        — the camera pans up, off the number line, to where the game
+  f dicey         — the camera pans up, off the number line, to where the game
                     is set, one frame above it (user's call; the script says
-                    "Fade everything out")                                 (13f, VO 5)
-  g dicey         — DICEY typed at the top middle, its tiles appearing as typed,
-                    and flips BBBYB; its 332 compatible answers fade in as a grid
-                    below; a highlight hops 10 times, landing on GUESS     (13g, VO 5)
-  h guess         — GUESS typed on a new row under DICEY and flips BYYBB; the
+                    "Fade everything out"), and DICEY starts typing at the top
+                    middle the moment its row is fully in view (user's call:
+                    13f and 13g MERGED, so from here each letter is ONE BEHIND
+                    the Doc's); DICEY flips BBBYB; its 332 compatible answers
+                    fade in as a grid below; a highlight hops 10 times, landing
+                    on GUESS                                          (13f+13g, VO 5)
+  g guess         — GUESS typed on a new row under DICEY and flips BYYBB; the
                     ruled-out words shrink away and the 21 left regrid; hops to
                     VALUE                                                  (13h, VO 5)
-  i value         — the same: VALUE, BBYYG, 5 left, hops to FLUTE          (13i, VO 5)
-  j flute         — the same: FLUTE, GGGBG, 2 left, hops to FLUKE          (13j, VO 5)
-  k fluke         — FLUKE typed and flips GGGGG; both words left (FLUKE, FLUME)
+  h value         — the same: VALUE, BBYYG, 5 left, hops to FLUTE          (13i, VO 5)
+  i flute         — the same: FLUTE, GGGBG, 2 left, hops to FLUKE          (13j, VO 5)
+  j fluke         — FLUKE typed and flips GGGGG; both words left (FLUKE, FLUME)
                     vanish as FLUKE's row does the win bounce              (13k, VO 5)
-  l back_to_line  — the camera pans back down to the number line; the game
+  k back_to_line  — the camera pans back down to the number line; the game
                     slides up out of frame                                 (13l, VO 5)
-  m compatible    — the Random Compatible Answers marker at 4.08, below
+  l compatible    — the Random Compatible Answers marker at 4.08, below
                     the line                                               (13m, VO 5)
 
 REUSE MAP — every element, the one source it comes from, and how it enters:
@@ -124,7 +126,9 @@ LAYOUT CHOICES, flagged:
     flip) moves down into the region for the new count of rows.
   - Every compatible answer is shown, all 332 after DICEY (so they are small), in
     the answer list's alphabetical order.
-  - Both pans take 1.5s with manim's default easing, and play no sound.
+  - Both pans take 1.5s with manim's default easing, and play no sound. DICEY's
+    typing starts when the pan brings its row TYPE_MARGIN inside the frame's top,
+    found from the pan's own rate function, so retiming the pan keeps it right.
   - Each win rate is coloured red -> green, very nonlinearly (user's call): the
     colour position is t = 1 - (1 - rate)^P with P set so t = 0.5 at WIN_MID (98%),
     i.e. a power law in the LOSS rate. The colour runs round the hue wheel from
@@ -170,6 +174,7 @@ ROWS_GRID_GAP = 0.3       # between the room for the next typed row and the grid
 GRID_MAX_SCALE = 1.0      # a gridded word is never bigger than 04's list size
 GAME_DY = config.frame_height   # the game sits one frame above the number line
 BOUNCE_H = 0.35           # board.bounce's height for a full-size tile (07's)
+TYPE_MARGIN = 0.15        # f: DICEY types once its row is this far inside the frame
 
 
 def _shrink_out(mob):
@@ -199,8 +204,8 @@ class Scene13(MovingCameraScene, WordleBoardScene):
     random — zoom out to 3..2500; 2315
     no_repeats — 1158
     until_single — zoom in to 3.42..6.90; 6.90
-    pan_up — the camera up to the game
-    dicey — DICEY typed at the top and flipped; 332 words in; hops to GUESS
+    dicey — the camera up to the game, DICEY typing as it arrives; 332 words in;
+        hops to GUESS
     guess — GUESS's turn; hops to VALUE
     value — VALUE's turn; hops to FLUTE
     flute — FLUTE's turn; hops to FLUKE
@@ -267,6 +272,24 @@ class Scene13(MovingCameraScene, WordleBoardScene):
         self.rows.append(row)
         row.type_word(self, 0, GAME["words"][k], run_time,
                       per_letter=key_cues(self), appear=True)
+
+    def _pan_and_type(self, pan_rt, type_rt):
+        """The camera pans up one frame to the game, and DICEY starts typing on the
+        first row as soon as that row is TYPE_MARGIN inside the frame's top — the
+        moment read off the pan's own rate function."""
+        row = self._new_row()
+        self.rows.append(row)
+        frame = self.camera.frame
+        need = row.get_top()[1] + TYPE_MARGIN - config.frame_height / 2 - frame.get_y()
+        a = next(a for a in np.linspace(0, 1, 1001) if smooth(a) * GAME_DY >= need)
+        t0 = a * pan_rt
+        cues = key_cues(self)
+        typing, total = row.type_anim(self, 0, GAME["words"][0], type_rt, appear=True,
+                                      per_letter=lambda i, ch, at: cues(i, ch, t0 + at))
+        frame.generate_target()
+        frame.target.shift(UP * GAME_DY)
+        self.play(MoveToTarget(frame, run_time=pan_rt),
+                  Succession(Wait(t0), AnimationGroup(typing, run_time=total)))
 
     def _flip(self, k, run_time):
         self.rows[k].reveal(self, 0, GAME["codes"][k], run_time)
@@ -376,36 +399,32 @@ class Scene13(MovingCameraScene, WordleBoardScene):
         m = self._marker(6.90, ["Random Until", "One Answer", "59.30%"])
         self._zoom_pop(left, m.value, m, 2.0, 0.4, 0.5)
 
-    # f : the camera pans up to the game, set one frame above the line
-    @subscene
-    def pan_up(self):
-        self.play(self.camera.frame.animate.shift(UP * GAME_DY), run_time=1.5)
-
-    # g : DICEY typed at the top, flips BBBYB; the 332 compatible answers; hops to GUESS
+    # f : (13f+13g, merged) the camera pans up to the game and DICEY types as its
+    #     row arrives; flips BBBYB; the 332 compatible answers; hops to GUESS
     @subscene
     def dicey(self):
         self._setup_game()
-        self._type(0, 0.65)
+        self._pan_and_type(1.5, 0.65)
         self._flip(0, 1.6)
         self.play(FadeIn(VGroup(*self.words.values())), run_time=0.8)
         self._hops(0, 0.12)
 
-    # h : GUESS's turn (BYYBB), 21 left; hops to VALUE
+    # g : GUESS's turn (BYYBB), 21 left; hops to VALUE
     @subscene
     def guess(self):
         self._turn(1, 0.65, 1.6, 1.0, 0.12)
 
-    # i : VALUE's turn (BBYYG), 5 left; hops to FLUTE
+    # h : VALUE's turn (BBYYG), 5 left; hops to FLUTE
     @subscene
     def value(self):
         self._turn(2, 0.65, 1.6, 1.0, 0.12)
 
-    # j : FLUTE's turn (GGGBG), 2 left; hops to FLUKE
+    # i : FLUTE's turn (GGGBG), 2 left; hops to FLUKE
     @subscene
     def flute(self):
         self._turn(3, 0.65, 1.6, 1.0, 0.12)
 
-    # k : FLUKE's turn (GGGGG); both words left vanish as the row does the win bounce
+    # j : FLUKE's turn (GGGGG); both words left vanish as the row does the win bounce
     @subscene
     def fluke(self):
         self._type(4, 0.65)
@@ -417,14 +436,14 @@ class Scene13(MovingCameraScene, WordleBoardScene):
         self.remove(*self.words.values())
         self.words, self.wscale = {}, {}
 
-    # l : the camera pans back down to the number line; the game leaves upward
+    # k : the camera pans back down to the number line; the game leaves upward
     @subscene
     def back_to_line(self):
         self.play(self.camera.frame.animate.shift(DOWN * GAME_DY), run_time=1.5)
         self.remove(*self.rows)            # off-frame now; keeps the snapshot light
         self.rows = []
 
-    # m : Random Compatible Answers at 4.08, below the line
+    # l : Random Compatible Answers at 4.08, below the line
     @subscene
     def compatible(self):
         m = self._marker(4.08, ["Random", "Compatible", "Answers", "98.20%"],
