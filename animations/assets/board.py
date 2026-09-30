@@ -164,7 +164,14 @@ class WordleBoard(VGroup):
                       fill_color=TILE_EMPTY_FILL, fill_opacity=1.0)
 
     def _letter(self, ch, tile, color=TILE_TEXT):
-        t = crisp_text(ch.upper(), color=color, weight=BOLD)
+        # ALWAYS built in TILE_TEXT and recoloured after, never built in `color`: the
+        # text cache is keyed on colour, so a coloured letter is a NEW render, and a
+        # new render of Inter bold currently comes out a different glyph (narrower,
+        # lighter) from the cached ones every board in this video draws. Recolouring
+        # keeps a coloured letter the SAME glyph as a normal one (scene 10's table).
+        t = crisp_text(ch.upper(), color=TILE_TEXT, weight=BOLD)
+        if ManimColor(color).to_hex().lower() != ManimColor(TILE_TEXT).to_hex().lower():
+            t.set_color(color)
         # Sized off the tile's CURRENT height, not TILE, so a letter typed into a
         # board that has been shrunk (scene 03's growing column) fits its tile.
         # Identical to TILE * LETTER_FRAC on an unscaled board.

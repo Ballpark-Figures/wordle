@@ -35,7 +35,8 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   s avg_4 / t opener_4 — t then plays TALE's all-grey path (its tree's longest
                    all-grey line, to the answer) in the top-right corner at the
                    table's tile size, each row typed then quick-flipped     (VO 6)
-  u avg_3 / v opener_3 — v fades 4's path and plays RAS's the same way      (VO 7)
+  u avg_3 / v opener_3 — u fades 4's path as 3's average comes in; v plays
+                   RAS's path the same way                                  (VO 7)
   j and o-r fill a whole row the same way: average, then opener.
   An average fades in; an opener is TYPED in as tiles, as SALET is, its letters
   coloured vowel red / consonant blue (hangman's rule, Y a vowel — the user's).
@@ -181,7 +182,7 @@ TABLE = {int(L): t for L, t in DATA["table"].items()}
 GREY_PATHS = {int(L): p for L, p in DATA["grey_paths"].items()}
 # the corner the all-grey paths sit in: top-right, clear of the header and of the
 # longer openers' rows (row 7's SALTINE ends at x 4.8)
-CORNER_UR = (7.6, 4.2)
+CORNER_UR = (7.2, 3.8)
 CORNER_W = 3.0
 CORNER_H = 4.1
 assert sorted(TABLE) == LENGTHS
@@ -399,7 +400,7 @@ class Scene10(WordleDarkScene):
                               lag_ratio=0.12), run_time=1.2)
 
     # ── j-v: filling in the table, one cell at a time ──────────────────────
-    def _fill_avg(self, L, run_time):
+    def _fill_avg(self, L, run_time, extra=()):
         """Length L's average guesses fades into its cell. A STUB total (None, see
         word_lengths_data) leaves the cell empty rather than showing a number."""
         t = TABLE[L]
@@ -407,7 +408,7 @@ class Scene10(WordleDarkScene):
             return
         cell = crisp_text(_avg(t["total"], t["answers"]), font_size=CELL_SIZE,
                           color=WHITE).move_to([AVG_X, _row_y(L), 0])
-        self.play(FadeIn(cell), run_time=run_time)
+        self.play(FadeIn(cell), *extra, run_time=run_time)
 
     def _fill_opener(self, L, run_time):
         """Length L's best opener typed into its row as tiles (they appear as their
@@ -503,16 +504,15 @@ class Scene10(WordleDarkScene):
         if self.path4 is not None:          # a stub if the TALE tree is missing
             self._play_corner(self.path4, 4, 0.52, 0.4)
 
-    # u : length 3's average
+    # u : length 3's average, as length 4's path fades from the corner
     @subscene
     def avg_3(self):
-        self._fill_avg(3, 0.5)
+        out = [] if self.path4 is None else [FadeOut(self.path4)]
+        self._fill_avg(3, 0.5, extra=out)
+        self.path4 = None
 
     # v : length 3's opener, then its tree's all-grey path replacing 4's in the corner
     @subscene
     def opener_3(self):
         self._fill_opener(3, 0.39)
-        if self.path4 is not None:
-            self.play(FadeOut(self.path4), run_time=0.5)
-        self.path4 = None
         self._play_corner(self._setup_corner(3), 3, 0.39, 0.4)
