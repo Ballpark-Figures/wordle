@@ -12,9 +12,11 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                    already scored, fades in above bar 3                      (VO 1)
   c game_wheel   — bar 3 back to grey, bar 4 green; a mini board of SALET,
                    BEVOR, CHIMP, WHEEL fades in below bar 3                  (VO 1)
-  d wheel_center — bar 4 back to grey; the chart and the THIRD board fade as
-                   the background turns navy; the WHEEL board moves to the
-                   middle at full size                                       (VO 1)
+  d wheel_center — at once: bar 4 greys as the chart and the THIRD board fade,
+                   the background turns navy, and the WHEEL board grows to the
+                   middle with its WHEEL row fading. Then every tile goes black,
+                   keeping only the A (SALET), E V O (BEVOR), I (CHIMP) and the
+                   T; then T becomes Y and V becomes U (the user's)          (VO 1)
   (VO 2 — the word-length discussion — has no subscene in the script yet.)
 
 REUSE MAP — every element and the one source it comes from:
@@ -76,14 +78,24 @@ BOARD_SCALE = 0.7
 BOARD_GAP_X = 0.8            # boards start this far right of bar 4's end
 BOARD_GAP_Y = 0.4            # THIRD this far above bar 3, WHEEL this far below
 
+# ── d: WHEEL's board, down to its vowels ──────────────────────────────────────
+# (row, position) of each letter that stays, in SALET / BEVOR / CHIMP: the A; the
+# E, V, O; the I — and the T. T and V then become Y and U (the user's call), so
+# the three rows hold all six vowels, spread across the three guesses.
+KEEP = {0: {1, 4}, 1: {1, 2, 3}, 2: {2}}
+MORPH = {(0, 4): "y", (1, 2): "u"}
+_ROWS = [g["word"] for g in DATA["games"]["wheel"]["guesses"][:3]]
+assert _ROWS == ["salet", "bevor", "chimp"], _ROWS
+assert [_ROWS[r][i] for (r, i) in MORPH] == ["t", "v"]
+
 
 class Scene10(WordleDarkScene):
     """BEAT MAP
     distribution — SALET's guess-distribution chart grows in
     game_third — bar 3 green; SALET's scored game for THIRD fades in above it
     game_wheel — bar 3 grey, bar 4 green; SALET's game for WHEEL fades in below bar 3
-    wheel_center — bar 4 grey; chart and THIRD board leave, bg to navy; WHEEL board
-                   to the middle
+    wheel_center — chart and THIRD board leave, bg to navy, WHEEL board to the
+                   middle minus its WHEEL row; tiles black, vowels kept; T->Y, V->U
     """
 
     def setup_scene(self):
@@ -145,15 +157,62 @@ class Scene10(WordleDarkScene):
         self.play(self._bar_color("3", TILE_ABSENT), self._bar_color("4", TILE_CORRECT),
                   FadeIn(self.board_wheel), run_time=0.8)
 
-    # d : bar 4 back to grey; the chart and THIRD's board leave as the background
-    #     turns navy; WHEEL's board to the middle
+    # d : all at once — bar 4 greys as the chart and THIRD's board fade, the
+    #     background turns navy, and WHEEL's board grows to the middle with its WHEEL
+    #     row fading; then the tiles go black, keeping only the vowels (and T, V);
+    #     then T becomes Y and V becomes U
+    def _setup_wheel_center(self):
+        c = self.chart
+        bar4 = c.bar_of["4"]
+        # bar 4 is animated on its own (grey AND out), so the rest of the chart
+        # fades without it — one mobject, one animation
+        self.chart_rest = [b for b in c.bars if b is not bar4] + \
+                          [c.labels, c.values, c.title]
+        self.upper = VGroup(*self.board_wheel[:-1])      # SALET, BEVOR, CHIMP
+        self.wheel_row = self.board_wheel[-1]
+        # full tile size, with the three rows that stay centred in the frame
+        self.k = 1 / BOARD_SCALE
+        self.pivot = self.board_wheel.get_center()
+        grown = self.upper.copy().scale(self.k, about_point=self.pivot)
+        self.to_mid = ORIGIN - grown.get_center()
+
+    def _black_tiles(self, run_time):
+        """Every tile to Wordle's empty black; letters not in KEEP fade out. A tile
+        keeping its letter gets the typed border, the others the empty one."""
+        anims = []
+        for r, row in enumerate(self.upper):
+            for i in range(5):
+                keep = i in KEEP[r]
+                border = TILE_FILLED_BORDER if keep else TILE_EMPTY_BORDER
+                anims.append(row.tiles[0][i].animate.set_fill(TILE_EMPTY_FILL)
+                             .set_stroke(border))
+                if not keep:
+                    anims.append(FadeOut(row.letters[0][i]))
+        self.play(*anims, run_time=run_time)
+
+    def _morph_letters(self, run_time):
+        anims = []
+        for (r, i), ch in MORPH.items():
+            row = self.upper[r]
+            new = row._letter(ch, row.tiles[0][i])
+            anims.append(Transform(row.letters[0][i], new))
+        self.play(*anims, run_time=run_time)
+
     @subscene
     def wheel_center(self):
-        # its own play: bar 4 is part of the chart, so recolouring it inside the
-        # FadeOut would put two animations on one mobject
-        self.play(self._bar_color("4", TILE_ABSENT), run_time=0.5)
-        self.play(FadeOut(self.chart), FadeOut(self.board_third),
-                  bg_to(self, BOARD_NAVY), run_time=1.0)
-        self.play(self.board_wheel.animate.scale(1 / BOARD_SCALE).move_to(ORIGIN),
+        self._setup_wheel_center()
+        bar4 = self.chart.bar_of["4"]
+        self.play(bar4.animate.set_fill(TILE_ABSENT, opacity=0)
+                      .set_stroke(TILE_ABSENT, opacity=0),
+                  FadeOut(*self.chart_rest), FadeOut(self.board_third),
+                  bg_to(self, BOARD_NAVY),
+                  self.upper.animate.scale(self.k, about_point=self.pivot)
+                      .shift(self.to_mid),
+                  self.wheel_row.animate.scale(self.k, about_point=self.pivot)
+                      .shift(self.to_mid).set_opacity(0),
                   run_time=1.2)
-        self.chart = self.board_third = None
+        self.remove(self.chart, bar4, self.board_third, self.wheel_row)
+        self.board_wheel.remove(self.wheel_row)
+        self.chart = self.board_third = self.wheel_row = None
+        self._black_tiles(1.0)
+        self._morph_letters(0.8)
