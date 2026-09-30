@@ -22,7 +22,7 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                     right into Arabic الْعَرَبِيَّة, vowel marks red, letters
                     blue                                                    (VO 5)
   i script_names  — (Hebrew) and (Arabic) fade up under them               (VO 5)
-  j poof          — the vowel marks fade out, with the airy whoosh sfx (the
+  j poof          — the vowel marks fade out, with the mids whoosh sfx (the
                     user's swap for the script's poof)                     (VO 5)
 
 THE VOWELS in h-j are the OPTIONAL marks, the ones everyday text leaves out (the
@@ -52,7 +52,7 @@ REUSE MAP — every element and the one source it comes from:
   script words   crisp_text in a system font with the script (Inter has neither):
                  Arial Hebrew, Geeza Pro; coloured VOWEL_TILE_COLOR /
                  CONS_TILE_COLOR, the same pair tile_color uses
-  whoosh sfx     music-library `whoosh-airy`, at scene 01's WHOOSH_GAIN
+  whoosh sfx     music-library `whoosh-mids`, at scene 01's WHOOSH_GAIN
                  (assets/stacks_view.py)
 
 NUMBERS: the VO's "only one possible Wordle answer matches" — checked against the
@@ -96,10 +96,10 @@ HEBREW = ("עִבְרִית", "Arial Hebrew", 8, {2, 4, 6})
 ARABIC = ("الْعَرَبِيَّة", "Geeza Pro", 12, {1, 3, 5, 7, 9})
 SCRIPT_SIZE = 130
 
-# j's sound: the third whoosh of Epidemic's 'Airy 02' (music-library catalog.md),
+# j's sound: the second whoosh of Epidemic's 'Mids' (music-library catalog.md),
 # at scene 01's whoosh level
-AIRY_SFX = "whoosh-airy"
-AIRY_PEAK = 0.28                      # s into the file where it is loudest (MEASURED)
+J_WHOOSH_SFX = "whoosh-mids"
+J_WHOOSH_PEAK = 0.20                     # s into the file where it is loudest (MEASURED)
 LABEL_SIZE = FONT_SIZE_SM
 LABEL_BUFF = 0.35
 
@@ -298,11 +298,11 @@ class Scene11(WordleBoardScene):
         self.play(*[FadeIn(n, shift=UP * 0.2) for n in self.names], run_time=0.8)
 
     # j : the vowel marks vanish, with a whoosh (the user's swap for the script's
-    #     poof) — the airy one, at scene 01's whoosh level, loudest mid-fade
+    #     poof) — whoosh-mids, at scene 01's whoosh level, loudest mid-fade
     @subscene
     def poof(self):
         rt = 0.7
-        self.sfx(AIRY_SFX, at=max(0.0, rt / 2 - AIRY_PEAK), gain=WHOOSH_GAIN)
+        self.sfx(J_WHOOSH_SFX, at=max(0.0, rt / 2 - J_WHOOSH_PEAK), gain=WHOOSH_GAIN)
         self.play(*[FadeOut(m) for m in self.marks], run_time=rt)
         for w in range(2):
             self.scripts[w].remove(*self.marks[w])
