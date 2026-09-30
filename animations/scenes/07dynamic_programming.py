@@ -209,7 +209,9 @@ AVG_NUM_BUFF = 0.3                 # between "Guesses" and the number
 AVG_BUFF = 0.35                    # from the frame's top-right corner
 AVG_GREEN = TILE_CORRECT           # an optimal tree's number (the others' are white):
                                    #   the tiles' green, as the winning rows
-FULL_ROOT_W = 5.0                  # zc: SALET's width; every node's goes as sqrt(answers)
+FULL_SCALE_W = 5.0                 # zc: the size rule -- a node of n answers is
+                                   #   FULL_SCALE_W * sqrt(n / N) wide, N all of them
+FULL_ROOT_W = 3.0                  # zc: SALET's own width, OFF the rule (user's call)
 FULL_R = 4.25                      # zc: (vertical) distance of a one-answer node from the
                                    #   centre; a node of n answers sits at
                                    #   FULL_R * log(N / n) / log(N) -- the bigger the group,
@@ -1358,7 +1360,7 @@ class Scene07(WordleBoardScene):
                        for k in n["kids"])
         total = count(tree)
         pieces, lines = [], []
-        k_w = FULL_ROOT_W / math.sqrt(total)
+        k_w = FULL_SCALE_W / math.sqrt(total)
         root = self._full_row(tree["guess"], None, FULL_ROOT_W, ORIGIN)
         pieces.append(root)
         pitch = lambda w: w * row_aspect() * (1 + GAP / TILE)
