@@ -33,9 +33,7 @@ REUSE MAP — every element, the one source it comes from, and how it enters:
                         the ends come to rest; in c and e the new marker starts popping
                         out while the zoom is still settling (user's call), which the
                         asset allows because a pop drives the marker's `grow`
-  zoom sound            01's camera-move whoosh: assets/stacks_view.py WHOOSH_SFX at
-                        WHOOSH_GAIN, placed so WHOOSH_PEAK lands at the zoom's midpoint
-                        (its fastest moment), as stacks_view.py:227 does
+  zoom sound            none (user's call: 01's whoosh was tried and dropped)
   SALET                 assets/board.py `get_typed_row` (the black typed row, as 12's
                         SALET), its border thinned by 12's rule for a small row
   marker text           crisp_text via the asset, WHITE, on a card in the Wordle
@@ -91,7 +89,6 @@ from config import *
 from bpkfigures.number_line import ZoomLine
 from assets.board import STROKE, get_typed_row
 from assets.groups import HEADER_W
-from assets.stacks_view import WHOOSH_SFX, WHOOSH_GAIN, WHOOSH_PEAK
 
 TITLE = "Average Guesses by Strategy"
 SUBTITLE = "(Win Rate)"
@@ -130,10 +127,9 @@ class Scene13(WordleBoardScene):
         pass
 
     def _zoom_pop(self, lo, hi, m, zoom_rt, pop_rt, lead):
-        """Zoom to lo..hi under 01's whoosh, with m popping out of its dot (and the
-        pop sound) starting `lead` seconds before the zoom ends."""
+        """Zoom to lo..hi, with m popping out of its dot (and the pop sound)
+        starting `lead` seconds before the zoom ends."""
         start = zoom_rt - lead
-        self.sfx(WHOOSH_SFX, at=max(0.0, zoom_rt / 2 - WHOOSH_PEAK), gain=WHOOSH_GAIN)
         self.sfx("pop", at=start)
         self.play(self.line.zoom(lo, hi, run_time=zoom_rt),
                   Succession(Wait(start), self.line.marker_in(m, run_time=pop_rt)))
