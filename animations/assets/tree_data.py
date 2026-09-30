@@ -17,7 +17,9 @@ Tree line format: `<answer> <guesses> <guess1> <pattern1> <guess2> <pattern2> ..
 patterns as b/y/g per position, the winning guess carrying none. Codes here are
 math/wordle.py pattern integers, POSITION 0 MOST SIGNIFICANT.
 
-Also "subtree": {"<results dir>:<forced guess>": nested branches (see _trie)} for
+Also "avg": {"<FIRST's code>" or "<results dir>:<forced guess>": average guesses for
+the whole game, the mean of the tree's own per-answer counts} for 07's "Average
+Guesses:" text, and "subtree": {"<results dir>:<forced guess>": nested branches (see _trie)} for
 07zb, read from math/data/shared/subtree/ (solver/run-subgroup-tree.sh).
 
 Cache: {"<opener>": {"<opener's code>": {"guess": next guess, "branches":
@@ -38,6 +40,7 @@ GROUPS = [7, 225]     # FIRST's --- G Y (TEASE's group) and G G Y - - (FIERY's),
 TRIT = {"b": 0, "y": 1, "g": 2}
 # 07zb: one group's optimal trees with a forced next guess, from
 # math/solver/run-subgroup-tree.sh -- (results dir, the forced guesses in order)
+AVG_GROUPS = [242, 177, 26, 7, 225, 8]   # 07: FIRST's groups whose average guesses show
 SUBTREES = [("first_30_cap6", ["after", "again", "other", "plane"]),   # BYBYB, 48 answers
             ("first_8_cap6", ["after", "again", "other", "bagel"])]    # BBBGG, 14 (in use)
 SUBTREE_DIR = os.path.join(HERE, "..", "..", "math", "data", "shared", "subtree")
@@ -69,13 +72,27 @@ def _build():
         assert len({b["code"] for b in branches}) == len(branches), "one answer per branch"
         branches.sort(key=lambda b: (b["code"] != 242, b["code"]))
         out[OPENER][str(g)] = {"guess": guess, "branches": branches}
+    # 07: AVERAGE GUESSES for a whole game, per group -- the mean of the tree's own
+    # per-answer guess counts (field 2 of a tree line, FIRST included)
+    out["avg"] = {}
+    for g in AVG_GROUPS:
+        counts = [int(t[1]) for t in lines
+                  if (g == 242 and len(t) == 3 and t[2] == OPENER)
+                  or (len(t) > 3 and t[2] == OPENER and code(t[3]) == g)]
+        assert counts, g
+        out["avg"][str(g)] = sum(counts) / len(counts)
     out["subtree"] = {}
     for name, guesses in SUBTREES:
         for g in guesses:
             with gzip.open(os.path.join(SUBTREE_DIR, name, "trees", f"{g}.txt.gz"), "rt") as f:
-                t = _trie([l.split() for l in f if l.strip()])
+                sub = [l.split() for l in f if l.strip()]
+            t = _trie(sub)
             assert t["guess"] == g
             out["subtree"][f"{name}:{g}"] = t
+            # a subgroup tree counts guesses from the forced one on; the guesses of
+            # the path before it (<opener>_<code>_...) are added back for the game
+            before = (len(name.split("_cap")[0].split("_")) + 1) // 2
+            out["avg"][f"{name}:{g}"] = sum(int(l[1]) for l in sub) / len(sub) + before
     return out
 
 
