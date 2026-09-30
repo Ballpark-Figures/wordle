@@ -119,12 +119,17 @@ class TilePop(Animation):
     """
 
     def __init__(self, tile, letter, bump=0.10, appear=False, **kwargs):
+        # `letter=None` pops an EMPTY tile in (scene 11 types out blank words); it
+        # needs `appear=True` to mean anything, since a visible empty tile has
+        # nothing to land. Every existing caller passes a letter and is unchanged.
         self.tile, self.letter, self.bump = tile, letter, bump
         self.appear = appear            # the tile itself is hidden until its letter lands
         self.t_h, self.t_w = tile.height, tile.width
-        self.l_h, self.l_w = letter.height, letter.width
+        if letter is not None:
+            self.l_h, self.l_w = letter.height, letter.width
         self.center = tile.get_center()
-        super().__init__(VGroup(tile, letter), **kwargs)
+        parts = [tile] if letter is None else [tile, letter]
+        super().__init__(VGroup(*parts), **kwargs)
 
     def interpolate_mobject(self, alpha):
         # Visibility is driven by ALPHA, not set in begin(): an AnimationGroup —
@@ -132,7 +137,8 @@ class TilePop(Animation):
         # revealing there made all five letters of a word appear at once, at the
         # moment the first one was typed. A member that has not reached its lag
         # offset yet sits at alpha 0, which is exactly "not typed".
-        self.letter.set_opacity(1.0 if alpha > 0 else 0.0)
+        if self.letter is not None:
+            self.letter.set_opacity(1.0 if alpha > 0 else 0.0)
         if self.appear:                 # same alpha rule for the tile's own visibility
             self.tile.set_fill(opacity=1.0 if alpha > 0 else 0.0)
             self.tile.set_stroke(opacity=1.0 if alpha > 0 else 0.0)
@@ -141,6 +147,8 @@ class TilePop(Animation):
         s = 1 + self.bump * np.sin(np.pi * self.rate_func(alpha))
         self.tile.stretch_to_fit_height(self.t_h * s) \
                  .stretch_to_fit_width(self.t_w * s).move_to(self.center)
+        if self.letter is None:
+            return
         self.letter.stretch_to_fit_height(self.l_h * s) \
                    .stretch_to_fit_width(self.l_w * s).move_to(self.center)
 
