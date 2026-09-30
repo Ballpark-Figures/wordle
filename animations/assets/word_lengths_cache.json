@@ -156,9 +156,9 @@
       "opener": "tale",
       "total": 9825,
       "answers": 2347,
-      "depth": 10,
+      "depth": 19,
       "deepest": 7,
-      "source": "optlen4/k200/trees_d10/tale.txt.gz"
+      "source": "optlen4/k200/trees_d19/tale.txt.gz"
     },
     "5": {
       "opener": "salet",
@@ -305,7 +305,7 @@
           ]
         }
       ],
-      "source": "optlen4/k200/trees_d10/tale.txt.gz"
+      "source": "optlen4/k200/trees_d19/tale.txt.gz"
     }
   }
 }
