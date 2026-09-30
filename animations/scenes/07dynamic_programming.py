@@ -132,7 +132,8 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 
 from config import *
-from assets.board import get_board, get_typed_row, WordleBoard, STROKE, TILE, GAP
+from assets.board import (get_board, get_typed_row, get_scored_row, WordleBoard, STROKE,
+                          TILE, GAP)
 from assets.pigpen import PigpenWord, WORD_W
 from assets.keys import key_cues
 from assets.flip import Flip, flip, row_parts
@@ -144,7 +145,8 @@ from assets import lists_data, tree_data
 DATA = lists_data.load()
 TREES = tree_data.load()["first"]      # x-z: two of FIRST's groups, from its optimal tree
 AVG = tree_data.load()["avg"]          # l-z: average guesses per tree, from its counts
-TREES_SUB = tree_data.load()["subtree"]  # zb: a group's trees after four forced guesses
+TREES_SUB = tree_data.load()["subtree"]
+TREES_FULL = tree_data.load()["full"]  # zc: SALET's whole optimal tree  # zb: a group's trees after four forced guesses
 FIRST, AFTER, THIRD = "first", "after", "third"   # the script's own words
 # the group each guess narrows to (pattern codes, position 0 most significant) —
 # the user's calls, 2026-09-29, in place of the script's all gray: FIRST's yellow T
@@ -207,6 +209,12 @@ AVG_NUM_BUFF = 0.3                 # between "Guesses" and the number
 AVG_BUFF = 0.35                    # from the frame's top-right corner
 AVG_GREEN = TILE_CORRECT           # an optimal tree's number (the others' are white):
                                    #   the tiles' green, as the winning rows
+FULL_ROOT_W = 1.6                  # zc: SALET's width; every node's goes as sqrt(answers)
+FULL_RADII = {1: 1.1, 2: 2.1, 3: 3.1, 4: 3.9, 5: 4.35}   # zc: each level's (vertical) radius
+FULL_X_STRETCH = 1.75              # zc: the ellipses' width / height (the frame's shape)
+FULL_START = math.pi / 2           # zc: where the first branch sits (straight up)
+FULL_LINE_W, FULL_LINE_OPACITY = 0.5, 0.35   # zc: the branch lines
+FULL_LETTER_W = 0.35               # zc: rows narrower than this get no letters
 THUMB_CASE = 0.3                   # y: the group waiting in a corner
 THUMB_TREE = 0.2                   # z: the finished tree waiting in a corner, small
                                    #   enough to clear the lines to the left branches
@@ -1315,3 +1323,66 @@ class Scene07(WordleBoardScene):
         self._big_contract(0.5)
         self._big_tree(best, None, 0.4, 1.5, 0.8)
         self.avg_counter = None
+
+    # ── the whole optimal tree, radial (script zc) -- FIRST DRAFT, a still ─────
+    # SALET (the optimal opener) in black at the centre; around it every colouring
+    # of SALET with the optimal next guess under it in black; around those the next
+    # colourings and guesses, out to the wins. Each node's width goes as the SQUARE
+    # ROOT of the answers in its group (user's spec). Levels on concentric ellipses
+    # (the frame is wider than tall); each node at the middle of an angle
+    # proportional to its answers. A still to experiment on: no animation yet.
+    def _full_row(self, word, code, width, centre):
+        """A row `width` wide at `centre`: `word` scored as `code`, or typed (black)
+        when `code` is None. Real letters only when wide enough to read; below
+        FULL_LETTER_W just the tiles, flat (thousands of rows)."""
+        if width >= FULL_LETTER_W:
+            row = get_typed_row(word) if code is None else get_scored_row(word, code)
+            return row.scale(width / row.width).move_to(centre)
+        trits = [None] * 5 if code is None else [(code // 3 ** (4 - i)) % 3 for i in range(5)]
+        tile = width / (5 + 4 * GAP / TILE)
+        sq = [Square(side_length=tile, stroke_width=0, fill_opacity=1.0,
+                     fill_color=TILE_EMPTY_FILL if t is None else TILE_STATE[t])
+              for t in trits]
+        return VGroup(*sq).arrange(RIGHT, buff=tile * GAP / TILE).move_to(centre)
+
+    def _full_tree(self, tree):
+        """Every node and line of `tree`, placed radially (see above)."""
+        def count(n):
+            return sum(len(k["answers"]) if not k["node"] else count(k["node"])
+                       for k in n["kids"])
+        total = count(tree)
+        pieces, lines = [], []
+        k_w = FULL_ROOT_W / math.sqrt(total)
+        root = self._full_row(tree["guess"], None, FULL_ROOT_W, ORIGIN)
+        pieces.append(root)
+        pitch = lambda w: w * row_aspect() * (1 + GAP / TILE)
+
+        def place(node, a0, a1, depth, parent_c):
+            a = a0
+            for kid in node["kids"]:
+                n = len(kid["answers"])
+                span = (a1 - a0) * n / sum(len(k["answers"]) for k in node["kids"])
+                mid = a + span / 2
+                r = FULL_RADII[depth]
+                c = np.array([r * FULL_X_STRETCH * math.cos(mid), r * math.sin(mid), 0.0])
+                w = k_w * math.sqrt(n)
+                if kid["node"] is None:                       # a win: the green row
+                    pieces.append(self._full_row(node["guess"], kid["code"], w, c))
+                else:                                          # colouring + next guess
+                    p = pitch(w)
+                    pieces.append(self._full_row(node["guess"], kid["code"], w, c + UP * p / 2))
+                    pieces.append(self._full_row(kid["node"]["guess"], None, w, c + DOWN * p / 2))
+                lines.append(Line(parent_c, c, color=WHITE, stroke_width=FULL_LINE_W,
+                                  stroke_opacity=FULL_LINE_OPACITY))
+                if kid["node"] is not None:
+                    place(kid["node"], a, a + span, depth + 1, c)
+                a += span
+        place(tree, FULL_START, FULL_START + 2 * math.pi, 1, ORIGIN)
+        return VGroup(*lines).set_z_index(-1), VGroup(*pieces)
+
+    # zc (script) : the whole of SALET's optimal tree, radially -- a first-draft STILL
+    @subscene
+    def full_tree(self):
+        lines, nodes = self._full_tree(TREES_FULL["salet"])
+        self.clear()
+        self.add(lines, nodes)
