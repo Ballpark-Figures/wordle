@@ -75,9 +75,12 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   x fiery_tree   — TEASE's tree shrinks into the top-left corner as FIERY's
                    group comes to the root; then its tree grows the same (07z, VO 7)
 
+  y big_case     — everything off to the left; FIRST's BYBYB group (48 words,
+                   code 30) in from the right, the words in a grid     (07za, VO 8)
+
   NB from s on the LETTERS run behind the script's: three script beats (s, t, u)
   are one subscene, so the script's v is subscene t, w is u, x is v, y is w and
-  z is x.
+  z is x, za is y.
 
 REUSE MAP — every element and the one source it comes from:
   board, typing, reveal   assets/board.py `get_board`, `type_word` (its
@@ -121,7 +124,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 
 from config import *
 from assets.board import get_board, WordleBoard, STROKE, TILE, GAP
-from assets.pigpen import PigpenWord
+from assets.pigpen import PigpenWord, WORD_W
 from assets.keys import key_cues
 from assets.flip import Flip, flip, row_parts
 from assets.groups import (ranked_layout, ranked_word_layout, scored_row, HEADER_W,
@@ -171,6 +174,11 @@ ROOT_Y = 3.8                       # y, z: the root's FIRST row
 CHILD_Y = 1.6                      # y, z: a branch's FIRST row
 CHILD_DROP = 2.6                   # y, z: a branch down to its win, FIRST to FIRST
 WORDS_Y = -3.45                    # y, z: the words' block, bottom middle, before branching
+BIG_CODE = 30                      # za: FIRST's - Y - Y - group, 48 words (the script's BYBYB)
+BIG_Y = 2.2                        # za: its FIRST row
+BIG_COLS = 8                       # za: its words, a grid of BIG_COLS columns ...
+BIG_WORD_W, BIG_DX, BIG_DY = 1.35, 1.6, 0.5   # ... this wide, this far apart
+BIG_WORDS_Y = 1.0                  # za: the grid's top row
 THUMB_CASE = 0.3                   # y: the group waiting in a corner
 THUMB_TREE = 0.2                   # z: the finished tree waiting in a corner, small
                                    #   enough to clear the lines to the left branches
@@ -230,6 +238,7 @@ class Scene07(WordleBoardScene):
     six_cases — the two 6-word groups in from the right
     tease_tree — FIERY's group to a corner; TEASE's tree grows
     fiery_tree — TEASE's tree to a corner; FIERY's tree grows
+    big_case — FIRST's 48-word BYBYB group in from the right
     """
 
     def setup_scene(self):
@@ -1021,3 +1030,32 @@ class Scene07(WordleBoardScene):
         self._tree_answers(fiery, 0.65)
         self._tree_down(fiery, 1.5)
         self._tree_wins(fiery, 1.0)
+
+    # ── the largest groups: a 48-word one (script za-zb) ──────────────────────
+    def _setup_big_case(self):
+        """FIRST's BYBYB group (48 words) as a case at the centre, as the others
+        came in: FIRST scored, its line out of the top, every one of its words in a
+        grid under it (alphabetical). Everything on screen leaves to the left."""
+        Y = config.frame_y_radius
+        (g,) = [g for g in DATA["full"][FIRST] if g["code"] == BIG_CODE]
+        self.big = scored_row(FIRST, BIG_CODE, self.pcase.width, [0, BIG_Y, 0])
+        self.big_line = _line([0, Y + OFF_CLEAR, 0], _r(self.big))
+        self.big_words = []
+        for k, w in enumerate(g["members"]):
+            i, j = divmod(k, BIG_COLS)
+            self.big_words.append(
+                PigpenWord(w, revealed=True).scale(BIG_WORD_W / WORD_W)
+                .move_to([(j - (BIG_COLS - 1) / 2) * BIG_DX, BIG_WORDS_Y - i * BIG_DY, 0]))
+        self.za_old = VGroup(*self._leaves())
+        self.za_in = VGroup(self.big, self.big_line, *self.big_words).shift(RIGHT * SWAP_DIST)
+
+    # y (script za) : FIERY's tree and TEASE's off to the left; FIRST's BYBYB group,
+    #     all 48 words, in from the right
+    @subscene
+    def big_case(self):
+        self._setup_big_case()
+        self.play(self.za_old.animate.shift(LEFT * SWAP_DIST),
+                  self.za_in.animate.shift(LEFT * SWAP_DIST), run_time=1.5)
+        self.clear()
+        self.add(self.big_line, self.big, *self.big_words)
+        self.za_old = self.za_in = self.cases = None
