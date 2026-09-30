@@ -137,7 +137,7 @@ from assets.keys import key_cues
 from assets.flip import Flip, flip, row_parts
 from assets.groups import (ranked_layout, ranked_word_layout, scored_row, HEADER_W,
                            GUESS_SCALE, GUESS_Y, HEAD_ROW_GAP, row_aspect, enter_from_beyond,
-                           edge_out)
+                           edge_out, grid_cells)
 from assets import lists_data, tree_data
 
 DATA = lists_data.load()
@@ -190,8 +190,7 @@ BIG_TREES = "first_8_cap6"         # zb: its trees, from solver/run-subgroup-tre
 BIG_GUESSES = ("after", "again", "other", "bagel")   # zb: the script's three, then the
                                    #   optimal next guess (BAGEL, in place of BYBYB's PLANE)
 BIG_Y = 2.2                        # za: its FIRST row
-BIG_COLS = 8                       # za: its words, a grid of at most BIG_COLS columns ...
-BIG_WORD_W, BIG_DX, BIG_DY = 1.35, 1.6, 0.5   # ... this wide, this far apart
+BIG_WORD_W, BIG_DX, BIG_DY = 1.35, 1.6, 0.5   # za: its words' width and grid pitches
 BIG_WORDS_Y = 1.0                  # za: the grid's top row
 BIG_EDGE = 0.3                     # zb: margin at the frame's sides
 BIG_FILL = 0.9                     # zb: a branch's row width, of the answer spacing
@@ -845,11 +844,12 @@ class Scene07(WordleBoardScene):
         node = TREES[str(g)]
         row = scored_row(FIRST, g, self.pcase.width, [x, 0, 0])
         line = _line([x, Y + OFF_CLEAR, 0], _r(row))
-        words = []
-        for k, b in enumerate(node["branches"]):
-            i, j = divmod(k, 3)
-            words.append(PigpenWord(b["answer"], revealed=True).scale(WIN_SCALE)
-                         .move_to([x + (j - 1) * SIX_WORD_DX, CASE_WORD_Y - i * SIX_WORD_DY, 0]))
+        # 04's word grid (groups.grid_cells), its top row at CASE_WORD_Y
+        cells = grid_cells(len(node["branches"]))
+        cy = CASE_WORD_Y - cells[0][1] * SIX_WORD_DY
+        words = [PigpenWord(b["answer"], revealed=True).scale(WIN_SCALE)
+                 .move_to([x + ox * SIX_WORD_DX, cy + oy * SIX_WORD_DY, 0])
+                 for b, (ox, oy) in zip(node["branches"], cells)]
         # where each word sits in the case, to go back to from a corner
         homes = [(w.get_center(), w.width) for w in words]
         return dict(g=g, node=node, row=row, line=line, words=words, homes=homes)
@@ -1060,17 +1060,13 @@ class Scene07(WordleBoardScene):
         self.big = scored_row(FIRST, BIG_CODE, self.pcase.width, [0, BIG_Y, 0])
         self.big_line = _line([0, Y + OFF_CLEAR, 0], _r(self.big))
         self.big_words = []
-        # as few rows as BIG_COLS allows, filled evenly (14 words: two rows of 7), a
-        # short last row centred, as the word groups elsewhere are
-        n = len(g["members"])
-        nr = math.ceil(n / BIG_COLS)
-        nc = math.ceil(n / nr)
-        for k, w in enumerate(g["members"]):
-            i, j = divmod(k, nc)
-            in_row = min(nc, n - i * nc)
+        # 04's word grid (groups.grid_cells), its top row at BIG_WORDS_Y
+        cells = grid_cells(len(g["members"]))
+        cy = BIG_WORDS_Y - cells[0][1] * BIG_DY
+        for w, (ox, oy) in zip(g["members"], cells):
             self.big_words.append(
                 PigpenWord(w, revealed=True).scale(BIG_WORD_W / WORD_W)
-                .move_to([(j - (in_row - 1) / 2) * BIG_DX, BIG_WORDS_Y - i * BIG_DY, 0]))
+                .move_to([ox * BIG_DX, cy + oy * BIG_DY, 0]))
         self.za_old = VGroup(*self._leaves())
         self.za_in = VGroup(self.big, self.big_line, *self.big_words).shift(RIGHT * SWAP_DIST)
 

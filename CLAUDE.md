@@ -4691,6 +4691,13 @@ a correction to one is invisible to the rest.
 
 ## Style
 - Uses `bpkfigures` style + the local `config.py` for colors/fonts.
+- **EVERY grid of words — a group's members, under a guess or on their own — goes
+  through `animations/assets/groups.py` `grid_cells(n)`**: scene 04's rule, ceil(sqrt(n))
+  columns, filled row by row, a short last row centred (6 words = 3+3, 14 = 4+4+4+2).
+  Never pick a column count by hand. The ONE deliberate exception is
+  `ranked_word_layout` (07d-g), whose grid shape is searched for the largest words
+  (user's call). (Bit us 2026-09-30: scene 07 hardcoded 3 columns, then 8, then
+  "fill rows evenly", giving 8+6 and then 7+7 grids the video uses nowhere else.)
 - **EVERY dictionary definition on screen ("n. Obsolete variant of rote") goes
   through `animations/assets/gloss.py` `gloss(lines, font_size, italic=...)`, never a
   bare `crisp_text`.** The helper italicises the leading part of speech ("n.", "v.",

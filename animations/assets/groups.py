@@ -215,15 +215,26 @@ def layout(data, guess, header=False, chain=False):
         cx, cy = bx, by - hh * f / 2               # the group sits under its header
         headers.append(np.array([cx, cy + b["eh"] * f / 2, 0.0]))
         groups.append(b["g"])
-        members, nc = b["g"]["members"], b["nc"]
-        nr = math.ceil(len(members) / nc)
-        for k, word in enumerate(members):
-            i, j = divmod(k, nc)
-            n_in_row = min(nc, len(members) - i * nc)
-            wx = cx + (j - (n_in_row - 1) / 2) * (ww + cg) * f
-            wy = cy + ((nr - 1) / 2 - i) * dy * f
-            slots[word] = np.array([wx, wy, 0.0])
+        members = b["g"]["members"]
+        for word, (ox, oy) in zip(members, grid_cells(len(members))):
+            slots[word] = np.array([cx + ox * (ww + cg) * f, cy + oy * dy * f, 0.0])
     return slots, GROUP_SCALE * f, headers, groups
+
+
+def grid_cells(n):
+    """THE way a group of words is gridded in this video (04's): ceil(sqrt(n))
+    columns, filled row by row, a short last row centred. Returns each word's
+    (column, row) offset from the grid's centre, in pitches, rows counting UP
+    (the first row is on top) -- multiply by the caller's pitches and add its
+    centre. Every word grid goes through here, so there is one rule to follow."""
+    nc = max(1, math.ceil(math.sqrt(n)))
+    nr = math.ceil(n / nc)
+    cells = []
+    for k in range(n):
+        i, j = divmod(k, nc)
+        in_row = min(nc, n - i * nc)
+        cells.append((j - (in_row - 1) / 2, (nr - 1) / 2 - i))
+    return cells
 
 
 def scored_row(guess, code, width, centre, stroke=STROKE):
