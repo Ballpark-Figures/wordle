@@ -396,13 +396,14 @@ def ranked_layout(data, guess, left, right=REGION_HALF_W, top=DOT_REGION_TOP,
 WORD_ASPECTS = np.geomspace(0.2, 5.0, 33)   # grid shapes tried: columns ~ sqrt(n * a)
 
 
-def _word_block(n, heads, aspect):
+def _word_block(n, heads, aspect, nc=None):
     """A block of `n` words at scale 1 (GROUP_SCALE words, 04's CELL_GAP/CELL_DY
     pitches) under a stack of `heads` scored rows, each HEADER_W wide (04's). The
     grid has about sqrt(n * aspect * dy / (ww + cg)) columns — aspect 1 makes its
-    AREA square-ish."""
+    AREA square-ish. `nc` fixes the column count instead."""
     ww, cg, dy = WORD_W * GROUP_SCALE, CELL_GAP, CELL_DY
-    nc = min(n, max(1, math.ceil(math.sqrt(n * aspect * dy / (ww + cg)))))
+    if nc is None:
+        nc = min(n, max(1, math.ceil(math.sqrt(n * aspect * dy / (ww + cg)))))
     nr = math.ceil(n / nc)
     rh = HEADER_W * row_aspect()
     hh = heads * rh + (heads - 1) * rh * HEAD_ROW_GAP + WORD_HEAD_GAP if heads else 0.0
@@ -412,18 +413,21 @@ def _word_block(n, heads, aspect):
 
 
 def ranked_word_layout(groups, left, right=REGION_HALF_W, top=DOT_REGION_TOP,
-                       bottom=REGION_BOT, heads=1):
+                       bottom=REGION_BOT, heads=1, ncols=None):
     """07: `groups` (in the order given — pass them largest first) as WORD blocks,
     packed as `ranked_layout` packs dot blocks, the last row centred; each block
     under a stack of `heads` scored rows, HEADER_W wide at GROUP_SCALE (04's
     proportion). The grid shape is the one of WORD_ASPECTS (the same for every
     block) that gives the LARGEST words. One block alone sits centred at the top.
+    `ncols` (one per group) FIXES the column counts instead -- for a group that is
+    already on screen and should keep its arrangement while it resizes (07f).
 
     Returns (slots {word: centre}, word scale, [[header centre, top first] per
     block], header width)."""
     best = None
-    for a in WORD_ASPECTS:
-        bs = [_word_block(g["size"], heads, a) for g in groups]
+    for a in (WORD_ASPECTS if ncols is None else [1.0]):
+        bs = [_word_block(g["size"], heads, a, None if ncols is None else ncols[i])
+              for i, g in enumerate(groups)]
         f, centres = _pack(bs, left, right, top, bottom, center_last=True)
         if best is None or f > best[0]:
             best = (f, centres, bs)

@@ -198,15 +198,15 @@ BIG_EDGE = 0.3                     # zb: margin at the frame's sides
 BIG_FILL = 0.9                     # zb: a branch's row width, of the answer spacing
 BIG_TOP = 2.6                      # zb: the first level's top row
 BIG_WORD_GAP = 1.3                 # zb: a word column's pitch, in word heights
-AVG_TEXT = "Average Guesses:"      # l-z: right of the case's FIRST (the user's words)
+AVG_TEXT = "Average Guesses:"      # k-z: fixed in the top-right corner (the user's words)
+AVG_LINES = ("Average", "Guesses:")   # the same, on three centred lines with the number
 AVG_FS = 32                        # its font size
-AVG_GAP = 0.5                      # between FIRST and the text
-AVG_SPACE = 0.2                    # between the colon and the number
-AVG_GREEN = TILE_CORRECT           # the text's colour with a (non-comparison) number:
+AVG_LINE_BUFF = 0.12               # between the three lines
+AVG_BUFF = 0.35                    # from the frame's top-right corner
+AVG_SPACE = 0.2                    # one line: between the colon and the number
+AVG_GREEN = TILE_CORRECT           # an optimal tree's number (the others' are white):
                                    #   the tiles' green, as the winning rows
 THUMB_CASE = 0.3                   # y: the group waiting in a corner
-THUMB_DROP = 0.8                   # y: the waiting group, below the root's "Average
-                                   #   Guesses:" line, which would otherwise run into it
 THUMB_TREE = 0.2                   # z: the finished tree waiting in a corner, small
                                    #   enough to clear the lines to the left branches
 GREEN_Y = -2.3                     # j: the all-green FIRST row, bottom centre
@@ -226,22 +226,32 @@ def _line(a, b):
     return Line(a, b, color=WHITE, stroke_width=LINE_W).set_z_index(-1)
 
 
-def _avg_label(row):
-    """AVG_TEXT in white, AVG_GAP right of `row` (a FIRST row, where it is or will
-    be), centred on it vertically."""
+def _avg_block(lines):
+    """The text for the top-right corner, white: three centred lines ("Average",
+    "Guesses:", then the number) or one ("Average Guesses: " and the number), laid
+    out with a placeholder number so the whole thing sits AVG_BUFF in from the
+    corner. Returns (the text, where a number goes: its centre for three lines, its
+    left edge on the baseline for one)."""
+    if lines == 3:
+        parts = [crisp_text(t, font_size=AVG_FS, color=WHITE) for t in AVG_LINES]
+        slot = crisp_text("0.00", font_size=AVG_FS)
+        VGroup(*parts, slot).arrange(DOWN, buff=AVG_LINE_BUFF).to_corner(UR, buff=AVG_BUFF)
+        return VGroup(*parts), slot.get_center()
+    full = crisp_text(f"{AVG_TEXT} 0.00", font_size=AVG_FS, baseline_at=(0, 0))
     lab = crisp_text(AVG_TEXT, font_size=AVG_FS, color=WHITE, baseline_at=(0, 0))
-    lab.shift(UP * (row.get_center()[1] - lab.get_center()[1]))
-    lab.shift(RIGHT * (row.get_right()[0] + AVG_GAP - lab.get_left()[0]))
-    return lab
+    lab.shift(full.get_left() - lab.get_left())
+    v = full.copy().to_corner(UR, buff=AVG_BUFF).get_center() - full.get_center()
+    lab.shift(v)
+    return lab, np.array([lab.get_right()[0] + AVG_SPACE, v[1], 0.0])
 
 
-def _avg_number(lab, value, color):
-    """`value` to 2 decimals, after `lab`'s colon on the same baseline."""
-    ref = crisp_text(AVG_TEXT, font_size=AVG_FS, baseline_at=(0, 0))
-    num = crisp_text(f"{value:.2f}", font_size=AVG_FS, color=color, baseline_at=(0, 0))
-    num.shift(UP * (lab.get_center()[1] - ref.get_center()[1]))
-    num.shift(RIGHT * (lab.get_right()[0] + AVG_SPACE - num.get_left()[0]))
-    return num
+def _avg_number(value, color, lines, slot):
+    """`value` to 2 decimals, in its slot of the corner text."""
+    num = crisp_text(f"{value:.2f}", font_size=AVG_FS, color=color,
+                     baseline_at=(0, 0) if lines == 1 else None)
+    if lines == 3:
+        return num.move_to(slot)
+    return num.shift([slot[0] - num.get_left()[0], slot[1], 0])
 
 
 def _jump(row):
@@ -356,7 +366,14 @@ class Scene07(WordleBoardScene):
         `members` go to a single block; `leaving` (mobjects) goes off the nearest
         edge. With `dots`, the words are new, and grow out of the dots on the way."""
         group = {"size": len(members), "members": members}
-        slots, s, hds, hw = ranked_word_layout([group], self.col_left, heads=len(guesses))
+        # words already on screen keep their arrangement (user's call): the same
+        # number of columns as their block has now, however it is resized
+        ncols = None
+        if dots is None:
+            ys = [round(self.words[m].get_center()[1], 3) for m in members]
+            ncols = [ys.count(max(ys))]          # the top row is always full
+        slots, s, hds, hw = ranked_word_layout([group], self.col_left, heads=len(guesses),
+                                               ncols=ncols)
         self.f_stack = [scored_row(g, KEEP[g], hw, c) for g, c in zip(guesses, hds[0])]
         self.f_old, self.f_leaving, self.f_dots = stack, leaving, dots
         if dots is None:
@@ -619,7 +636,6 @@ class Scene07(WordleBoardScene):
         self.k_shift = ORIGIN - self.g_row.get_center()
         # the connecting line's two ends each ride their own R, at their own pace
         self.k_ends = (_r(self.left), _r(self.g_row))
-        self.avg_lab = _avg_label(self.g_row.copy().shift(self.k_shift))
 
     def _connect(self, alpha):
         """k's connecting line at `alpha`: its top end on the top FIRST's R (rush_into,
@@ -639,7 +655,7 @@ class Scene07(WordleBoardScene):
                   self.g_word.animate.shift(self.k_shift),
                   UpdateFromAlphaFunc(self.g_line, lambda m, a: self._connect(a),
                                       rate_func=linear),
-                  FadeIn(self.avg_lab),
+                  *self._avg_in(3),
                   run_time=1.5)
         self.remove(self.left, *self.gone)
         self.left = self.gone = self.k_ends = self.k_up = self.k_shift = None
@@ -655,39 +671,49 @@ class Scene07(WordleBoardScene):
         self.remove(self.g_word)
         self.g_word = None
 
-    # ── "Average Guesses:" beside each case's FIRST (l-z) ─────────────────────
-    # The text stays white while its tree grows; when the tree is finished the
-    # average appears after the colon and the text turns green with it -- except
-    # for the forced comparisons in zb (AFTER, AGAIN, OTHER), which stay white; as
-    # the number goes, the text turns back to white (user's calls).
-    def _avg_show(self, key, green=True):
-        """Animations: the tree `key`'s average appears; the text turns green."""
-        color = AVG_GREEN if green else WHITE
-        self.avg_num = _avg_number(self.avg_lab, AVG[key], color)
-        return [FadeIn(self.avg_num), self.avg_lab.animate.set_color(color)]
+    # ── "Average Guesses:" in the top-right corner (k-z) ──────────────────────
+    # Fixed in the corner, always white, never moving with a case or tree (user's
+    # calls). When a tree is finished its average appears -- green for an optimal
+    # tree, white for zb's forced comparisons (AFTER, AGAIN, OTHER) -- and it goes
+    # when the tree does. Three centred lines where the corner is free, one line
+    # where a tree's first level reaches into it (zb).
+    def _avg_in(self, lines):
+        """Animations: the corner text appears."""
+        self.avg_lab, self.avg_slot = _avg_block(lines)
+        self.avg_lines, self.avg_num = lines, None
+        return [FadeIn(self.avg_lab)]
 
-    def _avg_away(self, v=ORIGIN):
-        """Animations: the number fades and the text turns white, both moving by
-        `v` (as their case leaves). `_avg_drop` removes them after the play."""
-        anims = [self.avg_lab.animate.shift(v).set_color(WHITE)]
-        if getattr(self, "avg_num", None) is not None:
-            anims.append(FadeOut(self.avg_num, shift=v))
+    def _avg_show(self, key, green=True):
+        """Animations: the tree `key`'s average appears."""
+        self.avg_num = _avg_number(AVG[key], AVG_GREEN if green else WHITE,
+                                   self.avg_lines, self.avg_slot)
+        return [FadeIn(self.avg_num)]
+
+    def _avg_hide(self):
+        """Animations: the number goes (none if there is none). `_avg_clear` after."""
+        return [FadeOut(self.avg_num)] if self.avg_num is not None else []
+
+    def _avg_clear(self):
+        if self.avg_num is not None:
+            self.remove(self.avg_num)
+        if getattr(self, "avg_old", None) is not None:
+            self.remove(self.avg_old)
+        self.avg_num = self.avg_old = None
+
+    def _avg_switch(self, lines):
+        """Animations: the number goes and the text changes layout (1 or 3 lines).
+        `_avg_clear` after, which also takes the old text away."""
+        old = self.avg_lab
+        anims = [*self._avg_hide(), FadeOut(old)]
+        self.avg_old = old
+        anims += self._avg_in_keep_num(lines)
         return anims
 
-    def _avg_drop(self, label_too=True):
-        """After `_avg_away`: the number (and the text, unless kept) off the scene."""
-        if getattr(self, "avg_num", None) is not None:
-            self.remove(self.avg_num)
-        if label_too:
-            self.remove(self.avg_lab)
-            self.avg_lab = None
-        self.avg_num = None
-
-    def _avg_ids(self):
-        """The text's and number's pieces, to leave out of a whole-frame move."""
-        mobs = [m for m in (getattr(self, "avg_lab", None), getattr(self, "avg_num", None))
-                if m is not None]
-        return {id(x) for m in mobs for x in m.get_family()}
+    def _avg_in_keep_num(self, lines):
+        num = self.avg_num
+        anims = self._avg_in(lines)
+        self.avg_num = num
+        return anims
 
     # ── a one-word group: guess the word and finish in two (m-p) ──────────────
     def _setup_case_swap(self):
@@ -700,9 +726,7 @@ class Scene07(WordleBoardScene):
         self.case_word = PigpenWord(SINGLE, revealed=True).scale(WIN_SCALE) \
             .move_to([0, CASE_WORD_Y, 0])
         self.m_away = LEFT * SWAP_DIST
-        self.m_avg = _avg_label(self.case)
-        self.m_in = VGroup(self.case, self.case_line, self.case_word, self.m_avg) \
-            .shift(RIGHT * SWAP_DIST)
+        self.m_in = VGroup(self.case, self.case_line, self.case_word).shift(RIGHT * SWAP_DIST)
 
     # m : the green FIRST off to the left with its line, as FRESH's case comes in
     #     from the right
@@ -710,13 +734,12 @@ class Scene07(WordleBoardScene):
     def case_swap(self):
         self._setup_case_swap()
         self.play(VGroup(self.g_row, self.g_line).animate.shift(self.m_away),
-                  *self._avg_away(self.m_away),
+                  *self._avg_hide(),
                   self.m_in.animate.shift(self.m_away), run_time=1.5)
-        self._avg_drop()
+        self._avg_clear()
         self.remove(self.g_row, self.g_line, self.m_in)
-        self.add(self.case, self.case_line, self.case_word, self.m_avg)
-        self.avg_lab = self.m_avg
-        self.g_row = self.g_line = self.m_in = self.m_away = self.m_avg = None
+        self.add(self.case, self.case_line, self.case_word)
+        self.g_row = self.g_line = self.m_in = self.m_away = None
 
     def _setup_type_fresh(self):
         """An empty row the case's size, under it at the board's row spacing."""
@@ -760,21 +783,18 @@ class Scene07(WordleBoardScene):
                        .move_to([sx * PAIR_WORD_DX, CASE_WORD_Y, 0])
                        for w, sx in zip(PAIR, (-1, 1))]
         self.q_out = VGroup(self.case, self.guess2, self.case_line)
-        self.q_avg = _avg_label(self.pcase)
-        self.q_in = VGroup(self.pcase, self.pline, *self.pwords, self.q_avg) \
-            .shift(RIGHT * SWAP_DIST)
+        self.q_in = VGroup(self.pcase, self.pline, *self.pwords).shift(RIGHT * SWAP_DIST)
 
     # q : FRESH's case off to the left, the BURST/WORST case in from the right
     @subscene
     def pair_swap(self):
         self._setup_pair_swap()
         self.play(self.q_out.animate.shift(LEFT * SWAP_DIST),
-                  *self._avg_away(LEFT * SWAP_DIST),
+                  *self._avg_hide(),
                   self.q_in.animate.shift(LEFT * SWAP_DIST), run_time=1.5)
-        self._avg_drop()
+        self._avg_clear()
         self.remove(self.q_out, self.q_in)
-        self.add(self.pcase, self.pline, *self.pwords, self.q_avg)
-        self.avg_lab, self.q_avg = self.q_avg, None
+        self.add(self.pcase, self.pline, *self.pwords)
         self.case = self.guess2 = self.case_line = self.q_out = self.q_in = None
 
     # r : BURST typed below FIRST, tiles appearing as typed
@@ -824,7 +844,6 @@ class Scene07(WordleBoardScene):
             self.prow, [self.pcase], targets, rise)
         top, r0 = self.pline.get_start(), _r(self.pcase)
         self.s_anims += [VGroup(self.pcase, self.prow).animate.shift(rise),
-                         self.avg_lab.animate.shift(rise),
                          UpdateFromAlphaFunc(self.pline, lambda m, a: m.put_start_and_end_on(
                              top, r0 + rise * smooth(a)), rate_func=linear)]
         # each copy's BURST: a copy of the typed row flipping into its scored row
@@ -906,6 +925,9 @@ class Scene07(WordleBoardScene):
         """Every drawn piece on screen, once each — so a whole-frame move (a sweep
         or a shrink) moves each piece exactly once, whatever groups hold it."""
         seen, out = set(), []
+        for m in (getattr(self, "avg_lab", None), getattr(self, "avg_num", None)):
+            if m is not None:                  # the corner text never moves with a tree
+                seen |= {id(x) for x in m.get_family()}
         for m in self.mobjects:
             for leaf in m.family_members_with_points():
                 if id(leaf) not in seen:
@@ -932,8 +954,7 @@ class Scene07(WordleBoardScene):
         return dict(g=g, node=node, row=row, line=line, words=words, homes=homes)
 
     def _setup_six_cases(self):
-        keep = self._avg_ids()                 # the text leaves on its own, turning white
-        self.x_old = VGroup(*[m for m in self._leaves() if id(m) not in keep])
+        self.x_old = VGroup(*self._leaves())
         self.cases = [self._group_case(g, sx * SIX_CASE_X) for g, sx in zip(SIX, (-1, 1))]
         self.x_in = VGroup(*[m for c in self.cases for m in (c["row"], c["line"], *c["words"])])
         self.x_in.shift(RIGHT * SWAP_DIST)
@@ -945,10 +966,11 @@ class Scene07(WordleBoardScene):
     def six_cases(self):
         self._setup_six_cases()
         self.play(self.x_old.animate.shift(LEFT * SWAP_DIST),
-                  *self._avg_away(LEFT * SWAP_DIST),
+                  *self._avg_hide(),
                   self.x_in.animate.shift(LEFT * SWAP_DIST), run_time=1.5)
-        self._avg_drop()
+        self._avg_clear()
         self.clear()
+        self.add(self.avg_lab)
         for c in self.cases:
             self.add(c["line"], c["row"], *c["words"])
         self.x_old = self.x_in = None
@@ -1084,17 +1106,16 @@ class Scene07(WordleBoardScene):
     def _setup_tease_tree(self):
         tease, fiery = self.cases
         self.y_thumb, self.y_thumb_anim = self._thumb(
-            [fiery["row"], *fiery["words"]], UR, THUMB_CASE, fiery["line"],
-            fiery["row"].tiles[0][2], drop=THUMB_DROP)
+            [fiery["row"], *fiery["words"]], UL, THUMB_CASE, fiery["line"],
+            fiery["row"].tiles[0][2])
         self.y_root = self._to_root(tease)
-        self.avg_lab = _avg_label(tease["row"].target)
 
     # y : FIERY's group shrinks into the top-right corner as TEASE's goes to the root;
     #     then TEASE's whole tree grows across the frame
     @subscene
     def tease_tree(self):
         self._setup_tease_tree()
-        self.play(*self.y_thumb_anim, *self.y_root, FadeIn(self.avg_lab), run_time=1.5)
+        self.play(*self.y_thumb_anim, *self.y_root, run_time=1.5)
         self.remove(self.y_thumb)
         tease, fiery = self.cases
         self.add(fiery["line"], fiery["row"], *fiery["words"])
@@ -1113,29 +1134,18 @@ class Scene07(WordleBoardScene):
         tree = [m for m in self._leaves() if id(m) not in mine]
         self.z_thumb, self.z_thumb_anim = self._thumb(tree, UL, THUMB_TREE, tease["line"],
                                                       tease["row"].tiles[0][2])
-        # TEASE's text goes into the corner with its tree, turning white, its number
-        # fading on the way (set on the shrink's own target)
-        lab = {id(m) for m in self.avg_lab.get_family()}
-        num = {id(m) for m in self.avg_num.get_family()}
-        for m, t in zip(self.z_thumb.get_family(), self.z_thumb.target.get_family()):
-            if id(m) in lab:
-                t.set_color(WHITE)
-            elif id(m) in num:
-                t.set_opacity(0)
         self.z_root = self._to_root(fiery)
-        self.z_avg = _avg_label(fiery["row"].target)
 
     # z : TEASE's tree shrinks into the top-left corner as FIERY's group comes out of
     #     its corner to the root; then FIERY's whole tree grows across the frame
     @subscene
     def fiery_tree(self):
         self._setup_fiery_tree()
-        self.play(*self.z_thumb_anim, *self.z_root, FadeIn(self.z_avg), run_time=1.5)
+        self.play(*self.z_thumb_anim, *self.z_root, *self._avg_hide(), run_time=1.5)
         tease, fiery = self.cases
         self.remove(self.z_thumb)
         self.add(tease["line"], *self.z_thumb.submobjects)
-        self._avg_drop(label_too=False)        # TEASE's text stays, in the corner
-        self.avg_lab, self.z_avg = self.z_avg, None
+        self._avg_clear()
         self.add(fiery["line"], fiery["row"], *fiery["words"])
         self.z_thumb = self.z_thumb_anim = self.z_root = None
         self._tree_guess(fiery, 0.65)
@@ -1162,11 +1172,8 @@ class Scene07(WordleBoardScene):
             self.big_words.append(
                 PigpenWord(w, revealed=True).scale(BIG_WORD_W / WORD_W)
                 .move_to([ox * BIG_DX, cy + oy * BIG_DY, 0]))
-        keep = self._avg_ids()                 # FIERY's text leaves on its own, turning white
-        self.za_old = VGroup(*[m for m in self._leaves() if id(m) not in keep])
-        self.za_avg = _avg_label(self.big)
-        self.za_in = VGroup(self.big, self.big_line, *self.big_words, self.za_avg) \
-            .shift(RIGHT * SWAP_DIST)
+        self.za_old = VGroup(*self._leaves())
+        self.za_in = VGroup(self.big, self.big_line, *self.big_words).shift(RIGHT * SWAP_DIST)
 
     # y (script za) : FIERY's tree and TEASE's off to the left; FIRST's BBBGG group
     #     (the user's pick over the script's BYBYB), all 14 words, in from the right
@@ -1174,13 +1181,12 @@ class Scene07(WordleBoardScene):
     def big_case(self):
         self._setup_big_case()
         self.play(self.za_old.animate.shift(LEFT * SWAP_DIST),
-                  *self._avg_away(LEFT * SWAP_DIST),
+                  *self._avg_switch(1),     # zb's first level reaches the corner: one line
                   self.za_in.animate.shift(LEFT * SWAP_DIST), run_time=1.5)
-        self._avg_drop()
+        self._avg_clear()
         self.clear()
-        self.add(self.big_line, self.big, *self.big_words, self.za_avg)
-        self.avg_lab = self.za_avg
-        self.za_old = self.za_in = self.cases = self.za_avg = None
+        self.add(self.big_line, self.big, *self.big_words, self.avg_lab)
+        self.za_old = self.za_in = self.cases = None
 
     # ── the group's optimal trees after four forced guesses (script zb) ────────
     # Laid out the ordinary way: every branch a full stack of rows, the answers
@@ -1240,8 +1246,7 @@ class Scene07(WordleBoardScene):
         for t in row.target.tiles[0]:
             t.set_stroke(width=STROKE)
         line = _line([0, Y + OFF_CLEAR, 0], _r(row.target))
-        self.play(MoveToTarget(row), Transform(self.big_line, line),
-                  self.avg_lab.animate.move_to(_avg_label(row.target)), run_time=run_time)
+        self.play(MoveToTarget(row), Transform(self.big_line, line), run_time=run_time)
 
     def _big_level(self, frontier, xs, rw, ys, run_time):
         """One level shoots out: every frontier branch's rows copied to each child,
@@ -1352,12 +1357,11 @@ class Scene07(WordleBoardScene):
         """Everything but the root FIRST and its line contracts into the root's R,
         fast, and is gone."""
         keep = {id(m) for m in (self.big, self.big_line) for m in m.get_family()}
-        keep |= self._avg_ids()
         tree = VGroup(*[m for m in self._leaves() if id(m) not in keep])
         self.play(tree.animate.scale(0.01).move_to(_r(self.big)).set_opacity(0),
-                  *self._avg_away(), run_time=run_time)
+                  *self._avg_hide(), run_time=run_time)
         self.remove(tree)
-        self._avg_drop(label_too=False)
+        self._avg_clear()
         self.add(self.big_line, self.big, self.avg_lab)
 
     # z (script zb) : the optimal tree after each forced guess in turn -- AFTER,
