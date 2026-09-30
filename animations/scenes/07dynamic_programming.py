@@ -132,7 +132,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 
 from config import *
-from assets.board import (get_board, get_typed_row, get_scored_row, WordleBoard, STROKE,
+from assets.board import (LETTER_FRAC, get_board, get_typed_row, get_scored_row, WordleBoard, STROKE,
                           TILE, GAP)
 from assets.pigpen import PigpenWord, WORD_W
 from assets.keys import key_cues
@@ -220,7 +220,10 @@ FULL_X_STRETCH = 1.75              # zc: the ellipses' width / height (the frame
 FULL_START = math.pi / 2           # zc: where the first branch sits (straight up)
 FULL_LINE_W, FULL_LINE_OPACITY = 0.4, 0.2    # zc: the branch lines
 FULL_CLEAR = 0.15                  # zc: least gap between SALET and any node
-FULL_LETTER_W = 0.35               # zc: rows narrower than this get no letters
+FULL_LETTER_W = 0.35               # zc: rows at least this wide are full board rows
+FULL_GLYPH_W = 0.08                # zc: narrower rows get copied letters down to this
+                                   #   width (user's call: letters that cannot be read
+                                   #   still read as letters); below it, bare tiles
 THUMB_CASE = 0.3                   # y: the group waiting in a corner
 THUMB_TREE = 0.2                   # z: the finished tree waiting in a corner, small
                                    #   enough to clear the lines to the left branches
@@ -1380,7 +1383,22 @@ class Scene07(WordleBoardScene):
         sq = [Square(side_length=tile, stroke_width=0, fill_opacity=1.0,
                      fill_color=TILE_EMPTY_FILL if t is None else TILE_STATE[t])
               for t in trits]
-        return VGroup(*sq).arrange(RIGHT, buff=tile * GAP / TILE).move_to(centre)
+        row = VGroup(*sq).arrange(RIGHT, buff=tile * GAP / TILE).move_to(centre)
+        if width < FULL_GLYPH_W:
+            return row
+        # letters too: unreadable this small, but a box with a letter still reads
+        # differently from an empty one (user's call). One glyph per letter, built
+        # once and copied -- thousands of rows
+        return VGroup(row, *[self._glyph(ch).copy().scale(tile * LETTER_FRAC).move_to(t)
+                             for ch, t in zip(word, sq)])
+
+    def _glyph(self, ch):
+        """The board's letter for `ch`, 1 unit tall, built once per letter."""
+        cache = self.__dict__.setdefault("glyphs", {})
+        if ch not in cache:
+            g = crisp_text(ch.upper(), color=TILE_TEXT, weight=BOLD)
+            cache[ch] = g.scale(1 / g.height)
+        return cache[ch]
 
     def _full_tree(self, tree):
         """Every node and line of `tree`, placed radially (see above)."""
