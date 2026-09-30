@@ -48,6 +48,12 @@ extern Group  GRP[MAXGROUP];
 extern char   GSPEC[MAXGROUP][64];
 extern int    NGROUP;
 
+/* OPT-IN: accept a partition covering EVERY reply (e.g. e0.e1.e2.e3.e4.e5).
+ * Off by default, and only `secondexact --every-reply` sets it: with a word per
+ * grey count the reply still CHOOSES the word, so it is not the blind two-word
+ * opening the refusal exists to catch.  secondword never sets it. */
+extern int    GROUPS_EVERY_REPLY;
+
 /* Call once, in this order, before anything else here. */
 void groups_build_tiles(void);
 void groups_build_vpos(char (*words)[WBUF], int nwords);

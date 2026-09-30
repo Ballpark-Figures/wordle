@@ -2430,6 +2430,15 @@ is the proven optimum over all 12972 x 12972 (opener, second word) pairs.
   - **MEASURED: ~18 CPU-seconds per opener**, so a full run is around three hours
     on 18 threads — and that is the worst case, from a probe whose incumbent was
     weak. Watch the `evaluated / cut` line.
+  - **`--by-grays 0 --every-reply` gives EVERY grey count 0-5 its own word**
+    (added 2026-09-30, user's ask, for scene 12i on SALET). groups.c refuses a
+    partition covering every reply as a blind opening; `GROUPS_EVERY_REPLY`
+    lifts that and ONLY `secondexact` sets it. The second guess then never
+    falls back to the random tail — **except on the opener's own all-green WIN,
+    which fires no group** (`GFIRE[g][ALL_GREEN] = 0`; only a no-grey group can
+    hold it, so nothing before `e0` needed it). Gated as check 6b, which is
+    mutation-tested on exactly that exclusion. The label
+    `e0.e1.e2.e3.e4.e5` is its own file.
 - **THE g3 RESULT (2026-09-10): `clint` then `parse`, 3.666937 exact**, over all
   12972 openers with 11324 evaluated and 1648 cut, in 653 s. **`spilt` is only
   4th** (3.671133) — it won the RACE because that race used the one-ply table's

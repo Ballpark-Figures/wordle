@@ -12,6 +12,7 @@ int8_t NONGRAY[NPAT];
 Group  GRP[MAXGROUP];
 char   GSPEC[MAXGROUP][64];
 int    NGROUP;
+int    GROUPS_EVERY_REPLY = 0;
 
 static int      EXG[MAXEXTRA], EXY[MAXEXTRA], NEXTRA;
 static uint8_t *VPOS;                /* nwords * WORDLEN */
@@ -332,10 +333,10 @@ void groups_resolve(int min_grays, char *label, size_t lsz) {
         }
         int all = 1;
         for (int c = 0; c < NPAT; c++) all &= covered[c];
-        if (all) {
+        if (all && !GROUPS_EVERY_REPLY) {
             fprintf(stderr, "this condition fires on EVERY reply, which is a "
                     "blind two-word opening rather than a rule that chooses when "
-                    "to commit\n");
+                    "to commit (secondexact --every-reply allows it)\n");
             exit(1);
         }
     }
