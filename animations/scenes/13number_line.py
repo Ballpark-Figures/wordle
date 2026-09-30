@@ -199,6 +199,6 @@ class Scene13(WordleBoardScene):
     # f : Random Compatible Answers at 4.08, below the line
     @subscene
     def compatible(self):
-        m = self._marker(4.08, ["Random", "Compatible Answers", "98.20%"],
+        m = self._marker(4.08, ["Random", "Compatible", "Answers", "98.20%"],
                          side=DOWN)
         self._pop_in(m, 0.4)
