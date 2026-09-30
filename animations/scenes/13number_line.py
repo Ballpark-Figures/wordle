@@ -84,8 +84,11 @@ REUSE MAP — every element, the one source it comes from, and how it enters:
   game words, lists     assets/random_game_data.py -> random_game_cache.json:
                         colourings and compatible answers from math/wordle.py
                         `pattern`, the 9 random hops per turn seeded
-  pans (f, l)           the camera (MovingCameraScene, as 08) shifts one frame height;
+  pans (f, k)           the camera (MovingCameraScene, as 08) shifts one frame height;
                         the game is built GAME_DY above the line, so nothing fades
+  pan sound             01's camera-move whoosh (user's call): assets/stacks_view.py
+                        WHOOSH_SFX at WHOOSH_GAIN, placed so WHOOSH_PEAK lands at the
+                        pan's midpoint, as stacks_view.py:227 does (the zooms have none)
   the win (k)           07p's fresh_win (07dynamic_programming.py:806): the leftover
                         words go (here 12's shrink-out) AS the row does
                         `bounce_anim` at 07's `_jump` height
@@ -126,7 +129,7 @@ LAYOUT CHOICES, flagged:
     flip) moves down into the region for the new count of rows.
   - Every compatible answer is shown, all 332 after DICEY (so they are small), in
     the answer list's alphabetical order.
-  - Both pans take 1.5s with manim's default easing, and play no sound. DICEY's
+  - Both pans take 1.5s with manim's default easing. DICEY's
     typing starts when the pan brings its row TYPE_MARGIN inside the frame's top,
     found from the pan's own rate function, so retiming the pan keeps it right.
   - Each win rate is coloured red -> green, very nonlinearly (user's call): the
@@ -153,6 +156,7 @@ from assets.groups import HEADER_W, GUESS_Y, ranked_word_layout
 from assets.pigpen import PigpenWord, WORD_W     # the list-size word ranked_word_layout sizes by
 from assets.keys import key_cues
 from assets import random_game_data
+from assets.stacks_view import WHOOSH_SFX, WHOOSH_GAIN, WHOOSH_PEAK
 
 GAME = random_game_data.load()
 
@@ -273,6 +277,10 @@ class Scene13(MovingCameraScene, WordleBoardScene):
         row.type_word(self, 0, GAME["words"][k], run_time,
                       per_letter=key_cues(self), appear=True)
 
+    def _whoosh(self, pan_rt):
+        """01's camera-move whoosh, loudest at the pan's midpoint."""
+        self.sfx(WHOOSH_SFX, at=max(0.0, pan_rt / 2 - WHOOSH_PEAK), gain=WHOOSH_GAIN)
+
     def _pan_and_type(self, pan_rt, type_rt):
         """The camera pans up one frame to the game, and DICEY starts typing on the
         first row as soon as that row is TYPE_MARGIN inside the frame's top — the
@@ -288,6 +296,7 @@ class Scene13(MovingCameraScene, WordleBoardScene):
                                       per_letter=lambda i, ch, at: cues(i, ch, t0 + at))
         frame.generate_target()
         frame.target.shift(UP * GAME_DY)
+        self._whoosh(pan_rt)
         self.play(MoveToTarget(frame, run_time=pan_rt),
                   Succession(Wait(t0), AnimationGroup(typing, run_time=total)))
 
@@ -439,6 +448,7 @@ class Scene13(MovingCameraScene, WordleBoardScene):
     # k : the camera pans back down to the number line; the game leaves upward
     @subscene
     def back_to_line(self):
+        self._whoosh(1.5)
         self.play(self.camera.frame.animate.shift(DOWN * GAME_DY), run_time=1.5)
         self.remove(*self.rows)            # off-frame now; keeps the snapshot light
         self.rows = []
