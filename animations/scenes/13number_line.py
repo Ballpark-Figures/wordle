@@ -101,7 +101,7 @@ LINE_Y = -0.4
 TITLE_BUFF = 0.6
 MARKER_FS = 30
 CARD_PAD = 0.22           # the marker cards' margin round their text
-CARD_RADIUS = 0.08        # nearly square, like the tiles
+CARD_RADIUS = 0.15        # the cards' corner rounding
 WIN_LOW, WIN_HIGH = LIGHT_RED, LIGHT_GREEN
 WIN_MID = 0.98            # the win rate that sits halfway from red to green
 
