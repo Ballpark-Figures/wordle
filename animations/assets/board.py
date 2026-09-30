@@ -153,6 +153,15 @@ class WordleBoard(VGroup):
         `self.sfx(name, at=offset)` rather than relying on when the call happens.
         The asset owns no sound policy; the scene does.
         """
+        anim, total = self.type_anim(scene, row, word, run_time, per_letter, key_gap, appear)
+        scene.play(anim, run_time=total)
+
+    def type_anim(self, scene, row, word, run_time, per_letter=None, key_gap=None,
+                  appear=False):
+        """`type_word` unplayed: the letters are made and put on the scene (hidden),
+        and (animation, the run_time to play it for) comes back — so several words
+        can be typed in ONE play (scene 07 types a row of final answers at once).
+        Same arguments and timing as `type_word`, which is this played."""
         n = max(len(word), 1)
         if key_gap is None:
             lag, total = 1.0 / n, run_time
@@ -189,7 +198,7 @@ class WordleBoard(VGroup):
                 per_letter(i, ch, at(i))
         pops = [TilePop(self.tiles[row][i], self.letters[row][i], appear=appear)
                 for i in range(len(word))]
-        scene.play(LaggedStart(*pops, lag_ratio=lag), run_time=total)
+        return LaggedStart(*pops, lag_ratio=lag), total
 
     # ── scoring ───────────────────────────────────────────────────────────────
     def reveal(self, scene, row, code, run_time, lag_ratio=0.45, cols=None):

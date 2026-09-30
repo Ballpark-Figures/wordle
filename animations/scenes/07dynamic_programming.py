@@ -170,7 +170,6 @@ KID_PITCH = 2.6                    # y, z: between two branches
 ROOT_Y = 3.8                       # y, z: the root's FIRST row
 CHILD_Y = 1.6                      # y, z: a branch's FIRST row
 CHILD_DROP = 2.6                   # y, z: a branch down to its win, FIRST to FIRST
-WAIT_Y = -3.6                      # y, z: the words, along the bottom, before branching
 THUMB_CASE = 0.3                   # y: the group waiting in a corner
 THUMB_TREE = 0.2                   # z: the finished tree waiting in a corner, small
                                    #   enough to clear the lines to the left branches
@@ -822,7 +821,9 @@ class Scene07(WordleBoardScene):
             i, j = divmod(k, 3)
             words.append(PigpenWord(b["answer"], revealed=True).scale(WIN_SCALE)
                          .move_to([x + (j - 1) * SIX_WORD_DX, CASE_WORD_Y - i * SIX_WORD_DY, 0]))
-        return dict(g=g, node=node, row=row, line=line, words=words)
+        # where each word sits in the case, to go back to from a corner
+        homes = [(w.get_center(), w.width) for w in words]
+        return dict(g=g, node=node, row=row, line=line, words=words, homes=homes)
 
     def _setup_six_cases(self):
         self.x_old = VGroup(*self._leaves())
@@ -849,10 +850,9 @@ class Scene07(WordleBoardScene):
 
     def _to_root(self, case):
         """The case to the root of a full-frame tree: FIRST to the top centre at
-        tree size, its line from the top following, its words to a row along the
-        bottom, one under each branch-to-be."""
+        tree size, its line from the top following; its words stay (or return from
+        a corner to) their two rows of three, until they branch out."""
         Y = config.frame_y_radius
-        n = len(case["words"])
         row = case["row"]
         row.generate_target()
         row.target.scale(TREE_ROW_W / row.width).move_to([0, ROOT_Y, 0])
@@ -860,18 +860,28 @@ class Scene07(WordleBoardScene):
             t.set_stroke(width=STROKE)
         line = _line([0, Y + OFF_CLEAR, 0], _r(row.target))
         anims = [MoveToTarget(row), Transform(case["line"], line)]
-        for k, w in enumerate(case["words"]):
-            w.generate_target()
-            w.target.scale(TREE_WORD_W / w.width).move_to([self._kid_x(k, n), WAIT_Y, 0])
-            anims.append(MoveToTarget(w))
+        for w, (c, width) in zip(case["words"], case["homes"]):
+            if not np.allclose(w.get_center(), c):
+                w.generate_target()
+                w.target.scale(width / w.width).move_to(c)
+                anims.append(MoveToTarget(w))
         return anims
 
-    def _thumb(self, mobs, corner, k):
-        """`mobs` shrunk by `k` into a top `corner` (UL or UR), out of the way."""
+    def _thumb(self, mobs, corner, k, line, anchor):
+        """`mobs` shrunk by `k` into a top `corner` (UL or UR), out of the way. Its
+        root `line` is not shrunk with it: it keeps running off the top of the frame,
+        its lower end riding `anchor` (the root's R tile, one of `mobs`' pieces)."""
+        Y = config.frame_y_radius
         grp = VGroup(*mobs)
         grp.generate_target()
         grp.target.scale(k).to_corner(corner, buff=CORNER_BUFF)
-        return grp, MoveToTarget(grp)
+        idx = grp.get_family().index(anchor)
+        a0, a1 = anchor.get_center(), grp.target.get_family()[idx].get_center()
+
+        def ride(m, a):
+            p = a0 + (a1 - a0) * smooth(a)
+            m.put_start_and_end_on([p[0], Y + OFF_CLEAR, 0], p)
+        return grp, [MoveToTarget(grp), UpdateFromAlphaFunc(line, ride, rate_func=linear)]
 
     # The tree grows in the same steps as the BURST/WORST tree (r-u), every branch at
     # once. One helper per phase, each taking its run_time, so a beat reads as a
@@ -899,7 +909,7 @@ class Scene07(WordleBoardScene):
             olds.append(old)
             flips.append(Flip(old, new, parts=(row_parts(old), row_parts(new)), travel=True))
             kids.append((f[0], new))
-        anims += [w.animate.move_to(self._under(w, [new]) + pitch)
+        anims += [w.animate.scale(TREE_WORD_W / w.width).move_to(self._under(w, [new]) + pitch)
                   for w, (_, new) in zip(words, kids)]
         self.add(*lines, *[f for f, _ in kids], *olds)
         flip(self, flips, run_time, extra=anims)
@@ -917,14 +927,18 @@ class Scene07(WordleBoardScene):
             self.remove(case["words"][k])
 
     def _tree_answers(self, case, run_time):
-        """Every other branch's answer typed under its guess, one after another;
-        `run_time` is each word's."""
-        case["typed"] = {}
-        for k in case["rest"]:
+        """Every other branch's answer typed under its guess, ALL AT ONCE (user's
+        call). Keystroke sounds for the first word only: every word's keys land on
+        the same beats, so sounding them all would stack five or six at a time."""
+        case["typed"], anims = {}, []
+        for i, k in enumerate(case["rest"]):
             t = self._typed_row(case["kids"][k][1])
-            t.type_word(self, 0, case["node"]["branches"][k]["answer"], run_time,
-                        per_letter=key_cues(self), appear=True)
+            a, total = t.type_anim(self, 0, case["node"]["branches"][k]["answer"], run_time,
+                                   per_letter=key_cues(self) if i == 0 else None,
+                                   appear=True)
+            anims.append(a)
             case["typed"][k] = t
+        self.play(*anims, run_time=total)
 
     def _tree_down(self, case, run_time):
         """Each of those branches straight down at once: a copy, its answer flipping
@@ -958,7 +972,8 @@ class Scene07(WordleBoardScene):
     def _setup_tease_tree(self):
         tease, fiery = self.cases
         self.y_thumb, self.y_thumb_anim = self._thumb(
-            [fiery["row"], fiery["line"], *fiery["words"]], UR, THUMB_CASE)
+            [fiery["row"], *fiery["words"]], UR, THUMB_CASE, fiery["line"],
+            fiery["row"].tiles[0][2])
         self.y_root = self._to_root(tease)
 
     # y : FIERY's group shrinks into the top-right corner as TEASE's goes to the root;
@@ -966,7 +981,7 @@ class Scene07(WordleBoardScene):
     @subscene
     def tease_tree(self):
         self._setup_tease_tree()
-        self.play(self.y_thumb_anim, *self.y_root, run_time=1.5)
+        self.play(*self.y_thumb_anim, *self.y_root, run_time=1.5)
         self.remove(self.y_thumb)
         tease, fiery = self.cases
         self.add(fiery["line"], fiery["row"], *fiery["words"])
@@ -974,16 +989,17 @@ class Scene07(WordleBoardScene):
         self._tree_guess(tease, 0.65)
         self._tree_out(tease, 1.8)
         self._tree_guess_win(tease, 1.0)
-        self._tree_answers(tease, 0.45)
+        self._tree_answers(tease, 0.65)
         self._tree_down(tease, 1.5)
         self._tree_wins(tease, 1.0)
 
     def _setup_fiery_tree(self):
         tease, fiery = self.cases
-        mine = {id(m) for m in (fiery["row"], fiery["line"], *fiery["words"])
+        mine = {id(m) for m in (fiery["row"], fiery["line"], tease["line"], *fiery["words"])
                 for m in m.family_members_with_points()}
         tree = [m for m in self._leaves() if id(m) not in mine]
-        self.z_thumb, self.z_thumb_anim = self._thumb(tree, UL, THUMB_TREE)
+        self.z_thumb, self.z_thumb_anim = self._thumb(tree, UL, THUMB_TREE, tease["line"],
+                                                      tease["row"].tiles[0][2])
         self.z_root = self._to_root(fiery)
 
     # z : TEASE's tree shrinks into the top-left corner as FIERY's group comes out of
@@ -991,15 +1007,15 @@ class Scene07(WordleBoardScene):
     @subscene
     def fiery_tree(self):
         self._setup_fiery_tree()
-        self.play(self.z_thumb_anim, *self.z_root, run_time=1.5)
-        self.remove(self.z_thumb)
-        self.add(*self.z_thumb.submobjects)
+        self.play(*self.z_thumb_anim, *self.z_root, run_time=1.5)
         tease, fiery = self.cases
+        self.remove(self.z_thumb)
+        self.add(tease["line"], *self.z_thumb.submobjects)
         self.add(fiery["line"], fiery["row"], *fiery["words"])
         self.z_thumb = self.z_thumb_anim = self.z_root = None
         self._tree_guess(fiery, 0.65)
         self._tree_out(fiery, 1.8)
         self._tree_guess_win(fiery, 1.0)
-        self._tree_answers(fiery, 0.45)
+        self._tree_answers(fiery, 0.65)
         self._tree_down(fiery, 1.5)
         self._tree_wins(fiery, 1.0)
