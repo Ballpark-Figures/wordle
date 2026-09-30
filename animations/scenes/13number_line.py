@@ -24,8 +24,13 @@ REUSE MAP — every element, the one source it comes from, and how it enters:
   title/subtitle in     plain FadeIn, played with their content — 08histogram.py:369
                         (the heading fades in with the axis), 10word_lengths.py:277
   line in               FadeIn, with the title (as 08's axis)
-  markers in            ZoomLine.marker_in (new with the asset; no earlier scene has
-                        a marker)
+  markers in            ZoomLine.marker_in(pop=True): the card grows out of its dot
+                        while the stem draws — 08's callouts, which grow from their
+                        anchor as the line draws (stacks_view.py CALLOUT_GROW, 0.3s);
+                        with the "pop" sound effect (user's call: the second pop of
+                        ES_Cartoon, Pop, Various) as it starts
+  zooms                 ZoomLine.zoom, eased with smootherstep (the asset's default) so
+                        the ends come to rest
   SALET                 assets/board.py `get_typed_row` (the black typed row, as 12's
                         SALET), its border thinned by 12's rule for a small row
   marker text           crisp_text via the asset, BLACK, on the shared card
@@ -115,6 +120,11 @@ class Scene13(WordleBoardScene):
     def setup_scene(self):
         pass
 
+    def _pop_in(self, m, run_time):
+        """The marker's card pops out of its dot, with the pop sound."""
+        self.sfx("pop")
+        self.play(self.line.marker_in(m), run_time=run_time)
+
     def _marker(self, value, lines, side=UP):
         """The last line is the win rate, "NN.NN%"; it takes its colour."""
         rate = lines[-1]
@@ -144,20 +154,20 @@ class Scene13(WordleBoardScene):
         for t in salet.tiles[0]:
             t.set_stroke(width=STROKE * min(1.0, SALET_W / HEADER_W))
         m = self._marker(3.42, ["Optimal", salet, "100%"])
-        self.play(self.line.marker_in(m), run_time=1.0)
+        self._pop_in(m, 0.4)
 
     # c : zoom out to 3..2500; Random at 2315
     @subscene
     def random(self):
         self.play(self.line.zoom(3, 2500), run_time=3.0)
         m = self._marker(2315, ["Random", "0.26%"])
-        self.play(self.line.marker_in(m), run_time=1.0)
+        self._pop_in(m, 0.4)
 
     # d : Random (no repeats) at 1158
     @subscene
     def no_repeats(self):
         m = self._marker(1158, ["Random", "(no repeats)", "0.26%"])
-        self.play(self.line.marker_in(m), run_time=1.0)
+        self._pop_in(m, 0.4)
 
     # e : zoom in, the leftmost dot at the left, 8 at the right; 1158 and 2315
     #     slide off; Random Until Single Answer at 6.90
@@ -166,11 +176,11 @@ class Scene13(WordleBoardScene):
         left = min(m.value for m in self.line.markers)
         self.play(self.line.zoom(left, 8), run_time=3.0)
         m = self._marker(6.90, ["Random Until", "Single Answer", "59.30%"])
-        self.play(self.line.marker_in(m), run_time=1.0)
+        self._pop_in(m, 0.4)
 
     # f : Random Compatible Answers at 4.08, below the line
     @subscene
     def compatible(self):
         m = self._marker(4.08, ["Random", "Compatible Answers", "98.20%"],
                          side=DOWN)
-        self.play(self.line.marker_in(m), run_time=1.0)
+        self._pop_in(m, 0.4)
