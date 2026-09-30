@@ -41,7 +41,10 @@ Provenance for everything it writes:
                  kind of result:
                    3   best of the --topk beams (k100-300 agree), depth 12 — an UPPER
                        BOUND, from a restricted search
-                   4   exact totals, but only 4 of 4030 openers examined (min depth 6)
+                   4   TALE, the winner of an exact search that examined only 4 of
+                       4030 openers (at depth 6); its TOTAL from its own tree solved
+                       at the solver's largest cap, 19 (the user's call: no depth
+                       restriction). BLANK until solver/run-length-tree.sh has run
                    5   SALET on the NYT lists (the rest of this module), depth 6
                    6   best of the first 819 of 15787 openers, depth 5 — PROVISIONAL
                        (LENGTHS.md); the 7-11 rule would pick DISTAL at depth 4
@@ -80,7 +83,10 @@ N_TRIPLES = 3
 # lexicographic rule); "total" = lowest total (a pinned-depth file, one cap).
 TABLE_SOURCES = {
     3: ("optlen3/k300/opener_totals_d12_ssq.csv", "total"),
-    4: ("optlen4/opener_totals_escalating_ssq.csv", "depth"),
+    # 4: TALE (the exact search's winner over the 4 openers it examined), its total
+    #    from its OWN tree solved at the solver's largest cap, 19 -- the user wants
+    #    no depth restriction here, and the row must be the corner path's strategy
+    4: ("optlen4/trees_d19/tale.txt.gz", "tree"),
     6: ("optlen6/opener_totals_d5_ssq.csv", "total"),
     7: ("optlen7/opener_totals_escalating_lb.csv", "depth"),
     8: ("optlen8/opener_totals_escalating_lb.csv", "depth"),
@@ -95,12 +101,29 @@ def _table(opener_total):
     out = {5: {"opener": OPENER, "total": opener_total, "answers": N_ANSWERS,
                "depth": 6, "source": "optturns/opener_totals.csv"}}
     for L, (rel, rule) in TABLE_SOURCES.items():
+        answers = sum(1 for w in open(os.path.join(shared, "words", "hello", f"len{L}",
+                                                    "mystery.txt")) if w.strip())
+        if rule == "tree":
+            path = os.path.join(shared, rel)
+            opener = os.path.basename(rel).split(".")[0]
+            cap = int(rel.split("trees_d")[1].split("/")[0])
+            if not os.path.exists(path):
+                print(f"STUB: no tree at {rel} -- length {L}'s average is BLANK. "
+                      f"Run solver/run-length-tree.sh --length {L} --depth max "
+                      f"--opener {opener}, then re-run this module.")
+                out[L] = {"opener": opener, "total": None, "answers": answers,
+                          "depth": cap, "source": rel}
+                continue
+            with gzip.open(path, "rt") as f:
+                costs = [int(line.split()[1]) for line in f]
+            assert len(costs) == answers, (rel, len(costs), answers)
+            out[L] = {"opener": opener, "total": sum(costs), "answers": answers,
+                      "depth": cap, "deepest": max(costs), "source": rel}
+            continue
         rows = [r for r in csv.DictReader(open(os.path.join(shared, rel))) if r["total"]]
         key = (lambda r: (int(r["depth"]), int(r["total"]), r["word"])) if rule == "depth" \
             else (lambda r: (int(r["total"]), r["word"]))
         r = min(rows, key=key)
-        answers = sum(1 for w in open(os.path.join(shared, "words", "hello", f"len{L}",
-                                                    "mystery.txt")) if w.strip())
         assert len(r["word"]) == L, (L, r["word"])
         assert f"{int(r['total']) / answers:.5f}" == r["expected"], (L, r, answers)
         out[L] = {"opener": r["word"], "total": int(r["total"]), "answers": answers,
@@ -111,10 +134,11 @@ def _table(opener_total):
 # length -> that row's tree (under math/data/shared), for 10t / 10v's all-grey path.
 # Each must be the tree OF THE TABLE'S ROW: same opener, and its lines' costs must
 # sum to the row's total (asserted). Length 4's comes from solver/run-length-tree.sh
-# (the exact solver, TALE, depth 6); until that run exists the path is a STUB (None).
+# (the exact solver, TALE, --depth max = 19); until that run exists the path is a
+# STUB (None), and so is the row's average.
 GREY_TREES = {
     3: "optlen3/k300/trees_d12/ras.txt.gz",
-    4: "optlen4/trees_d6/tale.txt.gz",
+    4: "optlen4/trees_d19/tale.txt.gz",
 }
 
 
@@ -249,7 +273,8 @@ if __name__ == "__main__":
               f"{t['of']}, {t['singles']} singles)")
     assert sorted(map(int, data["table"])) == data["lengths"]
     for L, t in data["table"].items():
-        print(f"  {L:>2}  {t['opener'].upper():<12} {t['total'] / t['answers']:.2f}  "
+        avg = "----" if t["total"] is None else f"{t['total'] / t['answers']:.2f}"
+        print(f"  {L:>2}  {t['opener'].upper():<12} {avg}  "
               f"depth {t['depth']:<2}  {t['source']}")
     for L, gp in data["grey_paths"].items():
         if gp:

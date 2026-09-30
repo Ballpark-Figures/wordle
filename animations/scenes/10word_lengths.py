@@ -64,8 +64,10 @@ NUMBERS — all SOURCED, from assets/word_lengths_data.py -> word_lengths_cache.
                    math/wordle.py pattern()
   the table      word_lengths_data `table`: each length's opener and total from
                    the file the user chose (TABLE_SOURCES there); averages 2 dp.
-                   NOT one kind of result — 3 is a beam's upper bound, 4 exact over
-                   only 4 openers, 6 provisional, 7-11 complete; caps differ
+                   NOT one kind of result — 3 is a beam's upper bound, 4 is TALE's
+                   own total at the solver's largest cap (19; blank until
+                   run-length-tree.sh has run), 6 provisional, 7-11 complete;
+                   caps differ
   10e's triples   the first three rows of the singletons triple ranking
                    (math/data/shared/singletons/triple_singletons.csv, ranks 365,
                    380, 478 of the top 100000 of a greedy screen) using all six
@@ -397,8 +399,11 @@ class Scene10(WordleDarkScene):
 
     # ── j-v: filling in the table, one cell at a time ──────────────────────
     def _fill_avg(self, L, run_time):
-        """Length L's average guesses fades into its cell."""
+        """Length L's average guesses fades into its cell. A STUB total (None, see
+        word_lengths_data) leaves the cell empty rather than showing a number."""
         t = TABLE[L]
+        if t["total"] is None:
+            return
         cell = crisp_text(_avg(t["total"], t["answers"]), font_size=CELL_SIZE,
                           color=WHITE).move_to([AVG_X, _row_y(L), 0])
         self.play(FadeIn(cell), run_time=run_time)

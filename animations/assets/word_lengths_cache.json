@@ -154,10 +154,10 @@
     },
     "4": {
       "opener": "tale",
-      "total": 9831,
+      "total": null,
       "answers": 2347,
-      "depth": 6,
-      "source": "optlen4/opener_totals_escalating_ssq.csv"
+      "depth": 19,
+      "source": "optlen4/trees_d19/tale.txt.gz"
     },
     "5": {
       "opener": "salet",

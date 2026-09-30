@@ -2,7 +2,7 @@
 # Emit ONE opener's optimal TREE for a hello wordl game of a given WORD LENGTH, at
 # a PINNED depth cap.
 #
-#     bash solver/run-length-tree.sh --length 4 --depth 6 --opener tale   # from math/
+#     bash solver/run-length-tree.sh --length 4 --depth max --opener tale   # from math/
 #     bash solver/run-length-tree.sh --length 4 --depth 6 --opener tale --dry-run
 #
 # WHY THIS EXISTS.  run-length-sweep.sh runs --optimal-only, which emits NO trees
@@ -13,8 +13,12 @@
 # (its all-grey path), and the only TALE tree on disk came from a --topk beam at a
 # different cap -- a different strategy with a different total.
 #
-# THE CAP IS PART OF THE OBJECTIVE and is PINNED here (no escalation): pass the
-# depth the sweep's row reports.  The tree lands in
+# THE CAP IS PART OF THE OBJECTIVE and is PINNED here (no escalation).
+# `--depth max` asks for as little restriction as the solver can give: the largest
+# cap its arrays allow, MAXD - 1 (19, read from optturns.c), far above what any of
+# these lengths needs.  That is NOT a proof that no cap binds -- only relaxing
+# further could show that -- so the run reports the tree's DEEPEST line for the
+# reader to hold against the cap.  The tree lands in
 #     data/shared/optlen<L>/trees_d<D>/<opener>.txt.gz
 # beside that length's other results, one directory per depth.  A tree already
 # there is REFUSED rather than overwritten.
@@ -53,8 +57,12 @@ case "$LENGTH" in
     5) echo "length 5 is the NYT problem: use optturns's own trees (run-sweep.sh)" >&2; exit 1 ;;
     *) echo "usage: bash solver/run-length-tree.sh --length <3..11> --depth <d> --opener <word> [--dry-run]" >&2; exit 1 ;;
 esac
+if [ "$DEPTH" = max ]; then
+    MAXD=$(awk '/^#define MAXD /{print $3}' "$MATH/solver/optturns.c")
+    DEPTH=$((MAXD - 1))
+fi
 case "$DEPTH" in
-    ''|*[!0-9]*) echo "--depth is required and must be a number (the cap IS the objective)" >&2; exit 1 ;;
+    ''|*[!0-9]*) echo "--depth is required: a number, or max (the cap IS the objective)" >&2; exit 1 ;;
 esac
 [ -n "$OPENER" ] || { echo "--opener is required: this solves ONE named opener" >&2; exit 1; }
 [ "${#OPENER}" -eq "$LENGTH" ] || { echo "--opener '$OPENER' is not $LENGTH letters" >&2; exit 1; }
@@ -102,4 +110,10 @@ echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] tree: length $LENGTH, opener $OPENER, dep
 "$BIN" --length "$LENGTH" --opener "$OPENER" --depth "$DEPTH" --trees "$TREES" \
     --tt-bits "$TTBITS" --threads "$THREADS" $WARM 2>&1 | tee -a "$LOG"
 echo
-if [ -f "$TREE" ]; then echo "tree: $TREE"; else echo "NO TREE WRITTEN (see above)" >&2; exit 1; fi
+if [ -f "$TREE" ]; then
+    echo "tree: $TREE"
+    echo "deepest line: $(gzip -dc "$TREE" | awk '$2 > m {m = $2} END {print m}') guesses (cap $DEPTH)" \
+        | tee -a "$LOG"
+else
+    echo "NO TREE WRITTEN (see above)" >&2; exit 1
+fi
