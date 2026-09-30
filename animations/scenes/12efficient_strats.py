@@ -42,7 +42,6 @@ REUSE MAP — every element and the one source it comes from:
                         answers; the tiles' border thinned by the new `stroke` arg
   typed words           assets/board.py `get_typed_row`, under a row at the board's
                         row spacing — 07's `_typed_row`
-  oval packing          assets/groups.py `_pack` (the packer ranked_layout uses)
   colours               BOARD_NAVY via WordleBoardScene; tiles config.py TILE_*
   groups                assets/lists_data.py -> lists_cache.json `full`
   second words etc.     assets/strategy_data.py -> strategy_cache.json (optimal
@@ -55,9 +54,13 @@ LAYOUT CHOICES, flagged:
     word is as wide as its row and the small groups' words are specks.
   - A group with no second word (LUCKY's and GUESS's own all-green win) gets none:
     a word arriving there shrinks away, a word leaving it grows in.
-  - The six clusters (h) are packed in reading order by grey count, 0 first; rows
-    in a cluster keep rank order; the whole arrangement takes the largest scale
-    that fits (so rows may grow). Ovals are WHITE (the script names no colour).
+  - The six ovals (h) sit in a 3x2 grid of equal cells, 0 greys top-left to 5
+    bottom-right (user's call), each centred in its cell, at one scale set by the
+    oval that fills its cell most (so rows may grow); rows in a cluster keep rank
+    order, each shelf centred. Ovals are WHITE (the script names no colour).
+  - a's SALET is START_SCALE (user's call: bigger); b shrinks it into the corner.
+  - i: the rows travel back and their words fade in UNDER THEM, riding along, over
+    the last part of that motion (user's call).
   - The grey-count words are typed rows at OVAL_WORD_W wide, inside the bottom of
     each oval.
   - j cycles CYCLE_STEPS times; a group smaller than that repeats its draws, a
@@ -75,7 +78,7 @@ from assets.board import STROKE, GAP, TILE, WordleBoard, get_typed_row
 from assets.pigpen import PigpenWord
 from assets.flip import Flip, flip, row_parts
 from assets.groups import (scored_row, ranked_layout, GUESS_SCALE, HEADER_W,
-                           enter_from_beyond, edge_out, _pack, REGION_HALF_W,
+                           enter_from_beyond, edge_out, REGION_HALF_W,
                            DOT_REGION_TOP, REGION_BOT)
 from assets.keys import key_cues
 from assets import lists_data, strategy_data
@@ -83,6 +86,10 @@ from assets import lists_data, strategy_data
 DATA = lists_data.load()
 SD = strategy_data.load()
 SALET, LUCKY, GUESS = "salet", "lucky", "guess"     # the script's own choices
+
+START_SCALE = 2.6          # a: SALET's size in the middle (b shrinks it to GUESS_SCALE)
+WORDS_IN_FROM = 0.6        # i: the share of the rows' motion before their words fade in
+OVAL_CELL_FILL = 0.92      # h: the largest oval fills this much of its grid cell
 
 DOT_COLOR = WHITE
 CORNER_BUFF = 0.3          # the corner word's gap to the frame's edges (06)
@@ -142,9 +149,11 @@ class Scene12(WordleBoardScene):
     """
 
     def setup_scene(self):
-        self.guess = PigpenWord(SALET, revealed=True).scale(GUESS_SCALE).move_to(ORIGIN)
+        self.guess = PigpenWord(SALET, revealed=True).scale(START_SCALE).move_to(ORIGIN)
         self.add(self.guess)
-        w, h = self.guess.width, self.guess.height
+        # the corner is sized for the word at GUESS_SCALE, which b shrinks it to
+        w = self.guess.width * GUESS_SCALE / START_SCALE
+        h = self.guess.height * GUESS_SCALE / START_SCALE
         self.corner = np.array([-config.frame_x_radius + CORNER_BUFF + w / 2,
                                 config.frame_y_radius - CORNER_BUFF - h / 2, 0.0])
         self.col_left = self.corner[0] + w / 2 + CORNER_MARGIN
@@ -179,7 +188,7 @@ class Scene12(WordleBoardScene):
     @subscene
     def dots(self):
         self._setup_dots()
-        self.play(self.guess.animate.move_to(self.corner),
+        self.play(self.guess.animate.scale(GUESS_SCALE / START_SCALE).move_to(self.corner),
                   *[grp.animate.move_to(c) for grp, c in self.incoming],
                   run_time=2.0)
         for grp, _ in self.incoming:
@@ -331,8 +340,12 @@ class Scene12(WordleBoardScene):
             oh = content_h * math.sqrt(2) + OVAL_PAD
             blocks.append(dict(n=n, place=place, cw=cw, ch=ch, label=label,
                                content_w=content_w, content_h=content_h, w=ow, h=oh))
-        f, centres = _pack(blocks, self.col_left, REGION_HALF_W, DOT_REGION_TOP,
-                           REGION_BOT, center_last=True)
+        # a 3x2 grid of equal cells, 0 greys top-left to 5 bottom-right, each oval
+        # centred in its cell; one scale for all, the largest oval filling its cell
+        cw_, ch_ = (REGION_HALF_W - self.col_left) / 3, (DOT_REGION_TOP - REGION_BOT) / 2
+        f = OVAL_CELL_FILL * min(min(cw_ / b["w"], ch_ / b["h"]) for b in blocks)
+        centres = [(self.col_left + (n % 3 + 0.5) * cw_, DOT_REGION_TOP - (n // 3 + 0.5) * ch_)
+                   for n in range(6)]
         self.home = [(row, row.get_center(), row.width) for row in self.rows]
         self.targets, self.ovals, self.labels = [], [], []
         for b, (bx, by_) in zip(blocks, centres):
@@ -371,9 +384,22 @@ class Scene12(WordleBoardScene):
         self.play(*[FadeOut(o) for o in self.ovals],
                   *[FadeOut(l) for l in self.labels],
                   *[row.animate.move_to(c).scale(wd / row.width) for row, c, wd in self.home],
+                  *self._ride_in(),
                   run_time=1.5)
-        self.play(*[FadeIn(w) for w in self.words if w is not None], run_time=1.0)
         self.ovals = self.labels = self.home = None
+
+    def _ride_in(self):
+        """Each typed word fading in UNDER its row as the rows finish moving: every
+        frame it is put under the row's current spot at the row's current width,
+        and from WORDS_IN_FROM of the way its opacity climbs to 1. Listed AFTER the
+        rows' animations in the play, so it reads the rows' positions for that
+        frame. Built per call, so no updater outlives the play."""
+        def follow(word, row):
+            def step(mob, a):
+                mob.scale(row.width / mob.width).move_to(_under(row))
+                mob.set_opacity(max(0.0, (a - WORDS_IN_FROM) / (1 - WORDS_IN_FROM)))
+            return UpdateFromAlphaFunc(word, step)
+        return [follow(w, row) for w, row in zip(self.words, self.rows) if w is not None]
 
     def _cycle_step(self, t):
         """Draw t: each word flips to its group's t-th random answer (a group with
