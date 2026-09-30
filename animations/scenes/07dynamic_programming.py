@@ -257,6 +257,34 @@ def _avg_number(value, color, slot):
     return crisp_text(f"{value:.2f}", font_size=AVG_FS, color=color).move_to(slot)
 
 
+def _vdc(k):
+    """The k-th term of the base-2 van der Corput sequence: 0, 1/2, 1/4, 3/4, 1/8 ..."""
+    f, d = 0.0, 0.5
+    while k:
+        f += d * (k & 1)
+        k >>= 1
+        d /= 2
+    return f
+
+
+def _spread(kids, around):
+    """The order zc lays a node's children out in (user's call: not pattern-code
+    order, which put every big group on one side). `around` (SALET's children, a
+    full circle): largest first, then each next-largest into the middle of the
+    biggest gap left -- van der Corput positions -- so the big groups are dealt
+    evenly round SALET. Otherwise (a slice of a parent's angle): largest in the
+    MIDDLE, sizes falling off to both sides, so a node's big children sit on its
+    own line out from the centre."""
+    by_size = sorted(kids, key=lambda k: (-len(k["answers"]), k["code"]))
+    if around:
+        slot = {id(k): _vdc(i) for i, k in enumerate(by_size)}
+        return sorted(by_size, key=lambda k: slot[id(k)])
+    left, right = [], []
+    for i, k in enumerate(by_size):
+        (right if i % 2 else left).append(k)
+    return left[::-1] + right
+
+
 def _jump(row):
     """The win bounce's height for `row`: the board's default, scaled with the tiles,
     so a small row does not jump over the row above it."""
@@ -1337,7 +1365,8 @@ class Scene07(WordleBoardScene):
     # ROOT of the answers in its group (user's spec). No level rings: a node's
     # distance from the centre falls with its group's size (log scale), so big groups
     # sit near the middle and the wins at the edge, on ellipses (the frame is wider
-    # than tall); each node at the middle of an angle proportional to its answers.
+    # than tall); each node at the middle of an angle proportional to its answers,
+    # siblings ordered by `_spread` (big groups dealt evenly round SALET).
     # A still to experiment on: no animation yet.
     def _full_row(self, word, code, width, centre):
         """A row `width` wide at `centre`: `word` scored as `code`, or typed (black)
@@ -1367,7 +1396,7 @@ class Scene07(WordleBoardScene):
 
         def place(node, a0, a1, depth, parent_c):
             a = a0
-            for kid in node["kids"]:
+            for kid in _spread(node["kids"], depth == 1):
                 n = len(kid["answers"])
                 span = (a1 - a0) * n / sum(len(k["answers"]) for k in node["kids"])
                 mid = a + span / 2
