@@ -1,0 +1,62 @@
+{
+ "first": {
+  "7": {
+   "guess": "tease",
+   "branches": [
+    {
+     "code": 242,
+     "answer": "tease"
+    },
+    {
+     "code": 96,
+     "answer": "patsy"
+    },
+    {
+     "code": 105,
+     "answer": "stash"
+    },
+    {
+     "code": 170,
+     "answer": "those"
+    },
+    {
+     "code": 197,
+     "answer": "these"
+    },
+    {
+     "code": 224,
+     "answer": "tense"
+    }
+   ]
+  },
+  "225": {
+   "guess": "boxen",
+   "branches": [
+    {
+     "code": 3,
+     "answer": "fiery"
+    },
+    {
+     "code": 6,
+     "answer": "filer"
+    },
+    {
+     "code": 7,
+     "answer": "finer"
+    },
+    {
+     "code": 24,
+     "answer": "fixer"
+    },
+    {
+     "code": 84,
+     "answer": "fibre"
+    },
+    {
+     "code": 87,
+     "answer": "fiber"
+    }
+   ]
+  }
+ }
+}

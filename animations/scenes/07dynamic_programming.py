@@ -65,8 +65,19 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                    all green on the way, the black WORST coming down
                    with it; winning bounce as the black WORST fades    (07w, VO 6)
 
+  v six_cases    — the BURST/WORST tree off to the left; TEASE's and FIERY's
+                   6-word groups in from the right, side by side (user's
+                   picks: TEASE's next guess is in its group, FIERY's,
+                   BOXEN, is not; both from FIRST's optimal tree)      (07x, VO 7)
+  w tease_tree   — FIERY's group shrinks into the top-right corner as
+                   TEASE's goes to the root; then its whole tree grows
+                   across the frame, r-u's steps with every branch at once (07y, VO 7)
+  x fiery_tree   — TEASE's tree shrinks into the top-left corner as FIERY's
+                   group comes to the root; then its tree grows the same (07z, VO 7)
+
   NB from s on the LETTERS run behind the script's: three script beats (s, t, u)
-  are one subscene, so the script's v is subscene t and its w is u.
+  are one subscene, so the script's v is subscene t, w is u, x is v, y is w and
+  z is x.
 
 REUSE MAP — every element and the one source it comes from:
   board, typing, reveal   assets/board.py `get_board`, `type_word` (its
@@ -116,9 +127,10 @@ from assets.flip import Flip, flip, row_parts
 from assets.groups import (ranked_layout, ranked_word_layout, scored_row, HEADER_W,
                            GUESS_SCALE, GUESS_Y, HEAD_ROW_GAP, row_aspect, enter_from_beyond,
                            edge_out)
-from assets import lists_data
+from assets import lists_data, tree_data
 
 DATA = lists_data.load()
+TREES = tree_data.load()["first"]      # x-z: two of FIRST's groups, from its optimal tree
 FIRST, AFTER, THIRD = "first", "after", "third"   # the script's own words
 # the group each guess narrows to (pattern codes, position 0 most significant) —
 # the user's calls, 2026-09-29, in place of the script's all gray: FIRST's yellow T
@@ -148,6 +160,20 @@ CHILD_DY = 2.2                     # s, w: a branch's drop, FIRST row to FIRST r
 CHILD_DX = 3.5                     # s: the two branches' distance from the centre
 PAIR_WORD_DX = 1.3                 # q: the two words, side by side at CASE_WORD_Y
 WORD_GAP = 0.25                    # u, w: a word's gap under the case it moves to
+SIX = (7, 225)                     # x-z: FIRST's 6-word groups shown (user's picks):
+                                   #   TEASE's (--- G Y) and FIERY's (G G Y - -)
+SIX_CASE_X = 4.0                   # x: the two cases' distance from the centre
+SIX_WORD_DX, SIX_WORD_DY = 2.05, 0.55  # x: a case's words, two rows of three
+TREE_ROW_W = 2.2                   # y, z: a full-frame tree's row width
+TREE_WORD_W = 1.5                  # y, z: its words' width
+KID_PITCH = 2.6                    # y, z: between two branches
+ROOT_Y = 3.8                       # y, z: the root's FIRST row
+CHILD_Y = 1.6                      # y, z: a branch's FIRST row
+CHILD_DROP = 2.6                   # y, z: a branch down to its win, FIRST to FIRST
+WAIT_Y = -3.6                      # y, z: the words, along the bottom, before branching
+THUMB_CASE = 0.3                   # y: the group waiting in a corner
+THUMB_TREE = 0.2                   # z: the finished tree waiting in a corner, small
+                                   #   enough to clear the lines to the left branches
 GREEN_Y = -2.3                     # j: the all-green FIRST row, bottom centre
 WORD_Y = -3.4                      # j: its one word, under it
 WIN_SCALE = 0.8                    # that word's size (1 = scene 04's list size)
@@ -201,6 +227,9 @@ class Scene07(WordleBoardScene):
     branch_score — rise, branch, score both BURSTs, words under, all at once
     left_win — the left case bounces
     right_branch — WORST typed; a copy branches down, WORST scoring as it goes
+    six_cases — the two 6-word groups in from the right
+    tease_tree — FIERY's group to a corner; TEASE's tree grows
+    fiery_tree — TEASE's tree to a corner; FIERY's tree grows
     """
 
     def setup_scene(self):
@@ -767,3 +796,210 @@ class Scene07(WordleBoardScene):
         self.play(FadeOut(self.pwords[1]), self.gwin.bounce_anim(0, height=_jump(self.gwin)),
                   run_time=1.0)
         self.remove(self.pwords[1])
+
+    # ── two 6-word groups, each expanded into its tree (x-z) ──────────────────
+    def _leaves(self):
+        """Every drawn piece on screen, once each — so a whole-frame move (a sweep
+        or a shrink) moves each piece exactly once, whatever groups hold it."""
+        seen, out = set(), []
+        for m in self.mobjects:
+            for leaf in m.family_members_with_points():
+                if id(leaf) not in seen:
+                    seen.add(id(leaf))
+                    out.append(leaf)
+        return out
+
+    def _group_case(self, g, x):
+        """One 6-word group as a case, centred on `x`: FIRST scored as the group
+        scored it, its line out of the top, its words in two rows of three under it
+        (in branch order, the next guess's own win first)."""
+        Y = config.frame_y_radius
+        node = TREES[str(g)]
+        row = scored_row(FIRST, g, self.pcase.width, [x, 0, 0])
+        line = _line([x, Y + OFF_CLEAR, 0], _r(row))
+        words = []
+        for k, b in enumerate(node["branches"]):
+            i, j = divmod(k, 3)
+            words.append(PigpenWord(b["answer"], revealed=True).scale(WIN_SCALE)
+                         .move_to([x + (j - 1) * SIX_WORD_DX, CASE_WORD_Y - i * SIX_WORD_DY, 0]))
+        return dict(g=g, node=node, row=row, line=line, words=words)
+
+    def _setup_six_cases(self):
+        self.x_old = VGroup(*self._leaves())
+        self.cases = [self._group_case(g, sx * SIX_CASE_X) for g, sx in zip(SIX, (-1, 1))]
+        self.x_in = VGroup(*[m for c in self.cases for m in (c["row"], c["line"], *c["words"])])
+        self.x_in.shift(RIGHT * SWAP_DIST)
+
+    # x : the BURST/WORST tree off to the left; two 6-word groups in from the right —
+    #     TEASE's (its next guess is one of its words) and FIERY's (its next guess,
+    #     BOXEN, is not)
+    @subscene
+    def six_cases(self):
+        self._setup_six_cases()
+        self.play(self.x_old.animate.shift(LEFT * SWAP_DIST),
+                  self.x_in.animate.shift(LEFT * SWAP_DIST), run_time=1.5)
+        self.clear()
+        for c in self.cases:
+            self.add(c["line"], c["row"], *c["words"])
+        self.x_old = self.x_in = None
+
+    # ── one group's tree, across the whole frame ─────────────────────────────
+    def _kid_x(self, k, n):
+        return (k - (n - 1) / 2) * KID_PITCH
+
+    def _to_root(self, case):
+        """The case to the root of a full-frame tree: FIRST to the top centre at
+        tree size, its line from the top following, its words to a row along the
+        bottom, one under each branch-to-be."""
+        Y = config.frame_y_radius
+        n = len(case["words"])
+        row = case["row"]
+        row.generate_target()
+        row.target.scale(TREE_ROW_W / row.width).move_to([0, ROOT_Y, 0])
+        for t in row.target.tiles[0]:
+            t.set_stroke(width=STROKE)
+        line = _line([0, Y + OFF_CLEAR, 0], _r(row.target))
+        anims = [MoveToTarget(row), Transform(case["line"], line)]
+        for k, w in enumerate(case["words"]):
+            w.generate_target()
+            w.target.scale(TREE_WORD_W / w.width).move_to([self._kid_x(k, n), WAIT_Y, 0])
+            anims.append(MoveToTarget(w))
+        return anims
+
+    def _thumb(self, mobs, corner, k):
+        """`mobs` shrunk by `k` into a top `corner` (UL or UR), out of the way."""
+        grp = VGroup(*mobs)
+        grp.generate_target()
+        grp.target.scale(k).to_corner(corner, buff=CORNER_BUFF)
+        return grp, MoveToTarget(grp)
+
+    # The tree grows in the same steps as the BURST/WORST tree (r-u), every branch at
+    # once. One helper per phase, each taking its run_time, so a beat reads as a
+    # timeline: _tree_guess, _tree_out, _tree_guess_win, _tree_answers,
+    # _tree_down, _tree_wins.
+    def _tree_guess(self, case, run_time):
+        """The next guess typed under FIRST."""
+        case["guess"] = self._typed_row(case["row"])
+        case["guess"].type_word(self, 0, case["node"]["guess"], run_time,
+                                per_letter=key_cues(self), appear=True)
+
+    def _tree_out(self, case, run_time):
+        """The branches out: a copy of FIRST to each, each copy's guess flipping to
+        its colours on the way, the words gliding under (a row of room left)."""
+        node, row, guess, words = case["node"], case["row"], case["guess"], case["words"]
+        branches = node["branches"]
+        n = len(branches)
+        pitch = row.height * (1 + GAP / TILE) * DOWN
+        targets = [np.array([self._kid_x(k, n), CHILD_Y, 0]) for k in range(n)]
+        firsts, lines, anims = self._branch(guess, [row], targets)
+        flips, olds, kids = [], [], []
+        for t, b, f in zip(targets, branches, firsts):
+            old = guess.copy()
+            new = scored_row(node["guess"], b["code"], guess.width, t + pitch)
+            olds.append(old)
+            flips.append(Flip(old, new, parts=(row_parts(old), row_parts(new)), travel=True))
+            kids.append((f[0], new))
+        anims += [w.animate.move_to(self._under(w, [new]) + pitch)
+                  for w, (_, new) in zip(words, kids)]
+        self.add(*lines, *[f for f, _ in kids], *olds)
+        flip(self, flips, run_time, extra=anims)
+        case["kids"] = kids
+        case["won"] = [k for k, b in enumerate(branches) if b["code"] == ALL_GREEN]
+        case["rest"] = [k for k in range(n) if k not in case["won"]]
+
+    def _tree_guess_win(self, case, run_time):
+        """A branch the guess itself wins bounces as its word fades (none for a
+        guess outside the group)."""
+        for k in case["won"]:
+            _, r = case["kids"][k]
+            self.play(FadeOut(case["words"][k]), r.bounce_anim(0, height=_jump(r)),
+                      run_time=run_time)
+            self.remove(case["words"][k])
+
+    def _tree_answers(self, case, run_time):
+        """Every other branch's answer typed under its guess, one after another;
+        `run_time` is each word's."""
+        case["typed"] = {}
+        for k in case["rest"]:
+            t = self._typed_row(case["kids"][k][1])
+            t.type_word(self, 0, case["node"]["branches"][k]["answer"], run_time,
+                        per_letter=key_cues(self), appear=True)
+            case["typed"][k] = t
+
+    def _tree_down(self, case, run_time):
+        """Each of those branches straight down at once: a copy, its answer flipping
+        to green on the way, its word coming down to sit under it."""
+        v = DOWN * CHILD_DROP
+        flips, olds, anims, case["wins"] = [], [], [], []
+        for k in case["rest"]:
+            first, g_row = case["kids"][k]
+            typed, w = case["typed"][k], case["words"][k]
+            (copy,), lines, a = self._branch(typed, [first], [first.get_center() + v])
+            self.add(*lines, copy[0])
+            old = typed.copy()
+            win = scored_row(case["node"]["branches"][k]["answer"], ALL_GREEN, typed.width,
+                             typed.get_center() + v)
+            olds.append(old)
+            flips.append(Flip(old, win, parts=(row_parts(old), row_parts(win)), travel=True))
+            anims += [*a, g_row.copy().animate.shift(v),
+                      w.animate.move_to(self._under(w, [win]))]
+            case["wins"].append(win)
+        self.add(*olds)
+        flip(self, flips, run_time, extra=anims)
+
+    def _tree_wins(self, case, run_time):
+        """Those branches win together, their words fading."""
+        words = [case["words"][k] for k in case["rest"]]
+        self.play(*[FadeOut(w) for w in words],
+                  *[r.bounce_anim(0, height=_jump(r)) for r in case["wins"]],
+                  run_time=run_time)
+        self.remove(*words)
+
+    def _setup_tease_tree(self):
+        tease, fiery = self.cases
+        self.y_thumb, self.y_thumb_anim = self._thumb(
+            [fiery["row"], fiery["line"], *fiery["words"]], UR, THUMB_CASE)
+        self.y_root = self._to_root(tease)
+
+    # y : FIERY's group shrinks into the top-right corner as TEASE's goes to the root;
+    #     then TEASE's whole tree grows across the frame
+    @subscene
+    def tease_tree(self):
+        self._setup_tease_tree()
+        self.play(self.y_thumb_anim, *self.y_root, run_time=1.5)
+        self.remove(self.y_thumb)
+        tease, fiery = self.cases
+        self.add(fiery["line"], fiery["row"], *fiery["words"])
+        self.y_thumb = self.y_thumb_anim = self.y_root = None
+        self._tree_guess(tease, 0.65)
+        self._tree_out(tease, 1.8)
+        self._tree_guess_win(tease, 1.0)
+        self._tree_answers(tease, 0.45)
+        self._tree_down(tease, 1.5)
+        self._tree_wins(tease, 1.0)
+
+    def _setup_fiery_tree(self):
+        tease, fiery = self.cases
+        mine = {id(m) for m in (fiery["row"], fiery["line"], *fiery["words"])
+                for m in m.family_members_with_points()}
+        tree = [m for m in self._leaves() if id(m) not in mine]
+        self.z_thumb, self.z_thumb_anim = self._thumb(tree, UL, THUMB_TREE)
+        self.z_root = self._to_root(fiery)
+
+    # z : TEASE's tree shrinks into the top-left corner as FIERY's group comes out of
+    #     its corner to the root; then FIERY's whole tree grows across the frame
+    @subscene
+    def fiery_tree(self):
+        self._setup_fiery_tree()
+        self.play(self.z_thumb_anim, *self.z_root, run_time=1.5)
+        self.remove(self.z_thumb)
+        self.add(*self.z_thumb.submobjects)
+        tease, fiery = self.cases
+        self.add(fiery["line"], fiery["row"], *fiery["words"])
+        self.z_thumb = self.z_thumb_anim = self.z_root = None
+        self._tree_guess(fiery, 0.65)
+        self._tree_out(fiery, 1.8)
+        self._tree_guess_win(fiery, 1.0)
+        self._tree_answers(fiery, 0.45)
+        self._tree_down(fiery, 1.5)
+        self._tree_wins(fiery, 1.0)
