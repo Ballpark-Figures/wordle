@@ -6,13 +6,15 @@ chart in. Talking head THG follows, so it ends with the vowel board up.
 
 BEAT MAP — one subscene per Script.md beat, letters matching:
 
-  a distribution — the Wordle-stats "guess distribution" chart for SALET's optimal
-                   strategy grows in: rows 1-6, one bar each, count inside  (VO 1)
+  a distribution — SALET typed in as tiles (the user's), then the Wordle-stats
+                   "guess distribution" chart for SALET's optimal strategy
+                   grows in below it: rows 1-6, one bar each, count inside  (VO 1)
   b game_third   — bar 3 turns green; a mini board of SALET, NORTH, THIRD,
                    already scored, fades in above bar 3                      (VO 1)
   c game_wheel   — bar 3 back to grey, bar 4 green; a mini board of SALET,
                    BEVOR, CHIMP, WHEEL fades in below bar 3                  (VO 1)
-  d wheel_center — ONE play: bar 4 greys as the chart and the THIRD board fade,
+  d wheel_center — ONE play: bar 4 greys as the chart, SALET's tiles and the
+                   THIRD board fade,
                    the background turns navy, and the WHEEL board grows to the
                    middle with its WHEEL row fading while every other tile
                    FLIPS to black, keeping only the A (SALET), E O (BEVOR) and
@@ -124,6 +126,7 @@ BAR_RATIO = 0.83
 MIN_BAR = 0.55               # the stub a 0 row keeps, wide enough for its "0"
 NUM_SIZE = FONT_SIZE_SM      # row numbers AND counts
 TITLE_SIZE = 28
+OPENER_BUFF = 0.3            # SALET's tiles this far above the title
 
 # ── the mini boards ───────────────────────────────────────────────────────────
 BOARD_SCALE = 0.7
@@ -242,6 +245,10 @@ class Scene10(WordleDarkScene):
             value_factory=lambda v: white(v, NUM_SIZE),
             title_mobject=title, title_buff=0.35)
         title.align_to(self.chart.labels, LEFT)
+        # SALET in tiles above the title, flush left with it, at the table's size
+        self.salet_tiles = get_board(rows=1, cols=5).scale(TABLE_TILE_SCALE)
+        self.salet_tiles.align_to(title, LEFT)
+        self.salet_tiles.align_to(title.get_top() + UP * OPENER_BUFF, DOWN)
 
     def _setup_board(self, answer, below):
         """SALET's finished game for `answer`, scored, as a mini board a little
@@ -265,6 +272,8 @@ class Scene10(WordleDarkScene):
     def distribution(self):
         self._setup_chart()
         c = self.chart
+        self.salet_tiles.type_word(self, 0, DATA["opener"], 0.65,
+                                   per_letter=key_cues(self), appear=True)
         self.play(FadeIn(c.title), FadeIn(c.labels), run_time=0.8)
         grow_bars(self, c.bars, 1.5, lag=0.08, edge=LEFT)
         self.play(FadeIn(c.values), run_time=0.6)
@@ -293,7 +302,7 @@ class Scene10(WordleDarkScene):
         # bar 4 is animated on its own (grey AND out), so the rest of the chart
         # fades without it — one mobject, one animation
         self.chart_rest = [b for b in c.bars if b is not bar4] + \
-                          [c.labels, c.values, c.title]
+                          [c.labels, c.values, c.title, self.salet_tiles]
         self.upper = VGroup(*self.board_wheel[:-1])      # SALET, BEVOR, CHIMP
         self.wheel_row = self.board_wheel[-1]
         # IN FRONT of everything it passes over on its way to the middle (the
