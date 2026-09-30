@@ -25,6 +25,11 @@ TILE_TEXT = "#ffffff"
 # board asset never maps a code to a colour itself.
 TILE_STATE = {0: TILE_ABSENT, 1: TILE_PRESENT, 2: TILE_CORRECT}
 
+# Semantic good/bad for text on the cream card: yahtzee's SCORE_GREEN / SCORE_RED,
+# chosen there for exactly that surface (deliberately darker than the accents).
+SCORE_GREEN = "#1A7A1A"
+SCORE_RED = "#A60E00"
+
 
 class WordleScene(BpkScene):
     def construct(self):

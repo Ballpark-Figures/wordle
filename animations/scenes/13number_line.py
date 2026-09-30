@@ -33,6 +33,8 @@ REUSE MAP — every element, the one source it comes from, and how it enters:
                         no earlier scene in this video boxes a label, so the house
                         card is the precedent
   colours               BOARD_NAVY via WordleBoardScene, as 08 and 12
+  win-rate colours      config.py SCORE_RED -> SCORE_GREEN (yahtzee's, made for text on
+                        this cream card), by `win_color`
 Nothing leaves: THI follows.
 
 EVERY NUMBER is the script's, and each matches the committed data it came from:
@@ -58,8 +60,16 @@ LAYOUT CHOICES, flagged:
   - 4.08's label hangs BELOW the line: above, it would overlap 3.42's. Its stem
     runs from the dot through the tick labels; a tick label it crosses is dropped.
   - Markers: a white dot and stem, running into the card (user's call: boxed text).
+  - Each win rate is coloured red -> green, very nonlinearly (user's call): the
+    colour position is t = 1 - (1 - rate)^P with P set so t = 0.5 at WIN_MID (98%),
+    i.e. a power law in the LOSS rate. The colour runs round the hue wheel from
+    SCORE_RED to SCORE_GREEN (through amber), since a straight RGB blend of the two
+    goes muddy brown in the middle, where 98.20% sits. Resulting t: 0.26% 0.00,
+    59.30% 0.15, 98.20% 0.51, 100% 1.00.
 """
 from pathlib import Path
+import colorsys
+import math
 import sys
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -78,6 +88,18 @@ LINE_Y = -0.4
 TITLE_BUFF = 0.6
 MARKER_FS = 30
 CARD_PAD = 0.18           # the marker cards' margin round their text
+WIN_MID = 0.98            # the win rate that sits halfway from red to green
+
+
+def win_color(rate):
+    """A win rate (0..1) on the red -> green scale: halfway at WIN_MID, via a
+    power law in the loss rate, interpolated round the hue wheel."""
+    p = math.log(0.5) / math.log(1 - WIN_MID)
+    t = 1 - (1 - rate) ** p
+    (h0, s0, v0), (h1, s1, v1) = (colorsys.rgb_to_hsv(*ManimColor(c).to_rgb())
+                                  for c in (SCORE_RED, SCORE_GREEN))
+    hsv = [a + (b - a) * t for a, b in ((h0, h1), (s0, s1), (v0, v1))]
+    return ManimColor.from_rgb(colorsys.hsv_to_rgb(*hsv))
 
 
 class Scene13(WordleBoardScene):
@@ -93,6 +115,9 @@ class Scene13(WordleBoardScene):
         pass
 
     def _marker(self, value, lines, side=UP):
+        """The last line is the win rate, "NN.NN%"; it takes its colour."""
+        rate = lines[-1]
+        lines = lines[:-1] + [(rate, win_color(float(rate.rstrip("%")) / 100))]
         return self.line.add_marker(value, lines, side=side, font_size=MARKER_FS,
                                     text_color=BLACK, box={"pad": CARD_PAD})
 
