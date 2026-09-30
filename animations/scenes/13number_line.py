@@ -38,13 +38,14 @@ REUSE MAP — every element, the one source it comes from, and how it enters:
                         (its fastest moment), as stacks_view.py:227 does
   SALET                 assets/board.py `get_typed_row` (the black typed row, as 12's
                         SALET), its border thinned by 12's rule for a small row
-  marker text           crisp_text via the asset, BLACK, on the shared card
-                        (bpkfigures/card.py `card_behind`, via add_marker(box=...)) —
-                        no earlier scene in this video boxes a label, so the house
-                        card is the precedent
+  marker text           crisp_text via the asset, WHITE, on a card in the Wordle
+                        TILE's own style (user's call, option 1: the cream house card
+                        looked foreign in an all-dark video): card_behind with fill
+                        TILE_EMPTY_FILL, border TILE_FILLED_BORDER at the board's
+                        STROKE, via add_marker(box=...)
   colours               BOARD_NAVY via WordleBoardScene, as 08 and 12
-  win-rate colours      config.py SCORE_RED -> SCORE_GREEN (yahtzee's, made for text on
-                        this cream card), by `win_color`
+  win-rate colours      style.py LIGHT_RED -> LIGHT_GREEN, by `win_color` — hangman's
+                        win/lose colours on a dark ground (02rules.py:76)
 Nothing leaves: THI follows.
 
 EVERY NUMBER is the script's, and each matches the committed data it came from:
@@ -74,7 +75,7 @@ LAYOUT CHOICES, flagged:
   - Each win rate is coloured red -> green, very nonlinearly (user's call): the
     colour position is t = 1 - (1 - rate)^P with P set so t = 0.5 at WIN_MID (98%),
     i.e. a power law in the LOSS rate. The colour runs round the hue wheel from
-    SCORE_RED to SCORE_GREEN (through amber), since a straight RGB blend of the two
+    LIGHT_RED to LIGHT_GREEN (through yellow), since a straight RGB blend of the two
     goes muddy brown in the middle, where 98.20% sits. Resulting t: 0.26% 0.00,
     59.30% 0.15, 98.20% 0.51, 100% 1.00.
 """
@@ -99,7 +100,9 @@ SALET_W = 2.2             # the SALET row's width in the Optimal label
 LINE_Y = -0.4
 TITLE_BUFF = 0.6
 MARKER_FS = 30
-CARD_PAD = 0.18           # the marker cards' margin round their text
+CARD_PAD = 0.22           # the marker cards' margin round their text
+CARD_RADIUS = 0.08        # nearly square, like the tiles
+WIN_LOW, WIN_HIGH = LIGHT_RED, LIGHT_GREEN
 WIN_MID = 0.98            # the win rate that sits halfway from red to green
 
 
@@ -109,7 +112,7 @@ def win_color(rate):
     p = math.log(0.5) / math.log(1 - WIN_MID)
     t = 1 - (1 - rate) ** p
     (h0, s0, v0), (h1, s1, v1) = (colorsys.rgb_to_hsv(*ManimColor(c).to_rgb())
-                                  for c in (SCORE_RED, SCORE_GREEN))
+                                  for c in (WIN_LOW, WIN_HIGH))
     hsv = [a + (b - a) * t for a, b in ((h0, h1), (s0, s1), (v0, v1))]
     return ManimColor.from_rgb(colorsys.hsv_to_rgb(*hsv))
 
@@ -146,7 +149,11 @@ class Scene13(WordleBoardScene):
         lines = lines[:-1] + [(rate, win_color(float(rate.rstrip("%")) / 100))]
         return self.line.add_marker(value, lines, side=side, font_size=MARKER_FS,
                                     grow=0.0,
-                                    text_color=BLACK, box={"pad": CARD_PAD})
+                                    text_color=WHITE,
+                                    box={"pad": CARD_PAD, "fill": TILE_EMPTY_FILL,
+                                         "stroke_color": TILE_FILLED_BORDER,
+                                         "stroke_width": STROKE,
+                                         "corner_radius": CARD_RADIUS})
 
     # a : the number line, 3 to 6, extending both ways; the title
     def _setup_show_line(self):
