@@ -390,3 +390,17 @@ def get_scored_row(word, code):
         row.letters[0][i] = letter
         row.add(letter)
     return row
+
+
+def get_typed_row(word):
+    """One typed-but-unscored row, static: `word`'s letters on empty tiles with the
+    typed border -- exactly what `type_word` leaves behind, built directly (scene
+    07 puts a guess on a branch without typing it)."""
+    row = WordleBoard(rows=1, cols=len(word))
+    for i, ch in enumerate(word):
+        tile = row.tiles[0][i]
+        tile.set_stroke(TILE_FILLED_BORDER, STROKE)
+        letter = row._letter(ch, tile)
+        row.letters[0][i] = letter
+        row.add(letter)
+    return row

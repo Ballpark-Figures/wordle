@@ -132,7 +132,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 
 from config import *
-from assets.board import get_board, WordleBoard, STROKE, TILE, GAP
+from assets.board import get_board, get_typed_row, WordleBoard, STROKE, TILE, GAP
 from assets.pigpen import PigpenWord, WORD_W
 from assets.keys import key_cues
 from assets.flip import Flip, flip, row_parts
@@ -1087,8 +1087,9 @@ class Scene07(WordleBoardScene):
     # spread evenly across the frame, each branch over the middle of its answers,
     # the levels spaced so the deepest stack still fits. Quick, to save time
     # (user's call): each LEVEL shoots out in one play -- copies of a branch's rows
-    # to each child, the child's new scored row fading in as it travels with them,
-    # the words gliding under -- with no typing and no win bounces; a word whose
+    # to each child, its black guess row flipping to the child's colours on the
+    # way, the child's own next guess appearing as a black row, the words gliding
+    # under -- with no typing and no win bounces; a word whose
     # branch is all green shrinks into that green row. Between forced guesses the
     # whole tree contracts back into the root FIRST, fast, and the next tree's
     # words shoot out of the root with its first level.
@@ -1116,6 +1117,7 @@ class Scene07(WordleBoardScene):
         rw = min(TREE_ROW_W, pitch * BIG_FILL)
         row_pitch = rw * row_aspect() * (1 + GAP / TILE)
         low = -Y + BIG_EDGE + (deepest + 1) * row_pitch   # the deepest level's top
+                                                          # (a win: no black row under it)
         step = (BIG_TOP - low) / max(deepest - 1, 1)
         ys = {d: BIG_TOP - (d - 1) * step for d in range(1, deepest + 1)}
         return xs, rw, ys
@@ -1141,20 +1143,19 @@ class Scene07(WordleBoardScene):
         self.play(MoveToTarget(row), Transform(self.big_line, line), run_time=run_time)
 
     def _big_level(self, frontier, xs, rw, ys, run_time):
-        """One level shoots out: every frontier branch's rows copied to each child;
-        the child's new row -- the branch's guess, scored -- starting invisible at
-        the branch's size one row under it and fading in as it travels; a line from
-        the branch's last row's R to the child's FIRST R; the child's words gliding
-        under it, those of an all-green child shrinking into its green row. Words
-        with a `start` (hidden at the root) grow out from there. Returns the next
-        frontier."""
-        anims, nxt, gone = [], [], []
+        """One level shoots out: every frontier branch's rows copied to each child,
+        its black guess row copied too and flipping to the child's colours on the
+        way (as r-u's did); a line from the guess's R to the child's FIRST R; for a
+        child still open, its own next guess as a black row, fading in as it travels
+        with the rest; the child's words gliding under it, those of an all-green
+        child shrinking into its green row. Words with a `start` (hidden at the
+        root) grow out from there. Returns the next frontier."""
+        anims, flips, olds, nxt, gone = [], [], [], [], []
         pitch = rw * row_aspect() * (1 + GAP / TILE)
-        for node, rows, words, path in frontier:
+        for node, rows, guess, words, path in frontier:
             by_word = {w.word: w for w in words}
             k = rw / rows[0].width
-            here = rows[0].height * (1 + GAP / TILE)
-            below = rows[-1].get_center() + DOWN * here       # where the guess would go
+            below = guess.get_center() + DOWN * guess.height * (1 + GAP / TILE)
             for kid in node["kids"]:
                 key = path + (kid["code"],)
                 x, top = xs[key], ys[len(key)]
@@ -1164,14 +1165,21 @@ class Scene07(WordleBoardScene):
                     self.add(c)
                     anims.append(c.animate.scale(k).move_to([x, top - i * pitch, 0]))
                     copies.append(c)
-                new = scored_row(node["guess"], kid["code"], rw, [x, top - len(rows) * pitch, 0])
-                new.generate_target()
-                new.scale(rows[0].width / rw).move_to(below).set_opacity(0)
-                self.add(new)
-                anims.append(MoveToTarget(new))
-                src, r0, r1 = _r(rows[-1]), _r(rows[0]), np.array([x, top, 0.0])
-                if np.linalg.norm(r0 - src) < 1e-6:     # a one-row branch (the root):
-                    r0 = src + DOWN * 1e-3              # a line needs some length to orient
+                old = guess.copy()
+                new = scored_row(node["guess"], kid["code"], rw,
+                                 [x, top - len(rows) * pitch, 0])
+                olds.append(old)
+                flips.append(Flip(old, new, parts=(row_parts(old), row_parts(new)),
+                                  travel=True))
+                nguess = None
+                if kid["node"] is not None:
+                    nguess = get_typed_row(kid["node"]["guess"])
+                    nguess.scale(rw / nguess.width).move_to([x, top - (len(rows) + 1) * pitch, 0])
+                    nguess.generate_target()
+                    nguess.scale(guess.width / rw).move_to(below).set_opacity(0)
+                    self.add(nguess)
+                    anims.append(MoveToTarget(nguess))
+                src, r0, r1 = _r(guess), _r(rows[0]), np.array([x, top, 0.0])
                 line = _line(src, r0)
                 self.add(line)
                 anims.append(UpdateFromAlphaFunc(
@@ -1180,11 +1188,11 @@ class Scene07(WordleBoardScene):
                     rate_func=linear))
                 mine = [by_word[a] for a in kid["answers"]]
                 won = kid["code"] == ALL_GREEN
-                y = top - (len(rows) + 1) * pitch
+                y = top - (len(rows) + 2) * pitch
                 for w in mine:
-                    h = w.height * rw / w.width if not hasattr(w, "start") else w.target.height
+                    h = w.target.height if hasattr(w, "start") else w.height * rw / w.width
                     if won:
-                        dest = new.target.get_center()
+                        dest = new.get_center()
                     else:
                         dest = np.array([x, y - h / 2, 0])
                         y -= h * BIG_WORD_GAP
@@ -1200,9 +1208,10 @@ class Scene07(WordleBoardScene):
                         anims.append(w.animate.scale(rw / w.width).move_to(dest))
                 if won:
                     gone += mine
-                elif kid["node"] is not None:
-                    nxt.append((kid["node"], copies + [new], mine, key))
-        self.play(*anims, run_time=run_time)
+                elif nguess is not None:
+                    nxt.append((kid["node"], copies + [new], nguess, mine, key))
+        self.add(*olds)
+        flip(self, flips, run_time, extra=anims)
         self.remove(*gone)
         return nxt
 
@@ -1220,13 +1229,18 @@ class Scene07(WordleBoardScene):
         self.add(*words)
         return words
 
-    def _big_tree(self, guess, words, level_time):
-        """One forced guess's whole tree, a level per play."""
+    def _big_tree(self, guess, words, guess_time, level_time):
+        """One forced guess's whole tree: its black row appears under the root (no
+        typing), then a level per play."""
         tree = TREES_SUB[f"{BIG_TREES}:{guess}"]
         xs, rw, ys = self._big_layout(tree)
         if words is None:
             words = self._big_words(rw)
-        frontier = [(tree, [self.big], words, ())]
+        row = get_typed_row(guess)
+        row.scale(self.big.width / row.width) \
+            .next_to(self.big, DOWN, buff=self.big.tiles[0][0].height * GAP / TILE)
+        self.play(FadeIn(row), run_time=guess_time)
+        frontier = [(tree, [self.big], row, words, ())]
         while frontier:
             frontier = self._big_level(frontier, xs, rw, ys, level_time)
 
@@ -1248,10 +1262,10 @@ class Scene07(WordleBoardScene):
         self.big_grid = [w.copy() for w in self.big_words]
         after, again, other, best = BIG_GUESSES
         self._big_root(1.0)
-        self._big_tree(after, self.big_words, 1.0)
+        self._big_tree(after, self.big_words, 0.4, 1.0)
         self._big_contract(0.5)
-        self._big_tree(again, None, 1.0)
+        self._big_tree(again, None, 0.4, 1.0)
         self._big_contract(0.5)
-        self._big_tree(other, None, 1.0)
+        self._big_tree(other, None, 0.4, 1.0)
         self._big_contract(0.5)
-        self._big_tree(best, None, 1.0)
+        self._big_tree(best, None, 0.4, 1.0)
