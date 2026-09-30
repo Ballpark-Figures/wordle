@@ -908,7 +908,8 @@ class Scene07(WordleBoardScene):
                 seen |= {id(x) for x in m.get_family()}
         for m in self.mobjects:
             for leaf in m.family_members_with_points():
-                if id(leaf) not in seen:
+                # only drawn pieces: a counter's ValueTracker sits on the scene too
+                if id(leaf) not in seen and isinstance(leaf, VMobject):
                     seen.add(id(leaf))
                     out.append(leaf)
         return out
@@ -1252,7 +1253,7 @@ class Scene07(WordleBoardScene):
         grow(tree, [self.big], guess, ())
         return pieces, dest
 
-    def _big_tree(self, guess, words, guess_time, grow_time):
+    def _big_tree(self, guess, words, guess_time, grow_time, count_time):
         """One forced guess's whole tree: its black row appears under the root (no
         typing); then the WHOLE tree sprouts from the root at once (user's call, the
         reverse of the contraction), the waiting words (first tree only) shrinking
@@ -1272,9 +1273,20 @@ class Scene07(WordleBoardScene):
                   *[w.animate.scale(0.01).move_to(dest[w.word]) for w in (words or [])],
                   run_time=grow_time)
         self.remove(*(words or []))
-        # finished: its average -- green only for the optimal guess
-        self.play(*self._avg_show(f"{BIG_TREES}:{guess}", green=guess == BIG_GUESSES[-1]),
-                  run_time=guess_time)
+        # finished: its average -- in zb the number COUNTS from one tree's to the next
+        # (a CrispCounter) rather than fading out and in (user's call); green only for
+        # the optimal guess
+        value = AVG[f"{BIG_TREES}:{guess}"]
+        if self.avg_counter is None:
+            probe = crisp_text("0.00", font_size=AVG_FS).move_to(self.avg_slot)
+            self.avg_counter = CrispCounter("", ValueTracker(value), left=probe.get_left()[0],
+                                            y=self.avg_slot[1], font_size=AVG_FS, color=WHITE)
+            self.avg_num = self.avg_counter.mob
+            self.play(FadeIn(self.avg_num), run_time=guess_time)
+        else:
+            self.avg_counter.count(self, value, run_time=count_time, flash="none")
+        if guess == BIG_GUESSES[-1]:
+            self.play(self.avg_num.animate.set_color(AVG_GREEN), run_time=guess_time)
 
     def _big_contract(self, run_time):
         """Everything but the root FIRST and its line contracts into the root's R,
@@ -1282,10 +1294,9 @@ class Scene07(WordleBoardScene):
         keep = {id(m) for m in (self.big, self.big_line) for m in m.get_family()}
         tree = VGroup(*[m for m in self._leaves() if id(m) not in keep])
         self.play(tree.animate.scale(0.01).move_to(_r(self.big)).set_opacity(0),
-                  *self._avg_hide(), run_time=run_time)
+                  run_time=run_time)
         self.remove(tree)
-        self._avg_clear()
-        self.add(self.big_line, self.big, self.avg_lab)
+        self.add(self.big_line, self.big, self.avg_lab, self.avg_num)
 
     # z (script zb) : the optimal tree after each forced guess in turn -- AFTER,
     #     AGAIN, OTHER, then BAGEL (the optimal one) -- each sprouting at once, the tree
@@ -1295,10 +1306,12 @@ class Scene07(WordleBoardScene):
         self.big_grid = [w.copy() for w in self.big_words]
         after, again, other, best = BIG_GUESSES
         self._big_root(1.0)
-        self._big_tree(after, self.big_words, 0.4, 1.5)
+        self.avg_counter = None
+        self._big_tree(after, self.big_words, 0.4, 1.5, 0.8)
         self._big_contract(0.5)
-        self._big_tree(again, None, 0.4, 1.5)
+        self._big_tree(again, None, 0.4, 1.5, 0.8)
         self._big_contract(0.5)
-        self._big_tree(other, None, 0.4, 1.5)
+        self._big_tree(other, None, 0.4, 1.5, 0.8)
         self._big_contract(0.5)
-        self._big_tree(best, None, 0.4, 1.5)
+        self._big_tree(best, None, 0.4, 1.5, 0.8)
+        self.avg_counter = None
