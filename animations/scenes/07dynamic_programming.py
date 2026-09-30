@@ -170,6 +170,7 @@ KID_PITCH = 2.6                    # y, z: between two branches
 ROOT_Y = 3.8                       # y, z: the root's FIRST row
 CHILD_Y = 1.6                      # y, z: a branch's FIRST row
 CHILD_DROP = 2.6                   # y, z: a branch down to its win, FIRST to FIRST
+WORDS_Y = -3.45                    # y, z: the words' block, bottom middle, before branching
 THUMB_CASE = 0.3                   # y: the group waiting in a corner
 THUMB_TREE = 0.2                   # z: the finished tree waiting in a corner, small
                                    #   enough to clear the lines to the left branches
@@ -850,8 +851,9 @@ class Scene07(WordleBoardScene):
 
     def _to_root(self, case):
         """The case to the root of a full-frame tree: FIRST to the top centre at
-        tree size, its line from the top following; its words stay (or return from
-        a corner to) their two rows of three, until they branch out."""
+        tree size, its line from the top following; its words to the bottom middle,
+        still in their two rows of three (user's call), at their case size (so back
+        up to it from a corner)."""
         Y = config.frame_y_radius
         row = case["row"]
         row.generate_target()
@@ -860,11 +862,11 @@ class Scene07(WordleBoardScene):
             t.set_stroke(width=STROKE)
         line = _line([0, Y + OFF_CLEAR, 0], _r(row.target))
         anims = [MoveToTarget(row), Transform(case["line"], line)]
+        mid = np.mean([c for c, _ in case["homes"]], axis=0)
         for w, (c, width) in zip(case["words"], case["homes"]):
-            if not np.allclose(w.get_center(), c):
-                w.generate_target()
-                w.target.scale(width / w.width).move_to(c)
-                anims.append(MoveToTarget(w))
+            w.generate_target()
+            w.target.scale(width / w.width).move_to(c - mid + [0, WORDS_Y, 0])
+            anims.append(MoveToTarget(w))
         return anims
 
     def _thumb(self, mobs, corner, k, line, anchor):
