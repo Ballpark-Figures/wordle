@@ -22,7 +22,8 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                     right into Arabic الْعَرَبِيَّة, vowel marks red, letters
                     blue                                                    (VO 5)
   i script_names  — (Hebrew) and (Arabic) fade up under them               (VO 5)
-  j poof          — the vowel marks fade out, with the poof sfx            (VO 5)
+  j poof          — the vowel marks fade out, with the whoosh sfx (the
+                    user's swap for the script's poof)                     (VO 5)
 
 THE VOWELS in h-j are the OPTIONAL marks, the ones everyday text leaves out (the
 user's definition): Hebrew's niqqud below the letters (hiriq, shva, hiriq — the yud
@@ -51,7 +52,7 @@ REUSE MAP — every element and the one source it comes from:
   script words   crisp_text in a system font with the script (Inter has neither):
                  Arial Hebrew, Geeza Pro; coloured VOWEL_TILE_COLOR /
                  CONS_TILE_COLOR, the same pair tile_color uses
-  poof sfx       music-library `poof`
+  whoosh sfx     scene 01's WHOOSH_SFX / _GAIN / _PEAK (assets/stacks_view.py)
 
 NUMBERS: the VO's "only one possible Wordle answer matches" — checked against the
 2315 answers (math/data/shared/words/mystery.txt): i.i.y matches only ICILY, b.f.t
@@ -70,6 +71,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 from config import *
 from assets.board import WordleBoard, TileFlip, TilePop
 from assets.flip import Flip, flip
+from assets.stacks_view import WHOOSH_SFX, WHOOSH_GAIN, WHOOSH_PEAK
 from bpkfigures.tier_list import tile_color, VOWEL_TILE_COLOR, CONS_TILE_COLOR
 
 LEFT_WORD, RIGHT_WORD = "icily", "befit"
@@ -289,11 +291,13 @@ class Scene11(WordleBoardScene):
         self._setup_script_names()
         self.play(*[FadeIn(n, shift=UP * 0.2) for n in self.names], run_time=0.8)
 
-    # j : the vowel marks vanish, with a poof
+    # j : the vowel marks vanish, with the whoosh (the user's swap for the script's
+    #     poof) — scene 01's camera-move whoosh, at its level, loudest mid-fade
     @subscene
     def poof(self):
-        self.sfx("poof")
-        self.play(*[FadeOut(m) for m in self.marks], run_time=0.7)
+        rt = 0.7
+        self.sfx(WHOOSH_SFX, at=max(0.0, rt / 2 - WHOOSH_PEAK), gain=WHOOSH_GAIN)
+        self.play(*[FadeOut(m) for m in self.marks], run_time=rt)
         for w in range(2):
             self.scripts[w].remove(*self.marks[w])
         self.marks = None
