@@ -78,9 +78,15 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   y big_case     — everything off to the left; FIRST's BYBYB group (48 words,
                    code 30) in from the right, the words in a grid     (07za, VO 8)
 
+  z big_trees    — the optimal tree for the 48 words after each forced next
+                   guess in turn, AFTER, AGAIN, OTHER then PLANE (the
+                   optimal one), grown level by level, laid out the ordinary
+                   way (user's call: see what goes wrong); trees from
+                   solver/run-subgroup-tree.sh                         (07zb, VO 8)
+
   NB from s on the LETTERS run behind the script's: three script beats (s, t, u)
   are one subscene, so the script's v is subscene t, w is u, x is v, y is w and
-  z is x, za is y.
+  z is x, za is y, zb is z.
 
 REUSE MAP — every element and the one source it comes from:
   board, typing, reveal   assets/board.py `get_board`, `type_word` (its
@@ -134,6 +140,7 @@ from assets import lists_data, tree_data
 
 DATA = lists_data.load()
 TREES = tree_data.load()["first"]      # x-z: two of FIRST's groups, from its optimal tree
+TREES_SUB = tree_data.load()["subtree"]  # zb: the 48-word group after four forced guesses
 FIRST, AFTER, THIRD = "first", "after", "third"   # the script's own words
 # the group each guess narrows to (pattern codes, position 0 most significant) —
 # the user's calls, 2026-09-29, in place of the script's all gray: FIRST's yellow T
@@ -179,6 +186,10 @@ BIG_Y = 2.2                        # za: its FIRST row
 BIG_COLS = 8                       # za: its words, a grid of BIG_COLS columns ...
 BIG_WORD_W, BIG_DX, BIG_DY = 1.35, 1.6, 0.5   # ... this wide, this far apart
 BIG_WORDS_Y = 1.0                  # za: the grid's top row
+BIG_EDGE = 0.3                     # zb: margin at the frame's sides
+BIG_FILL = 0.9                     # zb: a branch's row width, of the answer spacing
+BIG_TOP, BIG_BOTTOM = 2.6, -3.6    # zb: first and last levels' top rows
+BIG_WORD_GAP = 1.3                 # zb: a word column's pitch, in word heights
 THUMB_CASE = 0.3                   # y: the group waiting in a corner
 THUMB_TREE = 0.2                   # z: the finished tree waiting in a corner, small
                                    #   enough to clear the lines to the left branches
@@ -239,6 +250,7 @@ class Scene07(WordleBoardScene):
     tease_tree — FIERY's group to a corner; TEASE's tree grows
     fiery_tree — TEASE's tree to a corner; FIERY's tree grows
     big_case — FIRST's 48-word BYBYB group in from the right
+    big_trees — the optimal tree after AFTER, AGAIN, OTHER, then PLANE
     """
 
     def setup_scene(self):
@@ -1059,3 +1071,169 @@ class Scene07(WordleBoardScene):
         self.clear()
         self.add(self.big_line, self.big, *self.big_words)
         self.za_old = self.za_in = self.cases = None
+
+    # ── the 48-word group's optimal trees after four forced guesses (script zb) ─
+    # Laid out the ordinary way (user's call: "fit the tree normally and see what
+    # goes wrong"): every branch a full stack of rows, the answers spread evenly
+    # across the frame, each branch over the middle of its answers. The same steps
+    # as r-u and the 6-word trees, applied level by level, every branch of a level
+    # at once: the branches out (each copied guess flipping to its colours on the
+    # way, the words gliding under); the guesses' own wins bounce, their words
+    # fading; the next guesses typed, all at once; repeat.
+    def _big_layout(self, tree):
+        """x for every branch (answers evenly across the frame, a branch over the
+        middle of its answers), the row width that spacing allows, and y for each
+        level's top row."""
+        X = config.frame_x_radius - BIG_EDGE
+        n = sum(1 for _ in self._big_leaves(tree))
+        pitch = 2 * X / n
+        xs, it = {}, iter(range(n))
+
+        def place(node, path):
+            spans = []
+            for kid in node["kids"]:
+                key = path + (kid["code"],)
+                if kid["node"] is None:
+                    xs[key] = -X + pitch * (next(it) + 0.5)
+                else:
+                    place(kid["node"], key)
+                    below = [xs[key + (k["code"],)] for k in kid["node"]["kids"]]
+                    xs[key] = (min(below) + max(below)) / 2
+                spans.append(xs[key])
+        place(tree, ())
+        deepest = max(len(k) for k in xs)
+        rw = min(TREE_ROW_W, pitch * BIG_FILL)
+        step = (BIG_TOP - BIG_BOTTOM) / max(deepest - 1, 1)
+        ys = {d: BIG_TOP - (d - 1) * step for d in range(1, deepest + 1)}
+        return xs, rw, ys
+
+    def _big_leaves(self, node):
+        for kid in node["kids"]:
+            if kid["node"] is None:
+                yield kid
+            else:
+                yield from self._big_leaves(kid["node"])
+
+    def _big_words_grid(self):
+        """The 48 words in za's grid, as za built them."""
+        return [w.copy() for w in self.big_grid]
+
+    def _big_root(self, tree, run_time):
+        """FIRST to the top centre at tree size, its line following; the forced guess
+        typed under it."""
+        Y = config.frame_y_radius
+        row = self.big
+        if abs(row.get_center()[1] - ROOT_Y) > 1e-6:
+            row.generate_target()
+            row.target.scale(TREE_ROW_W / row.width).move_to([0, ROOT_Y, 0])
+            for t in row.target.tiles[0]:
+                t.set_stroke(width=STROKE)
+            line = _line([0, Y + OFF_CLEAR, 0], _r(row.target))
+            self.play(MoveToTarget(row), Transform(self.big_line, line), run_time=run_time)
+        typed = self._typed_row(row)
+        typed.type_word(self, 0, tree["guess"], 0.65, per_letter=key_cues(self), appear=True)
+        return [(tree, [row], typed, self.big_words, ())]
+
+    def _big_level(self, frontier, xs, rw, ys, run_time):
+        """Every frontier branch splits at once: copies of its rows to each child,
+        the typed guess flipping to the child's colours as it travels, a line from
+        the guess's R to the child's FIRST R, the child's words gliding under it."""
+        flips, olds, anims, kids = [], [], [], []
+        for node, rows, typed, words, path in frontier:
+            by_word = {w.word: w for w in words}
+            for kid in node["kids"]:
+                key = path + (kid["code"],)
+                depth = len(key)
+                k = rw / rows[0].width
+                x, top = xs[key], ys[depth]
+                pitch = rw * row_aspect() * (1 + GAP / TILE)
+                copies = []
+                for i, r in enumerate(rows):
+                    c = r.copy()
+                    self.add(c)
+                    anims.append(c.animate.scale(k).move_to([x, top - i * pitch, 0]))
+                    copies.append(c)
+                old = typed.copy()
+                new = scored_row(node["guess"], kid["code"], rw,
+                                 [x, top - len(rows) * pitch, 0])
+                olds.append(old)
+                flips.append(Flip(old, new, parts=(row_parts(old), row_parts(new)),
+                                  travel=True))
+                src, r0 = _r(typed), _r(rows[0])
+                r1 = np.array([x, top, 0.0])
+                line = _line(src, r0)
+                self.add(line)
+                anims.append(UpdateFromAlphaFunc(
+                    line, lambda m, a, r0=r0, r1=r1, src=src:
+                    m.put_start_and_end_on(src, r0 + (r1 - r0) * smooth(a)),
+                    rate_func=linear))
+                mine = [by_word[a] for a in kid["answers"]]
+                # the words in a column under the child, a row of room left for its
+                # next guess
+                y = top - (len(rows) + 2) * pitch
+                for w in mine:
+                    h = w.height * rw / w.width
+                    anims.append(w.animate.scale(rw / w.width).move_to([x, y - h / 2, 0]))
+                    y -= h * BIG_WORD_GAP
+                kids.append((kid, copies + [new], mine, key))
+        self.add(*olds)
+        flip(self, flips, run_time, extra=anims)
+        return kids
+
+    def _big_wins(self, kids, run_time):
+        """The branches their guess won bounce, their word fading."""
+        won = [(rows[-1], words[0]) for kid, rows, words, _ in kids if kid["code"] == ALL_GREEN]
+        if won:
+            self.play(*[FadeOut(w) for _, w in won],
+                      *[r.bounce_anim(0, height=_jump(r)) for r, _ in won], run_time=run_time)
+            self.remove(*[w for _, w in won])
+
+    def _big_type(self, kids, run_time):
+        """Every branch still open: its next guess typed under it, all at once (sound
+        for the first only). Returns the next frontier."""
+        frontier, anims, total = [], [], run_time
+        for i, (kid, rows, words, key) in enumerate(kids):
+            if kid["node"] is None:
+                continue
+            typed = self._typed_row(rows[-1])
+            a, total = typed.type_anim(self, 0, kid["node"]["guess"], run_time,
+                                       per_letter=key_cues(self) if not anims else None,
+                                       appear=True)
+            anims.append(a)
+            frontier.append((kid["node"], rows, typed, words, key))
+        if anims:
+            self.play(*anims, run_time=total)
+        return frontier
+
+    def _big_tree(self, guess):
+        """One forced guess's whole tree, level by level."""
+        tree = TREES_SUB[f"first_30_cap6:{guess}"]
+        xs, rw, ys = self._big_layout(tree)
+        frontier = self._big_root(tree, 1.0)
+        while frontier:
+            kids = self._big_level(frontier, xs, rw, ys, 1.5)
+            self._big_wins(kids, 0.8)
+            frontier = self._big_type(kids, 0.65)
+
+    def _big_reset(self, run_time):
+        """Back to the root alone, for the next forced guess: the tree fades, the 48
+        words fade back in, in za's grid."""
+        keep = {id(m) for m in (self.big, self.big_line) for m in m.get_family()}
+        gone = [m for m in self._leaves() if id(m) not in keep]
+        self.big_words = self._big_words_grid()
+        self.play(*[FadeOut(m) for m in gone], *[FadeIn(w) for w in self.big_words],
+                  run_time=run_time)
+        self.remove(*gone)
+
+    # z (script zb) : the optimal tree after each forced guess in turn -- AFTER,
+    #     AGAIN, OTHER, then PLANE (the optimal one) -- grown level by level
+    @subscene
+    def big_trees(self):
+        self.big_grid = [w.copy() for w in self.big_words]
+        self._big_tree("after")
+        self._big_reset(1.0)
+        self._big_tree("again")
+        self._big_reset(1.0)
+        self._big_tree("other")
+        self._big_reset(1.0)
+        self._big_tree("plane")

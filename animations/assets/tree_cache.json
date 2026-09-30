@@ -58,5 +58,3713 @@
     }
    ]
   }
+ },
+ "subtree": {
+  "first_30_cap6:after": {
+   "guess": "after",
+   "kids": [
+    {
+     "code": 0,
+     "answers": [
+      "sushi",
+      "suing",
+      "using",
+      "swing",
+      "scion",
+      "music",
+      "squib",
+      "sonic",
+      "spill",
+      "swill",
+      "sling",
+      "spoil",
+      "solid",
+      "spicy",
+      "shiny",
+      "spiny",
+      "slimy",
+      "skimp",
+      "skill",
+      "slick",
+      "slink",
+      "spiky"
+     ],
+     "node": {
+      "guess": "kylin",
+      "kids": [
+       {
+        "code": 3,
+        "answers": [
+         "sushi"
+        ],
+        "node": {
+         "guess": "sushi",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "sushi"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 4,
+        "answers": [
+         "suing",
+         "using",
+         "swing"
+        ],
+        "node": {
+         "guess": "suing",
+         "kids": [
+          {
+           "code": 134,
+           "answers": [
+            "using"
+           ],
+           "node": {
+            "guess": "using",
+            "kids": [
+             {
+              "code": 242,
+              "answers": [
+               "using"
+              ],
+              "node": null
+             }
+            ]
+           }
+          },
+          {
+           "code": 188,
+           "answers": [
+            "swing"
+           ],
+           "node": {
+            "guess": "swing",
+            "kids": [
+             {
+              "code": 242,
+              "answers": [
+               "swing"
+              ],
+              "node": null
+             }
+            ]
+           }
+          },
+          {
+           "code": 242,
+           "answers": [
+            "suing"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 5,
+        "answers": [
+         "scion"
+        ],
+        "node": {
+         "guess": "scion",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "scion"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 6,
+        "answers": [
+         "music",
+         "squib"
+        ],
+        "node": {
+         "guess": "music",
+         "kids": [
+          {
+           "code": 42,
+           "answers": [
+            "squib"
+           ],
+           "node": {
+            "guess": "squib",
+            "kids": [
+             {
+              "code": 242,
+              "answers": [
+               "squib"
+              ],
+              "node": null
+             }
+            ]
+           }
+          },
+          {
+           "code": 242,
+           "answers": [
+            "music"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 7,
+        "answers": [
+         "sonic"
+        ],
+        "node": {
+         "guess": "sonic",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "sonic"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 12,
+        "answers": [
+         "spill",
+         "swill"
+        ],
+        "node": {
+         "guess": "spill",
+         "kids": [
+          {
+           "code": 188,
+           "answers": [
+            "swill"
+           ],
+           "node": {
+            "guess": "swill",
+            "kids": [
+             {
+              "code": 242,
+              "answers": [
+               "swill"
+              ],
+              "node": null
+             }
+            ]
+           }
+          },
+          {
+           "code": 242,
+           "answers": [
+            "spill"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 13,
+        "answers": [
+         "sling"
+        ],
+        "node": {
+         "guess": "sling",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "sling"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 15,
+        "answers": [
+         "spoil"
+        ],
+        "node": {
+         "guess": "spoil",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "spoil"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 24,
+        "answers": [
+         "solid"
+        ],
+        "node": {
+         "guess": "solid",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "solid"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 30,
+        "answers": [
+         "spicy"
+        ],
+        "node": {
+         "guess": "spicy",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "spicy"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 31,
+        "answers": [
+         "shiny",
+         "spiny"
+        ],
+        "node": {
+         "guess": "shiny",
+         "kids": [
+          {
+           "code": 188,
+           "answers": [
+            "spiny"
+           ],
+           "node": {
+            "guess": "spiny",
+            "kids": [
+             {
+              "code": 242,
+              "answers": [
+               "spiny"
+              ],
+              "node": null
+             }
+            ]
+           }
+          },
+          {
+           "code": 242,
+           "answers": [
+            "shiny"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 39,
+        "answers": [
+         "slimy"
+        ],
+        "node": {
+         "guess": "slimy",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "slimy"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 84,
+        "answers": [
+         "skimp"
+        ],
+        "node": {
+         "guess": "skimp",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "skimp"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 93,
+        "answers": [
+         "skill",
+         "slick"
+        ],
+        "node": {
+         "guess": "skill",
+         "kids": [
+          {
+           "code": 210,
+           "answers": [
+            "slick"
+           ],
+           "node": {
+            "guess": "slick",
+            "kids": [
+             {
+              "code": 242,
+              "answers": [
+               "slick"
+              ],
+              "node": null
+             }
+            ]
+           }
+          },
+          {
+           "code": 242,
+           "answers": [
+            "skill"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 94,
+        "answers": [
+         "slink"
+        ],
+        "node": {
+         "guess": "slink",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "slink"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 111,
+        "answers": [
+         "spiky"
+        ],
+        "node": {
+         "guess": "spiky",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "spiky"
+           ],
+           "node": null
+          }
+         ]
+        }
+       }
+      ]
+     }
+    },
+    {
+     "code": 3,
+     "answers": [
+      "issue",
+      "sheik",
+      "seize",
+      "snide",
+      "shine",
+      "swine",
+      "smile",
+      "slice",
+      "slide",
+      "slime",
+      "spice",
+      "spike",
+      "snipe",
+      "spine"
+     ],
+     "node": {
+      "guess": "plink",
+      "kids": [
+       {
+        "code": 9,
+        "answers": [
+         "issue"
+        ],
+        "node": {
+         "guess": "issue",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "issue"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 11,
+        "answers": [
+         "sheik"
+        ],
+        "node": {
+         "guess": "sheik",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "sheik"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 18,
+        "answers": [
+         "seize"
+        ],
+        "node": {
+         "guess": "seize",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "seize"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 21,
+        "answers": [
+         "snide"
+        ],
+        "node": {
+         "guess": "snide",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "snide"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 24,
+        "answers": [
+         "shine",
+         "swine"
+        ],
+        "node": {
+         "guess": "shine",
+         "kids": [
+          {
+           "code": 188,
+           "answers": [
+            "swine"
+           ],
+           "node": {
+            "guess": "swine",
+            "kids": [
+             {
+              "code": 242,
+              "answers": [
+               "swine"
+              ],
+              "node": null
+             }
+            ]
+           }
+          },
+          {
+           "code": 242,
+           "answers": [
+            "shine"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 45,
+        "answers": [
+         "smile"
+        ],
+        "node": {
+         "guess": "smile",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "smile"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 72,
+        "answers": [
+         "slice",
+         "slide",
+         "slime"
+        ],
+        "node": {
+         "guess": "slice",
+         "kids": [
+          {
+           "code": 236,
+           "answers": [
+            "slide",
+            "slime"
+           ],
+           "node": {
+            "guess": "slide",
+            "kids": [
+             {
+              "code": 236,
+              "answers": [
+               "slime"
+              ],
+              "node": {
+               "guess": "slime",
+               "kids": [
+                {
+                 "code": 242,
+                 "answers": [
+                  "slime"
+                 ],
+                 "node": null
+                }
+               ]
+              }
+             },
+             {
+              "code": 242,
+              "answers": [
+               "slide"
+              ],
+              "node": null
+             }
+            ]
+           }
+          },
+          {
+           "code": 242,
+           "answers": [
+            "slice"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 99,
+        "answers": [
+         "spice"
+        ],
+        "node": {
+         "guess": "spice",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "spice"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 100,
+        "answers": [
+         "spike"
+        ],
+        "node": {
+         "guess": "spike",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "spike"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 102,
+        "answers": [
+         "snipe"
+        ],
+        "node": {
+         "guess": "snipe",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "snipe"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 105,
+        "answers": [
+         "spine"
+        ],
+        "node": {
+         "guess": "spine",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "spine"
+           ],
+           "node": null
+          }
+         ]
+        }
+       }
+      ]
+     }
+    },
+    {
+     "code": 6,
+     "answers": [
+      "shied",
+      "spiel",
+      "spied"
+     ],
+     "node": {
+      "guess": "shied",
+      "kids": [
+       {
+        "code": 186,
+        "answers": [
+         "spiel"
+        ],
+        "node": {
+         "guess": "spiel",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "spiel"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 188,
+        "answers": [
+         "spied"
+        ],
+        "node": {
+         "guess": "spied",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "spied"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "shied"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 81,
+     "answers": [
+      "slain",
+      "basic",
+      "basis",
+      "basin",
+      "basil",
+      "swami",
+      "snail"
+     ],
+     "node": {
+      "guess": "slain",
+      "kids": [
+       {
+        "code": 96,
+        "answers": [
+         "basic",
+         "basis"
+        ],
+        "node": {
+         "guess": "basic",
+         "kids": [
+          {
+           "code": 240,
+           "answers": [
+            "basis"
+           ],
+           "node": {
+            "guess": "basis",
+            "kids": [
+             {
+              "code": 242,
+              "answers": [
+               "basis"
+              ],
+              "node": null
+             }
+            ]
+           }
+          },
+          {
+           "code": 242,
+           "answers": [
+            "basic"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 98,
+        "answers": [
+         "basin"
+        ],
+        "node": {
+         "guess": "basin",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "basin"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 123,
+        "answers": [
+         "basil"
+        ],
+        "node": {
+         "guess": "basil",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "basil"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 183,
+        "answers": [
+         "swami"
+        ],
+        "node": {
+         "guess": "swami",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "swami"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 214,
+        "answers": [
+         "snail"
+        ],
+        "node": {
+         "guess": "snail",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "snail"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "slain"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 84,
+     "answers": [
+      "sepia"
+     ],
+     "node": {
+      "guess": "sepia",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "sepia"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 165,
+     "answers": [
+      "aside"
+     ],
+     "node": {
+      "guess": "aside",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "aside"
+        ],
+        "node": null
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "first_30_cap6:again": {
+   "guess": "again",
+   "kids": [
+    {
+     "code": 3,
+     "answers": [
+      "sushi",
+      "spiky",
+      "skimp",
+      "shied",
+      "spied",
+      "issue",
+      "spike",
+      "seize",
+      "skill",
+      "swill",
+      "spill",
+      "spiel",
+      "smile",
+      "slimy",
+      "slide",
+      "slime",
+      "spicy",
+      "spice",
+      "slick",
+      "slice"
+     ],
+     "node": {
+      "guess": "cleep",
+      "kids": [
+       {
+        "code": 0,
+        "answers": [
+         "sushi"
+        ],
+        "node": {
+         "guess": "sushi",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "sushi"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 1,
+        "answers": [
+         "spiky"
+        ],
+        "node": {
+         "guess": "spiky",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "spiky"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 2,
+        "answers": [
+         "skimp"
+        ],
+        "node": {
+         "guess": "skimp",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "skimp"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 6,
+        "answers": [
+         "shied"
+        ],
+        "node": {
+         "guess": "shied",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "shied"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 7,
+        "answers": [
+         "spied"
+        ],
+        "node": {
+         "guess": "spied",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "spied"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 9,
+        "answers": [
+         "issue"
+        ],
+        "node": {
+         "guess": "issue",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "issue"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 10,
+        "answers": [
+         "spike"
+        ],
+        "node": {
+         "guess": "spike",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "spike"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 12,
+        "answers": [
+         "seize"
+        ],
+        "node": {
+         "guess": "seize",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "seize"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 27,
+        "answers": [
+         "skill",
+         "swill"
+        ],
+        "node": {
+         "guess": "skill",
+         "kids": [
+          {
+           "code": 188,
+           "answers": [
+            "swill"
+           ],
+           "node": {
+            "guess": "swill",
+            "kids": [
+             {
+              "code": 242,
+              "answers": [
+               "swill"
+              ],
+              "node": null
+             }
+            ]
+           }
+          },
+          {
+           "code": 242,
+           "answers": [
+            "skill"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 28,
+        "answers": [
+         "spill"
+        ],
+        "node": {
+         "guess": "spill",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "spill"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 34,
+        "answers": [
+         "spiel"
+        ],
+        "node": {
+         "guess": "spiel",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "spiel"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 36,
+        "answers": [
+         "smile"
+        ],
+        "node": {
+         "guess": "smile",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "smile"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 54,
+        "answers": [
+         "slimy"
+        ],
+        "node": {
+         "guess": "slimy",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "slimy"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 63,
+        "answers": [
+         "slide",
+         "slime"
+        ],
+        "node": {
+         "guess": "slide",
+         "kids": [
+          {
+           "code": 236,
+           "answers": [
+            "slime"
+           ],
+           "node": {
+            "guess": "slime",
+            "kids": [
+             {
+              "code": 242,
+              "answers": [
+               "slime"
+              ],
+              "node": null
+             }
+            ]
+           }
+          },
+          {
+           "code": 242,
+           "answers": [
+            "slide"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 82,
+        "answers": [
+         "spicy"
+        ],
+        "node": {
+         "guess": "spicy",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "spicy"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 91,
+        "answers": [
+         "spice"
+        ],
+        "node": {
+         "guess": "spice",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "spice"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 135,
+        "answers": [
+         "slick"
+        ],
+        "node": {
+         "guess": "slick",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "slick"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 144,
+        "answers": [
+         "slice"
+        ],
+        "node": {
+         "guess": "slice",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "slice"
+           ],
+           "node": null
+          }
+         ]
+        }
+       }
+      ]
+     }
+    },
+    {
+     "code": 4,
+     "answers": [
+      "shiny",
+      "spiny",
+      "slink",
+      "swine",
+      "shine",
+      "spine",
+      "snipe",
+      "snide"
+     ],
+     "node": {
+      "guess": "delph",
+      "kids": [
+       {
+        "code": 1,
+        "answers": [
+         "shiny"
+        ],
+        "node": {
+         "guess": "shiny",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "shiny"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 3,
+        "answers": [
+         "spiny"
+        ],
+        "node": {
+         "guess": "spiny",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "spiny"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 9,
+        "answers": [
+         "slink"
+        ],
+        "node": {
+         "guess": "slink",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "slink"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 27,
+        "answers": [
+         "swine"
+        ],
+        "node": {
+         "guess": "swine",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "swine"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 28,
+        "answers": [
+         "shine"
+        ],
+        "node": {
+         "guess": "shine",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "shine"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 30,
+        "answers": [
+         "spine"
+        ],
+        "node": {
+         "guess": "spine",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "spine"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 33,
+        "answers": [
+         "snipe"
+        ],
+        "node": {
+         "guess": "snipe",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "snipe"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 108,
+        "answers": [
+         "snide"
+        ],
+        "node": {
+         "guess": "snide",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "snide"
+           ],
+           "node": null
+          }
+         ]
+        }
+       }
+      ]
+     }
+    },
+    {
+     "code": 5,
+     "answers": [
+      "scion"
+     ],
+     "node": {
+      "guess": "scion",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "scion"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 6,
+     "answers": [
+      "solid",
+      "music",
+      "sheik",
+      "squib",
+      "spoil"
+     ],
+     "node": {
+      "guess": "solid",
+      "kids": [
+       {
+        "code": 87,
+        "answers": [
+         "music"
+        ],
+        "node": {
+         "guess": "music",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "music"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 168,
+        "answers": [
+         "sheik",
+         "squib"
+        ],
+        "node": {
+         "guess": "sheik",
+         "kids": [
+          {
+           "code": 168,
+           "answers": [
+            "squib"
+           ],
+           "node": {
+            "guess": "squib",
+            "kids": [
+             {
+              "code": 242,
+              "answers": [
+               "squib"
+              ],
+              "node": null
+             }
+            ]
+           }
+          },
+          {
+           "code": 242,
+           "answers": [
+            "sheik"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 204,
+        "answers": [
+         "spoil"
+        ],
+        "node": {
+         "guess": "spoil",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "spoil"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "solid"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 7,
+     "answers": [
+      "sonic"
+     ],
+     "node": {
+      "guess": "sonic",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "sonic"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 21,
+     "answers": [
+      "swami"
+     ],
+     "node": {
+      "guess": "swami",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "swami"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 25,
+     "answers": [
+      "snail"
+     ],
+     "node": {
+      "guess": "snail",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "snail"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 26,
+     "answers": [
+      "slain"
+     ],
+     "node": {
+      "guess": "slain",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "slain"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 31,
+     "answers": [
+      "sling",
+      "using",
+      "suing",
+      "swing"
+     ],
+     "node": {
+      "guess": "sling",
+      "kids": [
+       {
+        "code": 107,
+        "answers": [
+         "using"
+        ],
+        "node": {
+         "guess": "using",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "using"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 188,
+        "answers": [
+         "suing",
+         "swing"
+        ],
+        "node": {
+         "guess": "suing",
+         "kids": [
+          {
+           "code": 188,
+           "answers": [
+            "swing"
+           ],
+           "node": {
+            "guess": "swing",
+            "kids": [
+             {
+              "code": 242,
+              "answers": [
+               "swing"
+              ],
+              "node": null
+             }
+            ]
+           }
+          },
+          {
+           "code": 242,
+           "answers": [
+            "suing"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "sling"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 87,
+     "answers": [
+      "basic",
+      "sepia",
+      "basil",
+      "basis"
+     ],
+     "node": {
+      "guess": "basic",
+      "kids": [
+       {
+        "code": 42,
+        "answers": [
+         "sepia"
+        ],
+        "node": {
+         "guess": "sepia",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "sepia"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 240,
+        "answers": [
+         "basil",
+         "basis"
+        ],
+        "node": {
+         "guess": "basil",
+         "kids": [
+          {
+           "code": 240,
+           "answers": [
+            "basis"
+           ],
+           "node": {
+            "guess": "basis",
+            "kids": [
+             {
+              "code": 242,
+              "answers": [
+               "basis"
+              ],
+              "node": null
+             }
+            ]
+           }
+          },
+          {
+           "code": 242,
+           "answers": [
+            "basil"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "basic"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 89,
+     "answers": [
+      "basin"
+     ],
+     "node": {
+      "guess": "basin",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "basin"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 165,
+     "answers": [
+      "aside"
+     ],
+     "node": {
+      "guess": "aside",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "aside"
+        ],
+        "node": null
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "first_30_cap6:other": {
+   "guess": "other",
+   "kids": [
+    {
+     "code": 0,
+     "answers": [
+      "music",
+      "squib",
+      "suing",
+      "using",
+      "swing",
+      "basic",
+      "basis",
+      "basin",
+      "swami",
+      "swill",
+      "skill",
+      "basil",
+      "snail",
+      "slimy",
+      "slick",
+      "sling",
+      "slink",
+      "slain",
+      "spicy",
+      "skimp",
+      "spiky",
+      "spiny",
+      "spill"
+     ],
+     "node": {
+      "guess": "plank",
+      "kids": [
+       {
+        "code": 0,
+        "answers": [
+         "music",
+         "squib"
+        ],
+        "node": {
+         "guess": "music",
+         "kids": [
+          {
+           "code": 42,
+           "answers": [
+            "squib"
+           ],
+           "node": {
+            "guess": "squib",
+            "kids": [
+             {
+              "code": 242,
+              "answers": [
+               "squib"
+              ],
+              "node": null
+             }
+            ]
+           }
+          },
+          {
+           "code": 242,
+           "answers": [
+            "music"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 6,
+        "answers": [
+         "suing",
+         "using",
+         "swing"
+        ],
+        "node": {
+         "guess": "suing",
+         "kids": [
+          {
+           "code": 134,
+           "answers": [
+            "using"
+           ],
+           "node": {
+            "guess": "using",
+            "kids": [
+             {
+              "code": 242,
+              "answers": [
+               "using"
+              ],
+              "node": null
+             }
+            ]
+           }
+          },
+          {
+           "code": 188,
+           "answers": [
+            "swing"
+           ],
+           "node": {
+            "guess": "swing",
+            "kids": [
+             {
+              "code": 242,
+              "answers": [
+               "swing"
+              ],
+              "node": null
+             }
+            ]
+           }
+          },
+          {
+           "code": 242,
+           "answers": [
+            "suing"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 9,
+        "answers": [
+         "basic",
+         "basis"
+        ],
+        "node": {
+         "guess": "basic",
+         "kids": [
+          {
+           "code": 240,
+           "answers": [
+            "basis"
+           ],
+           "node": {
+            "guess": "basis",
+            "kids": [
+             {
+              "code": 242,
+              "answers": [
+               "basis"
+              ],
+              "node": null
+             }
+            ]
+           }
+          },
+          {
+           "code": 242,
+           "answers": [
+            "basic"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 12,
+        "answers": [
+         "basin"
+        ],
+        "node": {
+         "guess": "basin",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "basin"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 18,
+        "answers": [
+         "swami"
+        ],
+        "node": {
+         "guess": "swami",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "swami"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 27,
+        "answers": [
+         "swill"
+        ],
+        "node": {
+         "guess": "swill",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "swill"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 28,
+        "answers": [
+         "skill"
+        ],
+        "node": {
+         "guess": "skill",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "skill"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 36,
+        "answers": [
+         "basil"
+        ],
+        "node": {
+         "guess": "basil",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "basil"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 48,
+        "answers": [
+         "snail"
+        ],
+        "node": {
+         "guess": "snail",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "snail"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 54,
+        "answers": [
+         "slimy"
+        ],
+        "node": {
+         "guess": "slimy",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "slimy"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 56,
+        "answers": [
+         "slick"
+        ],
+        "node": {
+         "guess": "slick",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "slick"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 60,
+        "answers": [
+         "sling"
+        ],
+        "node": {
+         "guess": "sling",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "sling"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 62,
+        "answers": [
+         "slink"
+        ],
+        "node": {
+         "guess": "slink",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "slink"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 75,
+        "answers": [
+         "slain"
+        ],
+        "node": {
+         "guess": "slain",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "slain"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 81,
+        "answers": [
+         "spicy"
+        ],
+        "node": {
+         "guess": "spicy",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "spicy"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 82,
+        "answers": [
+         "skimp",
+         "spiky"
+        ],
+        "node": {
+         "guess": "skimp",
+         "kids": [
+          {
+           "code": 208,
+           "answers": [
+            "spiky"
+           ],
+           "node": {
+            "guess": "spiky",
+            "kids": [
+             {
+              "code": 242,
+              "answers": [
+               "spiky"
+              ],
+              "node": null
+             }
+            ]
+           }
+          },
+          {
+           "code": 242,
+           "answers": [
+            "skimp"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 87,
+        "answers": [
+         "spiny"
+        ],
+        "node": {
+         "guess": "spiny",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "spiny"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 108,
+        "answers": [
+         "spill"
+        ],
+        "node": {
+         "guess": "spill",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "spill"
+           ],
+           "node": null
+          }
+         ]
+        }
+       }
+      ]
+     }
+    },
+    {
+     "code": 3,
+     "answers": [
+      "slide",
+      "seize",
+      "smile",
+      "slime",
+      "spike",
+      "aside",
+      "sepia",
+      "slice",
+      "spice",
+      "swine",
+      "spine",
+      "snide",
+      "snipe",
+      "issue"
+     ],
+     "node": {
+      "guess": "uncap",
+      "kids": [
+       {
+        "code": 0,
+        "answers": [
+         "slide",
+         "seize",
+         "smile",
+         "slime"
+        ],
+        "node": {
+         "guess": "slide",
+         "kids": [
+          {
+           "code": 182,
+           "answers": [
+            "seize"
+           ],
+           "node": {
+            "guess": "seize",
+            "kids": [
+             {
+              "code": 242,
+              "answers": [
+               "seize"
+              ],
+              "node": null
+             }
+            ]
+           }
+          },
+          {
+           "code": 209,
+           "answers": [
+            "smile"
+           ],
+           "node": {
+            "guess": "smile",
+            "kids": [
+             {
+              "code": 242,
+              "answers": [
+               "smile"
+              ],
+              "node": null
+             }
+            ]
+           }
+          },
+          {
+           "code": 236,
+           "answers": [
+            "slime"
+           ],
+           "node": {
+            "guess": "slime",
+            "kids": [
+             {
+              "code": 242,
+              "answers": [
+               "slime"
+              ],
+              "node": null
+             }
+            ]
+           }
+          },
+          {
+           "code": 242,
+           "answers": [
+            "slide"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 1,
+        "answers": [
+         "spike"
+        ],
+        "node": {
+         "guess": "spike",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "spike"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 3,
+        "answers": [
+         "aside"
+        ],
+        "node": {
+         "guess": "aside",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "aside"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 4,
+        "answers": [
+         "sepia"
+        ],
+        "node": {
+         "guess": "sepia",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "sepia"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 9,
+        "answers": [
+         "slice"
+        ],
+        "node": {
+         "guess": "slice",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "slice"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 10,
+        "answers": [
+         "spice"
+        ],
+        "node": {
+         "guess": "spice",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "spice"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 27,
+        "answers": [
+         "swine"
+        ],
+        "node": {
+         "guess": "swine",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "swine"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 28,
+        "answers": [
+         "spine"
+        ],
+        "node": {
+         "guess": "spine",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "spine"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 54,
+        "answers": [
+         "snide"
+        ],
+        "node": {
+         "guess": "snide",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "snide"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 55,
+        "answers": [
+         "snipe"
+        ],
+        "node": {
+         "guess": "snipe",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "snipe"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 81,
+        "answers": [
+         "issue"
+        ],
+        "node": {
+         "guess": "issue",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "issue"
+           ],
+           "node": null
+          }
+         ]
+        }
+       }
+      ]
+     }
+    },
+    {
+     "code": 6,
+     "answers": [
+      "spied",
+      "spiel"
+     ],
+     "node": {
+      "guess": "spied",
+      "kids": [
+       {
+        "code": 240,
+        "answers": [
+         "spiel"
+        ],
+        "node": {
+         "guess": "spiel",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "spiel"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "spied"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 9,
+     "answers": [
+      "shiny",
+      "sushi"
+     ],
+     "node": {
+      "guess": "shiny",
+      "kids": [
+       {
+        "code": 198,
+        "answers": [
+         "sushi"
+        ],
+        "node": {
+         "guess": "sushi",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "sushi"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "shiny"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 12,
+     "answers": [
+      "sheik",
+      "shine"
+     ],
+     "node": {
+      "guess": "sheik",
+      "kids": [
+       {
+        "code": 228,
+        "answers": [
+         "shine"
+        ],
+        "node": {
+         "guess": "shine",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "shine"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "sheik"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 15,
+     "answers": [
+      "shied"
+     ],
+     "node": {
+      "guess": "shied",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "shied"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 81,
+     "answers": [
+      "solid",
+      "scion",
+      "spoil",
+      "sonic"
+     ],
+     "node": {
+      "guess": "solid",
+      "kids": [
+       {
+        "code": 192,
+        "answers": [
+         "scion"
+        ],
+        "node": {
+         "guess": "scion",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "scion"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 204,
+        "answers": [
+         "spoil"
+        ],
+        "node": {
+         "guess": "spoil",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "spoil"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 222,
+        "answers": [
+         "sonic"
+        ],
+        "node": {
+         "guess": "sonic",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "sonic"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "solid"
+        ],
+        "node": null
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "first_30_cap6:plane": {
+   "guess": "plane",
+   "kids": [
+    {
+     "code": 0,
+     "answers": [
+      "music",
+      "squib",
+      "sushi"
+     ],
+     "node": {
+      "guess": "music",
+      "kids": [
+       {
+        "code": 42,
+        "answers": [
+         "squib"
+        ],
+        "node": {
+         "guess": "squib",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "squib"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 75,
+        "answers": [
+         "sushi"
+        ],
+        "node": {
+         "guess": "sushi",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "sushi"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "music"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 1,
+     "answers": [
+      "sheik",
+      "shied"
+     ],
+     "node": {
+      "guess": "sheik",
+      "kids": [
+       {
+        "code": 228,
+        "answers": [
+         "shied"
+        ],
+        "node": {
+         "guess": "shied",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "shied"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "sheik"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 2,
+     "answers": [
+      "issue",
+      "seize"
+     ],
+     "node": {
+      "guess": "issue",
+      "kids": [
+       {
+        "code": 110,
+        "answers": [
+         "seize"
+        ],
+        "node": {
+         "guess": "seize",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "seize"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "issue"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 3,
+     "answers": [
+      "scion",
+      "sonic"
+     ],
+     "node": {
+      "guess": "scion",
+      "kids": [
+       {
+        "code": 202,
+        "answers": [
+         "sonic"
+        ],
+        "node": {
+         "guess": "sonic",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "sonic"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "scion"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 5,
+     "answers": [
+      "snide"
+     ],
+     "node": {
+      "guess": "snide",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "snide"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 6,
+     "answers": [
+      "suing",
+      "using",
+      "shiny",
+      "swing"
+     ],
+     "node": {
+      "guess": "suing",
+      "kids": [
+       {
+        "code": 134,
+        "answers": [
+         "using"
+        ],
+        "node": {
+         "guess": "using",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "using"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 186,
+        "answers": [
+         "shiny"
+        ],
+        "node": {
+         "guess": "shiny",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "shiny"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 188,
+        "answers": [
+         "swing"
+        ],
+        "node": {
+         "guess": "swing",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "swing"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "suing"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 8,
+     "answers": [
+      "shine",
+      "swine"
+     ],
+     "node": {
+      "guess": "shine",
+      "kids": [
+       {
+        "code": 188,
+        "answers": [
+         "swine"
+        ],
+        "node": {
+         "guess": "swine",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "swine"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "shine"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 9,
+     "answers": [
+      "basic",
+      "basis"
+     ],
+     "node": {
+      "guess": "basic",
+      "kids": [
+       {
+        "code": 240,
+        "answers": [
+         "basis"
+        ],
+        "node": {
+         "guess": "basis",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "basis"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "basic"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 11,
+     "answers": [
+      "aside"
+     ],
+     "node": {
+      "guess": "aside",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "aside"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 12,
+     "answers": [
+      "basin"
+     ],
+     "node": {
+      "guess": "basin",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "basin"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 18,
+     "answers": [
+      "swami"
+     ],
+     "node": {
+      "guess": "swami",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "swami"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 27,
+     "answers": [
+      "skill",
+      "solid",
+      "swill"
+     ],
+     "node": {
+      "guess": "skill",
+      "kids": [
+       {
+        "code": 174,
+        "answers": [
+         "solid"
+        ],
+        "node": {
+         "guess": "solid",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "solid"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 188,
+        "answers": [
+         "swill"
+        ],
+        "node": {
+         "guess": "swill",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "swill"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "skill"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 29,
+     "answers": [
+      "smile"
+     ],
+     "node": {
+      "guess": "smile",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "smile"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 36,
+     "answers": [
+      "basil"
+     ],
+     "node": {
+      "guess": "basil",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "basil"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 48,
+     "answers": [
+      "snail"
+     ],
+     "node": {
+      "guess": "snail",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "snail"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 54,
+     "answers": [
+      "slick",
+      "slimy"
+     ],
+     "node": {
+      "guess": "slick",
+      "kids": [
+       {
+        "code": 234,
+        "answers": [
+         "slimy"
+        ],
+        "node": {
+         "guess": "slimy",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "slimy"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "slick"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 56,
+     "answers": [
+      "slice",
+      "slide",
+      "slime"
+     ],
+     "node": {
+      "guess": "slice",
+      "kids": [
+       {
+        "code": 236,
+        "answers": [
+         "slide",
+         "slime"
+        ],
+        "node": {
+         "guess": "slide",
+         "kids": [
+          {
+           "code": 236,
+           "answers": [
+            "slime"
+           ],
+           "node": {
+            "guess": "slime",
+            "kids": [
+             {
+              "code": 242,
+              "answers": [
+               "slime"
+              ],
+              "node": null
+             }
+            ]
+           }
+          },
+          {
+           "code": 242,
+           "answers": [
+            "slide"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "slice"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 60,
+     "answers": [
+      "sling",
+      "slink"
+     ],
+     "node": {
+      "guess": "sling",
+      "kids": [
+       {
+        "code": 240,
+        "answers": [
+         "slink"
+        ],
+        "node": {
+         "guess": "slink",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "slink"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "sling"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 75,
+     "answers": [
+      "slain"
+     ],
+     "node": {
+      "guess": "slain",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "slain"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 81,
+     "answers": [
+      "skimp",
+      "spicy",
+      "spiky"
+     ],
+     "node": {
+      "guess": "skimp",
+      "kids": [
+       {
+        "code": 181,
+        "answers": [
+         "spicy"
+        ],
+        "node": {
+         "guess": "spicy",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "spicy"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 208,
+        "answers": [
+         "spiky"
+        ],
+        "node": {
+         "guess": "spiky",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "spiky"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "skimp"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 82,
+     "answers": [
+      "spied"
+     ],
+     "node": {
+      "guess": "spied",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "spied"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 83,
+     "answers": [
+      "spice",
+      "spike"
+     ],
+     "node": {
+      "guess": "spice",
+      "kids": [
+       {
+        "code": 236,
+        "answers": [
+         "spike"
+        ],
+        "node": {
+         "guess": "spike",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "spike"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "spice"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 86,
+     "answers": [
+      "snipe"
+     ],
+     "node": {
+      "guess": "snipe",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "snipe"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 87,
+     "answers": [
+      "spiny"
+     ],
+     "node": {
+      "guess": "spiny",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "spiny"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 89,
+     "answers": [
+      "spine"
+     ],
+     "node": {
+      "guess": "spine",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "spine"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 91,
+     "answers": [
+      "sepia"
+     ],
+     "node": {
+      "guess": "sepia",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "sepia"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 108,
+     "answers": [
+      "spill",
+      "spoil"
+     ],
+     "node": {
+      "guess": "spill",
+      "kids": [
+       {
+        "code": 227,
+        "answers": [
+         "spoil"
+        ],
+        "node": {
+         "guess": "spoil",
+         "kids": [
+          {
+           "code": 242,
+           "answers": [
+            "spoil"
+           ],
+           "node": null
+          }
+         ]
+        }
+       },
+       {
+        "code": 242,
+        "answers": [
+         "spill"
+        ],
+        "node": null
+       }
+      ]
+     }
+    },
+    {
+     "code": 109,
+     "answers": [
+      "spiel"
+     ],
+     "node": {
+      "guess": "spiel",
+      "kids": [
+       {
+        "code": 242,
+        "answers": [
+         "spiel"
+        ],
+        "node": null
+       }
+      ]
+     }
+    }
+   ]
+  }
  }
 }

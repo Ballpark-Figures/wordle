@@ -17,6 +17,9 @@ Tree line format: `<answer> <guesses> <guess1> <pattern1> <guess2> <pattern2> ..
 patterns as b/y/g per position, the winning guess carrying none. Codes here are
 math/wordle.py pattern integers, POSITION 0 MOST SIGNIFICANT.
 
+Also "subtree": {"<results dir>:<forced guess>": nested branches (see _trie)} for
+07zb, read from math/data/shared/subtree/ (solver/run-subgroup-tree.sh).
+
 Cache: {"<opener>": {"<opener's code>": {"guess": next guess, "branches":
 [{"code": next guess's code, "answer": the answer}, ...]}}}, branches ordered the
 next guess's own win first (if it is an answer in the group), then by code.
@@ -33,6 +36,10 @@ OPENER = "first"
 GROUPS = [7, 225]     # FIRST's --- G Y (TEASE's group) and G G Y - - (FIERY's), the
                       # user's picks for 07x-z
 TRIT = {"b": 0, "y": 1, "g": 2}
+# 07zb: one group's optimal trees with a forced next guess, from
+# math/solver/run-subgroup-tree.sh -- (results dir, the forced guesses in order)
+SUBTREES = [("first_30_cap6", ["after", "again", "other", "plane"])]
+SUBTREE_DIR = os.path.join(HERE, "..", "..", "math", "data", "shared", "subtree")
 
 
 def code(pat):
@@ -61,7 +68,43 @@ def _build():
         assert len({b["code"] for b in branches}) == len(branches), "one answer per branch"
         branches.sort(key=lambda b: (b["code"] != 242, b["code"]))
         out[OPENER][str(g)] = {"guess": guess, "branches": branches}
+    out["subtree"] = {}
+    for name, guesses in SUBTREES:
+        for g in guesses:
+            with gzip.open(os.path.join(SUBTREE_DIR, name, "trees", f"{g}.txt.gz"), "rt") as f:
+                t = _trie([l.split() for l in f if l.strip()])
+            assert t["guess"] == g
+            out["subtree"][f"{name}:{g}"] = t
     return out
+
+
+def _trie(lines):
+    """A tree file as nested branches: {"guess": g, "kids": [{"code": c, "answers":
+    [...], "node": child or None}]}, kids by code. The all-green kid (code 242) is
+    the guess's own win and has no node; every other kid has one, since its answers
+    are only finished once named."""
+    root = {"guess": None, "kids": {}}
+    for t in lines:
+        answer, plays = t[0], t[2:]
+        steps = list(zip(plays[0::2], [code(p) for p in plays[1::2]] + [242]))
+        node = root
+        for g, c in steps:
+            assert node["guess"] in (None, g), "one move per position"
+            node["guess"] = g
+            kid = node["kids"].setdefault(c, {"code": c, "answers": [], "node": None})
+            kid["answers"].append(answer)
+            if c == 242:
+                assert g == answer
+                break
+            if kid["node"] is None:
+                kid["node"] = {"guess": None, "kids": {}}
+            node = kid["node"]
+
+    def freeze(n):
+        return {"guess": n["guess"],
+                "kids": [dict(k, node=freeze(k["node"]) if k["node"] else None)
+                         for _, k in sorted(n["kids"].items())]}
+    return freeze(root)
 
 
 def load():
