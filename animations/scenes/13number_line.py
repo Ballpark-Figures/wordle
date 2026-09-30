@@ -1,7 +1,7 @@
 """Scene 13 — random strategies on a number line of average guesses. Navy background.
 
 Scene 12 ends with the frame cleared, so everything here fades in. Talking head THI
-follows, so f ends with the whole line on screen.
+follows, so l ends with the whole line on screen.
 
 BEAT MAP — one subscene per Script.md beat, letters matching:
 
@@ -13,8 +13,20 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   e until_single  — the line zooms in, the leftmost dot (3.42) at the left and the
                     new 6.90 dot at the right (1158 and 2315 slide off);
                     the Random Until One Answer marker at 6.90             (13e, VO 4)
-  f compatible    — the Random Compatible Answers marker at 4.08, below
-                    the line                                               (13f, VO 5)
+  f fade_out      — everything fades out                                   (13f, VO 5)
+  g dicey         — an empty board fades in on the left; DICEY is typed and flips
+                    BBBYB; its 332 compatible answers fade in as a grid on the
+                    right; a highlight hops 10 times, landing on GUESS     (13g, VO 5)
+  h guess_value   — GUESS typed, flips BYYBB (the script gives no colouring for
+                    it; this is its real one); the ruled-out words shrink away and
+                    the 21 left regrid; hops to VALUE. Then VALUE the same: BBYYG,
+                    5 left, hops to FLUTE                                  (13h, VO 5)
+  i flute         — FLUTE typed, GGGBG, 2 left, hops to FLUKE              (13i, VO 5)
+  j fluke         — FLUKE typed, GGGGG; FLUKE alone is left                (13j, VO 5)
+  k back_to_line  — the board and FLUKE fade out as the number line, its markers
+                    and the title fade back in                             (13k, VO 5)
+  l compatible    — the Random Compatible Answers marker at 4.08, below
+                    the line                                               (13l, VO 5)
 
 REUSE MAP — every element, the one source it comes from, and how it enters:
   number line, ticks,   bpkfigures/number_line.py `ZoomLine` (new, for number lines
@@ -44,7 +56,28 @@ REUSE MAP — every element, the one source it comes from, and how it enters:
   colours               BOARD_NAVY via WordleBoardScene, as 08 and 12
   win-rate colours      style.py LIGHT_RED -> LIGHT_GREEN, by `win_color` — hangman's
                         win/lose colours on a dark ground (02rules.py:76)
-Nothing leaves: THI follows.
+  the board (g-j)       assets/board.py `get_board`, scaled onto the left; typing
+                        `type_word` + assets/keys.py `key_cues` (02, 07); flips
+                        `reveal` at 02's 1.6s
+  board in (g)          plain FadeIn — no earlier scene brings a board on mid-scene
+                        (every one is up from frame 0), so this is flagged
+  compatible words      assets/pigpen.py `PigpenWord(revealed=True)` — 04's answer
+                        words — gridded by assets/groups.py `grid_cells` at 04's
+                        CELL_GAP / CELL_DY pitches (relative to GROUP_SCALE), scaled
+                        to fill the right-hand region; tile strokes thinned by 12's
+                        rule for small rows
+  words in (g)          plain FadeIn of the whole grid
+  words ruled out       12's `_shrink_out` (06b's exit); survivors move and grow to
+                        their new cells in the same play
+  hops                  bpkfigures/highlight.py `highlight`: pulse=True for the 9
+                        random hops (the module's "a highlight that walks"), then
+                        persist=True on the next guess, faded as it is typed
+  game words, lists     assets/random_game_data.py -> random_game_cache.json:
+                        colourings and compatible answers from math/wordle.py
+                        `pattern`, the 9 random hops per turn seeded
+  the line back (k)     FadeOut the board with FadeIn of the line and title (the
+                        same objects f faded, markers and all)
+Nothing leaves at the end: THI follows.
 
 EVERY NUMBER is the script's, and each matches the committed data it came from:
   3.42              optturns: salet 7920 / 2315 = 3.42117
@@ -70,6 +103,13 @@ LAYOUT CHOICES, flagged:
   - 4.08's label hangs BELOW the line: above, it would overlap 3.42's. Its stem
     runs from the dot through the tick labels; a tick label it crosses is dropped.
   - Markers: a white dot and stem, running into the card (user's call: boxed text).
+  - 13g-j (user's calls, 2026-09-30): each (colouring, word) pair in the script is
+    that word's turn, so h plays two turns (GUESS, then VALUE); the board sits on
+    the left and the compatible answers in a grid on the right; each turn ends with
+    10 quick highlights, 9 random and the last on the next guess.
+  - Every compatible answer is shown, all 332 after DICEY (so they are small), in
+    the answer list's alphabetical order.
+  - k crossfades the board out and the line in, in one play.
   - Each win rate is coloured red -> green, very nonlinearly (user's call): the
     colour position is t = 1 - (1 - rate)^P with P set so t = 0.5 at WIN_MID (98%),
     i.e. a power law in the LOSS rate. The colour runs round the hue wheel from
@@ -87,8 +127,14 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 
 from config import *
 from bpkfigures.number_line import ZoomLine
-from assets.board import STROKE, get_typed_row
-from assets.groups import HEADER_W
+from bpkfigures.highlight import highlight
+from assets.board import STROKE, get_typed_row, get_board
+from assets.groups import HEADER_W, GROUP_SCALE, CELL_GAP, CELL_DY, grid_cells
+from assets.pigpen import PigpenWord
+from assets.keys import key_cues
+from assets import random_game_data
+
+GAME = random_game_data.load()
 
 TITLE = "Average Guesses by Strategy"
 SUBTITLE = "(Win Rate)"
@@ -101,6 +147,21 @@ CARD_PAD = 0.22           # the marker cards' margin round their text
 CARD_RADIUS = 0.25        # the cards' corner rounding
 WIN_LOW, WIN_HIGH = LIGHT_RED, LIGHT_GREEN
 WIN_MID = 0.98            # the win rate that sits halfway from red to green
+BOARD_H = 6.2             # g-j: the board's height, on the left
+BOARD_X = -5.0            # ... and its centre
+GRID_X = (-1.9, 7.6)      # g-j: the compatible-answer grid's region
+GRID_Y = (-4.0, 4.0)
+GRID_MAX_SCALE = 1.0      # a gridded word is never bigger than 04's list size
+
+
+def _shrink_out(mob):
+    """06b's exit for a thing going away where it stands (as 12's)."""
+    return mob.animate.scale(0.1).set_opacity(0)
+
+
+def _word_stroke(width):
+    """12's thinned tile border for a word row `width` wide."""
+    return STROKE * min(1.0, width / HEADER_W)
 
 
 def win_color(rate):
@@ -120,11 +181,89 @@ class Scene13(WordleBoardScene):
     random — zoom out to 3..2500; 2315
     no_repeats — 1158
     until_single — zoom in to 3.42..6.90; 6.90
+    fade_out — everything out
+    dicey — board in; DICEY typed and flipped; 332 words in; hops to GUESS
+    guess_value — GUESS's turn, then VALUE's
+    flute — FLUTE's turn
+    fluke — FLUKE's turn
+    back_to_line — board out, line back
     compatible — 4.08, below the line
     """
 
     def setup_scene(self):
         pass
+
+    # ── the game (g-j) ────────────────────────────────────────────────────────
+    def _grid(self, words):
+        """{word: (centre, scale)} for `words` gridded by grid_cells in the region."""
+        n = len(words)
+        nc = max(1, math.ceil(math.sqrt(n)))
+        nr = math.ceil(n / nc)
+        ww = self.word_w                            # a word's width at scale 1
+        cg, dy = CELL_GAP / GROUP_SCALE, CELL_DY / GROUP_SCALE
+        rw, rh = GRID_X[1] - GRID_X[0], GRID_Y[1] - GRID_Y[0]
+        s = min(rw / (nc * ww + (nc - 1) * cg), rh / (nr * dy), GRID_MAX_SCALE)
+        cx, cy = sum(GRID_X) / 2, sum(GRID_Y) / 2
+        return {w: (np.array([cx + ox * (ww + cg) * s, cy + oy * dy * s, 0.0]), s)
+                for w, (ox, oy) in zip(words, grid_cells(n))}
+
+    def _setup_game(self):
+        self.board = get_board()
+        self.board.scale(BOARD_H / self.board.height).move_to([BOARD_X, 0, 0])
+        self.word_w = PigpenWord("salet", revealed=True).width
+        self.words, self.wscale = {}, {}
+        for w, (c, sc) in self._grid(GAME["alive"][0]).items():
+            m = PigpenWord(w, revealed=True).scale(sc).move_to(c)
+            for t in m.tiles:
+                t.set_stroke(width=_word_stroke(m.width))
+            self.words[w], self.wscale[w] = m, sc
+        self.mark = None
+
+    def _type(self, k, run_time):
+        """Turn k's word typed into row k (the previous hop's highlight fades)."""
+        if self.mark is not None:
+            self.play(FadeOut(self.mark), run_time=0.2)
+            self.mark = None
+        self.board.type_word(self, k, GAME["words"][k], run_time,
+                             per_letter=key_cues(self))
+
+    def _flip(self, k, run_time):
+        self.board.reveal(self, k, GAME["codes"][k], run_time)
+
+    def _regrid(self, k, run_time):
+        """The words turn k rules out shrink away; the rest move to their cells."""
+        keep = GAME["alive"][k]
+        anims = []
+        for w, (c, sc) in self._grid(keep).items():
+            m = self.words[w]
+            f = sc / self.wscale[w]
+            anims.append(m.animate.scale(f).move_to(c))
+            self.wscale[w] = sc
+        gone = [w for w in self.words if w not in keep]
+        anims += [_shrink_out(self.words[w]) for w in gone]
+        self.play(*anims, run_time=run_time)
+        for w in gone:
+            self.remove(self.words.pop(w))
+            del self.wscale[w]
+        for m in self.words.values():
+            for t in m.tiles:
+                t.set_stroke(width=_word_stroke(m.width))
+
+    def _hops(self, k, hop_rt):
+        """10 quick highlights over turn k's compatible words: 9 random, then the
+        next guess, which keeps its highlight until it is typed."""
+        seq = GAME["hops"][k]
+        for w in seq[:-1]:
+            highlight(self, [self.words[w]], pulse=True, fade=hop_rt / 2, hold=hop_rt)
+        self.mark = highlight(self, [self.words[seq[-1]]], persist=True, fade=hop_rt)[0]
+
+    def _turn(self, k, type_rt, flip_rt, regrid_rt, hop_rt):
+        """A later turn: type, flip, regrid, and (unless it won) hop on."""
+        self._type(k, type_rt)
+        self._flip(k, flip_rt)
+        self._regrid(k, regrid_rt)
+        if k + 1 < len(GAME["words"]):
+            self._hops(k, hop_rt)
 
     def _zoom_pop(self, lo, hi, m, zoom_rt, pop_rt, lead):
         """Zoom to lo..hi, with m popping out of its dot (and the pop sound)
@@ -196,7 +335,47 @@ class Scene13(WordleBoardScene):
         m = self._marker(6.90, ["Random Until", "One Answer", "59.30%"])
         self._zoom_pop(left, m.value, m, 2.0, 0.4, 0.5)
 
-    # f : Random Compatible Answers at 4.08, below the line
+    # f : everything fades out
+    @subscene
+    def fade_out(self):
+        self.play(FadeOut(self.line), FadeOut(self.title), FadeOut(self.subtitle),
+                  run_time=1.0)
+
+    # g : board in; DICEY typed, flips BBBYB; the 332 compatible answers; hops to GUESS
+    @subscene
+    def dicey(self):
+        self._setup_game()
+        self.play(FadeIn(self.board), run_time=0.6)
+        self._type(0, 0.65)
+        self._flip(0, 1.6)
+        self.play(FadeIn(VGroup(*self.words.values())), run_time=0.8)
+        self._hops(0, 0.12)
+
+    # h : GUESS's turn (BYYBB), hops to VALUE; VALUE's turn (BBYYG), hops to FLUTE
+    @subscene
+    def guess_value(self):
+        self._turn(1, 0.65, 1.6, 1.0, 0.12)
+        self._turn(2, 0.65, 1.6, 1.0, 0.12)
+
+    # i : FLUTE's turn (GGGBG), hops to FLUKE
+    @subscene
+    def flute(self):
+        self._turn(3, 0.65, 1.6, 1.0, 0.12)
+
+    # j : FLUKE's turn (GGGGG); FLUKE alone is left
+    @subscene
+    def fluke(self):
+        self._turn(4, 0.65, 1.6, 1.0, 0.12)
+
+    # k : back to the timeline — the board and FLUKE out, the line and title in
+    @subscene
+    def back_to_line(self):
+        self.play(FadeOut(self.board), *[FadeOut(m) for m in self.words.values()],
+                  FadeIn(self.line), FadeIn(self.title), FadeIn(self.subtitle),
+                  run_time=1.2)
+        self.board, self.words, self.wscale = None, {}, {}
+
+    # l : Random Compatible Answers at 4.08, below the line
     @subscene
     def compatible(self):
         m = self._marker(4.08, ["Random", "Compatible", "Answers", "98.20%"],
