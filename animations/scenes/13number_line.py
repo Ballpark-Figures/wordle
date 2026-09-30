@@ -30,7 +30,9 @@ REUSE MAP — every element, the one source it comes from, and how it enters:
                         with the "pop" sound effect (user's call: the second pop of
                         ES_Cartoon, Pop, Various) as it starts
   zooms                 ZoomLine.zoom, eased with smootherstep (the asset's default) so
-                        the ends come to rest
+                        the ends come to rest; in c and e the new marker starts popping
+                        out while the zoom is still settling (user's call), which the
+                        asset allows because a pop drives the marker's `grow`
   SALET                 assets/board.py `get_typed_row` (the black typed row, as 12's
                         SALET), its border thinned by 12's rule for a small row
   marker text           crisp_text via the asset, BLACK, on the shared card
@@ -120,6 +122,14 @@ class Scene13(WordleBoardScene):
     def setup_scene(self):
         pass
 
+    def _zoom_pop(self, lo, hi, m, zoom_rt, pop_rt, lead):
+        """Zoom to lo..hi, with m popping out of its dot (and the pop sound)
+        starting `lead` seconds before the zoom ends."""
+        start = zoom_rt - lead
+        self.sfx("pop", at=start)
+        self.play(self.line.zoom(lo, hi, run_time=zoom_rt),
+                  Succession(Wait(start), self.line.marker_in(m, run_time=pop_rt)))
+
     def _pop_in(self, m, run_time):
         """The marker's card pops out of its dot, with the pop sound."""
         self.sfx("pop")
@@ -130,6 +140,7 @@ class Scene13(WordleBoardScene):
         rate = lines[-1]
         lines = lines[:-1] + [(rate, win_color(float(rate.rstrip("%")) / 100))]
         return self.line.add_marker(value, lines, side=side, font_size=MARKER_FS,
+                                    grow=0.0,
                                     text_color=BLACK, box={"pad": CARD_PAD})
 
     # a : the number line, 3 to 6, extending both ways; the title
@@ -159,9 +170,8 @@ class Scene13(WordleBoardScene):
     # c : zoom out to 3..2500; Random at 2315
     @subscene
     def random(self):
-        self.play(self.line.zoom(3, 2500), run_time=3.0)
         m = self._marker(2315, ["Random", "0.26%"])
-        self._pop_in(m, 0.4)
+        self._zoom_pop(3, 2500, m, 2.0, 0.4, 0.5)
 
     # d : Random (no repeats) at 1158
     @subscene
@@ -174,9 +184,8 @@ class Scene13(WordleBoardScene):
     @subscene
     def until_single(self):
         left = min(m.value for m in self.line.markers)
-        self.play(self.line.zoom(left, 8), run_time=3.0)
         m = self._marker(6.90, ["Random Until", "Single Answer", "59.30%"])
-        self._pop_in(m, 0.4)
+        self._zoom_pop(left, 8, m, 2.0, 0.4, 0.5)
 
     # f : Random Compatible Answers at 4.08, below the line
     @subscene
