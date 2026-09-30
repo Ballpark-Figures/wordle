@@ -100,5 +100,15 @@
         }
       ]
     }
+  },
+  "vowel_triple": {
+    "words": [
+      "curse",
+      "paint",
+      "godly"
+    ],
+    "rank": 365,
+    "of": 100000,
+    "singles": 1625
   }
 }

@@ -2,7 +2,7 @@
 
 Opens on Wordle's black (WordleDarkScene, WORDLE_BG), the colour scene 09 ends on;
 d turns it back to navy. Follows scene 09 directly, so it opens EMPTY and brings the
-chart in. Talking head THG follows, so it ends with the WHEEL board up.
+chart in. Talking head THG follows, so it ends with the vowel board up.
 
 BEAT MAP — one subscene per Script.md beat, letters matching:
 
@@ -17,7 +17,16 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                    middle with its WHEEL row fading, every tile going black,
                    every letter fading but the A (SALET), E V O (BEVOR), I
                    (CHIMP) and T, and T becoming Y, V becoming U (the user's) (VO 1)
-  (VO 2 — the word-length discussion — has no subscene in the script yet.)
+  e triple_vowels — the six vowels move to where CURSE PAINT GODLY puts them —
+                   the best all-six-vowel triple in the singletons ranking   (VO 2)
+  f adieu        — A I E U into ADIEU's positions in the first word, O to the
+                   middle of the second, Y to the end of the third           (VO 3)
+  g audio        — A U I O into AUDIO's positions, E to the middle of the
+                   second word (the script says U; the user's correction)    (VO 3)
+  h crypt        — Y into the middle of the third word as C R P T land
+                   around it, spelling CRYPT                                 (VO 3)
+  Letters move in ONE play per beat; a tile holding a letter has the typed
+  border, an empty one the empty border.
 
 REUSE MAP — every element and the one source it comes from:
   chart          bpkfigures.bar_graph.get_bar_chart(orientation="horizontal",
@@ -35,6 +44,9 @@ NUMBERS — all SOURCED, from assets/word_lengths_data.py -> word_lengths_cache.
                    asserted there to sum to 2315 answers and 7920 guesses
   THIRD / WHEEL    those answers' lines in the same tree, codes re-checked against
                    math/wordle.py pattern()
+  CURSE PAINT GODLY  10e's triple: the first row of the singletons triple ranking
+                   (math/data/shared/singletons/triple_singletons.csv, rank 365 of
+                   the top 100000 of a greedy screen) using all six vowels
 
 ON-SCREEN TEXT beyond column 2 (the user's call): the "GUESS DISTRIBUTION" title,
 in the real Wordle stats screen's capitals.
@@ -53,7 +65,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 
 from config import *
 from bpkfigures.bar_graph import get_bar_chart, grow_bars
-from assets.board import get_scored_row, GAP
+from assets.board import get_scored_row, GAP, TilePop
 from assets.background import bg_to
 from assets import word_lengths_data
 
@@ -88,6 +100,29 @@ _ROWS = [g["word"] for g in DATA["games"]["wheel"]["guesses"][:3]]
 assert _ROWS == ["salet", "bevor", "chimp"], _ROWS
 assert [_ROWS[r][i] for (r, i) in MORPH] == ["t", "v"]
 
+# ── e-h: where the six vowels go, (row, position) per vowel ───────────────────
+VOWELS = "aeiouy"                # Y a vowel, the video's convention
+
+
+def _vowels_in(word, row):
+    return {c: (row, i) for i, c in enumerate(word) if c in VOWELS}
+
+
+# e: the best all-six-vowel triple in the singletons ranking (sourced)
+TRIPLE = DATA["vowel_triple"]["words"]
+LAYOUT_TRIPLE = {}
+for _r, _w in enumerate(TRIPLE):
+    LAYOUT_TRIPLE.update(_vowels_in(_w, _r))
+# f: A I E U as in ADIEU, O mid second word, Y ending the third (Script.md 10f)
+LAYOUT_ADIEU = {**_vowels_in("adieu", 0), "o": (1, 2), "y": (2, 4)}
+# g: AUDIO, E mid second word (the user's correction of the script's "U")
+LAYOUT_AUDIO = {**_vowels_in("audio", 0), "e": (1, 2), "y": (2, 4)}
+# h: Y mid third word, the rest spelling CRYPT
+CRYPT = "crypt"
+LAYOUT_CRYPT = {**LAYOUT_AUDIO, "y": (2, CRYPT.index("y"))}
+for _l in (LAYOUT_TRIPLE, LAYOUT_ADIEU, LAYOUT_AUDIO, LAYOUT_CRYPT):
+    assert sorted(_l) == sorted(VOWELS) and len(set(_l.values())) == 6, _l
+
 
 class Scene10(WordleDarkScene):
     """BEAT MAP
@@ -96,6 +131,10 @@ class Scene10(WordleDarkScene):
     game_wheel — bar 3 grey, bar 4 green; SALET's game for WHEEL fades in below bar 3
     wheel_center — chart and THIRD board leave, bg to navy, WHEEL board to the
                    middle minus its WHEEL row; tiles black, vowels kept; T->Y, V->U
+    triple_vowels — vowels to CURSE PAINT GODLY's positions
+    adieu — vowels to ADIEU / O mid row 2 / Y end of row 3
+    audio — vowels to AUDIO / E mid row 2
+    crypt — Y mid row 3, C R P T land: CRYPT
     """
 
     def setup_scene(self):
@@ -219,3 +258,67 @@ class Scene10(WordleDarkScene):
         self.remove(self.chart, bar4, self.board_third, self.wheel_row)
         self.board_wheel.remove(self.wheel_row)
         self.chart = self.board_third = self.wheel_row = None
+        # the six vowel letters, by character, for e-h to move around
+        self.vowel = {MORPH.get((r, i), _ROWS[r][i]): self.upper[r].letters[0][i]
+                      for r, keep in KEEP.items() for i in keep}
+        assert sorted(self.vowel) == sorted(VOWELS)
+        # above EVERY row's tiles: a letter moving to a lower row would otherwise
+        # pass under that row's tiles, which are drawn after its own
+        for letter in self.vowel.values():
+            letter.set_z_index(1)
+
+    # ── e-h: the six vowels moved between the three rows ──────────────────────
+    def _tile(self, r, i):
+        return self.upper[r].tiles[0][i]
+
+    def _arrange(self, layout, run_time, extra=(), popped=()):
+        """ONE play: each vowel to its (row, position) in `layout`, tiles holding a
+        letter getting the typed border and the rest the empty one. `popped` are
+        tiles an `extra` TilePop is already driving, so they are left to it."""
+        anims = [self.vowel[ch].animate.move_to(self._tile(r, i).get_center())
+                 for ch, (r, i) in layout.items()]
+        held = set(layout.values())
+        for r in range(3):
+            for i in range(5):
+                if (r, i) in popped:
+                    continue
+                border = TILE_FILLED_BORDER if (r, i) in held else TILE_EMPTY_BORDER
+                anims.append(self._tile(r, i).animate.set_stroke(border))
+        self.play(*anims, *extra, run_time=run_time)
+
+    # e : the vowels into the positions CURSE PAINT GODLY puts them in
+    @subscene
+    def triple_vowels(self):
+        self._arrange(LAYOUT_TRIPLE, 1.2)
+
+    # f : ADIEU's A I E U into the first word, O mid second word, Y ending the third
+    @subscene
+    def adieu(self):
+        self._arrange(LAYOUT_ADIEU, 1.2)
+
+    # g : AUDIO in the first word, E mid second word (Y stays)
+    @subscene
+    def audio(self):
+        self._arrange(LAYOUT_AUDIO, 1.2)
+
+    # h : Y into the middle of the third word as C R P T land around it: CRYPT
+    def _setup_crypt(self):
+        row = self.upper[2]
+        self.crypt_letters = {}
+        for i, ch in enumerate(CRYPT):
+            if ch == "y":
+                continue
+            letter = row._letter(ch, row.tiles[0][i])
+            letter.set_opacity(0)                  # TilePop reveals it on its turn
+            row.letters[0][i] = letter
+            row.add(letter)
+            self.crypt_letters[i] = letter
+
+    @subscene
+    def crypt(self):
+        self._setup_crypt()
+        self.add(*self.crypt_letters.values())
+        pops = [TilePop(self._tile(2, i), letter)
+                for i, letter in self.crypt_letters.items()]
+        self._arrange(LAYOUT_CRYPT, 1.0, popped={(2, i) for i in self.crypt_letters},
+                      extra=[LaggedStart(*pops, lag_ratio=0.25)])
