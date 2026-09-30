@@ -61,8 +61,9 @@ LAYOUT CHOICES, flagged:
   - a's SALET is START_SCALE (user's call: bigger); b shrinks it into the corner.
   - i: the rows travel back and their words fade in UNDER THEM, riding along, over
     the last part of that motion (user's call).
-  - The grey-count words are typed rows at OVAL_WORD_W wide, inside the bottom of
-    each oval.
+  - The grey-count words are typed rows as wide as the corner SALET (user's call),
+    inside the bottom of each oval; the ovals are OVAL_KX wide and OVAL_KY tall
+    over their contents so a word that size fits its cell.
   - j cycles CYCLE_STEPS times; a group smaller than that repeats its draws, a
     one-answer group never changes.
 """
@@ -97,9 +98,12 @@ CORNER_MARGIN = 0.35       # clear space kept right of the corner word (06)
 
 CLUSTER_GAP = 0.06         # between rows in a grey-count cluster (h)
 CLUSTER_ASPECT = 2.0       # a cluster's width / height, before its word
-OVAL_WORD_W = 1.1          # the grey-count word's width (h)
 OVAL_WORD_GAP = 0.12       # between a cluster's rows and its word
-OVAL_PAD = 0.25            # added to each oval axis beyond sqrt(2) x its content
+OVAL_PAD = 0.25            # added to each oval axis beyond OVAL_KX/KY x its content
+OVAL_KX = 1.15             # an oval's axes over its content box's sides: any (kx, ky)
+OVAL_KY = 1 / math.sqrt(1 - 1 / OVAL_KX ** 2)   # with 1/kx^2 + 1/ky^2 = 1 contains
+                           # the box's corners; narrower and taller than sqrt(2), so the
+                           # corner-sized words fit their cells
 OVAL_STROKE = 3
 OVAL_COLOR = WHITE
 CYCLE_STEPS = 6            # j: how many draws each word cycles through
@@ -301,7 +305,7 @@ class Scene12(WordleBoardScene):
     def _setup_by_grays(self):
         """Six clusters, one per grey count: each cluster's rows shelf-packed at
         their current sizes (rank order), its word under them, an oval round both;
-        the six ovals packed in reading order, 0 greys first, at one scale."""
+        the six in a 3x2 grid by grey count, the rows at one scale."""
         by = {n: [k for k, g in enumerate(self.groups) if _grays(g) == n] for n in range(6)}
         blocks = []
         for n in range(6):
@@ -333,34 +337,46 @@ class Scene12(WordleBoardScene):
                 y -= sh_h + CLUSTER_GAP
             ch = -y - CLUSTER_GAP
             label = get_typed_row(SD["by_grays"][str(n)])
-            label.scale(OVAL_WORD_W / label.width)
-            content_w = max(cw, label.width)
-            content_h = ch + OVAL_WORD_GAP + label.height
-            ow = content_w * math.sqrt(2) + OVAL_PAD
-            oh = content_h * math.sqrt(2) + OVAL_PAD
-            blocks.append(dict(n=n, place=place, cw=cw, ch=ch, label=label,
-                               content_w=content_w, content_h=content_h, w=ow, h=oh))
+            label.scale(self.guess.width / label.width)      # the corner word's size
+            blocks.append(dict(n=n, place=place, cw=cw, ch=ch, label=label))
         # a 3x2 grid of equal cells, 0 greys top-left to 5 bottom-right, each oval
-        # centred in its cell; one scale for all, the largest oval filling its cell
-        cw_, ch_ = (REGION_HALF_W - self.col_left) / 3, (DOT_REGION_TOP - REGION_BOT) / 2
-        f = OVAL_CELL_FILL * min(min(cw_ / b["w"], ch_ / b["h"]) for b in blocks)
-        centres = [(self.col_left + (n % 3 + 0.5) * cw_, DOT_REGION_TOP - (n // 3 + 0.5) * ch_)
+        # centred in its cell. The rows take one scale f, the largest for which every
+        # oval fits its cell; the words keep the corner word's size whatever f is
+        cell_w = (REGION_HALF_W - self.col_left) / 3
+        cell_h = (DOT_REGION_TOP - REGION_BOT) / 2
+
+        def oval(b, f):
+            """(content w, content h, oval w, oval h) at row scale f."""
+            lw, lh = b["label"].width, b["label"].height
+            w, h = max(b["cw"] * f, lw), b["ch"] * f + OVAL_WORD_GAP + lh
+            return w, h, w * OVAL_KX + OVAL_PAD, h * OVAL_KY + OVAL_PAD
+
+        def fits(f):
+            return all(o[2] <= OVAL_CELL_FILL * cell_w and o[3] <= OVAL_CELL_FILL * cell_h
+                       for o in (oval(b, f) for b in blocks))
+
+        assert fits(0.0), "a grey-count word alone does not fit its cell"
+        lo, hi = 0.0, 3.0
+        for _ in range(40):
+            mid = (lo + hi) / 2
+            lo, hi = (mid, hi) if fits(mid) else (lo, mid)
+        f = lo
+        centres = [(self.col_left + (n % 3 + 0.5) * cell_w, DOT_REGION_TOP - (n // 3 + 0.5) * cell_h)
                    for n in range(6)]
         self.home = [(row, row.get_center(), row.width) for row in self.rows]
         self.targets, self.ovals, self.labels = [], [], []
         for b, (bx, by_) in zip(blocks, centres):
-            top = by_ + b["content_h"] * f / 2
+            w, h, ow, oh = oval(b, f)
+            top = by_ + h / 2
             left = bx - b["cw"] * f / 2
             for k, px, py in b["place"]:
                 self.targets.append((self.rows[k], np.array([left + px * f, top + py * f, 0.0]),
                                      self.rows[k].width * f))
             # the word sits at the bottom of the content, which the oval centres on
-            lab = b["label"].scale(f)
-            lab.move_to([bx, by_ - b["content_h"] * f / 2 + lab.height / 2, 0])
-            for t in lab.tiles[0]:
-                t.set_stroke(width=_stroke(lab.width))
+            lab = b["label"]
+            lab.move_to([bx, by_ - h / 2 + lab.height / 2, 0])
             self.labels.append(lab)
-            self.ovals.append(Ellipse(width=b["w"] * f, height=b["h"] * f,
+            self.ovals.append(Ellipse(width=ow, height=oh,
                                       stroke_color=OVAL_COLOR, stroke_width=OVAL_STROKE)
                               .move_to([bx, by_, 0]))
 
