@@ -13,7 +13,9 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   e until_single  — the line zooms in, the leftmost dot (3.42) at the left and the
                     new 6.90 dot at the right (1158 and 2315 slide off);
                     the Random Until One Answer marker at 6.90             (13e, VO 4)
-  f fade_out      — everything fades out                                   (13f, VO 5)
+  f pan_up        — the camera pans up, off the number line, to where the game
+                    is set, one frame above it (user's call; the script says
+                    "Fade everything out")                                 (13f, VO 5)
   g dicey         — DICEY typed at the top middle, its tiles appearing as typed,
                     and flips BBBYB; its 332 compatible answers fade in as a grid
                     below; a highlight hops 10 times, landing on GUESS     (13g, VO 5)
@@ -22,9 +24,10 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                     VALUE                                                  (13h, VO 5)
   i value         — the same: VALUE, BBYYG, 5 left, hops to FLUTE          (13i, VO 5)
   j flute         — the same: FLUTE, GGGBG, 2 left, hops to FLUKE          (13j, VO 5)
-  k fluke         — FLUKE typed and flips GGGGG; FLUKE alone is left       (13k, VO 5)
-  l back_to_line  — the typed rows and the words fade out as the number line, its
-                    markers and the title fade back in                     (13l, VO 5)
+  k fluke         — FLUKE typed and flips GGGGG; both words left (FLUKE, FLUME)
+                    vanish as FLUKE's row does the win bounce              (13k, VO 5)
+  l back_to_line  — the camera pans back down to the number line; the game
+                    slides up out of frame                                 (13l, VO 5)
   m compatible    — the Random Compatible Answers marker at 4.08, below
                     the line                                               (13m, VO 5)
 
@@ -79,8 +82,11 @@ REUSE MAP — every element, the one source it comes from, and how it enters:
   game words, lists     assets/random_game_data.py -> random_game_cache.json:
                         colourings and compatible answers from math/wordle.py
                         `pattern`, the 9 random hops per turn seeded
-  the line back (k)     FadeOut the rows and words with FadeIn of the line and title
-                        (the same objects f faded, markers and all)
+  pans (f, l)           the camera (MovingCameraScene, as 08) shifts one frame height;
+                        the game is built GAME_DY above the line, so nothing fades
+  the win (k)           07p's fresh_win (07dynamic_programming.py:806): the leftover
+                        words go (here 12's shrink-out) AS the row does
+                        `bounce_anim` at 07's `_jump` height
 Nothing leaves at the end: THI follows.
 
 EVERY NUMBER is the script's, and each matches the committed data it came from:
@@ -118,7 +124,7 @@ LAYOUT CHOICES, flagged:
     flip) moves down into the region for the new count of rows.
   - Every compatible answer is shown, all 332 after DICEY (so they are small), in
     the answer list's alphabetical order.
-  - l crossfades the rows and words out and the line in, in one play.
+  - Both pans take 1.5s with manim's default easing, and play no sound.
   - Each win rate is coloured red -> green, very nonlinearly (user's call): the
     colour position is t = 1 - (1 - rate)^P with P set so t = 0.5 at WIN_MID (98%),
     i.e. a power law in the LOSS rate. The colour runs round the hue wheel from
@@ -135,6 +141,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 
 from config import *
+from manim import MovingCameraScene
 from bpkfigures.number_line import ZoomLine
 from bpkfigures.highlight import highlight
 from assets.board import STROKE, GAP, TILE, WordleBoard, get_typed_row
@@ -161,6 +168,8 @@ GRID_X = (-7.6, 7.6)      # g-j: the compatible-answer grid's region, below the 
 GRID_BOTTOM = -4.3
 ROWS_GRID_GAP = 0.3       # between the room for the next typed row and the grid
 GRID_MAX_SCALE = 1.0      # a gridded word is never bigger than 04's list size
+GAME_DY = config.frame_height   # the game sits one frame above the number line
+BOUNCE_H = 0.35           # board.bounce's height for a full-size tile (07's)
 
 
 def _shrink_out(mob):
@@ -184,19 +193,19 @@ def win_color(rate):
     return ManimColor.from_rgb(colorsys.hsv_to_rgb(*hsv))
 
 
-class Scene13(WordleBoardScene):
+class Scene13(MovingCameraScene, WordleBoardScene):
     """show_line — the line, 3..6, and the title
     optimal — 3.42
     random — zoom out to 3..2500; 2315
     no_repeats — 1158
     until_single — zoom in to 3.42..6.90; 6.90
-    fade_out — everything out
+    pan_up — the camera up to the game
     dicey — DICEY typed at the top and flipped; 332 words in; hops to GUESS
     guess — GUESS's turn; hops to VALUE
     value — VALUE's turn; hops to FLUTE
     flute — FLUTE's turn; hops to FLUKE
-    fluke — FLUKE's turn, all green
-    back_to_line — rows and words out, line back
+    fluke — FLUKE's turn; both words go as the row bounces
+    back_to_line — the camera back down
     compatible — 4.08, below the line
     """
 
@@ -208,9 +217,10 @@ class Scene13(WordleBoardScene):
         """{word: (centre, PigpenWord scale)} for turn k's compatible `words`:
         07's `ranked_word_layout` (the shape giving the largest words) in the region
         below the room for turn k+1's row, capped at list size and kept top-aligned."""
-        top = GUESS_Y - self.row_h / 2 - (k + 1) * self.pitch - ROWS_GRID_GAP
+        top = GAME_DY + GUESS_Y - self.row_h / 2 - (k + 1) * self.pitch - ROWS_GRID_GAP
         slots, sc, _, _ = ranked_word_layout([{"size": len(words), "members": words}],
-                                             GRID_X[0], GRID_X[1], top, GRID_BOTTOM,
+                                             GRID_X[0], GRID_X[1], top,
+                                             GAME_DY + GRID_BOTTOM,
                                              heads=0)
         width = WORD_W * sc                         # the layout's word width
         f = min(1.0, self.word_w * GRID_MAX_SCALE / width)
@@ -228,7 +238,7 @@ class Scene13(WordleBoardScene):
         row = WordleBoard(rows=1, cols=5)
         row.scale(self.word_w * TOP_SCALE / row.width)
         if not self.rows:
-            row.move_to([0, GUESS_Y, 0])
+            row.move_to([0, GAME_DY + GUESS_Y, 0])
         else:
             above = self.rows[-1]
             row.next_to(above, DOWN, buff=above.tiles[0][0].height * GAP / TILE)
@@ -366,11 +376,10 @@ class Scene13(WordleBoardScene):
         m = self._marker(6.90, ["Random Until", "One Answer", "59.30%"])
         self._zoom_pop(left, m.value, m, 2.0, 0.4, 0.5)
 
-    # f : everything fades out
+    # f : the camera pans up to the game, set one frame above the line
     @subscene
-    def fade_out(self):
-        self.play(FadeOut(self.line), FadeOut(self.title), FadeOut(self.subtitle),
-                  run_time=1.0)
+    def pan_up(self):
+        self.play(self.camera.frame.animate.shift(UP * GAME_DY), run_time=1.5)
 
     # g : DICEY typed at the top, flips BBBYB; the 332 compatible answers; hops to GUESS
     @subscene
@@ -396,21 +405,24 @@ class Scene13(WordleBoardScene):
     def flute(self):
         self._turn(3, 0.65, 1.6, 1.0, 0.12)
 
-    # k : FLUKE's turn (GGGGG); FLUKE alone is left
+    # k : FLUKE's turn (GGGGG); both words left vanish as the row does the win bounce
     @subscene
     def fluke(self):
-        self._turn(4, 0.65, 1.6, 1.0, 0.12)
+        self._type(4, 0.65)
+        self._flip(4, 1.6)
+        row = self.rows[4]
+        jump = BOUNCE_H * row.tiles[0][0].height / TILE
+        self.play(*[_shrink_out(m) for m in self.words.values()],
+                  row.bounce_anim(0, height=jump), run_time=1.0)
+        self.remove(*self.words.values())
+        self.words, self.wscale = {}, {}
 
-    # l : back to the timeline — the rows and words out, the line and title in
+    # l : the camera pans back down to the number line; the game leaves upward
     @subscene
     def back_to_line(self):
-        out = [*self.rows, *self.words.values()]
-        if self.mark is not None:
-            out.append(self.mark)
-        self.play(*[FadeOut(m) for m in out],
-                  FadeIn(self.line), FadeIn(self.title), FadeIn(self.subtitle),
-                  run_time=1.2)
-        self.rows, self.words, self.wscale, self.mark = [], {}, {}, None
+        self.play(self.camera.frame.animate.shift(DOWN * GAME_DY), run_time=1.5)
+        self.remove(*self.rows)            # off-frame now; keeps the snapshot light
+        self.rows = []
 
     # m : Random Compatible Answers at 4.08, below the line
     @subscene
