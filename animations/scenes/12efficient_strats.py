@@ -54,16 +54,18 @@ LAYOUT CHOICES, flagged:
     word is as wide as its row and the small groups' words are specks.
   - A group with no second word (LUCKY's and GUESS's own all-green win) gets none:
     a word arriving there shrinks away, a word leaving it grows in.
-  - The six ovals (h) sit in a 3x2 grid of equal cells, 0 greys top-left to 5
-    bottom-right (user's call), each centred in its cell, at one scale set by the
-    oval that fills its cell most (so rows may grow); rows in a cluster keep rank
-    order, each shelf centred. Ovals are WHITE (the script names no colour).
+  - The six ovals (h) sit in a 3x2 grid, 0 greys top-left to 5 bottom-right
+    (user's call): equal columns, each grid row as tall as its tallest oval, the
+    spare height shared evenly; each oval centred in its cell. The rows keep their
+    ORIGINAL size (user's call), shrinking only if that cannot fit; rows in a
+    cluster keep rank order, each shelf centred. Ovals are WHITE (the script names
+    no colour).
   - a's SALET is START_SCALE (user's call: bigger); b shrinks it into the corner.
   - i: the rows travel back and their words fade in UNDER THEM, riding along, over
     the last part of that motion (user's call).
   - The grey-count words are typed rows as wide as the corner SALET (user's call),
-    inside the bottom of each oval; the ovals are OVAL_KX wide and OVAL_KY tall
-    over their contents so a word that size fits its cell.
+    inside the bottom of each oval; each oval is as wide as its column allows, so
+    as short as it can be around its contents.
   - j cycles CYCLE_STEPS times; a group smaller than that repeats its draws, a
     one-answer group never changes.
 """
@@ -90,7 +92,6 @@ SALET, LUCKY, GUESS = "salet", "lucky", "guess"     # the script's own choices
 
 START_SCALE = 2.6          # a: SALET's size in the middle (b shrinks it to GUESS_SCALE)
 WORDS_IN_FROM = 0.6        # i: the share of the rows' motion before their words fade in
-OVAL_CELL_FILL = 0.92      # h: the largest oval fills this much of its grid cell
 
 DOT_COLOR = WHITE
 CORNER_BUFF = 0.3          # the corner word's gap to the frame's edges (06)
@@ -99,11 +100,9 @@ CORNER_MARGIN = 0.35       # clear space kept right of the corner word (06)
 CLUSTER_GAP = 0.06         # between rows in a grey-count cluster (h)
 CLUSTER_ASPECT = 2.0       # a cluster's width / height, before its word
 OVAL_WORD_GAP = 0.12       # between a cluster's rows and its word
-OVAL_PAD = 0.25            # added to each oval axis beyond OVAL_KX/KY x its content
-OVAL_KX = 1.15             # an oval's axes over its content box's sides: any (kx, ky)
-OVAL_KY = 1 / math.sqrt(1 - 1 / OVAL_KX ** 2)   # with 1/kx^2 + 1/ky^2 = 1 contains
-                           # the box's corners; narrower and taller than sqrt(2), so the
-                           # corner-sized words fit their cells
+OVAL_PAD = 0.25            # added to each oval axis beyond kx/ky x its content
+OVAL_KX_MAX = 1.6          # widest an oval gets over its content (flatter = shorter)
+OVAL_COL_FILL = 0.96       # an oval may use this much of its column's width
 OVAL_STROKE = 3
 OVAL_COLOR = WHITE
 CYCLE_STEPS = 6            # j: how many draws each word cycles through
@@ -339,30 +338,44 @@ class Scene12(WordleBoardScene):
             label = get_typed_row(SD["by_grays"][str(n)])
             label.scale(self.guess.width / label.width)      # the corner word's size
             blocks.append(dict(n=n, place=place, cw=cw, ch=ch, label=label))
-        # a 3x2 grid of equal cells, 0 greys top-left to 5 bottom-right, each oval
-        # centred in its cell. The rows take one scale f, the largest for which every
-        # oval fits its cell; the words keep the corner word's size whatever f is
+        # a 3x2 grid, 0 greys top-left to 5 bottom-right: equal columns, each grid
+        # row as tall as its tallest oval, the height left over shared out evenly
+        # above, between and below; each oval centred in its cell. The rows keep
+        # their ORIGINAL size (user's call) unless even that cannot fit, and the
+        # words keep the corner word's size either way
         cell_w = (REGION_HALF_W - self.col_left) / 3
-        cell_h = (DOT_REGION_TOP - REGION_BOT) / 2
+        region_h = DOT_REGION_TOP - REGION_BOT
 
         def oval(b, f):
-            """(content w, content h, oval w, oval h) at row scale f."""
+            """(content w, content h, oval w, oval h) at row scale f. The oval is
+            as WIDE as its column allows (up to OVAL_KX_MAX x its content), which
+            makes it as SHORT as it can be while still containing its content box:
+            axes kx*w and ky*h with 1/kx^2 + 1/ky^2 = 1."""
             lw, lh = b["label"].width, b["label"].height
             w, h = max(b["cw"] * f, lw), b["ch"] * f + OVAL_WORD_GAP + lh
-            return w, h, w * OVAL_KX + OVAL_PAD, h * OVAL_KY + OVAL_PAD
+            kx = min(OVAL_KX_MAX, (cell_w * OVAL_COL_FILL - OVAL_PAD) / w)
+            ky = 1 / math.sqrt(1 - 1 / kx ** 2)
+            return w, h, w * kx + OVAL_PAD, h * ky + OVAL_PAD
+
+        def row_heights(f):
+            return [max(oval(blocks[n], f)[3] for n in range(r * 3, r * 3 + 3)) for r in range(2)]
 
         def fits(f):
-            return all(o[2] <= OVAL_CELL_FILL * cell_w and o[3] <= OVAL_CELL_FILL * cell_h
-                       for o in (oval(b, f) for b in blocks))
+            return (all(oval(b, f)[2] <= cell_w * OVAL_COL_FILL + 1e-9 for b in blocks)
+                    and sum(row_heights(f)) <= region_h)
 
         assert fits(0.0), "a grey-count word alone does not fit its cell"
-        lo, hi = 0.0, 3.0
-        for _ in range(40):
-            mid = (lo + hi) / 2
-            lo, hi = (mid, hi) if fits(mid) else (lo, mid)
-        f = lo
-        centres = [(self.col_left + (n % 3 + 0.5) * cell_w, DOT_REGION_TOP - (n // 3 + 0.5) * cell_h)
-                   for n in range(6)]
+        f = 1.0
+        if not fits(f):
+            lo, hi = 0.0, 1.0
+            for _ in range(40):
+                mid = (lo + hi) / 2
+                lo, hi = (mid, hi) if fits(mid) else (lo, mid)
+            f = lo
+        rh = row_heights(f)
+        gap = (region_h - sum(rh)) / 3
+        ys = [DOT_REGION_TOP - gap - rh[0] / 2, DOT_REGION_TOP - 2 * gap - rh[0] - rh[1] / 2]
+        centres = [(self.col_left + (n % 3 + 0.5) * cell_w, ys[n // 3]) for n in range(6)]
         self.home = [(row, row.get_center(), row.width) for row in self.rows]
         self.targets, self.ovals, self.labels = [], [], []
         for b, (bx, by_) in zip(blocks, centres):
