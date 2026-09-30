@@ -217,6 +217,7 @@ FULL_R = 4.25                      # zc: (vertical) distance of a one-answer nod
 FULL_X_STRETCH = 1.75              # zc: the ellipses' width / height (the frame's shape)
 FULL_START = math.pi / 2           # zc: where the first branch sits (straight up)
 FULL_LINE_W, FULL_LINE_OPACITY = 0.4, 0.2    # zc: the branch lines
+FULL_CLEAR = 0.15                  # zc: least gap between SALET and any node
 FULL_LETTER_W = 0.35               # zc: rows narrower than this get no letters
 THUMB_CASE = 0.3                   # y: the group waiting in a corner
 THUMB_TREE = 0.2                   # z: the finished tree waiting in a corner, small
@@ -1369,8 +1370,15 @@ class Scene07(WordleBoardScene):
                 span = (a1 - a0) * n / sum(len(k["answers"]) for k in node["kids"])
                 mid = a + span / 2
                 r = FULL_R * math.log(total / n) / math.log(total)
-                c = np.array([r * FULL_X_STRETCH * math.cos(mid), r * math.sin(mid), 0.0])
                 w = k_w * math.sqrt(n)
+                h = (2 if kid["node"] is not None else 1) * pitch(w)
+                c = np.array([r * FULL_X_STRETCH * math.cos(mid), r * math.sin(mid), 0.0])
+                # a node that would overlap SALET is pushed out along its angle until
+                # it clears it by FULL_CLEAR (nothing else moves)
+                while (abs(c[0]) < (FULL_ROOT_W + w) / 2 + FULL_CLEAR
+                       and abs(c[1]) < (root.height + h) / 2 + FULL_CLEAR):
+                    r *= 1.03
+                    c = np.array([r * FULL_X_STRETCH * math.cos(mid), r * math.sin(mid), 0.0])
                 if kid["node"] is None:                       # a win: the green row
                     pieces.append(self._full_row(node["guess"], kid["code"], w, c))
                 else:                                          # colouring + next guess
