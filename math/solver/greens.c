@@ -105,7 +105,9 @@ typedef uint8_t pat_t;
 /* An ARRAY BOUND, not a modelling limit: it sizes the per-depth arena.  Depth is
  * 6 because a Wordle game is 6 guesses. */
 #ifndef MAXD
-#define MAXD       12
+/* 16 (depths up to 15), raised from 12 on 2026-09-30 when the depth sweep reached
+ * 12.  Each level costs ~0.3 MB of per-thread arena, so the bound is cheap. */
+#define MAXD       16
 #endif
 
 /* How many of the evenest-splitting guesses feas() tries before falling back to
