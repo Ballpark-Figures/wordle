@@ -5,7 +5,7 @@ follows, so f ends with the whole line on screen.
 
 BEAT MAP — one subscene per Script.md beat, letters matching:
 
-  a show_line     — the number line, 3 at the left and 4 at the right, running on
+  a show_line     — the number line, 3 at the left and 6 at the right, running on
                     past both edges; the title and "(Win Rate)" fade in    (13a, VO 1)
   b optimal       — the Optimal SALET marker at 3.42                       (13b, VO 1)
   c random        — the line zooms out to 3..2500; the Random marker at 2315 (13c, VO 2)
@@ -51,7 +51,8 @@ numbers are part of the number line.
 
 LAYOUT CHOICES, flagged:
   - The line runs off both frame edges with arrow tips (user's call). It opens on
-    3..4 across x -6..6 (user's call), so only 3 and 4 are labelled at first.
+    3..6 across x -6..6 (user's call: left at 3, the same 3-wide range as the earlier
+    1..4 opening).
   - The zoom out keeps 3 where it was (3..2500), so the anchor does not jump; at that
     scale 0 is back in view, just left of 3.
   - The zoom in puts the leftmost marker at x=-6 (user's call), derived from the
@@ -103,7 +104,7 @@ def win_color(rate):
 
 
 class Scene13(WordleBoardScene):
-    """show_line — the line, 3..4, and the title
+    """show_line — the line, 3..6, and the title
     optimal — 3.42
     random — zoom out to 3..2500; 2315
     no_repeats — 1158
@@ -121,9 +122,9 @@ class Scene13(WordleBoardScene):
         return self.line.add_marker(value, lines, side=side, font_size=MARKER_FS,
                                     text_color=BLACK, box={"pad": CARD_PAD})
 
-    # a : the number line, 3 to 4, extending both ways; the title
+    # a : the number line, 3 to 6, extending both ways; the title
     def _setup_show_line(self):
-        self.line = ZoomLine(3, 4, y=LINE_Y, min_label_step=1)
+        self.line = ZoomLine(3, 6, y=LINE_Y, min_label_step=1)
         self.title = crisp_text(TITLE, color=WHITE, font_size=FONT_SIZE_LG)
         self.title.to_edge(UP, buff=TITLE_BUFF)
         self.subtitle = crisp_text(SUBTITLE, color=WHITE, font_size=FONT_SIZE_MD)
