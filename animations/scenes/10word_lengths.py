@@ -43,7 +43,7 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   x path_3       — RAS's all-grey path, the same way. Also not a script beat
                    yet: needs one after the opener_3 beat                    (VO 7)
   j and o-r fill a whole row the same way: average, then opener.
-  An average fades in; an opener is TYPED in as tiles, as SALET is, its letters
+  An average rises in (as i's rows do); an opener is TYPED in as tiles, as SALET is, its letters
   coloured vowel red / consonant blue (hangman's rule, Y a vowel — the user's).
   EVERY LETTER CHANGE IS A FLIP (the user's): a tile turns over and shows its new
   letter, or none — nothing slides or morphs. Only tiles that change flip, left to
@@ -425,7 +425,8 @@ class Scene10(WordleDarkScene):
             return
         cell = crisp_text(_avg(t["total"], t["answers"]), font_size=CELL_SIZE,
                           color=WHITE).move_to([AVG_X, _row_y(L), 0])
-        self.play(FadeIn(cell), *extra, run_time=run_time)
+        # rising in, as the table's rows do in i
+        self.play(FadeIn(cell, shift=UP * 0.3), *extra, run_time=run_time)
 
     def _fill_opener(self, L, run_time):
         """Length L's best opener typed into its row as tiles (they appear as their
