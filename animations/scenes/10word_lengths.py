@@ -30,7 +30,11 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                    Average Guesses / Best Opener, one row per length, 3 to 11 (the
                    longest with results) — only the lengths filled          (VO 4)
   j salet_row    — SALET typed into length 5's row as tiles, then 3.42       (VO 4)
-  (VO 5 has no subscene in the script yet.)
+  k avg_6 / l opener_6 / m avg_7 / n opener_7 — one cell each               (VO 5)
+  o both_8 / p both_9 / q both_10 / r both_11 — average, then opener        (VO 5)
+  s avg_4 / t opener_4                                                        (VO 6)
+  u avg_3 / v opener_3                                                        (VO 7)
+  An average fades in; an opener is TYPED in as tiles, as SALET is.
   EVERY LETTER CHANGE IS A FLIP (the user's): a tile turns over and shows its new
   letter, or none — nothing slides or morphs. Only tiles that change flip, left to
   right, top to bottom. Every tile has the same border.
@@ -53,6 +57,10 @@ NUMBERS — all SOURCED, from assets/word_lengths_data.py -> word_lengths_cache.
                    asserted there to sum to 2315 answers and 7920 guesses
   THIRD / WHEEL    those answers' lines in the same tree, codes re-checked against
                    math/wordle.py pattern()
+  the table      word_lengths_data `table`: each length's opener and total from
+                   the file the user chose (TABLE_SOURCES there); averages 2 dp.
+                   NOT one kind of result — 3 is a beam's upper bound, 4 exact over
+                   only 4 openers, 6 provisional, 7-11 complete; caps differ
   10e's triples   the first three rows of the singletons triple ranking
                    (math/data/shared/singletons/triple_singletons.csv, ranks 365,
                    380, 478 of the top 100000 of a greedy screen) using all six
@@ -160,6 +168,10 @@ HEADER_SIZE = 28
 CELL_SIZE = 30
 
 
+TABLE = {int(L): t for L, t in DATA["table"].items()}
+assert sorted(TABLE) == LENGTHS
+
+
 def _row_y(L):
     return ROW_Y0 - LENGTHS.index(L) * ROW_DY
 
@@ -182,6 +194,9 @@ class Scene10(WordleDarkScene):
     crypt — flips to CRYPT in row 3
     table — boxes out; the word-length table in, lengths only
     salet_row — SALET typed in as tiles, 3.42 beside it
+    avg_6, opener_6, avg_7, opener_7 — one cell each
+    both_8, both_9, both_10, both_11 — average then opener
+    avg_4, opener_4, avg_3, opener_3 — one cell each
     """
 
     def setup_scene(self):
@@ -368,17 +383,88 @@ class Scene10(WordleDarkScene):
         self.play(LaggedStart(*[FadeIn(r, shift=UP * 0.3) for r in self.table_rows],
                               lag_ratio=0.12), run_time=1.2)
 
-    # j : SALET typed into its row's boxes, then its average
-    def _setup_salet_row(self):
-        self.row5 = get_board(rows=1, cols=5).scale(TABLE_TILE_SCALE)
-        self.row5.move_to([0, _row_y(5), 0]).align_to(np.array([OPENER_X, 0, 0]), LEFT)
-        self.avg5 = crisp_text(_avg(DATA["total"], DATA["answers"]),
-                               font_size=CELL_SIZE, color=WHITE)
-        self.avg5.move_to([AVG_X, _row_y(5), 0])
+    # ── j-v: filling in the table, one cell at a time ──────────────────────
+    def _fill_avg(self, L, run_time):
+        """Length L's average guesses fades into its cell."""
+        t = TABLE[L]
+        cell = crisp_text(_avg(t["total"], t["answers"]), font_size=CELL_SIZE,
+                          color=WHITE).move_to([AVG_X, _row_y(L), 0])
+        self.play(FadeIn(cell), run_time=run_time)
 
+    def _fill_opener(self, L, run_time):
+        """Length L's best opener typed into its row as tiles (they appear as their
+        letters land), with the keystroke sounds."""
+        row = get_board(rows=1, cols=L).scale(TABLE_TILE_SCALE)
+        row.move_to([0, _row_y(L), 0]).align_to(np.array([OPENER_X, 0, 0]), LEFT)
+        row.type_word(self, 0, TABLE[L]["opener"], run_time,
+                      per_letter=key_cues(self), appear=True)
+
+    # j : SALET typed into its row's boxes, then its average
     @subscene
     def salet_row(self):
-        self._setup_salet_row()
-        self.row5.type_word(self, 0, DATA["opener"], 0.65, per_letter=key_cues(self),
-                            appear=True)
-        self.play(FadeIn(self.avg5), run_time=0.5)
+        self._fill_opener(5, 0.65)
+        self._fill_avg(5, 0.5)
+
+    # k : length 6's average
+    @subscene
+    def avg_6(self):
+        self._fill_avg(6, 0.5)
+
+    # l : length 6's opener
+    @subscene
+    def opener_6(self):
+        self._fill_opener(6, 0.78)
+
+    # m : length 7's average
+    @subscene
+    def avg_7(self):
+        self._fill_avg(7, 0.5)
+
+    # n : length 7's opener
+    @subscene
+    def opener_7(self):
+        self._fill_opener(7, 0.91)
+
+    # o : both for 8
+    @subscene
+    def both_8(self):
+        self._fill_avg(8, 0.5)
+        self._fill_opener(8, 1.04)
+
+    # p : both for 9
+    @subscene
+    def both_9(self):
+        self._fill_avg(9, 0.5)
+        self._fill_opener(9, 1.17)
+
+    # q : both for 10
+    @subscene
+    def both_10(self):
+        self._fill_avg(10, 0.5)
+        self._fill_opener(10, 1.3)
+
+    # r : both for 11
+    @subscene
+    def both_11(self):
+        self._fill_avg(11, 0.5)
+        self._fill_opener(11, 1.43)
+
+    # s : length 4's average
+    @subscene
+    def avg_4(self):
+        self._fill_avg(4, 0.5)
+
+    # t : length 4's opener
+    @subscene
+    def opener_4(self):
+        self._fill_opener(4, 0.52)
+
+    # u : length 3's average
+    @subscene
+    def avg_3(self):
+        self._fill_avg(3, 0.5)
+
+    # v : length 3's opener
+    @subscene
+    def opener_3(self):
+        self._fill_opener(3, 0.39)

@@ -143,5 +143,70 @@
     9,
     10,
     11
-  ]
+  ],
+  "table": {
+    "3": {
+      "opener": "ras",
+      "total": 3517,
+      "answers": 707,
+      "depth": 12,
+      "source": "optlen3/k300/opener_totals_d12_ssq.csv"
+    },
+    "4": {
+      "opener": "tale",
+      "total": 9831,
+      "answers": 2347,
+      "depth": 6,
+      "source": "optlen4/opener_totals_escalating_ssq.csv"
+    },
+    "5": {
+      "opener": "salet",
+      "total": 7920,
+      "answers": 2315,
+      "depth": 6,
+      "source": "optturns/opener_totals.csv"
+    },
+    "6": {
+      "opener": "carnet",
+      "total": 14482,
+      "answers": 4561,
+      "depth": 5,
+      "source": "optlen6/opener_totals_d5_ssq.csv"
+    },
+    "7": {
+      "opener": "saltine",
+      "total": 14873,
+      "answers": 5137,
+      "depth": 4,
+      "source": "optlen7/opener_totals_escalating_lb.csv"
+    },
+    "8": {
+      "opener": "ceratins",
+      "total": 14480,
+      "answers": 5327,
+      "depth": 4,
+      "source": "optlen8/opener_totals_escalating_lb.csv"
+    },
+    "9": {
+      "opener": "saprolite",
+      "total": 12882,
+      "answers": 5056,
+      "depth": 3,
+      "source": "optlen9/opener_totals_escalating_lb.csv"
+    },
+    "10": {
+      "opener": "mercantile",
+      "total": 9631,
+      "answers": 4030,
+      "depth": 3,
+      "source": "optlen10/opener_totals_escalating_lb.csv"
+    },
+    "11": {
+      "opener": "meteoritics",
+      "total": 6823,
+      "answers": 3022,
+      "depth": 3,
+      "source": "optlen11/opener_totals_escalating_lb.csv"
+    }
+  }
 }

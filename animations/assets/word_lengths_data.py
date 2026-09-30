@@ -33,6 +33,20 @@ Provenance for everything it writes:
                  math/data/shared/optlen<L>/ result directory (the hello-wordl length
                  sweeps), plus 5, which is the NYT problem above rather than hello's.
                  Asserted contiguous from 3.
+  table        — each length's best opener and total, read from the file TABLE_SOURCES
+                 names (the user's choices, 2026-09-29), plus that length's hello answer
+                 count; the build asserts total / answers reproduces the file's own
+                 `expected`. EVERY ROW IS AN OPTIMUM SUBJECT TO A DEPTH CAP, and the
+                 caps differ (the `depth` field), and the rows are NOT all the same
+                 kind of result:
+                   3   best of the --topk beams (k100-300 agree), depth 12 — an UPPER
+                       BOUND, from a restricted search
+                   4   exact totals, but only 4 of 4030 openers examined (min depth 6)
+                   5   SALET on the NYT lists (the rest of this module), depth 6
+                   6   best of the first 819 of 15787 openers, depth 5 — PROVISIONAL
+                       (LENGTHS.md); the 7-11 rule would pick DISTAL at depth 4
+                   7-11 COMPLETE and exact: fewest worst-case guesses first, then
+                       lowest total (LENGTHS.md)
 """
 import csv
 import gzip
@@ -55,6 +69,39 @@ TILE = {"b": 0, "y": 1, "g": 2}
 TRIPLES = os.path.join(MATH, "data", "shared", "singletons", "triple_singletons.csv")
 VOWELS = "aeiouy"
 N_TRIPLES = 3
+
+
+# length -> (result file under math/data/shared, how its best row is chosen). "depth"
+# = fewest worst-case guesses first, then lowest total (the escalating runs' own
+# lexicographic rule); "total" = lowest total (a pinned-depth file, one cap).
+TABLE_SOURCES = {
+    3: ("optlen3/k300/opener_totals_d12_ssq.csv", "total"),
+    4: ("optlen4/opener_totals_escalating_ssq.csv", "depth"),
+    6: ("optlen6/opener_totals_d5_ssq.csv", "total"),
+    7: ("optlen7/opener_totals_escalating_lb.csv", "depth"),
+    8: ("optlen8/opener_totals_escalating_lb.csv", "depth"),
+    9: ("optlen9/opener_totals_escalating_lb.csv", "depth"),
+    10: ("optlen10/opener_totals_escalating_lb.csv", "depth"),
+    11: ("optlen11/opener_totals_escalating_lb.csv", "depth"),
+}
+
+
+def _table(opener_total):
+    shared = os.path.join(MATH, "data", "shared")
+    out = {5: {"opener": OPENER, "total": opener_total, "answers": N_ANSWERS,
+               "depth": 6, "source": "optturns/opener_totals.csv"}}
+    for L, (rel, rule) in TABLE_SOURCES.items():
+        rows = [r for r in csv.DictReader(open(os.path.join(shared, rel))) if r["total"]]
+        key = (lambda r: (int(r["depth"]), int(r["total"]), r["word"])) if rule == "depth" \
+            else (lambda r: (int(r["total"]), r["word"]))
+        r = min(rows, key=key)
+        answers = sum(1 for w in open(os.path.join(shared, "words", "hello", f"len{L}",
+                                                    "mystery.txt")) if w.strip())
+        assert len(r["word"]) == L, (L, r["word"])
+        assert f"{int(r['total']) / answers:.5f}" == r["expected"], (L, r, answers)
+        out[L] = {"opener": r["word"], "total": int(r["total"]), "answers": answers,
+                  "depth": int(r["depth"]), "source": rel}
+    return {str(L): out[L] for L in sorted(out)}
 
 
 def _lengths():
@@ -123,7 +170,7 @@ def _build():
     return {"opener": OPENER, "total": total, "answers": N_ANSWERS,
             "distribution": {str(n): c for n, c in counts.items()},
             "games": games, "vowel_triples": _vowel_triples(),
-            "lengths": _lengths()}
+            "lengths": _lengths(), "table": _table(total)}
 
 
 def load():
@@ -147,4 +194,8 @@ if __name__ == "__main__":
     for t in data["vowel_triples"]:
         print(f"vowel triple: {' '.join(t['words']).upper()}  (rank {t['rank']} of "
               f"{t['of']}, {t['singles']} singles)")
+    assert sorted(map(int, data["table"])) == data["lengths"]
+    for L, t in data["table"].items():
+        print(f"  {L:>2}  {t['opener'].upper():<12} {t['total'] / t['answers']:.2f}  "
+              f"depth {t['depth']:<2}  {t['source']}")
     print(f"\nwrote {CACHE}")
