@@ -118,11 +118,13 @@ class TilePop(Animation):
     `there_and_back` in `bounce`.
     """
 
-    def __init__(self, tile, letter, bump=0.10, appear=False, **kwargs):
+    def __init__(self, tile, letter, bump=0.10, appear=False, stroke=STROKE, **kwargs):
         # `letter=None` pops an EMPTY tile in (scene 11 types out blank words); it
         # needs `appear=True` to mean anything, since a visible empty tile has
         # nothing to land. Every existing caller passes a letter and is unchanged.
-        self.tile, self.letter, self.bump = tile, letter, bump
+        # `stroke` is the border the landed tile takes: the board's STROKE unless a
+        # tiny row needs a thinner one (scene 12's dot-sized rows).
+        self.tile, self.letter, self.bump, self.stroke = tile, letter, bump, stroke
         self.appear = appear            # the tile itself is hidden until its letter lands
         self.t_h, self.t_w = tile.height, tile.width
         if letter is not None:
@@ -143,7 +145,7 @@ class TilePop(Animation):
             self.tile.set_fill(opacity=1.0 if alpha > 0 else 0.0)
             self.tile.set_stroke(opacity=1.0 if alpha > 0 else 0.0)
         if alpha > 0:
-            self.tile.set_stroke(TILE_FILLED_BORDER, STROKE)
+            self.tile.set_stroke(TILE_FILLED_BORDER, self.stroke)
         s = 1 + self.bump * np.sin(np.pi * self.rate_func(alpha))
         self.tile.stretch_to_fit_height(self.t_h * s) \
                  .stretch_to_fit_width(self.t_w * s).move_to(self.center)
@@ -223,11 +225,13 @@ class WordleBoard(VGroup):
         scene.play(anim, run_time=total)
 
     def type_anim(self, scene, row, word, run_time, per_letter=None, key_gap=None,
-                  appear=False, letter_color=None):
+                  appear=False, letter_color=None, stroke=STROKE):
         """`type_word` unplayed: the letters are made and put on the scene (hidden),
         and (animation, the run_time to play it for) comes back — so several words
         can be typed in ONE play (scene 07 types a row of final answers at once).
-        Same arguments and timing as `type_word`, which is this played."""
+        Same arguments and timing as `type_word`, which is this played. `stroke` is
+        the landed tiles' border -- STROKE unless a tiny row needs it thinner (scene
+        12 types 148 words at dot-view sizes)."""
         n = max(len(word), 1)
         if key_gap is None:
             lag, total = 1.0 / n, run_time
@@ -263,7 +267,7 @@ class WordleBoard(VGroup):
                 # i * run_time / (2n - 1). Using the even spacing instead fired every
                 # cue progressively later than the letter it belonged to.
                 per_letter(i, ch, at(i))
-        pops = [TilePop(self.tiles[row][i], self.letters[row][i], appear=appear)
+        pops = [TilePop(self.tiles[row][i], self.letters[row][i], appear=appear, stroke=stroke)
                 for i in range(len(word))]
         return LaggedStart(*pops, lag_ratio=lag), total
 
