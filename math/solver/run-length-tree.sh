@@ -4,6 +4,7 @@
 #
 #     bash solver/run-length-tree.sh --length 4 --depth max --opener tale   # from math/
 #     bash solver/run-length-tree.sh --length 4 --depth 6 --opener tale --dry-run
+#     bash solver/run-length-tree.sh --length 4 --depth 6 --opener tale -k 1
 #
 # WHY THIS EXISTS.  run-length-sweep.sh runs --optimal-only, which emits NO trees
 # (write_tree is only called from the single-opener and plain --sweep paths), so a
@@ -26,6 +27,17 @@
 # The printed total must equal the sweep row's `total` for that opener and depth;
 # the run prints the row to compare against.
 #
+# -k K RESTRICTS THE BRANCHING BELOW THE OPENER (optturns --topk K): at every
+# node only the K evenest splitters by sum of squared bins are searched (plus the
+# live candidates once n <= K), and the exact minimum is taken over those.  Not a
+# beam -- nothing is carried forward -- but no longer the optimum either: the
+# total is an UPPER BOUND on this opener's exact price, the best strategy found
+# within that restriction.  Each K is a different strategy, so it gets its own
+# directory, exactly as run-length-sweep.sh -k routes it:
+#     data/shared/optlen<L>/k<K>/trees_d<D>/<opener>.txt.gz
+# and the sweep rows printed for comparison are that K's.  K is in the TT salt,
+# so a table from another K (or the exact run) cannot be read by mistake.
+#
 # PREREQUISITES are run-length-sweep.sh's: the length's word lists, its pattern
 # matrix, and the optturns<L> binary.
 
@@ -36,6 +48,7 @@ MATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LENGTH=""
 DEPTH=""
 OPENER=""
+TOPK=0           # 0 = exact. K > 0 restricts branching to the K evenest splits
 THREADS=18
 TTBITS=28
 DRYRUN=0
@@ -45,6 +58,7 @@ while [ $# -gt 0 ]; do
         --length)  LENGTH="$2";  shift 2 ;;
         --depth)   DEPTH="$2";   shift 2 ;;
         --opener)  OPENER="$2";  shift 2 ;;
+        -k|--topk) TOPK="$2";    shift 2 ;;
         --threads) THREADS="$2"; shift 2 ;;
         --tt-bits) TTBITS="$2";  shift 2 ;;
         --dry-run) DRYRUN=1;     shift ;;
@@ -64,6 +78,9 @@ fi
 case "$DEPTH" in
     ''|*[!0-9]*) echo "--depth is required: a number, or max (the cap IS the objective)" >&2; exit 1 ;;
 esac
+case "$TOPK" in
+    ''|*[!0-9]*) echo "-k must be a non-negative integer (0 = exact)" >&2; exit 1 ;;
+esac
 [ -n "$OPENER" ] || { echo "--opener is required: this solves ONE named opener" >&2; exit 1; }
 [ "${#OPENER}" -eq "$LENGTH" ] || { echo "--opener '$OPENER' is not $LENGTH letters" >&2; exit 1; }
 
@@ -72,9 +89,16 @@ cd "$MATH" || exit 1
 BIN=./solver/optturns$LENGTH
 PATS=data/local/patterns/patterns_len$LENGTH.npy
 WORDS=data/shared/words/hello/len$LENGTH/guess.txt
-TREES=data/shared/optlen$LENGTH/trees_d$DEPTH
-TREE=$TREES/$OPENER.txt.gz
+OUTDIR=data/shared/optlen$LENGTH
 LOC=data/local/optlen$LENGTH
+KFLAG=""
+if [ "$TOPK" -gt 0 ]; then
+    OUTDIR=$OUTDIR/k$TOPK
+    LOC=$LOC/k$TOPK
+    KFLAG="--topk $TOPK"
+fi
+TREES=$OUTDIR/trees_d$DEPTH
+TREE=$TREES/$OPENER.txt.gz
 LOG=$LOC/tree.log
 
 [ -x "$BIN" ] || { echo "no $BIN -- run 'sh build.sh $LENGTH' in solver/" >&2; exit 1; }
@@ -93,11 +117,15 @@ fi
 WARM=""
 [ -f "$LOC/tt.bin" ] && WARM="--tt-load $LOC/tt.bin"
 
-echo "length $LENGTH, opener $OPENER, depth $DEPTH PINNED"
+echo "length $LENGTH, opener $OPENER, depth $DEPTH PINNED, topk $TOPK"
+if [ "$TOPK" -gt 0 ]; then
+    echo "*** -k $TOPK: branching below $OPENER is restricted, so the total is an UPPER" >&2
+    echo "*** BOUND on its exact price and the tree is the best found within that." >&2
+fi
 echo "tree  -> $TREE"
 echo "log   -> $LOG"
 echo "sweep rows for this opener and depth, to compare the total against:"
-grep -h "^$OPENER," data/shared/optlen$LENGTH/opener_totals_*.csv 2>/dev/null \
+grep -h "^$OPENER," $OUTDIR/opener_totals_*.csv 2>/dev/null \
     | awk -F, -v d="$DEPTH" '$4 == d' | sed 's/^/    /'
 if [ "$DRYRUN" -eq 1 ]; then
     echo "--dry-run: nothing run, nothing written"
@@ -105,10 +133,10 @@ if [ "$DRYRUN" -eq 1 ]; then
 fi
 
 mkdir -p "$TREES" "$LOC"
-echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] tree: length $LENGTH, opener $OPENER, depth $DEPTH $WARM" \
+echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] tree: length $LENGTH, opener $OPENER, depth $DEPTH, topk $TOPK $WARM" \
     | tee -a "$LOG"
 "$BIN" --length "$LENGTH" --opener "$OPENER" --depth "$DEPTH" --trees "$TREES" \
-    --tt-bits "$TTBITS" --threads "$THREADS" $WARM 2>&1 | tee -a "$LOG"
+    --tt-bits "$TTBITS" --threads "$THREADS" $KFLAG $WARM 2>&1 | tee -a "$LOG"
 echo
 if [ -f "$TREE" ]; then
     echo "tree: $TREE"
