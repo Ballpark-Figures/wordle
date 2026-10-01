@@ -1,9 +1,14 @@
 """Scene 15 — multi-word openers, and a strategy that always wins. Navy background.
 
 Scene 14 ends with everything faded out, so a starts on an empty frame. Talking head
-THJ follows, so the scene may end with LEDGE PAWNS ROCKY THUMB on screen.
+THJ follows, so the scene ends with LEDGE PAWNS ROCKY THUMB on screen.
 
-BEAT MAP — one subscene per Script.md beat, letters matching. BUILT SO FAR: a-d.
+GEOMETRY: the boards live in the frame at the origin; scene 14's number line sits ONE
+FRAME ABOVE them (StrategyLine `_build_line(..., dy=GAME_DY)`), so the script's "bring
+back the timeline" / "move up to reveal a board" / "go back down to the timeline" are
+camera pans (13's convention) and nothing fades.
+
+BEAT MAP — one subscene per Script.md beat, letters matching:
 
   a second_words — SALET in the top-left corner and its 148 groups as coloured rows
                    (scene 12's view, no dots: user's call) fade in; every optimal
@@ -14,7 +19,43 @@ BEAT MAP — one subscene per Script.md beat, letters matching. BUILT SO FAR: a-
                    middle as its other rows fade in around them; everything else
                    shrinks away                                    (15c, VO 3)
   d third        — THIRD typed into row 3                          (15d, VO 3)
-  e-za           — not built yet
+  e timeline     — the camera pans up to scene 14's number line as it ended: 3.42 to
+                   4.08, the Optimal, Random Compatible Answers and SLATE markers
+                                                                   (15e, VO 4)
+  f two_words    — the PARSE CLINT marker pops out at 3.69, below the line
+                                                                   (15f, VO 5)
+  g crane_spilt  — its words flip to CRANE SPILT as it slides to 3.70, the win rate
+                   counting                                        (15g, VO 5)
+  h three_words  — the line zooms out to fit 4.16, the DANCE HORST BLIMP marker
+                   popping out there, above the line               (15h, VO 6)
+  i bland_copse  — flips to BLAND COPSE RIGHT, sliding to 4.17     (15i, VO 6)
+  j four_words   — the line zooms out to fit 5.02, the CHAMP FLINT RUGBY SOWED
+                   marker popping out there, below the line        (15j, VO 7)
+  k bugle_champ  — flips to BUGLE CHAMP DOWNY FIRST (same 5.02)    (15k, VO 7)
+  l reveal_board — the camera pans down to an empty board          (15l, VO 8)
+  m five_words   — BLUNK CIMEX GRYPT VOZHD WAQFS typed             (15m, VO 9)
+  n puree        — the five rows flip to the colouring PUREE, PURER, RUPEE and UPPER
+                   all give                                        (15n, VO 9)
+  o board_left   — the board moves to the left half                (15o, VO 9)
+  p puree_words  — PUREE PURER RUPEE UPPER fade in on the right half (15p, VO 9)
+  q chott        — the rows flip to CHOTT DUMBO FAWNY VERGE SPILL; the four words
+                   fade out                                        (15q, VO 10)
+  r unsolved     — its 16 unsolved answers fade in on the right, grouped by the
+                   feedback they share                             (15r, VO 10)
+  s board_back   — the words slide off to the right; the board back to centre
+                                                                   (15s, VO 11)
+  t six_words    — the rows flip to CATTY FROND RUMBA SPILL VERGE WHACK (15t, VO 11)
+    (VO 12 has no subscene)
+  u back_to_line — the camera pans up to the number line           (15u, VO 13)
+  v two_up       — every marker but the 2-word one dims            (15v, VO 13)
+  w four_up      — the 2-word marker dims, the 4-word one returns  (15w, VO 13)
+  x empty_board  — the camera pans down to an empty board          (15x, VO 14)
+  y climb_start  — trial 68's starting words typed: QUERY NINNY BALER MASSE
+                                                                   (15y, VO 14)
+  z climb        — each of its nine accepted moves flips the rows it changes, ending
+                   on LEDGE PAWNS ROCKY THUMB                      (15z, VO 14)
+  za finale      — the two empty rows drop off the bottom; the four words grow,
+                   centred                                         (15za, VO 15)
 
 REUSE MAP — every element, the one source it comes from, and how it enters:
   SALET (a)             assets/pigpen.py `PigpenWord(revealed=True)` at GUESS_SCALE in
@@ -27,21 +68,61 @@ REUSE MAP — every element, the one source it comes from, and how it enters:
   second words (a)      12d's typing: `WordleBoard.type_anim` under each row, all in
                         ONE play, key sound on the first only (12efficient_strats.py
                         second_words); words from strategy_data (the optimal trees)
-  CLONE (b)             assets/flip.py `Flip` by `row_parts`, every word at once (12e's
-                        word flips); typed rows by second_view `typed_under`
-  board (c)             assets/board.py `get_board()` at the origin, unscaled — 02's and
-                        04's board; rows 3-6 fade in as SALET and CLONE travel
+  every word flip       assets/flip.py `Flip` by `row_parts` (12e's word flips)
+  boards (c, l-za)      assets/board.py at the origin, unscaled — 02's and 04's board;
+                        from l on, six one-row boards stacked at the board's spacing,
+                        so each row can be typed, flipped and moved on its own
   rows leaving (c)      06b's shrink-out (strategy_line `shrink_out`)
-  THIRD (d)             `WordleBoard.type_word` + assets/keys.py `key_cues` (02's typing)
-  colours               BOARD_NAVY via WordleBoardScene
+  typing                `WordleBoard.type_word` + assets/keys.py `key_cues` (02's);
+                        y types four rows in one play, key sound on the first (12d's)
+  number line (e-k,u-w) assets/strategy_line.py `StrategyLine` — scene 14's line,
+                        title, subtitle and markers, built one frame up
+  pans                  StrategyLine `_pan_up` / `_pan_down` (13's pan + whoosh)
+  new markers (f,h,j)   StrategyLine `_marker` (13's cards) popping out with the pop
+                        sound (`_pop_in`; with a zoom, `_zoom_pop` as 13c/e)
+  zooms (h, j)          13e's rule: the leftmost marker at the left end, the new one at
+                        the right end — only when a new marker would not fit (user's
+                        call)
+  marker swaps (g,i,k)  StrategyLine `replace_marker` — 14c's flip-while-sliding with
+                        the win rate counting (moved there from scene 14 for this)
+  emphasis (v, w)       dim the rest to 0.2 (house rule: save_state / Restore)
+  answer words (p, r)   PigpenWord(revealed=True) — 04's answer words; p's four by
+                        assets/groups.py `grid_cells` (2x2); r's sixteen by
+                        `ranked_word_layout` (07's groups, filling the region)
+  words in / out        plain FadeIn / FadeOut; s slides them off to the right
+  finale (za)           the rows move and scale as one (no source: the script's own)
+  colours               BOARD_NAVY via WordleBoardScene; win rates by `win_color`
 
-EVERY NUMBER is sourced (assets/always_win_data.py -> its cache; provenance there).
-The words of a-d are the script's (SALET, CLONE, THIRD) and the optimal trees'.
+EVERY NUMBER is sourced (assets/always_win_data.py -> its cache; provenance there):
+  SLATE                     3.82, 98.87% (scene 14's exact rate: user's call, not
+                            the VO's 98.86%)
+  PARSE CLINT / CRANE SPILT 3.69, 99.48% / 3.70, 99.51%     openexact, exact
+  DANCE HORST BLIMP / BLAND COPSE RIGHT   4.16, 99.84% / 4.17, 99.91%
+  CHAMP FLINT RUGBY SOWED / BUGLE CHAMP DOWNY FIRST   5.02, 99.92% / 5.02, 99.88%
+  BLUNK CIMEX GRYPT VOZHD WAQFS 72 unsolved; PUREE PURER RUPEE UPPER share codes
+  CHOTT DUMBO FAWNY VERGE SPILL 16 unsolved, in 8 groups
+  CATTY FROND RUMBA SPILL VERGE WHACK separates all 2315
+  trial 68: QUERY NINNY BALER MASSE, nine moves, LEDGE PAWNS ROCKY THUMB
+The markers' averages are shown only by where they sit (13's convention). The VO's
+72/16 are spoken, not shown.
+
+NB LEDGE PAWNS ROCKY THUMB has ONE unsolved answer under the custom.txt follow-up:
+SALLE, beside FALSE and SALVE. The user accepts that (2026-10-01): nobody guesses
+SALLE over SALVE. Do not re-flag it.
 
 LAYOUT CHOICES, flagged:
-  - c: CLONE comes from the largest group's slot (the first row), the one nearest
-    the corner; every CLONE is the same word.
-  - c: the travelling rows' tile borders thicken to the board's STROKE as they grow.
+  - c: CLONE comes from the largest group's slot (the first row); every CLONE is the
+    same word. The travelling rows' borders thicken to the board's STROKE.
+  - Multi-word markers show their word rows and the win rate only — no "then Random
+    Compatible" lines (SLATE's card has them): a 4-word card with them does not fit
+    above or below the line.
+  - Marker sides: 2-word and 4-word below, 3-word above, so no two cards overlap.
+  - p: the four words at 1.2x list size, 2x2, centred on the right half.
+  - r: the sixteen words grouped (their shared feedback is not drawn), largest group
+    first, filling the region right of the board.
+  - y: the board's slot order is the climb's slots 2, 0, 1, 3 (user's call: an order
+    that ends on LEDGE PAWNS ROCKY THUMB; a blind opening's score ignores order).
+  - za: the four rows grow to FINAL_SCALE, centred on the frame.
 """
 from pathlib import Path
 import sys
@@ -51,19 +132,37 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 
 from config import *
 from manim import MovingCameraScene
-from assets import lists_data, strategy_data, always_win_data
-from assets.board import STROKE, WordleBoard, get_board
+from assets import lists_data, strategy_data, always_win_data, random_compatible_data
+from assets.board import (STROKE, GAP, WordleBoard, get_board, get_typed_row,
+                          get_scored_row)
 from assets.pigpen import PigpenWord
 from assets.flip import Flip, flip, row_parts
-from assets.groups import GUESS_SCALE
+from assets.groups import (GUESS_SCALE, grid_cells, ranked_word_layout, REGION_HALF_W,
+                           DOT_REGION_TOP, REGION_BOT)
 from assets.keys import key_cues
 from assets.second_view import corner_spot, row_stroke, under, typed_under, group_rows
-from assets.strategy_line import StrategyLine, shrink_out
+from assets.strategy_line import (StrategyLine, GAME_DY, shrink_out, word_line,
+                                  rate_text, word_stroke, OPTIMAL, COMPATIBLE)
 
 DATA = lists_data.load()
 SD = strategy_data.load()
 AW = always_win_data.load()
+SLATE = random_compatible_data.load()["openers"]["slate"]   # scene 14's marker
 SALET, CLONE, THIRD = "salet", "clone", "third"      # the script's words
+TWO, TWO_B = "parse clint", "crane spilt"            # the script's openers
+THREE, THREE_B = "dance horst blimp", "bland copse right"
+FOUR, FOUR_B = "champ flint rugby sowed", "bugle champ downy first"
+BLUNK = "blunk cimex grypt vozhd waqfs"
+CHOTT = "chott dumbo fawny verge spill"
+SIX = "catty frond rumba spill verge whack"
+
+BOARD_SIDE_X = 4.0         # o: how far left the board moves
+SAME_SCALE = 1.2           # p: the four words' size (x list size)
+SAME_PITCH = (3.2, 0.95)   # p: their grid pitches (x, y)
+UNSOLVED_LEFT = -1.1       # r: the grouped words' region starts here
+FINAL_SCALE = 1.5          # za: the four rows' growth
+MULTI_W = 1.7              # a multi-word card's word rows (narrower than SLATE's 2.2, so
+                           #   cards above the line clear each other)
 
 
 def _tiles(row):
@@ -71,11 +170,47 @@ def _tiles(row):
     return row.tiles if isinstance(row, PigpenWord) else row.tiles[0]
 
 
+def _stack():
+    """An empty board as six one-row boards at the board's spacing, at the origin
+    (the same geometry as get_board), so each row is its own mobject."""
+    rows = [WordleBoard(rows=1, cols=5) for _ in range(6)]
+    VGroup(*rows).arrange(DOWN, buff=GAP).move_to(ORIGIN)
+    return rows
+
+
+def _at(new, old):
+    """`new` (a one-row word) sized and placed over `old`."""
+    return new.scale(old.width / new.width).move_to(old)
+
+
 class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
     """second_words — SALET and its coloured rows; every optimal second word typed
     clone — every second word flips to CLONE
     to_board — SALET and a CLONE into a board's first two rows; the rest goes
     third — THIRD typed into row 3
+    timeline — pan up to scene 14's line
+    two_words — PARSE CLINT at 3.69
+    crane_spilt — flips to CRANE SPILT at 3.70
+    three_words — zoom; DANCE HORST BLIMP at 4.16
+    bland_copse — flips to BLAND COPSE RIGHT at 4.17
+    four_words — zoom; CHAMP FLINT RUGBY SOWED at 5.02
+    bugle_champ — flips to BUGLE CHAMP DOWNY FIRST
+    reveal_board — pan down to an empty board
+    five_words — BLUNK CIMEX GRYPT VOZHD WAQFS typed
+    puree — the rows flip to PUREE's colouring
+    board_left — the board to the left half
+    puree_words — PUREE PURER RUPEE UPPER on the right
+    chott — the rows flip to CHOTT DUMBO FAWNY VERGE SPILL; the words go
+    unsolved — its 16 unsolved answers, grouped, on the right
+    board_back — the words off right; the board back to centre
+    six_words — the rows flip to CATTY FROND RUMBA SPILL VERGE WHACK
+    back_to_line — pan up to the line
+    two_up — dim all but the 2-word marker
+    four_up — the 4-word marker instead
+    empty_board — pan down to an empty board
+    climb_start — QUERY NINNY BALER MASSE typed
+    climb — the nine moves, to LEDGE PAWNS ROCKY THUMB
+    finale — the empty rows drop away; the four grow, centred
     """
 
     def setup_scene(self):
@@ -148,3 +283,221 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
     @subscene
     def third(self):
         self.board.type_word(self, 2, THIRD, 0.65, per_letter=key_cues(self))
+
+    # e : the camera pans up to scene 14's number line as it ended
+    def _setup_timeline(self):
+        self._build_line(OPTIMAL[0], COMPATIBLE[0], dy=GAME_DY)
+        self.optimal_marker(grow=1.0)
+        self.compatible_marker(grow=1.0)
+        self._marker(round(SLATE["mean"], 2),
+                     [word_line("slate"), "then Random", "Compatible",
+                      rate_text(SLATE["win_rate"])], grow=1.0)
+        self.add(self.line, self.title, self.subtitle)
+
+    @subscene
+    def timeline(self):
+        self._setup_timeline()
+        self._pan_up(1.5)
+        self._clear_below()
+        self.board = self.salet_row = self.clone_row = None   # off-frame now
+
+    def _clear_below(self):
+        """Everything but the number line off the scene — including the typing's
+        wrapper groups, which keep a removed board's tiles on screen (flip.py's
+        ghost note). Only while the board's frame is out of view."""
+        keep = {self.line, self.title, self.subtitle, self.camera.frame}
+        self.remove(*[m for m in self.mobjects if m not in keep])
+
+    def _opener(self, key, side):
+        """A k-word opener's marker: its word rows and its win rate."""
+        o = AW["openers"][key]
+        return self._marker(round(o["mean"], 2),
+                            [word_line(w, MULTI_W) for w in key.split()] + [rate_text(o["win_rate"])],
+                            side=side)
+
+    def _swap(self, mk, key, run_time):
+        o = AW["openers"][key]
+        self.replace_marker(mk, key.split(), round(o["mean"], 2), o["win_rate"], run_time)
+
+    def _zoom_to(self, mk):
+        """13e's zoom: the leftmost marker at the left end, `mk` at the right."""
+        left = min(m.value for m in self.line.markers)
+        self._zoom_pop(left, mk.value, mk, 2.0, 0.4, 0.5)
+
+    # f : PARSE CLINT at 3.69, below the line
+    @subscene
+    def two_words(self):
+        self.two = self._opener(TWO, DOWN)
+        self._pop_in(self.two, 0.4)
+
+    # g : PARSE CLINT flips to CRANE SPILT, sliding to 3.70
+    @subscene
+    def crane_spilt(self):
+        self._swap(self.two, TWO_B, 1.2)
+
+    # h : zoom out to fit DANCE HORST BLIMP at 4.16, above the line
+    @subscene
+    def three_words(self):
+        self.three = self._opener(THREE, UP)
+        self._zoom_to(self.three)
+
+    # i : flips to BLAND COPSE RIGHT, sliding to 4.17
+    @subscene
+    def bland_copse(self):
+        self._swap(self.three, THREE_B, 1.2)
+
+    # j : zoom out to fit CHAMP FLINT RUGBY SOWED at 5.02, below the line
+    @subscene
+    def four_words(self):
+        self.four = self._opener(FOUR, DOWN)
+        self._zoom_to(self.four)
+
+    # k : flips to BUGLE CHAMP DOWNY FIRST (still 5.02)
+    @subscene
+    def bugle_champ(self):
+        self._swap(self.four, FOUR_B, 1.2)
+
+    # l : the camera pans down to an empty board
+    def _setup_reveal_board(self):
+        self.rows = _stack()
+        self.add(*self.rows)
+
+    @subscene
+    def reveal_board(self):
+        self._setup_reveal_board()
+        self._pan_down(1.5)
+
+    # m : BLUNK CIMEX GRYPT VOZHD WAQFS typed
+    @subscene
+    def five_words(self):
+        for r, w in enumerate(BLUNK.split()):
+            self.rows[r].type_word(self, 0, w, 0.5, per_letter=key_cues(self))
+
+    def _flip_rows(self, news, run_time, extra=()):
+        """Rows r flip to news[r] (a dict), each in place; the new rows replace them."""
+        fl = []
+        for r, new in news.items():
+            old = self.rows[r]
+            _at(new, old)
+            olds = row_parts(old) if old.letters[0][0] is not None else list(old.tiles[0])
+            fl.append(Flip(old, new, parts=(olds, row_parts(new))))
+        flip(self, fl, run_time, extra=extra)
+        for r, new in news.items():
+            self.rows[r] = new
+
+    # n : the five rows flip to the colouring PUREE, PURER, RUPEE and UPPER share
+    @subscene
+    def puree(self):
+        codes = AW["same"]["codes"]
+        self._flip_rows({r: get_scored_row(w, c)
+                         for r, (w, c) in enumerate(zip(BLUNK.split(), codes))}, 1.6)
+
+    # o : the board moves to the left half
+    @subscene
+    def board_left(self):
+        self.play(VGroup(*self.rows).animate.shift(LEFT * BOARD_SIDE_X), run_time=1.0)
+
+    # p : PUREE PURER RUPEE UPPER on the right half
+    def _setup_puree_words(self):
+        ws = AW["same"]["members"]
+        cx = BOARD_SIDE_X
+        self.same = [PigpenWord(w, revealed=True).scale(SAME_SCALE)
+                     .move_to([cx + i * SAME_PITCH[0], j * SAME_PITCH[1], 0])
+                     for w, (i, j) in zip(ws, grid_cells(len(ws)))]
+
+    @subscene
+    def puree_words(self):
+        self._setup_puree_words()
+        self.play(*[FadeIn(m) for m in self.same], run_time=0.8)
+
+    # q : the rows flip to CHOTT DUMBO FAWNY VERGE SPILL; the four words fade out
+    @subscene
+    def chott(self):
+        self._flip_rows({r: get_typed_row(w) for r, w in enumerate(CHOTT.split())}, 1.6,
+                        extra=[FadeOut(m) for m in self.same])
+        self.remove(*self.same)
+        self.same = None
+
+    # r : CHOTT...'s 16 unsolved answers on the right, grouped by shared feedback
+    def _setup_unsolved(self):
+        groups = [{"size": len(g["members"]), "members": g["members"]}
+                  for g in AW["fixed"][CHOTT]["groups"]]
+        slots, sc, _, _ = ranked_word_layout(groups, UNSOLVED_LEFT, REGION_HALF_W,
+                                             DOT_REGION_TOP, REGION_BOT, heads=0)
+        self.unsolved_words = []
+        for w, c in slots.items():
+            m = PigpenWord(w, revealed=True).scale(sc).move_to(c)
+            for t in m.tiles:
+                t.set_stroke(width=word_stroke(m.width))
+            self.unsolved_words.append(m)
+
+    @subscene
+    def unsolved(self):
+        self._setup_unsolved()
+        self.play(*[FadeIn(m) for m in self.unsolved_words], run_time=0.8)
+
+    # s : the words slide off to the right; the board back to centre
+    @subscene
+    def board_back(self):
+        self.play(VGroup(*self.unsolved_words).animate.shift(RIGHT * config.frame_width),
+                  VGroup(*self.rows).animate.shift(RIGHT * BOARD_SIDE_X),
+                  run_time=1.2)
+        self.remove(*self.unsolved_words)
+        self.unsolved_words = None
+
+    # t : the rows flip to CATTY FROND RUMBA SPILL VERGE WHACK (the sixth row too)
+    @subscene
+    def six_words(self):
+        self._flip_rows({r: get_typed_row(w) for r, w in enumerate(SIX.split())}, 1.6)
+
+    # u : the camera pans up to the number line; the board is swapped for an
+    #     empty one while it is off-frame (for x)
+    @subscene
+    def back_to_line(self):
+        self._pan_up(1.5)
+        self._clear_below()
+        self.rows = _stack()
+        self.add(*self.rows)
+
+    # v : every marker but the 2-word one dims
+    @subscene
+    def two_up(self):
+        for m in self.line.markers:
+            m.save_state()
+        self.play(*[m.animate.set_opacity(0.2) for m in self.line.markers
+                    if m is not self.two], run_time=0.6)
+
+    # w : the 2-word marker dims and the 4-word one comes back
+    @subscene
+    def four_up(self):
+        self.play(self.two.animate.set_opacity(0.2), Restore(self.four), run_time=0.6)
+
+    # x : the camera pans down to the empty board
+    @subscene
+    def empty_board(self):
+        self._pan_down(1.5)
+
+    # y : trial 68's starting words, typed at once
+    @subscene
+    def climb_start(self):
+        anims, total = [], 0.0
+        for r, w in enumerate(AW["climb"]["start"]):
+            a, total = self.rows[r].type_anim(self, 0, w, 0.65,
+                                              per_letter=key_cues(self) if r == 0 else None)
+            anims.append(a)
+        self.play(*anims, run_time=total)
+
+    # z : each accepted move flips the rows it changes, ending on LEDGE PAWNS ROCKY THUMB
+    @subscene
+    def climb(self):
+        for mv in AW["climb"]["moves"]:
+            self._flip_rows({r: get_typed_row(w) for r, w in mv["rows"]}, 0.6)
+
+    # za : the two empty rows drop off the bottom; the four words grow, centred
+    @subscene
+    def finale(self):
+        self.play(VGroup(*self.rows[4:]).animate.shift(DOWN * config.frame_height),
+                  VGroup(*self.rows[:4]).animate.scale(FINAL_SCALE).move_to(ORIGIN),
+                  run_time=1.5)
+        self.remove(*self.rows[4:])
+        self.rows = self.rows[:4]

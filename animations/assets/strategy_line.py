@@ -27,6 +27,8 @@ import math
 from config import *
 from bpkfigures.number_line import ZoomLine
 from bpkfigures.highlight import highlight
+from bpkfigures.style import CrispCounter
+from assets.flip import Flip, flip, row_parts
 from assets.board import STROKE, GAP, TILE, WordleBoard, get_typed_row
 from assets.groups import HEADER_W, GUESS_Y, ranked_word_layout
 from assets.pigpen import PigpenWord, WORD_W     # the list-size word ranked_word_layout sizes by
@@ -79,13 +81,13 @@ def win_color(rate):
     return ManimColor.from_rgb(colorsys.hsv_to_rgb(*hsv))
 
 
-def word_line(word):
+def word_line(word, width=WORD_LINE_W):
     """A word as a black typed tile row for a marker label (13b's SALET), its
-    border thinned by 12's rule for a small row."""
+    border thinned by 12's rule for a small row. `width` for a narrower card."""
     row = get_typed_row(word)
-    row.scale(WORD_LINE_W / row.width)
+    row.scale(width / row.width)
     for t in row.tiles[0]:
-        t.set_stroke(width=STROKE * min(1.0, WORD_LINE_W / HEADER_W))
+        t.set_stroke(width=STROKE * min(1.0, width / HEADER_W))
     return row
 
 
@@ -94,16 +96,22 @@ def rate_text(rate):
     return f"{rate * 100:.2f}%"
 
 
+def pct(v):
+    """A counting win rate (in percent) as a marker shows it."""
+    return f"{v:.2f}%"
+
+
 class StrategyLine:
     """The number line and the game, as methods of the scene they are mixed into."""
 
     # ── the number line ──────────────────────────────────────────────────────
-    def _build_line(self, lo, hi):
-        """The line over lo..hi, its title and subtitle above it (not added)."""
-        self.line = ZoomLine(lo, hi, y=LINE_Y, min_label_step=1, tips=False,
+    def _build_line(self, lo, hi, dy=0.0):
+        """The line over lo..hi, its title and subtitle above it (not added), all
+        `dy` above the frame at the origin (scene 15 sets it one frame up)."""
+        self.line = ZoomLine(lo, hi, y=LINE_Y + dy, min_label_step=1, tips=False,
                              ends_buff=-0.1)
         self.title = crisp_text(TITLE, color=WHITE, font_size=FONT_SIZE_LG)
-        self.title.to_edge(UP, buff=TITLE_BUFF)
+        self.title.to_edge(UP, buff=TITLE_BUFF).shift(UP * dy)
         self.subtitle = crisp_text(SUBTITLE, color=WHITE, font_size=FONT_SIZE_MD)
         self.subtitle.next_to(self.title, DOWN, buff=SUBTITLE_BUFF)
 
@@ -111,13 +119,15 @@ class StrategyLine:
         """The last line is the win rate, "NN.NN%"; it takes its colour."""
         rate = lines[-1]
         lines = lines[:-1] + [(rate, win_color(float(rate.rstrip("%")) / 100))]
-        return self.line.add_marker(value, lines, side=side, font_size=MARKER_FS,
-                                    grow=grow,
-                                    text_color=WHITE,
-                                    box={"pad": CARD_PAD, "fill": TILE_EMPTY_FILL,
-                                         "stroke_color": TILE_FILLED_BORDER,
-                                         "stroke_width": STROKE,
-                                         "corner_radius": CARD_RADIUS})
+        mk = self.line.add_marker(value, lines, side=side, font_size=MARKER_FS,
+                                  grow=grow,
+                                  text_color=WHITE,
+                                  box={"pad": CARD_PAD, "fill": TILE_EMPTY_FILL,
+                                       "stroke_color": TILE_FILLED_BORDER,
+                                       "stroke_width": STROKE,
+                                       "corner_radius": CARD_RADIUS})
+        mk.rate = float(rate.rstrip("%")) / 100        # what replace_marker counts from
+        return mk
 
     def optimal_marker(self, grow=0.0):
         return self._marker(OPTIMAL[0], ["Optimal", word_line("salet"), OPTIMAL[1]],
@@ -150,6 +160,46 @@ class StrategyLine:
         """The camera pans down one frame (the content leaves upward), whooshing."""
         self._whoosh(run_time)
         self.play(self.camera.frame.animate.shift(DOWN * GAME_DY), run_time=run_time)
+
+    def _pan_up(self, run_time):
+        """The camera pans up one frame (the content leaves downward), whooshing."""
+        self._whoosh(run_time)
+        self.play(self.camera.frame.animate.shift(UP * GAME_DY), run_time=run_time)
+
+    # ── a marker's words change as it slides (14c's, then 15's) ──────────────
+    def replace_marker(self, mk, words, value, rate, run_time):
+        """The marker's first len(words) lines (word rows) flip to `words` while it
+        slides to `value` and its win rate (the last line) counts to `rate`."""
+        content = mk.label[1]
+        k = len(words)
+        olds, rate_mob = list(content[:k]), content[-1]
+        old_rate = mk.rate
+        line = self.line
+        dx = line.x_of(value) - line.x_of(mk.value)
+        news = [word_line(w, o.width).move_to(o.get_center() + RIGHT * dx)
+                for w, o in zip(words, olds)]
+        # the readout takes the rate's place in the card, at its left edge
+        counter = CrispCounter("", ValueTracker(old_rate * 100),
+                               left=rate_mob.get_left()[0], y=rate_mob.get_center()[1],
+                               font_size=MARKER_FS, color=win_color(rate), fmt=pct)
+        counter.mob.set_color(win_color(old_rate))      # the rate's own colour
+        content.remove(rate_mob)
+        content.add(counter.mob)
+        for o in olds:                                  # the flips carry the rows
+            content.remove(o)
+        v0, left0 = mk.value, counter.left
+        counter.mob.add_updater(                        # ride the card (before the count's)
+            lambda m: setattr(counter, "left",
+                              left0 + line.x_of(mk.value) - line.x_of(v0)))
+        count = counter.count_anim(rate * 100)
+        flip(self, [Flip(o, n, parts=(row_parts(o), row_parts(n)), travel=True)
+                    for o, n in zip(olds, news)],
+             run_time, extra=[line.move_marker(mk, value), count])
+        counter.end_count()
+        self.remove(*news)
+        for i, n in enumerate(news):
+            content.submobjects.insert(i, n)
+        mk.rate = rate
 
     # ── the game ─────────────────────────────────────────────────────────────
     def _grid(self, words, k):

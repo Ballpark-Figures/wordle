@@ -42,12 +42,13 @@ REUSE MAP — every element, the one source it comes from, and how it enters:
   CHOSE marker (b)      13's marker card (`_marker`), CHOSE as a tile row like 13b's
                         SALET (`word_line`); pops out of its dot with the pop sound
                         (`_pop_in`, 13's)
-  CHOSE -> SLATE (c)    assets/flip.py `Flip(..., travel=True)` by `row_parts`, the
-                        row sliding with its marker (bpkfigures ZoomLine
-                        `move_marker`, added for this beat)
-  win-rate count (c)    bpkfigures style.py `CrispCounter` (`count_anim`, added for
-                        this beat so the count can ride the moving card), coloured
-                        by StrategyLine `win_color`
+  CHOSE -> SLATE (c)    StrategyLine `replace_marker` (moved there from this beat for
+                        scene 15): assets/flip.py `Flip(..., travel=True)` by
+                        `row_parts`, the row sliding with its marker (bpkfigures
+                        ZoomLine `move_marker`, added for this beat); the win rate
+                        counting by bpkfigures style.py `CrispCounter` (`count_anim`,
+                        so the count can ride the moving card), coloured by
+                        StrategyLine `win_color`
   title (d)             crisp_text, WHITE, FONT_SIZE_LG — 13's title
   table (d)             scene 10's table: bold header at 28, cells at 30, rows 0.72
                         apart (10word_lengths.py:178-186, 409-416)
@@ -86,12 +87,9 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 
 from config import *
 from manim import MovingCameraScene
-from bpkfigures.style import CrispCounter
 from assets import random_game_data, random_compatible_data
-from assets.flip import Flip, flip, row_parts
-from assets.strategy_line import (StrategyLine, GAME_DY, MARKER_FS, TITLE_BUFF,
-                                  OPTIMAL, COMPATIBLE, win_color, word_line,
-                                  rate_text)
+from assets.strategy_line import (StrategyLine, GAME_DY, TITLE_BUFF,
+                                  OPTIMAL, COMPATIBLE, word_line, rate_text)
 
 DATA = random_compatible_data.load()
 CHOSE, SLATE = DATA["openers"]["chose"], DATA["openers"]["slate"]
@@ -112,11 +110,6 @@ DP = {1: 2, 2: 2, 3: 2, 4: 4, 5: 4}   # the script's decimal places per row
 def _fmt(k):
     """Turn k's average as the table shows it."""
     return f"{TURNS[k]:.{DP[k]}f}"
-
-
-def _pct(v):
-    """The counting win rate (in percent) as a marker shows it."""
-    return f"{v:.2f}%"
 
 
 def _row_y(k):
@@ -170,39 +163,10 @@ class Scene14(StrategyLine, MovingCameraScene, WordleBoardScene):
         self._pop_in(self.chose_mk, 0.4)
 
     # c : CHOSE flips to SLATE as the marker slides to 3.82; the rate counts up
-    def _setup_slate(self):
-        mk = self.chose_mk
-        content = mk.label[1]
-        self.old_row, rate = content[0], content[-1]
-        dx = self.line.x_of(round(SLATE["mean"], 2)) - self.line.x_of(mk.value)
-        self.new_row = word_line("slate").move_to(self.old_row.get_center() + RIGHT * dx)
-        # the readout takes the rate's place in the card, at its left edge
-        self.counter = CrispCounter("", ValueTracker(CHOSE["win_rate"] * 100),
-                                    left=rate.get_left()[0], y=rate.get_center()[1],
-                                    font_size=MARKER_FS,
-                                    color=win_color(SLATE["win_rate"]), fmt=_pct)
-        self.counter.mob.set_color(win_color(CHOSE["win_rate"]))   # the rate's own colour
-        content.remove(rate)
-        content.add(self.counter.mob)
-        content.remove(self.old_row)        # the flip carries the row; the card moves alone
-
     @subscene
     def slate(self):
-        self._setup_slate()
-        mk, line, counter = self.chose_mk, self.line, self.counter
-        v0, left0 = mk.value, counter.left
-        counter.mob.add_updater(            # ride the card (before the count's updater)
-            lambda m: setattr(counter, "left",
-                              left0 + line.x_of(mk.value) - line.x_of(v0)))
-        count = counter.count_anim(SLATE["win_rate"] * 100)
-        flip(self, [Flip(self.old_row, self.new_row,
-                         parts=(row_parts(self.old_row), row_parts(self.new_row)),
-                         travel=True)],
-             1.2, extra=[line.move_marker(mk, round(SLATE["mean"], 2)), count])
-        counter.end_count()
-        self.remove(self.new_row)
-        mk.label[1].submobjects.insert(0, self.new_row)
-        self.old_row = self.new_row = self.counter = None
+        self.replace_marker(self.chose_mk, ["slate"], round(SLATE["mean"], 2),
+                            SLATE["win_rate"], 1.2)
 
     # d : pan down to the title and the table
     def _setup_table(self):
