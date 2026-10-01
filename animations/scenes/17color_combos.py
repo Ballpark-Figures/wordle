@@ -7,9 +7,11 @@ BEAT MAP:
   a show_243   — the 243 colorings from scene 05, colours only, fade in      (17a, VO 1)
   b two_kinds  — the 5 rows of 4 greens + a gray go left, the 30 of 2G 2Y 1 gray
                  go right (above the rest), everything else fades out        (17b, VO 2)
-  c combos     — GGGG- and GGYY- move into their places in the triangle of 21
+  c combos     — GGGG- and GGYY- move into their places in the grid of 21
                  combinations while the other 33 fade; then the other 19 fade in (17c, VO 2)
-  (17d is NOT BUILT — its direction is not final, the user's call 2026-10-01.)
+  d drop_impossible — GGGGY fades out                                     (17d, VO 2)
+  e drop_win   — GGGGG, all greens, fades out                             (17e, VO 2)
+  (17f is NOT BUILT — its direction is not final, the user's call 2026-10-01.)
 
 REUSE MAP — every element and the one source it comes from:
   the 243 grid        assets/colorings.py `level` — scene 05's 9 x 27 build, moved out
@@ -25,9 +27,11 @@ REUSE MAP — every element and the one source it comes from:
 
 LAYOUT CHOICES, flagged:
   - 17b: the 5 in one column on the left, the 30 in three columns of ten on the right,
-    in their 243-grid order, all at COMBO_TILE.
-  - 17c: a triangle (the user's call): one line per green count, 5 at the top, most
-    yellows on the left; combinations centred in fixed-pitch cells.
+    in their 243-grid order, all at PART_TILE; equal gaps edge -> 5 -> 30 -> edge
+    (the user's call).
+  - 17c: a rectangular grid (the user's call): one column per green count, all greens
+    in the last column, each column from the top, most yellows first; combinations
+    centred in fixed-pitch cells.
 No on-screen text: 243 / 5 / 30 / 21 / 19 are spoken, not shown.
 """
 from pathlib import Path
@@ -45,19 +49,35 @@ KIND_B = (2, 2, 1)         # 2 greens, 2 yellows, a gray — 30 rows
 PART_TILE = 0.34           # tile side for the 35 kept rows
 PART_ROW_GAP = 0.5         # gap between rows, in tiles
 PART_COL_GAP = 1.5         # gap between columns, in tiles
-LEFT_X, RIGHT_X = -4.0, 4.0
-RIGHT_COLS = 3
+RIGHT_COLS = 3             # the 30 in three columns of ten; the 5 in one column
 
-# ── 17c: the triangle of 21 ────────────────────────────────────────────────────
+# ── 17c: the grid of 21 ────────────────────────────────────────────────────────
 COMBO_TILE = 0.32
 BLOCK_GAP = 0.45           # gap between colour blocks, in tiles (tile gap is TILE_BUFF)
-COMBO_PITCH = 8.0          # cell width, in tiles (the widest combination is 6.8)
-LINE_PITCH = 1.1           # vertical distance between green-count lines
+COMBO_PITCH = 8.0          # column pitch, in tiles (the widest combination is 6.8)
+LINE_PITCH = 1.1           # row pitch
+IMPOSSIBLE = (4, 1, 0)     # 17d: 4 greens and a yellow can never happen
+WIN = (5, 0, 0)            # 17e: all greens — the game is over
 
 
 def _counts(c):
     t = trits(c)
     return (t.count(2), t.count(1), t.count(0))
+
+
+def _block_w(cols, size):
+    """Width of `cols` columns of five-tile rows at tile side `size`."""
+    w = size * (5 + 4 * TILE_BUFF)
+    return cols * w + (cols - 1) * PART_COL_GAP * size
+
+
+def _part_xs(size):
+    """Centres of the 5's column and the 30's block: frame edge -> 5 -> 30 -> frame
+    edge, three equal gaps (the user's call)."""
+    wa, wb = _block_w(1, size), _block_w(RIGHT_COLS, size)
+    gap = (2 * config.frame_x_radius - wa - wb) / 3
+    xa = -config.frame_x_radius + gap + wa / 2
+    return xa, xa + wa / 2 + gap + wb / 2
 
 
 def _part_cells(n, cols, cx, size):
@@ -84,15 +104,15 @@ def _combo(g, y, b, size):
     return row
 
 
-def _triangle():
-    """{(g, y, b): combination} — one line per green count, 5 greens on top, most
-    yellows on the left; each line centred."""
+def _grid21():
+    """{(g, y, b): combination} — a rectangular grid, one COLUMN per green count, 0
+    greens on the left to 5 on the right; each column from the top, most yellows
+    first (the user's call). Cells on fixed pitches, combinations centred in them."""
     out = {}
-    for g in range(5, -1, -1):
-        ys = range(5 - g, -1, -1)
-        for i, y in enumerate(ys):
-            x = (i - (len(ys) - 1) / 2) * COMBO_PITCH * COMBO_TILE
-            yy = (g - 2.5) * LINE_PITCH
+    for g in range(6):
+        for row, y in enumerate(range(5 - g, -1, -1)):
+            x = (g - 2.5) * COMBO_PITCH * COMBO_TILE
+            yy = (2.5 - row) * LINE_PITCH
             out[(g, y, 5 - g - y)] = _combo(g, y, 5 - g - y, COMBO_TILE).move_to([x, yy, 0])
     return out
 
@@ -101,7 +121,9 @@ class Scene17(WordleBoardScene):
     """BEAT MAP
     show_243 — the 243 colorings fade in, colours only
     two_kinds — 4G+gray to the left, 2G2Y+gray to the right, the rest fade
-    combos — two move into the triangle of 21, the rest fade; the other 19 fade in
+    combos — two move into the grid of 21, the rest fade; the other 19 fade in
+    drop_impossible — GGGGY fades out
+    drop_win — GGGGG fades out
     """
 
     def setup_scene(self):
@@ -126,10 +148,11 @@ class Scene17(WordleBoardScene):
         kept = {**self.kind_a, **self.kind_b}
         self.rest = VGroup(*[r for c, r in by_code.items() if c not in kept])
         order = lambda d: sorted(d, key=slot)               # the 243 grid's order
+        xa, xb = _part_xs(PART_TILE)
         self.targets = list(zip([self.kind_a[c] for c in order(self.kind_a)],
-                                _part_cells(5, 1, LEFT_X, PART_TILE))) + \
+                                _part_cells(5, 1, xa, PART_TILE))) + \
             list(zip([self.kind_b[c] for c in order(self.kind_b)],
-                     _part_cells(30, RIGHT_COLS, RIGHT_X, PART_TILE)))
+                     _part_cells(30, RIGHT_COLS, xb, PART_TILE)))
         for r, _ in self.targets:
             r.set_z_index(1)
 
@@ -145,7 +168,7 @@ class Scene17(WordleBoardScene):
     # c : GGGG- and GGYY- into the triangle of 21, the other 33 fading; then the
     #     other 19 fade in
     def _setup_combos(self):
-        self.combos = _triangle()
+        self.combos = _grid21()
         movers = {code("GGGG-"): KIND_A, code("GGYY-"): KIND_B}
         kept = {**self.kind_a, **self.kind_b}
         self.moves = [(kept[c], self.combos[k]) for c, k in movers.items()]
@@ -160,4 +183,14 @@ class Scene17(WordleBoardScene):
                                   if k not in (KIND_A, KIND_B)])), run_time=1.0)
         self.kind_a = self.kind_b = self.fading = self.moves = None
 
-    # d : NOT BUILT — 17d's direction is not final (the user, 2026-10-01)
+    # d : GGGGY, the impossible combination, fades out
+    @subscene
+    def drop_impossible(self):
+        self.play(FadeOut(self.combos.pop(IMPOSSIBLE)), run_time=0.8)
+
+    # e : GGGGG, the all-greens combination (the game is over), fades out
+    @subscene
+    def drop_win(self):
+        self.play(FadeOut(self.combos.pop(WIN)), run_time=0.8)
+
+    # f : NOT BUILT — 17f's direction is not final (the user, 2026-10-01)
