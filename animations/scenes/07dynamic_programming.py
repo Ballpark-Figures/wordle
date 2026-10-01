@@ -1500,22 +1500,6 @@ class Scene07(MovingCameraScene, WordleBoardScene):
         words, slot = _avg_block()
         return VGroup(words, _avg_number(value, color, slot)).shift(origin)
 
-    def _counter_to(self, value, color, run_time):
-        """The corner number counts to `value` (and turns `color`). A fresh
-        CrispCounter from the number on screen: one is never kept between subscenes
-        (its default formatter is a lambda, which a snapshot cannot pickle)."""
-        old = self.avg_num
-        start = float(old.text) if hasattr(old, "text") else value
-        probe = crisp_text("0.00", font_size=AVG_FS).move_to(self.avg_slot)
-        counter = CrispCounter("", ValueTracker(start), left=probe.get_left()[0],
-                               y=self.avg_slot[1], font_size=AVG_FS, color=old.get_color())
-        self.remove(old)
-        self.avg_num = counter.mob
-        self.add(self.avg_num)
-        counter.count(self, value, run_time=run_time, flash="none")
-        if color is not None:
-            self.play(self.avg_num.animate.set_color(color), run_time=0.4)
-
     def _setup_first_full(self):
         """A CAMERA move (user's call). FIRST's whole tree is built at its final size,
         turned so the - - - G G branch -- BAGEL's tree, which is that branch of
@@ -1590,11 +1574,10 @@ class Scene07(MovingCameraScene, WordleBoardScene):
                 + (a.get_center() - row.get_center()) * (k - 1)
             self.ff_anims.append(a.animate.scale(k).move_to(dest).set_opacity(0))
             self.ff_gone.append(a)
-        # the corner text rides with the frame: back to where it was on screen
-        for m in (self.avg_lab, self.avg_num):
-            m.generate_target()
-            m.target.shift(-c0).scale(M, about_point=ORIGIN)
-            self.ff_anims.append(MoveToTarget(m))
+        # separate averages (user's call): BAGEL's block stays where it is in the
+        # world as the camera pulls back from it; FIRST's tree has its own, already
+        # showing, at the top right of the final view (as zb's trees each do)
+        self.ff_rest.append(self._avg_at(ORIGIN, AVG[f"full:{FIRST}"], WHITE))
         self.ff_keep = [b for _, b in pairs] + [b for _, b in moves]
         # on screen during the move: the rows' counterparts (fading in), never the
         # lines' -- a moving line BECOMES its target, and drawing the target too left
@@ -1603,7 +1586,8 @@ class Scene07(MovingCameraScene, WordleBoardScene):
 
     # za (script zc) : zoom out -- the camera pulls back from BAGEL's tree to FIRST's
     #     whole tree, already in place above, while the branch's edge contracts and
-    #     BAGEL's pieces move into their radial places; FIRST's average after
+    #     BAGEL's pieces move into their radial places; FIRST's tree has its own
+    #     average block, BAGEL's stays behind
     @subscene
     def first_full(self):
         self._setup_first_full()
@@ -1611,7 +1595,6 @@ class Scene07(MovingCameraScene, WordleBoardScene):
         self.play(*self.ff_anims, run_time=4.0)
         self.remove(*self.ff_gone)
         self.add(*self.ff_keep)
-        self._counter_to(AVG[f"full:{FIRST}"], WHITE, 1.0)   # not the best opener: white
         self.ff_anims = self.ff_gone = self.ff_keep = self.ff_rest = self.ff_shown = None
         self.big_keyed = self.big_row = None
 
