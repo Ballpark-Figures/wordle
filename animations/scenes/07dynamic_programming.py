@@ -1574,9 +1574,26 @@ class Scene07(MovingCameraScene, WordleBoardScene):
                 + (a.get_center() - row.get_center()) * (k - 1)
             self.ff_anims.append(a.animate.scale(k).move_to(dest).set_opacity(0))
             self.ff_gone.append(a)
-        # separate averages (user's call): BAGEL's block stays where it is in the
-        # world as the camera pulls back from it; FIRST's tree has its own, already
-        # showing, at the top right of the final view (as zb's trees each do)
+        # separate averages (user's call): BAGEL's block slides off the right of the
+        # FRAME as the camera pulls back -- held at its screen size, placed against the
+        # live camera each frame, so the zoom does not shrink or drag it -- and is
+        # removed once off screen; FIRST's tree has its own, already showing, at the
+        # top right of the final view (as zb's trees each do)
+        avg = VGroup(*[m for m in (self.avg_lab, self.avg_num) if m is not None])
+        fw0, orig = f.width, avg.copy()
+        left_scr = (orig.get_left()[0] - c0[0]) * config.frame_width / fw0
+        off = (config.frame_x_radius - left_scr + 0.2) * fw0 / config.frame_width
+
+        def slide(m, alpha):
+            k = f.width / fw0
+            e = smooth(min(1.0, alpha / 0.4))
+            m.become(orig.copy().scale(k, about_point=c0)
+                     .shift(f.get_center() - c0 + RIGHT * off * k * e))
+            for x, y in zip(m.family_members_with_points(),
+                            orig.family_members_with_points()):
+                x.set_stroke(width=y.get_stroke_width() * k, family=False)
+        self.ff_anims.append(UpdateFromAlphaFunc(avg, slide))
+        self.ff_gone += [avg, *avg]
         self.ff_rest.append(self._avg_at(ORIGIN, AVG[f"full:{FIRST}"], WHITE))
         self.ff_keep = [b for _, b in pairs] + [b for _, b in moves]
         # on screen during the move: the rows' counterparts (fading in), never the
