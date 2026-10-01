@@ -140,6 +140,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 
 from config import *
+from manim import MovingCameraScene
 from assets.board import (LETTER_FRAC, get_board, get_typed_row, get_scored_row, WordleBoard, STROKE,
                           TILE, GAP)
 from assets.pigpen import PigpenWord, WORD_W
@@ -233,6 +234,7 @@ FULL_GLYPH_W = 0.08                # zc: narrower rows get copied letters down t
                                    #   width (user's call: letters that cannot be read
                                    #   still read as letters); below it, bare tiles
 PAN_DIST = 17.0                    # zd: SALET's tree, this far right of FIRST's
+FULL_BELOW = 0.4                   # zc: zb's frame starts this far below FIRST's tree
 THUMB_CASE = 0.3                   # y: the group waiting in a corner
 THUMB_TREE = 0.2                   # z: the finished tree waiting in a corner, small
                                    #   enough to clear the lines to the left branches
@@ -310,7 +312,7 @@ def _corner():
                      config.frame_y_radius - CORNER_BUFF - w.height / 2, 0.0]), w.width
 
 
-class Scene07(WordleBoardScene):
+class Scene07(MovingCameraScene, WordleBoardScene):
     """BEAT MAP
     show_board — the empty board, centred, held
     type_first — FIRST typed
@@ -1242,7 +1244,9 @@ class Scene07(WordleBoardScene):
         xs, it = {}, iter(range(n))
 
         def place(node, path):
-            for kid in node["kids"]:
+            # left to right in the order the branches take in the full radial tree
+            # (`_spread`), so the zoom-out in za rearranges them without crossing
+            for kid in _spread(node["kids"], False):
                 key = path + (kid["code"],)
                 if kid["node"] is None:
                     xs[key] = -X + pitch * (next(it) + 0.5)
@@ -1419,21 +1423,20 @@ class Scene07(WordleBoardScene):
             cache[ch] = g.scale(1 / g.height)
         return cache[ch]
 
-    def _full_tree(self, tree, origin=ORIGIN):
-        """Every node and line of `tree`, placed radially round `origin` (see
-        above). Returns (root row, {branch path: [colouring row, next-guess row
-        (open branches only)]}, {branch path: line in from its parent}); a path is
-        the tuple of pattern codes from the root, as `_big_build`'s keys."""
+    def _full_layout(self, tree, start):
+        """Where every branch of `tree` goes, relative to its root: {path: (centre,
+        width, open)}, a path being the tuple of pattern codes from the root (as
+        `_big_build`'s keys); the first branch at angle `start` (see above)."""
         def count(n):
             return sum(len(k["answers"]) if not k["node"] else count(k["node"])
                        for k in n["kids"])
         total = count(tree)
-        nodes, lines = {}, {}
         k_w = FULL_SCALE_W / math.sqrt(total)
-        root = self._full_row(tree["guess"], None, FULL_ROOT_W, origin)
+        root_h = FULL_ROOT_W * row_aspect()
         pitch = lambda w: w * row_aspect() * (1 + GAP / TILE)
+        out = {}
 
-        def place(node, a0, a1, depth, parent_c, path):
+        def place(node, a0, a1, depth, path):
             a = a0
             for kid in _spread(node["kids"], depth == 1):
                 key = path + (kid["code"],)
@@ -1447,22 +1450,55 @@ class Scene07(WordleBoardScene):
                 # a node that would overlap the root is pushed out along its angle
                 # until it clears it by FULL_CLEAR (nothing else moves)
                 while (abs(off(r)[0]) < (FULL_ROOT_W + w) / 2 + FULL_CLEAR
-                       and abs(off(r)[1]) < (root.height + h) / 2 + FULL_CLEAR):
+                       and abs(off(r)[1]) < (root_h + h) / 2 + FULL_CLEAR):
                     r *= 1.03
-                c = origin + off(r)
-                if kid["node"] is None:                       # a win: the green row
+                out[key] = (off(r), w, kid["node"] is not None, mid)
+                if kid["node"] is not None:
+                    place(kid["node"], a, a + span, depth + 1, key)
+                a += span
+        place(tree, start, start + 2 * math.pi, 1, ())
+        return out
+
+    def _full_start(self, tree, key, angle):
+        """The start angle that puts branch `key` of `tree` at `angle` -- turning the
+        whole tree (spans do not depend on where it starts)."""
+        mid = self._full_layout(tree, FULL_START)[key][3]
+        return FULL_START + angle - mid
+
+    def _full_tree(self, tree, origin=ORIGIN, start=FULL_START):
+        """Every node and line of `tree`, placed radially round `origin`. Returns
+        (root row, {path: [colouring row, next-guess row (open branches only)]},
+        {path: line in from its parent}, {path: node centre})."""
+        layout = self._full_layout(tree, start)
+        root = self._full_row(tree["guess"], None, FULL_ROOT_W, origin)
+        nodes, lines, cents = {}, {}, {}
+        guesses = {(): tree}
+
+        def walk(node, path):
+            for kid in node["kids"]:
+                key = path + (kid["code"],)
+                off, w, open_, _ = layout[key]
+                c = origin + off
+                cents[key] = c
+                if not open_:                                  # a win: the green row
                     nodes[key] = [self._full_row(node["guess"], kid["code"], w, c)]
                 else:                                          # colouring + next guess
-                    p = pitch(w)
+                    p = w * row_aspect() * (1 + GAP / TILE)
                     nodes[key] = [self._full_row(node["guess"], kid["code"], w, c + UP * p / 2),
                                   self._full_row(kid["node"]["guess"], None, w, c + DOWN * p / 2)]
-                lines[key] = Line(parent_c, c, color=WHITE, stroke_width=FULL_LINE_W,
+                parent = origin if not path else cents[path]
+                lines[key] = Line(parent, c, color=WHITE, stroke_width=FULL_LINE_W,
                                   stroke_opacity=FULL_LINE_OPACITY).set_z_index(-1)
-                if kid["node"] is not None:
-                    place(kid["node"], a, a + span, depth + 1, c, key)
-                a += span
-        place(tree, FULL_START, FULL_START + 2 * math.pi, 1, origin, ())
-        return root, nodes, lines
+                if open_:
+                    walk(kid["node"], key)
+        walk(tree, ())
+        return root, nodes, lines, cents
+
+    def _avg_at(self, origin, value, color):
+        """A tree's own "Average Guesses" block, already showing `value`: where the
+        corner text sits in the default frame, shifted to the tree at `origin`."""
+        words, slot = _avg_block()
+        return VGroup(words, _avg_number(value, color, slot)).shift(origin)
 
     def _counter_to(self, value, color, run_time):
         """The corner number counts to `value` (and turns `color`). A fresh
@@ -1481,29 +1517,56 @@ class Scene07(WordleBoardScene):
             self.play(self.avg_num.animate.set_color(color), run_time=0.4)
 
     def _setup_first_full(self):
-        """FIRST's whole tree at the centre, and every piece of BAGEL's tree mapped
-        onto its branch of it: BAGEL's tree IS the branch FIRST -> - - - G G of
-        FIRST's committed optimal tree (checked identical, line for line)."""
-        self.ff_root, self.ff_nodes, self.ff_lines = self._full_tree(TREES_FULL[FIRST])
+        """A CAMERA move (user's call). FIRST's whole tree is built at its final size,
+        turned so the - - - G G branch -- BAGEL's tree, which is that branch of
+        FIRST's committed tree, checked identical line for line -- points straight
+        down from FIRST. Everything is in place except that branch, which starts
+        further out along its own edge, beyond the bottom of the tree; zb's view is
+        re-expressed as a camera zoomed in on it (nothing on screen changes). Then
+        the camera zooms out to FIRST while the edge contracts, BAGEL's pieces moving
+        into their radial places."""
+        tree = TREES_FULL[FIRST]
         base = (BIG_CODE,)
-        # (on screen now, its place in FIRST's tree): the root FIRST row and the
-        # typed BAGEL under it -> the branch's colouring and next guess; the line in
-        # from the top -> that branch's line; then every branch of BAGEL's tree
-        pairs = [(self.big, self.ff_nodes[base][0]), (self.big_row, self.ff_nodes[base][1])]
-        lines = [(self.big_line, self.ff_lines[base])]
+        start = self._full_start(tree, base, -math.pi / 2)
+        root, nodes, lines, cents = self._full_tree(tree, ORIGIN, start)
+        # zoom: zb's FIRST row is this many times the branch's colouring row
+        M = self.big.width / nodes[base][0].width
+        # the branch starts this far down: zb's frame then lies wholly below the tree
+        mine = lambda k: k[:1] == base
+        bottom = min(m.get_bottom()[1] for k, ms in nodes.items() if not mine(k) for m in ms)
+        q = self.big.get_center()                      # zb's FIRST row, on screen
+        s_row = np.array([nodes[base][0].get_center()[0],
+                          bottom - FULL_BELOW - (config.frame_y_radius - q[1]) / M, 0.0])
+        c0 = s_row - q / M                              # zb's frame, in the world
+        # re-express everything on screen in world coordinates, and point the camera
+        # at it -- identical on screen
+        for m in self.mobjects:
+            if isinstance(m, VMobject):
+                m.scale(1 / M, about_point=ORIGIN).shift(c0)
+                # each piece's OWN stroke, thinned with it (scale's scale_stroke sets
+                # the whole family to the parent's width -- every letter went bold)
+                for x in m.family_members_with_points():
+                    x.set_stroke(width=x.get_stroke_width() / M, family=False)
+        f = self.camera.frame
+        f.set(width=f.width / M).move_to(c0)
+        # the branch's edge, in from the root, its far end on zb's FIRST row
+        start_line = Line(ORIGIN, self.big.get_center(), color=WHITE,
+                          stroke_width=self.big_line.get_stroke_width(),
+                          stroke_opacity=self.big_line.get_stroke_opacity()).set_z_index(-1)
+        pairs = [(self.big, nodes[base][0]), (self.big_row, nodes[base][1])]
+        moves = [(start_line, lines[base])]
         fading = []
         for key, part in self.big_keyed.items():
-            target = self.ff_nodes[base + key]
+            target = nodes[base + key]
             pairs.append((part["new"], target[0]))
             if part["guess"] is not None:
                 pairs.append((part["guess"], target[1]))
-            lines.append((part["line"], self.ff_lines[base + key]))
+            moves.append((part["line"], lines[base + key]))
             fading += [(c, target[0]) for c in part["copies"]]    # stacked rows: into it
-        mapped = {id(t) for _, t in pairs} | {id(t) for _, t in lines}
-        self.ff_rest = [self.ff_root] + [m for ms in self.ff_nodes.values() for m in ms
-                                          if id(m) not in mapped] \
-            + [l for l in self.ff_lines.values() if id(l) not in mapped]
-        self.ff_anims, self.ff_gone = [], []
+        mapped = {id(t) for _, t in pairs} | {id(t) for _, t in moves}
+        self.ff_rest = [root] + [m for ms in nodes.values() for m in ms if id(m) not in mapped] \
+            + [l for l in lines.values() if id(l) not in mapped]
+        self.ff_anims, self.ff_gone = [f.animate.set(width=config.frame_width).move_to(ORIGIN)], []
         # a piece and its counterpart cross-fade while travelling together, so the
         # different row builds never show as a morph
         for a, b in pairs:
@@ -1513,44 +1576,47 @@ class Scene07(WordleBoardScene):
                               a.animate.scale(b.target.width / a.width).move_to(b.target)
                               .set_opacity(0)]
             self.ff_gone.append(a)
-        for a, b in lines:
+        for a, b in moves:
             self.ff_anims.append(Transform(a, b))
             self.ff_gone.append(a)
+        self.add(start_line)
+        self.remove(self.big_line)
         for a, b in fading:
             self.ff_anims.append(a.animate.scale(0.01).move_to(b).set_opacity(0))
             self.ff_gone.append(a)
-        self.ff_anims += [FadeIn(m) for m in self.ff_rest]
-        self.ff_keep = [b for _, b in pairs] + [b for _, b in lines]
+        # the corner text rides with the frame: back to where it was on screen
+        for m in (self.avg_lab, self.avg_num):
+            m.generate_target()
+            m.target.shift(-c0).scale(M, about_point=ORIGIN)
+            self.ff_anims.append(MoveToTarget(m))
+        self.ff_keep = [b for _, b in pairs] + [b for _, b in moves]
 
-    # za (script zc) : zoom out -- BAGEL's tree moves into its place as one branch of
-    #     FIRST's whole optimal tree, the view centred on FIRST, the rest of the tree
-    #     fading in round it; the corner counts to FIRST's average
+    # za (script zc) : zoom out -- the camera pulls back from BAGEL's tree to FIRST's
+    #     whole tree, already in place above, while the branch's edge contracts and
+    #     BAGEL's pieces move into their radial places; FIRST's average after
     @subscene
     def first_full(self):
         self._setup_first_full()
-        self.add(*self.ff_keep)
-        self.play(*self.ff_anims, run_time=3.0)
+        self.add(*self.ff_rest, *self.ff_keep)
+        self.play(*self.ff_anims, run_time=4.0)
         self.remove(*self.ff_gone)
-        self.add(*self.ff_keep, *self.ff_rest)
+        self.add(*self.ff_keep)
         self._counter_to(AVG[f"full:{FIRST}"], WHITE, 1.0)   # not the best opener: white
         self.ff_anims = self.ff_gone = self.ff_keep = self.ff_rest = None
         self.big_keyed = self.big_row = None
 
     def _setup_salet_full(self):
-        """SALET's whole tree, one frame to the right, ready to pan to."""
-        X = config.frame_x_radius
-        root, nodes, lines = self._full_tree(TREES_FULL["salet"], RIGHT * PAN_DIST)
-        self.sf_all = [root, *[m for ms in nodes.values() for m in ms], *lines.values()]
+        """SALET's whole tree one frame to the right, with its own average block
+        already showing (green: the best opener)."""
+        root, nodes, lines, _ = self._full_tree(TREES_FULL["salet"], RIGHT * PAN_DIST)
+        self.sf_all = [root, *[m for ms in nodes.values() for m in ms], *lines.values(),
+                       self._avg_at(RIGHT * PAN_DIST, AVG["full:salet"], AVG_GREEN)]
 
-    # zb (script zd) : pan right to SALET's tree; the corner counts to its average,
-    #     green -- the optimal opener
+    # zb (script zd) : the camera pans right to SALET's tree, its average block with
+    #     it; FIRST's leaves with FIRST's tree
     @subscene
     def salet_full(self):
         self._setup_salet_full()
         self.add(*self.sf_all)
-        world = VGroup(*[m for m in self._leaves()])
-        self.play(world.animate.shift(LEFT * PAN_DIST), run_time=2.5)
-        self.remove(world)
-        self.add(*world.submobjects)
-        self._counter_to(AVG["full:salet"], AVG_GREEN, 1.0)
+        self.play(self.camera.frame.animate.move_to(RIGHT * PAN_DIST), run_time=2.5)
         self.sf_all = None
