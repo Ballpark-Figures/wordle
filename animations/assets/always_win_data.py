@@ -32,8 +32,16 @@ Writes `always_win_cache.json`; the scene reads only that.
             the slots in order 2, 0, 1, 3, which ends on LEDGE PAWNS ROCKY THUMB (a
             blind opening's score does not depend on order). `moves` are in board
             rows: [(row, new word), ...] per accepted move, in order.
-            NB its 1 unsolved answer is SALLE (beside FALSE and SALVE); the user
-            accepts that, 2026-10-01: nobody guesses SALLE over SALVE.
+            `start_unsolved` (1049) is QUERY NINNY BALER MASSE's count, which the
+            log does not record: every count here comes from
+            math/tools/guarantee_sweep.py `check_opening` (pool custom, cap 6),
+            asserted equal to the log's after every move.
+            NB its 1 unsolved answer is SALVE (asserted), in the bucket FALSE,
+            SALLE, SALVE (SALLE is a custom.txt word, not an answer). check_opening's
+            worst line is FALSE fifth (which does not split SALLE from SALVE), SALLE
+            sixth, SALVE seventh: a loss needs SALLE played. The user accepts that,
+            2026-10-01: nobody guesses SALLE over SALVE.
+            The scene's counter shows every count minus 1 for that reason.
 """
 import csv
 import json
@@ -113,13 +121,45 @@ def _climb():
         for p, w in zip(pos, new):
             slots[p] = w
         moves.append({"section": m.group(1), "unsolved": int(m.group(4)),
-                      "rows": [[BOARD_ORDER.index(p), w] for p, w in zip(pos, new)]})
+                      "rows": [[BOARD_ORDER.index(p), w] for p, w in zip(pos, new)],
+                      "opening": list(slots)})
     row = next(r for r in _rows(CLIMB_CSV) if int(r["trial"]) == TRIAL)
     assert slots == row["opening"].split(), (slots, row["opening"])
     assert moves[-1]["unsolved"] == int(row["unsolved"]) == 1
     board = [slots[s] for s in BOARD_ORDER]
     assert board == FINAL, board
-    return {"start": [start[s] for s in BOARD_ORDER], "moves": moves, "final": board}
+    # The log gives the unsolved count AFTER each move, not for the start. Every
+    # count comes from guarantee_sweep.check_opening -- the check the climb ran
+    # against itself every trial -- and must reproduce the log's own numbers.
+    losing = _losing([start] + [m["opening"] for m in moves])
+    assert losing[-1] == ["salve"], losing[-1]     # the one the counter leaves out
+    unsolved = [len(l) for l in losing]
+    for m, u in zip(moves, unsolved[1:]):
+        assert u == m["unsolved"], (m["opening"], u, m["unsolved"])
+    for m in moves:
+        del m["opening"]
+    return {"start": [start[s] for s in BOARD_ORDER], "start_unsolved": unsolved[0],
+            "moves": moves, "final": board}
+
+
+def _losing(openings):
+    """The losing answers of each opening, pool custom.txt, cap 6 -- the climb's objective.
+    (`adapt` 2, the committed guarantee runs' setting; it cannot change the count,
+    since abandoning fires only on live sets of 2 or fewer: greedybuild's note.)"""
+    import numpy as np
+    sys.path.insert(0, os.path.join(MATH, "tools"))
+    from build_patterns import load_patterns
+    from guarantee_sweep import check_opening
+    from opening_list import resolve_word_set
+    from wordle import load_words
+    guesses, answers = load_words("guess"), load_words("mystery")
+    gpos = {w: i for i, w in enumerate(guesses)}
+    pool = sorted(resolve_word_set("custom"))
+    full = np.array(load_patterns(full=True))
+    cidx = np.array([gpos[w] for w in pool])
+    ppos = {w: i for i, w in enumerate(pool)}
+    ctx = (full, cidx, pool, np.array([ppos[w] for w in answers]), answers, 2, 6, gpos)
+    return [sorted(check_opening(list(o), ctx)[1]) for o in openings]
 
 
 def _build():

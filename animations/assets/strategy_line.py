@@ -122,6 +122,12 @@ def pct(v):
     return f"{v:.2f}%"
 
 
+def whole(v):
+    """A counter's readout as a whole number. In an asset so a scene can keep a
+    CrispCounter on self: a function defined in a scene file does not pickle."""
+    return f"{round(v)}"
+
+
 def _pct_color(v):
     """A counting win rate's (in percent) colour: `win_color` of what it shows."""
     return win_color(v / 100)
@@ -203,17 +209,24 @@ class StrategyLine:
         self.play(self.camera.frame.animate.shift(UP * GAME_DY), run_time=run_time)
 
     # ── a marker's words change as it slides (14c's, then 15's) ──────────────
-    def replace_marker(self, mk, words, value, rate, run_time):
+    def replace_marker(self, mk, words, value, rate, run_time, zoom=None):
         """The marker's word rows flip to `words` while it slides to `value` and its
         win rate (the last line) counts to `rate`. The rows are its first line: a
-        single `word_line`, or a `word_stack` whose rows flip one each."""
+        single `word_line`, or a `word_stack` whose rows flip one each. `zoom`
+        (lo, hi) zooms the line to that window in the same play (15i: the card
+        slides past the edge, so the view follows it)."""
         content = mk.label[1]
         stack = content[0] if getattr(content[0], "is_stack", False) else None
         olds = list(stack) if stack is not None else list(content[:len(words)])
         rate_mob = content[-1]
         old_rate = mk.rate
         line = self.line
-        dx = line.x_of(value) - line.x_of(mk.value)
+        if zoom is None:
+            x_end = line.x_of(value)
+        else:                                           # where `value` lands after the zoom
+            lo, hi = zoom
+            x_end = line.x_range[0] + (value - lo) * (line.x_range[1] - line.x_range[0]) / (hi - lo)
+        dx = x_end - line.x_of(mk.value)
         news = [word_line(w, o.width).move_to(o.get_center() + RIGHT * dx)
                 for w, o in zip(words, olds)]
         # the readout takes the rate's place in the card, at its left edge
@@ -235,7 +248,8 @@ class StrategyLine:
         count = counter.count_anim(rate * 100)
         flip(self, [Flip(o, n, parts=(row_parts(o), row_parts(n)), travel=True)
                     for o, n in zip(olds, news)],
-             run_time, extra=[line.move_marker(mk, value), count])
+             run_time, extra=[line.move_marker(mk, value), count]
+             + ([line.zoom(*zoom)] if zoom is not None else []))
         counter.end_count()
         self.remove(*news)
         if stack is not None:

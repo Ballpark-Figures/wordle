@@ -153,9 +153,10 @@ from assets.flip import Flip, flip, row_parts
 from assets.groups import (GUESS_SCALE, ranked_word_layout, REGION_HALF_W,
                            DOT_REGION_TOP, REGION_BOT)
 from assets.keys import key_cues
+from bpkfigures.style import CrispCounter
 from assets.second_view import corner_spot, row_stroke, under, typed_under, group_rows
 from assets.strategy_line import (StrategyLine, GAME_DY, shrink_out,
-                                  word_stroke, OPTIMAL, COMPATIBLE)
+                                  word_stroke, whole, OPTIMAL, COMPATIBLE)
 
 DATA = lists_data.load()
 SD = strategy_data.load()
@@ -178,6 +179,12 @@ ZOOM_EDGE = 6.5            # h, j: where a zoom puts its end markers (13e: 6)
 LINE_DROP = -0.2           # the line sits this much lower than 13/14's and every
 MARKER_STEM_15 = 0.3       #   stem is shorter (13: 0.45), so the full-size 3- and
                            #   4-word cards clear the subtitle and the frame edge
+COUNT_LABEL = ["Unsolved", "Words"]   # x-z (user's wording)
+COUNT_FS = 72              # x-z: the counter's size (the label is FONT_SIZE_LG)
+COUNT_GAP = 0.15           # x-z: between the label's lines and the counter
+UNCOUNTED = 1              # x-z: SALVE's one loss is not counted (user's call: it
+                           #   needs SALLE guessed), so the counter shows count - 1
+COUNT_DONE = LIGHT_GREEN   # x-z: the counter at 0 -- the win-rate scale's green
 FINAL_SCALE = 1.5          # za: the four rows' growth
 
 
@@ -332,15 +339,27 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
             mob.set_z_index(1)                 # over the rows it crosses (user's call)
             self.movers.append(mob)
         self.leaving = self.rows + self.words
+        # the board's other rows travel WITH SALET and CLONE as they fade in (user's
+        # call): they start where they would hang under the corner pair -- the same
+        # map that takes board row 0 onto SALET -- invisible, and end in place
+        self.rest = VGroup(*self.board.rows[2:])
+        self.rest.save_state()
+        row0 = self.board.rows[0]
+        c0 = row0.get_center()
+        self.rest.scale(self.guess.width / row0.width, about_point=c0)
+        self.rest.shift(self.guess.get_center() - c0).set_opacity(0)
 
     @subscene
     def to_board(self):
         self._setup_to_board()
+        self.add(self.rest)
         self.play(*[MoveToTarget(m) for m in self.movers],
                   *[shrink_out(m) for m in self.leaving],
-                  *[FadeIn(r) for r in self.board.rows[2:]],
+                  Restore(self.rest),
                   run_time=1.5)
-        self.remove(*self.leaving)
+        self.remove(*self.leaving, self.rest)
+        self.add(*self.board.rows[2:])
+        self.rest = None
         self.salet_row, self.clone_row = self.movers
         self.rows = self.words = self.groups = self.leaving = self.movers = None
         self.corner_clone = None
@@ -383,18 +402,25 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
         return self.opener_marker(round(o["mean"], 2), key.split(), o["win_rate"],
                                   side=side)
 
-    def _swap(self, mk, key, run_time):
+    def _swap(self, mk, key, run_time, follow=False):
+        """`mk` flips to `key`'s opener; `follow` zooms so it lands at the right
+        end (15i: it slides past the edge, so the view pans with it)."""
         o = AW["openers"][key]
-        self.replace_marker(mk, key.split(), round(o["mean"], 2), o["win_rate"], run_time)
+        value = round(o["mean"], 2)
+        zoom = self._window(value) if follow else None
+        self.replace_marker(mk, key.split(), value, o["win_rate"], run_time, zoom=zoom)
 
-    def _zoom_to(self, mk):
-        """13e's zoom, the leftmost marker at x = -ZOOM_EDGE and `mk` at +ZOOM_EDGE
-        (13e used 6; full-size cards need the extra room to clear each other)."""
-        lo, hi = min(m.value for m in self.line.markers), mk.value
+    def _window(self, right):
+        """13e's zoom window: the leftmost marker at x = -ZOOM_EDGE and the value
+        `right` at +ZOOM_EDGE (13e used 6; full-size cards need the extra room)."""
+        lo, hi = min(m.value for m in self.line.markers), right
         s = 2 * ZOOM_EDGE / (hi - lo)                  # screen units per guess
         half = (self.line.x_range[1] - self.line.x_range[0]) / 2 / s
         c = (lo + hi) / 2
-        self._zoom_pop(c - half, c + half, mk, 2.0, 0.4, 0.5)
+        return c - half, c + half
+
+    def _zoom_to(self, mk, zoom_rt, pop_rt, lead):
+        self._zoom_pop(*self._window(mk.value), mk, zoom_rt, pop_rt, lead)
 
     # f : PARSE CLINT at 3.69, below the line
     @subscene
@@ -411,19 +437,19 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
     @subscene
     def three_words(self):
         self.three = self._opener(THREE, UP)
-        self._zoom_to(self.three)
+        self._zoom_to(self.three, 1.0, 0.4, 0.3)
 
     # i : flips to BLAND COPSE RIGHT, sliding to 4.17
     @subscene
     def bland_copse(self):
-        self._swap(self.three, THREE_B, 1.2)
+        self._swap(self.three, THREE_B, 1.2, follow=True)
 
     # j : zoom out to fit CHAMP FLINT RUGBY SOWED at 5.02, above the line (right of
     #     the title, so the tall card has room)
     @subscene
     def four_words(self):
         self.four = self._opener(FOUR, UP)
-        self._zoom_to(self.four)
+        self._zoom_to(self.four, 1.0, 0.4, 0.3)
 
     # k : flips to BUGLE CHAMP DOWNY FIRST (still 5.02)
     @subscene
@@ -475,7 +501,11 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
         """An empty one-row board per word, in a column at the board's own size and
         spacing, mirroring the board on the right half."""
         self.same = [WordleBoard(rows=1, cols=5) for _ in AW["same"]["members"]]
-        VGroup(*self.same).arrange(DOWN, buff=GAP).move_to(RIGHT * BOARD_SIDE_X)
+        VGroup(*self.same).arrange(DOWN, buff=GAP).move_to(RIGHT * self._right_mid())
+
+    def _right_mid(self):
+        """x halfway between the (left-moved) board and the frame's right edge."""
+        return (VGroup(*self.rows).get_right()[0] + config.frame_x_radius) / 2
 
     @subscene
     def puree_words(self):
@@ -502,17 +532,24 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
         slots, sc, _, _ = ranked_word_layout(groups, UNSOLVED_LEFT, REGION_HALF_W,
                                              DOT_REGION_TOP, REGION_BOT, heads=0)
         slots = _close_columns(groups, slots, sc, UNSOLVED_LEFT, REGION_HALF_W)
+        width = PigpenWord("salet", revealed=True).scale(sc).width
         self.unsolved_words = []
         for w, c in slots.items():
-            m = PigpenWord(w, revealed=True).scale(sc).move_to(c)
-            for t in m.tiles:
-                t.set_stroke(width=word_stroke(m.width))
-            self.unsolved_words.append(m)
+            b = WordleBoard(rows=1, cols=5)
+            b.scale(width / b.width).move_to(c)
+            self.unsolved_words.append((b, w))
 
     @subscene
     def unsolved(self):
         self._setup_unsolved()
-        self.play(*[FadeIn(m) for m in self.unsolved_words], run_time=0.8)
+        anims, total = [], 0.0
+        for i, (b, w) in enumerate(self.unsolved_words):
+            a, total = b.type_anim(self, 0, w, 0.65, appear=True,
+                                   per_letter=key_cues(self) if i == 0 else None,
+                                   stroke=word_stroke(b.width))
+            anims.append(a)
+        self.play(*anims, run_time=total)
+        self.unsolved_words = [b for b, _ in self.unsolved_words]
 
     # s : the words slide off to the right; the board back to centre
     @subscene
@@ -535,6 +572,7 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
         self._pan_up(1.5)
         self._clear_below()
         self.rows = _stack()
+        VGroup(*self.rows).shift(LEFT * BOARD_SIDE_X)      # x-z: the board on the left
         self.add(*self.rows)
 
     # v : every marker but the 2-word one dims
@@ -557,27 +595,54 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
     def empty_board(self):
         self._pan_down(1.5)
 
-    # y : trial 68's starting words, typed at once
+    # y : trial 68's starting words, typed at once; the unsolved counter beside
+    #     the board fades in with them
+    def _setup_climb_start(self):
+        cx = self._right_mid()
+        self.count_label = VGroup(*[crisp_text(t, color=WHITE, font_size=FONT_SIZE_LG)
+                                    for t in COUNT_LABEL]).arrange(DOWN, buff=COUNT_GAP)
+        start = AW["climb"]["start_unsolved"] - UNCOUNTED
+        self.counter = CrispCounter("", ValueTracker(start), left=0.0, y=0.0,
+                                    font_size=COUNT_FS, color=WHITE,
+                                    fmt=whole)
+        block = VGroup(self.count_label, self.counter.mob).arrange(DOWN, buff=COUNT_GAP)
+        block.move_to([cx, 0, 0])
+        self.counter.left = self.counter.mob.get_left()[0]
+        self.counter.y = self.counter.mob.get_center()[1]
+        self.count_x = cx
+
     @subscene
     def climb_start(self):
+        self._setup_climb_start()
         anims, total = [], 0.0
         for r, w in enumerate(AW["climb"]["start"]):
             a, total = self.rows[r].type_anim(self, 0, w, 0.65,
                                               per_letter=key_cues(self) if r == 0 else None)
             anims.append(a)
-        self.play(*anims, run_time=total)
+        self.play(*anims, FadeIn(self.count_label), FadeIn(self.counter.mob),
+                  run_time=total)
 
-    # z : each accepted move flips the rows it changes, ending on LEDGE PAWNS ROCKY THUMB
+    # z : each accepted move flips the rows it changes while the counter counts
+    #     down to its unsolved words, ending on LEDGE PAWNS ROCKY THUMB at 0, green
     @subscene
     def climb(self):
+        c, cx = self.counter, self.count_x
         for mv in AW["climb"]["moves"]:
-            self._flip_rows({r: get_typed_row(w) for r, w in mv["rows"]}, 0.6)
+            count = c.count_anim(mv["unsolved"] - UNCOUNTED, flash="none")
+            c.mob.add_updater(lambda m: m.set_x(cx))      # centred, after the rebuild
+            self._flip_rows({r: get_typed_row(w) for r, w in mv["rows"]}, 0.6,
+                            extra=[count])
+            c.end_count()
+        self.play(c.mob.animate.set_color(COUNT_DONE), run_time=0.4)
 
-    # za : the two empty rows drop off the bottom; the four words grow, centred
+    # za : the counter fades and the two empty rows drop off the bottom; the four
+    #      words grow, centred
     @subscene
     def finale(self):
         self.play(VGroup(*self.rows[4:]).animate.shift(DOWN * config.frame_height),
+                  FadeOut(self.count_label), FadeOut(self.counter.mob),
                   VGroup(*self.rows[:4]).animate.scale(FINAL_SCALE).move_to(ORIGIN),
                   run_time=1.5)
-        self.remove(*self.rows[4:])
+        self.remove(*self.rows[4:], self.count_label, self.counter.mob)
         self.rows = self.rows[:4]
+        self.count_label = self.counter = None
