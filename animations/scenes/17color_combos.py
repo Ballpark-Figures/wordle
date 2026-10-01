@@ -9,8 +9,8 @@ BEAT MAP:
                  go right (above the rest), everything else fades out        (17b, VO 2)
   c combos     — GGGG- and GGYY- move into their places in the grid of 21
                  combinations while the other 33 fade; then the other 19 fade in (17c, VO 2)
-  d drop_impossible — GGGGY fades out, poof                                 (17d, VO 2)
-  e drop_win   — GGGGG, all greens, fades out, poof                        (17e, VO 2)
+  d drop_impossible — GGGGY fades out, whoosh                                (17d, VO 2)
+  e drop_win   — GGGGG, all greens, fades out, whoosh                       (17e, VO 2)
   (17f is NOT BUILT — its direction is not final, the user's call 2026-10-01.)
 
 REUSE MAP — every element and the one source it comes from:
@@ -22,7 +22,8 @@ REUSE MAP — every element and the one source it comes from:
                       the rest FadeOut, kept rows at z_index 1 (script)
   17c combinations    tiles greens, yellows, grays; tile gap the board's ratio
                       (TILE_BUFF), BLOCK_GAP between colour blocks (script: "slight gaps")
-  17d/e sound         self.sfx("poof") — music-library/sfx/poof.wav at library level
+  17d/e sound         11j's vanish: whoosh-mids at stacks_view WHOOSH_GAIN, peaking
+                      mid-fade (11pop_quiz.py `poof`)
   colours             BOARD_NAVY via WordleBoardScene; tiles config.py TILE_STATE
 
 LAYOUT CHOICES, flagged:
@@ -42,6 +43,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 
 from config import *
 from assets.colorings import level, code, trits, slot, TILE_BUFF, tile
+from assets.stacks_view import WHOOSH_GAIN
 
 # ── 17b: the two kinds ─────────────────────────────────────────────────────────
 KIND_A = (4, 0, 1)         # (greens, yellows, grays): 4 greens and a gray — 5 rows
@@ -58,6 +60,10 @@ COMBO_PITCH = 8.0          # column pitch, in tiles (the widest combination is 6
 LINE_PITCH = 1.1           # row pitch
 IMPOSSIBLE = (4, 1, 0)     # 17d: 4 greens and a yellow can never happen
 WIN = (5, 0, 0)            # 17e: all greens — the game is over
+# 17d/e: 11j's vanish sound, copied — whoosh-mids at scene 01's whoosh level,
+# timed so its loudest point lands mid-fade
+VANISH_SFX = "whoosh-mids"
+VANISH_PEAK = 0.20         # s into the file where it is loudest (11pop_quiz.py's MEASURED)
 
 
 def _counts(c):
@@ -185,13 +191,15 @@ class Scene17(WordleBoardScene):
     # d : GGGGY, the impossible combination, fades out
     @subscene
     def drop_impossible(self):
-        self.sfx("poof")
-        self.play(FadeOut(self.combos.pop(IMPOSSIBLE)), run_time=0.8)
+        rt = 0.8
+        self.sfx(VANISH_SFX, at=max(0.0, rt / 2 - VANISH_PEAK), gain=WHOOSH_GAIN)
+        self.play(FadeOut(self.combos.pop(IMPOSSIBLE)), run_time=rt)
 
     # e : GGGGG, the all-greens combination (the game is over), fades out
     @subscene
     def drop_win(self):
-        self.sfx("poof")
-        self.play(FadeOut(self.combos.pop(WIN)), run_time=0.8)
+        rt = 0.8
+        self.sfx(VANISH_SFX, at=max(0.0, rt / 2 - VANISH_PEAK), gain=WHOOSH_GAIN)
+        self.play(FadeOut(self.combos.pop(WIN)), run_time=rt)
 
     # f : NOT BUILT — 17f's direction is not final (the user, 2026-10-01)
