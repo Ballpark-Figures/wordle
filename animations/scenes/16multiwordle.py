@@ -2,8 +2,8 @@
 windows of the 2^n variants, then a played Octordle game. Navy background.
 
 Follows talking head THJ, so the single board is up from frame 0 (THJ covers the
-cut in). After it comes VO section 4 (no subscene) and then THK, so it ends on the
-finished game, with the FOURTH footnote faded out.
+cut in). After it comes VO section 6 (no subscene) and then THK, so it ends on the
+finished second game, its candidates under every board.
 
 BEAT MAP — one subscene per Script.md beat, letters matching:
 
@@ -15,6 +15,32 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   f variants      — Octordle to the top-right cell, the other five in     (16f, VO 2)
   g back_down     — windows shift down off frame, the 8 boards back       (16g, VO 3)
   h playthrough   — SOLVE EIGHT WORDS, then FIRST .. OCTET; FORTH's *     (16h, VO 3)
+  i replay_solve  — the game flips back to black, boards up, SOLVE again,
+                    each board's candidates appear beneath it             (16i, VO 4)
+  j replay_eight  — EIGHT, candidates updated                             (16j, VO 4)
+  k replay_words  — WORDS                                                 (16k, VO 4)
+  l replay_first  — FIRST                                                 (16l, VO 4)
+  m replay_rest   — the rest of the game                                  (16m, VO 4)
+  n blank_rest    — every row but SOLVE back to black, candidates out     (16n, VO 5)
+  o flip_eight    — row 2 back to coloured EIGHT in one flip              (16o, VO 5)
+  p flip_words    — row 3 back to WORDS in one flip                       (16p, VO 5)
+  q after_solve   — rows 2-3 back to black, SOLVE's candidates back       (16q, VO 5)
+  r greedy        — fewest-candidates board emphasised, a random one of
+                    its candidates guessed, candidates updated, to the end (16r, VO 5)
+
+CANDIDATES UNDER A BOARD (16i-r): the answers still consistent with every reply that
+board has had, as WHITE DOTS while there are more than 20 and as WORDS from 20 down
+("switch to actual words once the number drops to 20 or fewer"). ONE dot size for
+the whole scene (fitted to the largest set, 342), so a count reads as an area; one
+word size, fitted to 20. Updating after a guess: the eliminated fade out, the rest
+regrid, and a set crossing 20 turns into words that grow out of their dots (07's
+move). Numbers from assets/multi_data.py -> multi_cache.json.
+
+16r's GAME IS math/multiwordle.py's `greedy` RULE, PLAYED BY ITS OWN CODE: the board
+with the fewest candidates (ties: lowest board index), a candidate of it drawn at
+random. One draw, seed 0 (multi_data.GREEDY_SEED). The emphasis is a translucent
+navy MASK over every other board's column -- lowering opacity instead would expose
+the hidden glyphs inside each PigpenWord.
 
 THE GAME HAS NO PAUSES OF ITS OWN (user's call): a solved board does not jump; one
 wave runs through all eight winning rows at the end instead. The FOURTH footnote fades in with FIFTH's typing and out
@@ -52,6 +78,17 @@ REUSE MAP — every element and the one source it comes from:
   feedback codes            assets/game_data.py load("octordle") -> game_cache.json,
                             computed by math/wordle.py `pattern`
   colours                   BOARD_NAVY via WordleBoardScene; tiles config.py TILE_*
+  flip back to black        board.TileFlip(..., swap_to=None) -- the blank face
+  flip back to a word       board.TileFlip(..., swap_to=letter), lag 0 ("one flip")
+  candidate dots            WHITE `Dot`s as scenes 06/07 (DOT_COLOR), in
+                            assets/groups.py `dot_grid` (added for this)
+  candidate words           assets/pigpen.py `PigpenWord(revealed=True)`, placed
+                            by groups.py `ranked_word_layout` (a word grid that
+                            fills a region), as 07
+  dots -> words             07's `_setup_focus`: each word starts at its dot's
+                            size and spot, invisible, and grows to its slot
+  emphasis                  dim the rest (house rule), as masks (see above)
+  second game               assets/multi_data.py load("greedy")
 
 ON-SCREEN TEXT, each licensed by column 2: the windows' tab titles and addresses
 ("browser window", 16e/f), and the asterisk + "*Yes, I know how to spell FOURTH"
@@ -67,6 +104,10 @@ from config import *
 from assets.board import get_board, ROWS, TILE, GAP, STROKE
 from assets import game_data
 from assets.keys import key_cues
+from assets.board import TileFlip
+from assets import multi_data
+from assets.groups import dot_grid, ranked_word_layout
+from assets.pigpen import PigpenWord
 from bpkfigures.browser import browser_window
 
 MEDIA = Path(__file__).resolve().parent.parent / "assets" / "web_media"
@@ -126,6 +167,16 @@ VARIANTS = [
 OCT = 2                                        # Octordle's index in VARIANTS
 
 FOOT_W = 4.2                                   # footnote width
+
+# ── candidates under the boards (16i-r) ───────────────────────────────────────
+REPLAY = multi_data.load("replay")
+GREEDY = multi_data.load("greedy")
+RAISE = 0.9                  # boards move up this far in 16i, to make room below
+CAND_TOP_GAP = 0.15          # board bottom to the candidates' top
+CAND_BOTTOM = -4.3
+WORD_MAX = 20                # "switch to actual words once ... 20 or fewer"
+DOT_COLOR = WHITE            # 06's dots
+DIM = 0.75                   # the emphasis mask's opacity over a dimmed column
 FORTH_BOARD = 3                                # board whose answer is FORTH
 
 
@@ -158,6 +209,8 @@ class Scene16(WordleBoardScene):
         self.add(*self.boards)
         self.windows = None
         self.foot = None
+        self.cands = None            # per board: {word: Dot or PigpenWord}
+        self.masks = None
 
     @staticmethod
     def _board(layout, i):
@@ -312,3 +365,258 @@ class Scene16(WordleBoardScene):
         self._guess(10, 0.65, 0.9)             # OCTET
         self._wave(2.0)
         self.star = self.foot = None
+
+    # ── candidates under the boards (16i-r) ───────────────────────────────────
+    def _region(self, k):
+        b = self.boards[k]
+        return (b.get_left()[0], b.get_right()[0], b.get_bottom()[1] - CAND_TOP_GAP)
+
+    def _sizes(self):
+        """The ONE dot pitch (fitted to the largest set either game shows) and the
+        word grid's column count (fitted to WORD_MAX words), for this layout."""
+        if getattr(self, "_pitch", None) is not None:
+            return self._pitch, self._ncols
+        left, right, top = self._region(0)
+        w, h = right - left, top - CAND_BOTTOM
+        biggest = max(len(b["members"]) for g in (REPLAY, GREEDY)
+                      for st in g["steps"] for b in st["boards"])
+        lo, hi = 0.001, 1.0                       # largest pitch that fits `biggest`
+        for _ in range(50):
+            p = (lo + hi) / 2
+            lo, hi = (p, hi) if int(w / p) * int(h / p) >= biggest else (lo, p)
+        group = {"size": WORD_MAX, "members": [f"w{i}" for i in range(WORD_MAX)]}
+        best = max(range(1, WORD_MAX + 1), key=lambda nc: ranked_word_layout(
+            [group], left, right, top, CAND_BOTTOM, heads=0, ncols=[nc])[1])
+        self._pitch, self._ncols = lo, best
+        return lo, best
+
+    def _cand_anims(self, members_by_board):
+        """ONE play's worth of animations taking every board's candidates to the
+        sets given, plus what to do when it ends. Dots while a set is over WORD_MAX,
+        words from there down; eliminated ones fade, survivors regrid, a set
+        crossing to words grows its words out of their dots (07)."""
+        pitch, ncols = self._sizes()
+        anims, gone, new = [], [], []
+        for k, members in enumerate(members_by_board):
+            cur = self.cands[k]
+            left, right, top = self._region(k)
+            nxt = {}
+            if len(members) > WORD_MAX:
+                spots, r = dot_grid(members, pitch, left, right, top)
+                for wd in members:
+                    if wd in cur:
+                        anims.append(cur[wd].animate.move_to(spots[wd]))
+                        nxt[wd] = cur[wd]
+                    else:
+                        d = Dot(point=spots[wd], radius=r, color=DOT_COLOR)
+                        anims.append(FadeIn(d))
+                        new.append(d)
+                        nxt[wd] = d
+            else:
+                slots, sc, _, _ = ranked_word_layout(
+                    [{"size": len(members), "members": members}], left, right, top,
+                    CAND_BOTTOM, heads=0, ncols=[ncols])
+                for wd in members:
+                    old = cur.get(wd)
+                    if isinstance(old, PigpenWord):
+                        anims.append(old.animate.move_to(slots[wd]))
+                        nxt[wd] = old
+                        continue
+                    m = PigpenWord(wd, revealed=True).scale(sc).move_to(slots[wd])
+                    if old is None:
+                        anims.append(FadeIn(m))
+                    else:                        # grows out of its dot (07)
+                        m.generate_target()
+                        m.scale(old.width / m.width).move_to(old).set_opacity(0)
+                        anims += [MoveToTarget(m),
+                                  old.animate.move_to(slots[wd]).set_opacity(0)]
+                        gone.append(old)
+                    new.append(m)
+                    nxt[wd] = m
+            for wd, m in cur.items():
+                if wd not in nxt:
+                    anims.append(FadeOut(m))
+                    gone.append(m)
+            self.cands[k] = nxt
+        return anims, new, gone
+
+    def _update_cands(self, members_by_board, run_time):
+        anims, new, gone = self._cand_anims(members_by_board)
+        self.add(*new)
+        self.play(*anims, run_time=run_time)
+        self.remove(*gone)
+
+    def _play(self, game, j, type_rt, score_rt, update_rt):
+        """Guess j of `game` (multi_data's): typed into every board it reaches,
+        scored, then every board's candidates updated."""
+        step = game["steps"][j]
+        live = [k for k, b in enumerate(step["boards"]) if b["code"] is not None]
+        types = []
+        for n, k in enumerate(live):
+            anim, total = self.boards[k].type_anim(
+                self, j, step["word"], type_rt,
+                per_letter=key_cues(self) if n == 0 else None)
+            types.append(anim)
+        self.play(*types, run_time=total)
+        self.play(*[self.boards[k].reveal_anim(j, step["boards"][k]["code"])
+                    for k in live], run_time=score_rt)
+        self._update_cands([b["members"] for b in step["boards"]], update_rt)
+
+    def _blank_flips(self, rows, shift=None):
+        """Every tile of `rows` (per board) flipped to the blank face -- letters gone
+        -- as one cascade per row; `shift` moves the WHOLE board meanwhile. Returns
+        (animations, letters to remove after)."""
+        anims, dead = [], []
+        for k, b in enumerate(self.boards):
+            for r in range(b.n_rows):
+                flipping = r in rows[k]
+                flips = []
+                for c in range(b.n_cols):
+                    tile, letter = b.tiles[r][c], b.letters[r][c]
+                    if flipping:
+                        to = None if shift is None else tile.get_center() + shift
+                        flips.append(TileFlip(tile, letter, TILE_EMPTY_FILL,
+                                              stroke=TILE_EMPTY_BORDER, swap_to=None,
+                                              to_center=to))
+                        if letter is not None:
+                            dead.append((b, r, c, letter))
+                    elif shift is not None:
+                        anims.append(tile.animate.shift(shift))
+                if flips:
+                    anims.append(LaggedStart(*flips, lag_ratio=0.25))
+        return anims, dead
+
+    def _drop_letters(self, dead):
+        for b, r, c, letter in dead:
+            b.remove(letter)
+            self.remove(letter)
+            b.letters[r][c] = None
+
+    def _filled_rows(self):
+        return [[r for r in range(b.n_rows) if b.letters[r][0] is not None]
+                for b in self.boards]
+
+    def _flip_word_in(self, j, run_time):
+        """Row j of every board it reached flips back to REPLAY's coloured guess j,
+        all tiles at once ("in one flip")."""
+        step = REPLAY["steps"][j]
+        flips = []
+        for k, b in enumerate(self.boards):
+            code = step["boards"][k]["code"]
+            if code is None:
+                continue
+            trits = [(code // 3 ** (4 - i)) % 3 for i in range(5)]
+            for c, ch in enumerate(step["word"]):
+                tile = b.tiles[j][c]
+                letter = b._letter(ch, tile).set_opacity(0)
+                b.letters[j][c] = letter
+                b.add(letter)
+                self.add(letter)
+                flips.append(TileFlip(tile, None, TILE_STATE[trits[c]], swap_to=letter))
+        self.play(*flips, run_time=run_time)
+
+    # i : the game flips back to black as the boards move up; SOLVE again, and
+    #     each board's candidates appear beneath it
+    @subscene
+    def replay_solve(self):
+        anims, dead = self._blank_flips(self._filled_rows(), shift=UP * RAISE)
+        self.play(*anims, run_time=1.2)
+        self._drop_letters(dead)
+        self.cands = [{} for _ in self.boards]
+        self._play(REPLAY, 0, 0.65, 0.9, 1.0)       # SOLVE
+
+    # j : EIGHT
+    @subscene
+    def replay_eight(self):
+        self._play(REPLAY, 1, 0.65, 0.9, 1.0)
+
+    # k : WORDS
+    @subscene
+    def replay_words(self):
+        self._play(REPLAY, 2, 0.65, 0.9, 1.0)
+
+    # l : FIRST
+    @subscene
+    def replay_first(self):
+        self._play(REPLAY, 3, 0.65, 0.9, 1.0)
+
+    # m : the rest of the game
+    @subscene
+    def replay_rest(self):
+        self._play(REPLAY, 4, 0.65, 0.9, 0.6)       # HALVE
+        self._play(REPLAY, 5, 0.65, 0.9, 0.6)       # THIRD
+        self._play(REPLAY, 6, 0.65, 0.9, 0.6)       # FORTH
+        self._play(REPLAY, 7, 0.65, 0.9, 0.6)       # FIFTH
+        self._play(REPLAY, 8, 0.65, 0.9, 0.6)       # SIXTH
+        self._play(REPLAY, 9, 0.65, 0.9, 0.6)       # SEVEN
+        self._play(REPLAY, 10, 0.65, 0.9, 0.6)      # OCTET
+
+    # n : every row but SOLVE back to black; the candidates go
+    @subscene
+    def blank_rest(self):
+        rows = [[r for r in rs if r > 0] for rs in self._filled_rows()]
+        anims, dead = self._blank_flips(rows)
+        cands = [m for c in self.cands for m in c.values()]
+        self.play(*anims, *[FadeOut(m) for m in cands], run_time=1.2)
+        self.remove(*cands)
+        self._drop_letters(dead)
+        self.cands = [{} for _ in self.boards]
+
+    # o : row 2 back to the coloured EIGHT, in one flip
+    @subscene
+    def flip_eight(self):
+        self._flip_word_in(1, 0.6)
+
+    # p : row 3 back to WORDS, in one flip
+    @subscene
+    def flip_words(self):
+        self._flip_word_in(2, 0.6)
+
+    # q : rows 2 and 3 back to black, and SOLVE's candidates back
+    @subscene
+    def after_solve(self):
+        anims, dead = self._blank_flips([[1, 2] for _ in self.boards])
+        self.play(*anims, run_time=1.0)
+        self._drop_letters(dead)
+        assert GREEDY["steps"][0] == REPLAY["steps"][0]     # both open on SOLVE
+        self._update_cands([b["members"] for b in REPLAY["steps"][0]["boards"]], 1.0)
+
+    def _setup_masks(self):
+        self.masks = []
+        gap = self.boards[1].get_left()[0] - self.boards[0].get_right()[0]
+        for b in self.boards:
+            m = Rectangle(width=b.width + gap, height=FH, stroke_width=0,
+                          fill_color=BOARD_NAVY, fill_opacity=0.0)
+            m.move_to([b.get_center()[0], 0, 0]).set_z_index(50)
+            self.masks.append(m)
+        self.add(*self.masks)
+
+    def _emphasize(self, k, run_time):
+        """Board k (and its candidates) at full strength, every other column dimmed."""
+        self.play(*[m.animate.set_fill(opacity=0.0 if i == k else DIM)
+                    for i, m in enumerate(self.masks)], run_time=run_time)
+
+    def _greedy(self, j):
+        """16r's guess j: its board emphasised, then the guess played everywhere."""
+        self._emphasize(GREEDY["steps"][j]["target"], 0.5)
+        self._play(GREEDY, j, 0.65, 0.9, 0.8)
+
+    # r : the board with the fewest candidates emphasised, a random one of its
+    #     candidates guessed, every board's candidates updated -- to the end
+    @subscene
+    def greedy(self):
+        self._setup_masks()
+        self._greedy(1)              # SEVER  (for board 7)
+        self._greedy(2)              # SEVEN  (board 7)
+        self._greedy(3)              # VALVE  (board 2)
+        self._greedy(4)              # HALVE  (board 2)
+        self._greedy(5)              # OCTET  (board 8)
+        self._greedy(6)              # WORTH  (board 4)
+        self._greedy(7)              # THIRD  (board 3)
+        self._greedy(8)              # FIRST  (board 1)
+        self._greedy(9)              # FORTH  (board 4)
+        self._greedy(10)             # FIFTH  (board 5)
+        self._greedy(11)             # SIXTH  (board 6)
+        self.play(*[FadeOut(m) for m in self.masks], run_time=0.6)
+        self.remove(*self.masks)
+        self.masks = None

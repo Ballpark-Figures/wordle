@@ -393,6 +393,25 @@ def ranked_layout(data, guess, left, right=REGION_HALF_W, top=DOT_REGION_TOP,
     return (groups, *_fill(groups, bs, centres, f))
 
 
+def dot_grid(members, pitch, left, right, top):
+    """Every word of `members` a dot, in rows of as many as fit between `left` and
+    `right` at `pitch`, top row at `top` (just under the top edge), filled left to
+    right in member order, each row centred -- scene 16's candidates under a board.
+    No scored row on top (unlike `dot_layout`'s blocks). The PITCH IS THE CALLER'S,
+    so every board shows its candidates at one dot size and a count reads as an
+    area. Returns ({word: centre}, dot radius)."""
+    nc = max(1, int((right - left) / pitch))
+    n = len(members)
+    cx = (left + right) / 2
+    spots = {}
+    for k, word in enumerate(members):
+        i, j = divmod(k, nc)
+        in_row = min(nc, n - i * nc)
+        spots[word] = np.array([cx + (j - (in_row - 1) / 2) * pitch,
+                                top - (i + 0.5) * pitch, 0.0])
+    return spots, DOT_FRAC * pitch
+
+
 # ── words packed by size (07) ─────────────────────────────────────────────────
 WORD_ASPECTS = np.geomspace(0.2, 5.0, 33)   # grid shapes tried: columns ~ sqrt(n * a)
 
