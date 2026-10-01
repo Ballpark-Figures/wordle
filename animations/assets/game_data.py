@@ -41,6 +41,18 @@ GAMES = {
     "rules": ("ended", ["begin", "edits", "melee", "ended"]),
 }
 
+# name -> (answers, guesses in order): ONE set of guesses played on every board at
+# once, the multi-Wordle games. A board stops at the guess that solves it (Octordle
+# takes no more guesses on a solved board), so each board's rows are a prefix.
+MULTI = {
+    # Scene 16h -- "Start with SOLVE EIGHT WORDS and then do the 8 words in order."
+    # The opener and the answers are the user's (worked out in the scene-16 thread
+    # so every board is down to ONE candidate when its answer is played).
+    "octordle": (["first", "halve", "third", "forth", "fifth", "sixth", "seven", "octet"],
+                 ["solve", "eight", "words",
+                  "first", "halve", "third", "forth", "fifth", "sixth", "seven", "octet"]),
+}
+
 # name -> committed result file whose chain IS the game. Read, never typed in: the
 # line is the solver's output, and a re-run of it can legitimately emit a DIFFERENT
 # chain of the same length (eldrowmax's witness depends on thread timing).
@@ -95,6 +107,21 @@ def _build():
                     assert wordle.pattern(g, w) == wordle.pattern(g, answer), \
                         f"{name}: {w} contradicts the clue from {g}"
         out[name] = game
+
+    for name, (answers_, guesses) in MULTI.items():
+        for w in answers_ + guesses:
+            assert w in legal, f"{name}: {w} is not a legal word"
+        assert all(a in guesses for a in answers_), f"{name}: an answer is never played"
+        boards = []
+        for a in answers_:
+            played = guesses[:guesses.index(a) + 1]
+            rows = []
+            for g in played:
+                code = wordle.pattern(g, a)
+                rows.append({"word": g, "code": int(code),
+                             "tiles": [(code // 3 ** (4 - i)) % 3 for i in range(5)]})
+            boards.append({"answer": a, "in_mystery": a in answers, "guesses": rows})
+        out[name] = {"answers": answers_, "guesses": guesses, "boards": boards}
     return out
 
 
@@ -110,6 +137,12 @@ if __name__ == "__main__":
         f.write("\n")
     names = {0: "absent", 1: "present", 2: "correct"}
     for name, game in data.items():
+        if "boards" in game:
+            print(f"{name}: {len(game['boards'])} boards, guesses "
+                  + " ".join(g.upper() for g in game["guesses"]))
+            for b in game["boards"]:
+                print(f"  {b['answer'].upper()}: solved on guess {len(b['guesses'])}")
+            continue
         note = "" if game["in_mystery"] else "  (not one of the 2315 answers)"
         print(f"{name}: answer {game['answer'].upper()}{note}")
         for g in game["guesses"]:
