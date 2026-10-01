@@ -9,18 +9,25 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
 
   a one_board     — the ordinary 6-row board                               (16a, VO 1)
   b split_two     — splits into 2 side by side, 7 rows each               (16b, VO 1)
-  c split_four    — splits into 4 in a 2x2 grid, 9 rows each              (16c, VO 1)
-  d split_eight   — splits into 8 in a 2x4 grid, 13 rows each             (16d, VO 1)
+  c split_four    — splits into 4 in a row, 9 rows each                   (16c, VO 1)
+  d split_eight   — splits into 8 in a row, 13 rows each                  (16d, VO 1)
   e browser_in    — boards shift up off frame, Octordle's window up in    (16e, VO 1)
   f variants      — Octordle to the top-right cell, the other five in     (16f, VO 2)
   g back_down     — windows shift down off frame, the 8 boards back       (16g, VO 3)
   h playthrough   — SOLVE EIGHT WORDS, then FIRST .. OCTET; FORTH's *     (16h, VO 3)
 
-THE SPLITS ARE PIECE BY PIECE. Every old tile is transformed to its counterpart in
-ONE of the two children; a copy of it goes to the other child; only the rows a
-child has that its parent did not (the "adding a row" of the script) fade in, from
-BEHIND the moving tiles, the trick `board.add_row` uses. The 13-row layout of d is
-exactly the board the game of h is played on, so nothing changes at the seam.
+THE GAME HAS NO PAUSES OF ITS OWN (user's call): a solved board jumps during the
+next guess's typing, and the FOURTH footnote fades in with FIFTH's typing and out
+with OCTET's, staying up while the game goes on.
+
+ALL BOARDS IN ONE ROW (user's call, 2026-10-01 -- the script's "grid" and "2x4"
+were overridden): each board splits into two neighbours, pushing the row apart.
+
+THE NEW ROWS ARE ATTACHED (user's call): each child moves as one board, starting as
+an exact overlay of its parent with its extra rows already in place below the last
+row but invisible, and those rows fade in as the board travels (`_split`). The
+13-row layout of d is exactly the board the game of h is played on, so nothing
+changes at that seam.
 
 THE ROW COUNTS ARE THE REAL GAMES': 7 (Dordle), 9 (Quordle), 13 (Octordle).
 
@@ -78,35 +85,32 @@ def _board_h(rows):
 
 
 L1 = (ROWS, 1.0, [ORIGIN])
-_S2 = 1.0
-_X2 = (BOARD_W * _S2 + 1.0) / 2
-L2 = (7, _S2, [LEFT * _X2, RIGHT * _X2])
-_S4, _G4 = 0.44, 0.3
-_DX4 = (BOARD_W * _S4 + _G4) / 2
-_DY4 = (_board_h(9) * _S4 + _G4) / 2
-# left board -> top-left, bottom-left; right board -> top-right, bottom-right
-L4 = (9, _S4, [np.array([-_DX4, _DY4, 0]), np.array([-_DX4, -_DY4, 0]),
-               np.array([_DX4, _DY4, 0]), np.array([_DX4, -_DY4, 0])])
-_S8, _G8 = 0.30, 0.25
-_Y8 = 0.15                                    # block raised, room for the footnote
-_PX8 = BOARD_W * _S8 + _G8
-_DY8 = (_board_h(13) * _S8 + _G8) / 2
-_XS8 = [(-1.5 + k) * _PX8 for k in range(4)]
-# each 2x2 board splits sideways: TL -> cols 0,1 top; BL -> 0,1 bottom; TR -> 2,3
-# top; BR -> 2,3 bottom. GRID8[i] is the centre of child i.
-_TOP8, _BOT8 = _Y8 + _DY8, _Y8 - _DY8
-L8 = (13, _S8, [np.array([_XS8[0], _TOP8, 0]), np.array([_XS8[1], _TOP8, 0]),
-                np.array([_XS8[0], _BOT8, 0]), np.array([_XS8[1], _BOT8, 0]),
-                np.array([_XS8[2], _TOP8, 0]), np.array([_XS8[3], _TOP8, 0]),
-                np.array([_XS8[2], _BOT8, 0]), np.array([_XS8[3], _BOT8, 0])])
-# which split child sits in which game slot: game board k (answer k, read like
-# Octordle: top row left to right, then bottom row) -> child index
-SLOT8 = [0, 1, 4, 5, 2, 3, 6, 7]
+ROW_GAP = 0.8                 # space between neighbouring boards, in unscaled units
+ROW_MAX_W, ROW_MAX_H = 15.2, 8.2
+
+
+def _row_layout(n, rows):
+    """n boards of `rows` rows side by side in ONE row, centred, as big as fits (never
+    bigger than the ordinary board). Board i splits into children 2i and 2i+1, which
+    sit next to each other -- so every split pushes boards apart sideways."""
+    span = n * BOARD_W + (n - 1) * ROW_GAP
+    s = min(1.0, ROW_MAX_W / span, ROW_MAX_H / _board_h(rows))
+    xs = [(-span / 2 + BOARD_W / 2 + k * (BOARD_W + ROW_GAP)) * s for k in range(n)]
+    return (rows, s, [np.array([x, 0, 0]) for x in xs])
+
+
+L2 = _row_layout(2, 7)
+L4 = _row_layout(4, 9)
+L8 = _row_layout(8, 13)
 
 # ── browser windows ───────────────────────────────────────────────────────────
-WIN_W = 13.6                                  # the full-frame Octordle window
-CELL_W = 4.6                                  # one window of the 3x2 variants grid
-CELL_GX, CELL_GY = 0.4, 0.5
+# The screenshots are 1920x1490 (web_shots.py --size 1920x1490), not 16:9: taller
+# windows fill the 3x2 grid's cells, which a 16:9 window cannot. A window is then
+# WIN_TALL times its width (page 1490/1920 plus browser.py's tab strip + toolbar).
+WIN_TALL = 1490 / 1920 + 0.046
+WIN_W = 10.4                                  # the full-frame Octordle window
+CELL_W = 5.0                                  # one window of the 3x2 variants grid
+CELL_GX, CELL_GY = 0.25, 0.3
 # (screenshot, tab title, address). Power-of-two order, read left to right, top
 # row first -- which puts Octordle in the TOP-RIGHT cell the script names.
 VARIANTS = [
@@ -124,7 +128,7 @@ FORTH_BOARD = 3                                # board whose answer is FORTH
 
 
 def _cell_center(i):
-    win_h = CELL_W * (9 / 16 + 0.046)          # viewport + chrome (browser.py fracs)
+    win_h = CELL_W * WIN_TALL
     col, row = i % 3, i // 3
     return np.array([(col - 1) * (CELL_W + CELL_GX),
                      (0.5 - row) * (win_h + CELL_GY), 0])
@@ -159,26 +163,29 @@ class Scene16(WordleBoardScene):
         return get_board(rows=rows).scale(s).move_to(centres[i])
 
     def _split(self, layout, run_time):
-        """Every board splits in two, both children growing to `layout`'s rows."""
-        anims, new, gone = [], [], []
+        """Every board splits in two, both children growing to `layout`'s rows.
+
+        Each child moves as ONE board: it starts as an exact overlay of its parent,
+        its extra rows already ATTACHED below the parent's last row but invisible,
+        and travels to its own pose while those rows fade in -- so the new rows ride
+        with the board rather than appearing where it ends up. The parent is swapped
+        for the two overlays before the play (identical pose, so no pop).
+        """
+        anims, starts, new = [], [], []
         for i, b in enumerate(self.boards):
-            twin = b.copy()
-            kids = [self._board(layout, 2 * i), self._board(layout, 2 * i + 1)]
-            for src, kid in zip((b, twin), kids):
-                for r in range(b.n_rows):
-                    for c in range(b.n_cols):
-                        anims.append(Transform(src.tiles[r][c], kid.tiles[r][c]))
+            for kid in (self._board(layout, 2 * i), self._board(layout, 2 * i + 1)):
+                start = kid.copy()
+                start.scale(b.tiles[0][0].width / kid.tiles[0][0].width)
+                start.shift(b.tiles[0][0].get_center() - start.tiles[0][0].get_center())
                 for r in range(b.n_rows, kid.n_rows):
-                    kid.rows[r].set_z_index(-1)
-                    anims.append(FadeIn(kid.rows[r]))
-            gone += [b, twin]
-            new += kids
-        self.add(*[b for b in gone if b not in self.boards])
+                    start.rows[r].set_opacity(0)
+                anims.append(Transform(start, kid))
+                starts.append(start)
+                new.append(kid)
+        self.remove(*self.boards)
+        self.add(*starts)
         self.play(*anims, run_time=run_time)
-        self.remove(*gone)
-        for kid in new:
-            for row in kid.rows:
-                row.set_z_index(0)
+        self.remove(*starts)
         self.add(*new)
         self.boards = new
 
@@ -201,8 +208,6 @@ class Scene16(WordleBoardScene):
     @subscene
     def split_eight(self):
         self._split(L8, 1.4)
-        # game order: answer k's board is child SLOT8[k]
-        self.boards = [self.boards[j] for j in SLOT8]
 
     def _setup_browser(self):
         win = _window(OCT, WIN_W)
@@ -248,9 +253,14 @@ class Scene16(WordleBoardScene):
         self.windows = None
 
     # ── the game ──────────────────────────────────────────────────────────────
-    def _guess(self, j, type_rt, score_rt, win_rt=0.8):
-        """Guess j typed into every unsolved board, scored, and any board it solves
-        jumps. A board is unsolved at guess j while it has a row j."""
+    def _guess(self, j, type_rt, score_rt, extra=()):
+        """Guess j typed into every unsolved board, then scored. A board is unsolved
+        at guess j while it has a row j.
+
+        NO PAUSE OF ITS OWN BETWEEN GUESSES: a board this guess solves jumps DURING
+        the next guess's typing (held in `self.wins` until then), and `extra`
+        animations (the footnote in and out) join the typing play too. Only the
+        last guess's jump plays on its own (`_last_win`)."""
         live = [k for k, b in enumerate(BOARDS) if len(b["guesses"]) > j]
         word = GUESSES[j]
         types = []
@@ -258,12 +268,15 @@ class Scene16(WordleBoardScene):
             anim, total = self.boards[k].type_anim(
                 self, j, word, type_rt, per_letter=key_cues(self) if n == 0 else None)
             types.append(anim)
-        self.play(*types, run_time=total)
+        self.play(*types, *self.wins, *extra, run_time=total)
         self.play(*[self.boards[k].reveal_anim(j, BOARDS[k]["guesses"][j]["code"])
                     for k in live], run_time=score_rt)
-        won = [k for k in live if BOARDS[k]["answer"] == word]
-        if won:
-            self.play(*[self.boards[k].bounce_anim(j) for k in won], run_time=win_rt)
+        self.wins = [self.boards[k].bounce_anim(j) for k in live
+                     if BOARDS[k]["answer"] == word]
+
+    def _last_win(self, run_time):
+        self.play(*self.wins, run_time=run_time)
+        self.wins = []
 
     def _setup_footnote(self):
         b = self.boards[FORTH_BOARD]
@@ -282,19 +295,20 @@ class Scene16(WordleBoardScene):
     # h : SOLVE EIGHT WORDS, then the eight answers in order
     @subscene
     def playthrough(self):
-        self._guess(0, 0.65, 1.2)              # SOLVE
-        self._guess(1, 0.65, 1.2)              # EIGHT
-        self._guess(2, 0.65, 1.2)              # WORDS
-        self._guess(3, 0.65, 1.2)              # FIRST
-        self._guess(4, 0.65, 1.2)              # HALVE
-        self._guess(5, 0.65, 1.2)              # THIRD
-        self._guess(6, 0.65, 1.2)              # FORTH
+        self.wins = []
+        self._guess(0, 0.65, 0.9)              # SOLVE
+        self._guess(1, 0.65, 0.9)              # EIGHT
+        self._guess(2, 0.65, 0.9)              # WORDS
+        self._guess(3, 0.65, 0.9)              # FIRST
+        self._guess(4, 0.65, 0.9)              # HALVE
+        self._guess(5, 0.65, 0.9)              # THIRD
+        self._guess(6, 0.65, 0.9)              # FORTH
         self._setup_footnote()
-        self.play(FadeIn(self.star), FadeIn(self.foot), run_time=0.6)
-        self.wait(1.5)
-        self._guess(7, 0.65, 1.2)              # FIFTH
-        self._guess(8, 0.65, 1.2)              # SIXTH
-        self._guess(9, 0.65, 1.2)              # SEVEN
-        self._guess(10, 0.65, 1.2)             # OCTET
-        self.play(FadeOut(self.star), FadeOut(self.foot), run_time=0.6)
+        # the footnote comes up WITH the next guess's typing -- no pause of its own --
+        # and stays up while the game goes on
+        self._guess(7, 0.65, 0.9, extra=[FadeIn(self.star), FadeIn(self.foot)])  # FIFTH
+        self._guess(8, 0.65, 0.9)              # SIXTH
+        self._guess(9, 0.65, 0.9)              # SEVEN
+        self._guess(10, 0.65, 0.9, extra=[FadeOut(self.star), FadeOut(self.foot)])  # OCTET
+        self._last_win(0.8)
         self.star = self.foot = None

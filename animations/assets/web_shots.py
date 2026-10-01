@@ -9,7 +9,8 @@ Drives the Google Chrome already installed on this machine through Playwright
 board only exists after clicking into it, which is why a plain `chrome --screenshot`
 cannot reach it: every recipe below is a URL plus the clicks that get to the board.
 
-Output: `animations/assets/web_media/<game>.png`, 1920x1080, dark colour scheme
+Output: `animations/assets/web_media/<game>.png`, 1920x1080 unless `--size` says
+otherwise (scene 16 uses 1920x1490), dark colour scheme
 requested (a site with no dark mode, like Dordle, stays light). A screenshot is a
 POINT-IN-TIME capture of a live site — today's puzzle, today's layout — so re-running
 replaces it; nothing here is computed. The sites change, so a recipe that stops
@@ -27,7 +28,24 @@ from playwright.sync_api import sync_playwright
 
 OUT = Path(__file__).resolve().parent / "web_media"
 VIEW = {"width": 1920, "height": 1080}
-SETTLE_MS = 4000      # after load / after each click: these are JS apps with animations
+SETTLE_MS = 4000
+
+# Requests to these hosts are dropped, so no ad lands in a screenshot (a real ad
+# would put a third party's creative in the video). Substring match on the host.
+AD_HOSTS = ("doubleclick", "googlesyndication", "googleadservices", "adservice",
+            "amazon-adsystem", "adnxs", "rubiconproject", "pubmatic", "openx",
+            "criteo", "taboola", "outbrain", "moatads", "teads", "casalemedia",
+            "33across", "sharethrough", "indexww", "adsrvr", "smartadserver",
+            "gumgum", "media.net", "yieldmo", "triplelift", "lijit", "sovrn",
+            "adform", "springserve", "pubnation", "kargo", "connatix", "freestar",
+            "googletagservices", "securepubads", "ad-delivery", "adsafeprotected")
+
+
+def _block_ads(route):
+    host = route.request.url.split("/")[2] if "://" in route.request.url else ""
+    if any(a in host for a in AD_HOSTS):
+        return route.abort()
+    return route.continue_()      # after load / after each click: these are JS apps with animations
 
 # game -> (url, [click steps]). A step is a Playwright locator description:
 #   ("text", "Play")        the first visible element whose text is exactly that
@@ -50,8 +68,9 @@ GAMES = {
 }
 
 
-def _run(game, url, steps, browser, full_page=False):
-    ctx = browser.new_context(viewport=VIEW, color_scheme="dark")
+def _run(game, url, steps, browser, full_page=False, view=VIEW):
+    ctx = browser.new_context(viewport=view, color_scheme="dark")
+    ctx.route("**/*", _block_ads)
     page = ctx.new_page()
     try:
         page.goto(url, wait_until="domcontentloaded", timeout=45000)
@@ -84,6 +103,9 @@ def _run(game, url, steps, browser, full_page=False):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("games", nargs="*", help=f"subset of: {' '.join(GAMES)}")
+    ap.add_argument("--size", default="1920x1080",
+                    help="browser viewport WxH in px (default 1920x1080); scene 16's "
+                         "windows use 1920x1490")
     ap.add_argument("--full-page", action="store_true",
                     help="capture the whole scrolling page, not just the 1080px window")
     ap.add_argument("--list", action="store_true", help="print the recipes and stop")
@@ -98,7 +120,9 @@ def main():
     todo = a.games or list(GAMES)
     with sync_playwright() as p:
         browser = p.chromium.launch(channel="chrome", headless=True)
-        ok = [_run(g, *GAMES[g], browser, a.full_page) for g in todo]
+        w, h = (int(x) for x in a.size.lower().split("x"))
+        ok = [_run(g, *GAMES[g], browser, a.full_page, {"width": w, "height": h})
+              for g in todo]
         browser.close()
     if not all(ok):
         sys.exit(1)
