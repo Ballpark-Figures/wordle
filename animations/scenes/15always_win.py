@@ -115,8 +115,10 @@ The markers' averages are shown only by where they sit (13's convention). The VO
 72/16 are spoken, not shown.
 
 NB LEDGE PAWNS ROCKY THUMB has ONE unsolved answer under the custom.txt follow-up:
-SALLE, beside FALSE and SALVE. The user accepts that (2026-10-01): nobody guesses
-SALLE over SALVE. Do not re-flag it.
+SALVE, in the bucket FALSE / SALLE / SALVE (SALLE is not an answer); losing it
+needs SALLE guessed (worst line FALSE, SALLE, SALVE). The user accepts that
+(2026-10-01): nobody guesses SALLE over SALVE. Do not re-flag it. The x-z counter
+shows every count minus 1 (UNCOUNTED) for that reason, so it ends at 0.
 
 LAYOUT CHOICES, flagged:
   - b: the corner CLONE's letter i lands as the words' tile i turns over (user's
