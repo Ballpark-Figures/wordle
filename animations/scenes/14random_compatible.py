@@ -1,0 +1,259 @@
+"""Scene 14 — one word of our choice, then random compatible answers; and how much
+each guess matters. Navy background.
+
+Talking head THI precedes it, so a starts on an empty frame. Scene 15 follows
+directly, and i ends with everything faded out (user's call, 2026-10-01).
+
+BEAT MAP — one subscene per Script.md beat, letters matching:
+
+  a chose_game  — scene 13's game again, from CHOSE (the "word of our choice"; the
+                  script's CHOICE has six letters), against WOVEN: CHOSE typed and
+                  flipped BBYBY, its 66 compatible answers in, and each next word
+                  selected straight away (no random hops, per the script): VIDEO
+                  (YBBGY, 5 left), NOVEL (YGGGB, 1 left), WOVEN (GGGGG, the win
+                  bounce)                                               (14a, VO 1)
+  b chose_line  — the camera pans down to scene 13's number line (the game leaves
+                  upward), now 3.42 at the left and Random Compatible's 4.08 at the
+                  right (user's call); the CHOSE marker pops out at 3.99 (98.53%)
+                                                                        (14b, VO 1)
+  c slate       — CHOSE flips to SLATE as its marker slides left to 3.82, its win
+                  rate counting up to 98.87%                            (14c, VO 1)
+  d table       — the camera pans down again (the line leaves upward) to the title
+                  "Random Compatible on Turn ___ / Optimal Elsewhere" and a table:
+                  turns 1-5 down the left, "Average Guesses" over the right
+                                                                        (14d, VO 2)
+  e turn5       — 3.4212 in row 5                                       (14e, VO 3)
+  f turn4       — 3.4225 in row 4                                       (14f, VO 4)
+  g turn1       — 3.61 in row 1                                         (14g, VO 5)
+  h turn3       — 3.49 in row 3                                         (14h, VO 6)
+  i turn2       — 3.67 in row 2; then everything fades out              (14i, VO 6)
+
+REUSE MAP — every element, the one source it comes from, and how it enters:
+  the game (a)          assets/strategy_line.py `StrategyLine` — scene 13's game,
+                        moved there unchanged: typed rows `_type`, flips `_flip`,
+                        the grid `_words_in`/`_regrid`, the highlight `_hops` (a
+                        single hop, the next guess), the win `_win`
+  CHOSE in (a)          typed as it appears (13's `_type`); the scene opens on it
+  number line (b)       StrategyLine `_build_line` (13's title, subtitle and line),
+                        bpkfigures ZoomLine; the 3.42 and 4.08 markers are
+                        StrategyLine `optimal_marker`/`compatible_marker`, 13's
+  line in (b)           already in place one frame below the game; the camera pans
+                        down to it with 01's whoosh (`_pan_down`, 13k's pan)
+  CHOSE marker (b)      13's marker card (`_marker`), CHOSE as a tile row like 13b's
+                        SALET (`word_line`); pops out of its dot with the pop sound
+                        (`_pop_in`, 13's)
+  CHOSE -> SLATE (c)    assets/flip.py `Flip(..., travel=True)` by `row_parts`, the
+                        row sliding with its marker (bpkfigures ZoomLine
+                        `move_marker`, added for this beat)
+  win-rate count (c)    bpkfigures style.py `CrispCounter` (`count_anim`, added for
+                        this beat so the count can ride the moving card), coloured
+                        by StrategyLine `win_color`
+  title (d)             crisp_text, WHITE, FONT_SIZE_LG — 13's title
+  table (d)             scene 10's table: bold header at 28, cells at 30, rows 0.72
+                        apart (10word_lengths.py:178-186, 409-416)
+  table in (d)          already in place one frame below the line; the camera pans
+                        down to it (13k's pan, as b)
+  cells (e-i)           10's `_fill_avg`: FadeIn rising 0.3 (10word_lengths.py:437)
+  the end (i)           FadeOut of everything
+  colours               BOARD_NAVY via WordleBoardScene, as 13
+
+EVERY NUMBER is sourced (assets/random_compatible_data.py -> its cache; provenance
+there), except the two line markers carried over from scene 13 (its docstring):
+  CHOSE   3.99 (3.987382), 98.53% (0.985295)   openexact, exact
+  SLATE   3.82 (3.821367), 98.87% (0.988670)   openexact, exact (user's call: the
+                                               exact rate, not the race's 98.86%)
+  turn 1..5   3.61 3.67 3.49 3.4225 3.4212     kthrandom (k=1 the answer-word
+                                               openers' optimal totals, averaged)
+The markers' averages are shown only by where they sit (13's convention).
+
+LAYOUT CHOICES, flagged:
+  - The game is 13's, set one frame above the line, so a -> b and b -> d are pans
+    and nothing fades (13's convention).
+  - Every compatible answer shown, all 66 after CHOSE.
+  - The CHOSE/SLATE card hangs above the line (4.08's is below, 3.42's is far left).
+  - Its text is "then Random" / "Compatible" under the tiles (script: "CHOICE,
+    then random compatible"), capitalised as 13's markers are.
+  - The table's left column has no header (the script labels only the right one).
+    Its title's blank is a short line of underscores (user's call).
+  - Decimal places as the script writes them: 4 for turns 4 and 5, 2 for 1-3
+    (`_fmt`).
+"""
+from pathlib import Path
+import sys
+
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
+
+from config import *
+from manim import MovingCameraScene
+from bpkfigures.style import CrispCounter
+from assets import random_game_data, random_compatible_data
+from assets.flip import Flip, flip, row_parts
+from assets.strategy_line import (StrategyLine, GAME_DY, MARKER_FS, TITLE_BUFF,
+                                  OPTIMAL, COMPATIBLE, win_color, word_line,
+                                  rate_text)
+
+DATA = random_compatible_data.load()
+CHOSE, SLATE = DATA["openers"]["chose"], DATA["openers"]["slate"]
+TURNS = {int(k): v for k, v in DATA["turns"].items()}
+
+TABLE_TITLE = ["Random Compatible on Turn ___", "Optimal Elsewhere"]
+TITLE_GAP = 0.15                # between the title's two lines
+TABLE_TOP = 1.3                 # the header row's centre, in the table's frame
+ROW_DY = 0.72                   # scene 10's
+TURN_X = -2.2                   # the turn column's centre
+AVG_X = 1.6                     # the Average Guesses column's centre
+HEADER_SIZE = 28                # scene 10's
+CELL_SIZE = 30                  # scene 10's
+TABLE_DY = -GAME_DY             # the table sits one frame below the line
+DP = {1: 2, 2: 2, 3: 2, 4: 4, 5: 4}   # the script's decimal places per row
+
+
+def _fmt(k):
+    """Turn k's average as the table shows it."""
+    return f"{TURNS[k]:.{DP[k]}f}"
+
+
+def _pct(v):
+    """The counting win rate (in percent) as a marker shows it."""
+    return f"{v:.2f}%"
+
+
+def _row_y(k):
+    return TABLE_DY + TABLE_TOP - k * ROW_DY
+
+
+class Scene14(StrategyLine, MovingCameraScene, WordleBoardScene):
+    """chose_game — CHOSE, VIDEO, NOVEL, WOVEN, each next word selected at once
+    chose_line — pan down to the line; the CHOSE marker at 3.99
+    slate — CHOSE flips to SLATE, sliding to 3.82; 98.53% counts to 98.87%
+    table — pan down to the title and the turn table
+    turn5 — 3.4212
+    turn4 — 3.4225
+    turn1 — 3.61
+    turn3 — 3.49
+    turn2 — 3.67; everything out
+    """
+
+    def setup_scene(self):
+        self.game = random_game_data.load("14")
+        self.camera.frame.move_to([0, GAME_DY, 0])     # the game's frame
+
+    # a : the DICEY game again from CHOSE, each next word selected straight away
+    @subscene
+    def chose_game(self):
+        self._setup_game()
+        self._type(0, 0.65)
+        self._flip(0, 1.6)
+        self._words_in(0.8)
+        self._hops(0, 0.3)
+        self._turn(1, 0.65, 1.6, 1.0, 0.3)
+        self._turn(2, 0.65, 1.6, 1.0, 0.3)
+        self._win(3, 0.65, 1.6, 1.0)
+
+    # b : pan down to the number line (3.42 .. 4.08); CHOSE's marker at 3.99
+    def _setup_chose_line(self):
+        self._build_line(OPTIMAL[0], COMPATIBLE[0])
+        self.optimal_marker(grow=1.0)
+        self.compatible_marker(grow=1.0)
+        self.chose_mk = self._marker(round(CHOSE["mean"], 2),
+                                     [word_line("chose"), "then Random", "Compatible",
+                                      rate_text(CHOSE["win_rate"])])
+        self.add(self.line, self.title, self.subtitle)
+
+    @subscene
+    def chose_line(self):
+        self._setup_chose_line()
+        self._pan_down(1.5)
+        self.remove(*self.rows)            # off-frame now; keeps the snapshot light
+        self.rows = []
+        self._pop_in(self.chose_mk, 0.4)
+
+    # c : CHOSE flips to SLATE as the marker slides to 3.82; the rate counts up
+    def _setup_slate(self):
+        mk = self.chose_mk
+        content = mk.label[1]
+        self.old_row, rate = content[0], content[-1]
+        dx = self.line.x_of(round(SLATE["mean"], 2)) - self.line.x_of(mk.value)
+        self.new_row = word_line("slate").move_to(self.old_row.get_center() + RIGHT * dx)
+        # the readout takes the rate's place in the card, at its left edge
+        self.counter = CrispCounter("", ValueTracker(CHOSE["win_rate"] * 100),
+                                    left=rate.get_left()[0], y=rate.get_center()[1],
+                                    font_size=MARKER_FS,
+                                    color=win_color(SLATE["win_rate"]), fmt=_pct)
+        self.counter.mob.set_color(win_color(CHOSE["win_rate"]))   # the rate's own colour
+        content.remove(rate)
+        content.add(self.counter.mob)
+        content.remove(self.old_row)        # the flip carries the row; the card moves alone
+
+    @subscene
+    def slate(self):
+        self._setup_slate()
+        mk, line, counter = self.chose_mk, self.line, self.counter
+        v0, left0 = mk.value, counter.left
+        counter.mob.add_updater(            # ride the card (before the count's updater)
+            lambda m: setattr(counter, "left",
+                              left0 + line.x_of(mk.value) - line.x_of(v0)))
+        count = counter.count_anim(SLATE["win_rate"] * 100)
+        flip(self, [Flip(self.old_row, self.new_row,
+                         parts=(row_parts(self.old_row), row_parts(self.new_row)),
+                         travel=True)],
+             1.2, extra=[line.move_marker(mk, round(SLATE["mean"], 2)), count])
+        counter.end_count()
+        self.remove(self.new_row)
+        mk.label[1].submobjects.insert(0, self.new_row)
+        self.old_row = self.new_row = self.counter = None
+
+    # d : pan down to the title and the table
+    def _setup_table(self):
+        lines = [crisp_text(t, color=WHITE, font_size=FONT_SIZE_LG) for t in TABLE_TITLE]
+        self.table_title = VGroup(*lines).arrange(DOWN, buff=TITLE_GAP)
+        self.table_title.to_edge(UP, buff=TITLE_BUFF).shift(UP * TABLE_DY)
+        self.table_head = crisp_text("Average Guesses", font_size=HEADER_SIZE,
+                                     color=WHITE, weight=BOLD).move_to([AVG_X, _row_y(0), 0])
+        self.table_turns = VGroup(*[crisp_text(str(k), font_size=CELL_SIZE, color=WHITE)
+                                    .move_to([TURN_X, _row_y(k), 0]) for k in range(1, 6)])
+        self.add(self.table_title, self.table_head, self.table_turns)
+
+    @subscene
+    def table(self):
+        self._setup_table()
+        self._pan_down(1.5)
+        self.remove(self.line, self.title, self.subtitle)   # off-frame now
+        self.line = self.title = self.subtitle = self.chose_mk = None
+        self.cells = VGroup()
+
+    # e-i : the averages, one row at a time
+    def _fill(self, k, run_time):
+        """Turn k's average rises into its cell (10's `_fill_avg`)."""
+        cell = crisp_text(_fmt(k), font_size=CELL_SIZE,
+                          color=WHITE).move_to([AVG_X, _row_y(k), 0])
+        self.cells.add(cell)
+        self.play(FadeIn(cell, shift=UP * 0.3), run_time=run_time)
+
+    # e : 3.4212 in row 5
+    @subscene
+    def turn5(self):
+        self._fill(5, 0.5)
+
+    # f : 3.4225 in row 4
+    @subscene
+    def turn4(self):
+        self._fill(4, 0.5)
+
+    # g : 3.61 in row 1
+    @subscene
+    def turn1(self):
+        self._fill(1, 0.5)
+
+    # h : 3.49 in row 3
+    @subscene
+    def turn3(self):
+        self._fill(3, 0.5)
+
+    # i : 3.67 in row 2; then everything fades out
+    @subscene
+    def turn2(self):
+        self._fill(2, 0.5)
+        self.wait(1.0)
+        self.play(FadeOut(*self.mobjects), run_time=0.8)

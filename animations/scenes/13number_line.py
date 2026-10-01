@@ -33,7 +33,9 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   l compatible    — the Random Compatible Answers marker at 4.08, below
                     the line                                               (13m, VO 5)
 
-REUSE MAP — every element, the one source it comes from, and how it enters:
+REUSE MAP — every element, the one source it comes from, and how it enters.
+Since 2026-10-01 the line, its markers and the game are assets/strategy_line.py
+`StrategyLine`, shared with scene 14 and unchanged in behaviour:
   number line, ticks,   bpkfigures/number_line.py `ZoomLine` (new, for number lines
   zooms, markers        and timelines): `zoom` for c/e, `add_marker` + `marker_in`
   title                 crisp_text, WHITE, FONT_SIZE_LG — 08's title
@@ -140,8 +142,6 @@ LAYOUT CHOICES, flagged:
     59.30% 0.15, 98.20% 0.51, 100% 1.00.
 """
 from pathlib import Path
-import colorsys
-import math
 import sys
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -149,60 +149,11 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 
 from config import *
 from manim import MovingCameraScene
-from bpkfigures.number_line import ZoomLine
-from bpkfigures.highlight import highlight
-from assets.board import STROKE, GAP, TILE, WordleBoard, get_typed_row
-from assets.groups import HEADER_W, GUESS_Y, ranked_word_layout
-from assets.pigpen import PigpenWord, WORD_W     # the list-size word ranked_word_layout sizes by
-from assets.keys import key_cues
 from assets import random_game_data
-from assets.stacks_view import WHOOSH_SFX, WHOOSH_GAIN, WHOOSH_PEAK
-
-GAME = random_game_data.load()
-
-TITLE = "Average Guesses by Strategy"
-SUBTITLE = "(Win Rate)"
-SUBTITLE_BUFF = 0.15
-SALET_W = 2.2             # the SALET row's width in the Optimal label
-LINE_Y = -0.4
-TITLE_BUFF = 0.6
-MARKER_FS = 30
-CARD_PAD = 0.22           # the marker cards' margin round their text
-CARD_RADIUS = 0.25        # the cards' corner rounding
-WIN_LOW, WIN_HIGH = LIGHT_RED, LIGHT_GREEN
-WIN_MID = 0.98            # the win rate that sits halfway from red to green
-TOP_SCALE = 1.7           # g-j: the typed rows' size, as a PigpenWord scale
-GRID_X = (-7.6, 7.6)      # g-j: the compatible-answer grid's region, below the rows
-GRID_BOTTOM = -4.3
-ROWS_GRID_GAP = 0.3       # between the room for the next typed row and the grid
-GRID_MAX_SCALE = 1.0      # a gridded word is never bigger than 04's list size
-GAME_DY = config.frame_height   # the game sits one frame above the number line
-BOUNCE_H = 0.35           # board.bounce's height for a full-size tile (07's)
-TYPE_MARGIN = 0.15        # f: DICEY types once its row is this far inside the frame
+from assets.strategy_line import StrategyLine
 
 
-def _shrink_out(mob):
-    """06b's exit for a thing going away where it stands (as 12's)."""
-    return mob.animate.scale(0.1).set_opacity(0)
-
-
-def _word_stroke(width):
-    """12's thinned tile border for a word row `width` wide."""
-    return STROKE * min(1.0, width / HEADER_W)
-
-
-def win_color(rate):
-    """A win rate (0..1) on the red -> green scale: halfway at WIN_MID, via a
-    power law in the loss rate, interpolated round the hue wheel."""
-    p = math.log(0.5) / math.log(1 - WIN_MID)
-    t = 1 - (1 - rate) ** p
-    (h0, s0, v0), (h1, s1, v1) = (colorsys.rgb_to_hsv(*ManimColor(c).to_rgb())
-                                  for c in (WIN_LOW, WIN_HIGH))
-    hsv = [a + (b - a) * t for a, b in ((h0, h1), (s0, s1), (v0, v1))]
-    return ManimColor.from_rgb(colorsys.hsv_to_rgb(*hsv))
-
-
-class Scene13(MovingCameraScene, WordleBoardScene):
+class Scene13(StrategyLine, MovingCameraScene, WordleBoardScene):
     """show_line — the line, 3..6, and the title
     optimal — 3.42
     random — zoom out to 3..2500; 2315
@@ -219,158 +170,11 @@ class Scene13(MovingCameraScene, WordleBoardScene):
     """
 
     def setup_scene(self):
-        pass
-
-    # ── the game (g-j) ────────────────────────────────────────────────────────
-    def _grid(self, words, k):
-        """{word: (centre, PigpenWord scale)} for turn k's compatible `words`:
-        07's `ranked_word_layout` (the shape giving the largest words) in the region
-        below the room for turn k+1's row, capped at list size and kept top-aligned."""
-        top = GAME_DY + GUESS_Y - self.row_h / 2 - (k + 1) * self.pitch - ROWS_GRID_GAP
-        slots, sc, _, _ = ranked_word_layout([{"size": len(words), "members": words}],
-                                             GRID_X[0], GRID_X[1], top,
-                                             GAME_DY + GRID_BOTTOM,
-                                             heads=0)
-        width = WORD_W * sc                         # the layout's word width
-        f = min(1.0, self.word_w * GRID_MAX_SCALE / width)
-        pts = np.array([slots[w] for w in words])
-        cx, ty = pts[:, 0].mean(), pts[:, 1].max()
-        return {w: (np.array([cx + (slots[w][0] - cx) * f,
-                              ty + (slots[w][1] - ty) * f, 0.0]),
-                    width * f / self.word_w)
-                for w in words}
-
-    def _new_row(self):
-        """An empty one-row board for the next typed word: the first at 04i's
-        GUESS_Y, TOP_SCALE wide; each later one under the last at the board's
-        row spacing (07's `_typed_row`)."""
-        row = WordleBoard(rows=1, cols=5)
-        row.scale(self.word_w * TOP_SCALE / row.width)
-        if not self.rows:
-            row.move_to([0, GAME_DY + GUESS_Y, 0])
-        else:
-            above = self.rows[-1]
-            row.next_to(above, DOWN, buff=above.tiles[0][0].height * GAP / TILE)
-        return row
-
-    def _setup_game(self):
-        self.word_w = PigpenWord("salet", revealed=True).width
-        self.rows = []
-        self.pitch = self.word_w * TOP_SCALE / (5 * TILE + 4 * GAP) * (TILE + GAP)
-        self.row_h = self.pitch * TILE / (TILE + GAP)
-        self.words, self.wscale = {}, {}
-        for w, (c, sc) in self._grid(GAME["alive"][0], 0).items():
-            m = PigpenWord(w, revealed=True).scale(sc).move_to(c)
-            for t in m.tiles:
-                t.set_stroke(width=_word_stroke(m.width))
-            self.words[w], self.wscale[w] = m, sc
-        self.mark = None
-
-    def _type(self, k, run_time):
-        """Turn k's word typed on a new row, its tiles appearing as typed (the
-        previous hop's highlight fades first)."""
-        if self.mark is not None:
-            self.play(FadeOut(self.mark), run_time=0.2)
-            self.mark = None
-        row = self._new_row()
-        self.rows.append(row)
-        row.type_word(self, 0, GAME["words"][k], run_time,
-                      per_letter=key_cues(self), appear=True)
-
-    def _whoosh(self, pan_rt):
-        """01's camera-move whoosh, loudest at the pan's midpoint."""
-        self.sfx(WHOOSH_SFX, at=max(0.0, pan_rt / 2 - WHOOSH_PEAK), gain=WHOOSH_GAIN)
-
-    def _pan_and_type(self, pan_rt, type_rt):
-        """The camera pans up one frame to the game, and DICEY starts typing on the
-        first row as soon as that row is TYPE_MARGIN inside the frame's top — the
-        moment read off the pan's own rate function."""
-        row = self._new_row()
-        self.rows.append(row)
-        frame = self.camera.frame
-        need = row.get_top()[1] + TYPE_MARGIN - config.frame_height / 2 - frame.get_y()
-        a = next(a for a in np.linspace(0, 1, 1001) if smooth(a) * GAME_DY >= need)
-        t0 = a * pan_rt
-        cues = key_cues(self)
-        typing, total = row.type_anim(self, 0, GAME["words"][0], type_rt, appear=True,
-                                      per_letter=lambda i, ch, at: cues(i, ch, t0 + at))
-        frame.generate_target()
-        frame.target.shift(UP * GAME_DY)
-        self._whoosh(pan_rt)
-        self.play(MoveToTarget(frame, run_time=pan_rt),
-                  Succession(Wait(t0), AnimationGroup(typing, run_time=total)))
-
-    def _flip(self, k, run_time):
-        self.rows[k].reveal(self, 0, GAME["codes"][k], run_time)
-
-    def _regrid(self, k, run_time):
-        """The words turn k rules out shrink away; the rest move to their cells."""
-        keep = GAME["alive"][k]
-        anims = []
-        for w, (c, sc) in self._grid(keep, k).items():
-            m = self.words[w]
-            f = sc / self.wscale[w]
-            anims.append(m.animate.scale(f).move_to(c))
-            self.wscale[w] = sc
-        gone = [w for w in self.words if w not in keep]
-        anims += [_shrink_out(self.words[w]) for w in gone]
-        self.play(*anims, run_time=run_time)
-        for w in gone:
-            self.remove(self.words.pop(w))
-            del self.wscale[w]
-        for m in self.words.values():
-            for t in m.tiles:
-                t.set_stroke(width=_word_stroke(m.width))
-
-    def _hops(self, k, hop_rt):
-        """10 quick highlights over turn k's compatible words: 9 random, then the
-        next guess, which keeps its highlight until it is typed."""
-        seq = GAME["hops"][k]
-        for w in seq[:-1]:
-            highlight(self, [self.words[w]], pulse=True, fade=hop_rt / 2, hold=hop_rt)
-        self.mark = highlight(self, [self.words[seq[-1]]], persist=True, fade=hop_rt)[0]
-
-    def _turn(self, k, type_rt, flip_rt, regrid_rt, hop_rt):
-        """A later turn: type, flip, regrid, and (unless it won) hop on."""
-        self._type(k, type_rt)
-        self._flip(k, flip_rt)
-        self._regrid(k, regrid_rt)
-        if k + 1 < len(GAME["words"]):
-            self._hops(k, hop_rt)
-
-    def _zoom_pop(self, lo, hi, m, zoom_rt, pop_rt, lead):
-        """Zoom to lo..hi, with m popping out of its dot (and the pop sound)
-        starting `lead` seconds before the zoom ends."""
-        start = zoom_rt - lead
-        self.sfx("pop", at=start)
-        self.play(self.line.zoom(lo, hi, run_time=zoom_rt),
-                  Succession(Wait(start), self.line.marker_in(m, run_time=pop_rt)))
-
-    def _pop_in(self, m, run_time):
-        """The marker's card pops out of its dot, with the pop sound."""
-        self.sfx("pop")
-        self.play(self.line.marker_in(m), run_time=run_time)
-
-    def _marker(self, value, lines, side=UP):
-        """The last line is the win rate, "NN.NN%"; it takes its colour."""
-        rate = lines[-1]
-        lines = lines[:-1] + [(rate, win_color(float(rate.rstrip("%")) / 100))]
-        return self.line.add_marker(value, lines, side=side, font_size=MARKER_FS,
-                                    grow=0.0,
-                                    text_color=WHITE,
-                                    box={"pad": CARD_PAD, "fill": TILE_EMPTY_FILL,
-                                         "stroke_color": TILE_FILLED_BORDER,
-                                         "stroke_width": STROKE,
-                                         "corner_radius": CARD_RADIUS})
+        self.game = random_game_data.load("13")
 
     # a : the number line, 3 to 6, extending both ways; the title
     def _setup_show_line(self):
-        self.line = ZoomLine(3, 6, y=LINE_Y, min_label_step=1, tips=False,
-                             ends_buff=-0.1)
-        self.title = crisp_text(TITLE, color=WHITE, font_size=FONT_SIZE_LG)
-        self.title.to_edge(UP, buff=TITLE_BUFF)
-        self.subtitle = crisp_text(SUBTITLE, color=WHITE, font_size=FONT_SIZE_MD)
-        self.subtitle.next_to(self.title, DOWN, buff=SUBTITLE_BUFF)
+        self._build_line(3, 6)
 
     @subscene
     def show_line(self):
@@ -381,12 +185,7 @@ class Scene13(MovingCameraScene, WordleBoardScene):
     # b : Optimal SALET at 3.42
     @subscene
     def optimal(self):
-        salet = get_typed_row("salet")
-        salet.scale(SALET_W / salet.width)
-        for t in salet.tiles[0]:
-            t.set_stroke(width=STROKE * min(1.0, SALET_W / HEADER_W))
-        m = self._marker(3.42, ["Optimal", salet, "100%"])
-        self._pop_in(m, 0.4)
+        self._pop_in(self.optimal_marker(), 0.4)
 
     # c : zoom out to 3..2500; Random at 2315
     @subscene
@@ -415,7 +214,7 @@ class Scene13(MovingCameraScene, WordleBoardScene):
         self._setup_game()
         self._pan_and_type(1.5, 0.65)
         self._flip(0, 1.6)
-        self.play(FadeIn(VGroup(*self.words.values())), run_time=0.8)
+        self._words_in(0.8)
         self._hops(0, 0.12)
 
     # g : GUESS's turn (BYYBB), 21 left; hops to VALUE
@@ -436,26 +235,16 @@ class Scene13(MovingCameraScene, WordleBoardScene):
     # j : FLUKE's turn (GGGGG); both words left vanish as the row does the win bounce
     @subscene
     def fluke(self):
-        self._type(4, 0.65)
-        self._flip(4, 1.6)
-        row = self.rows[4]
-        jump = BOUNCE_H * row.tiles[0][0].height / TILE
-        self.play(*[_shrink_out(m) for m in self.words.values()],
-                  row.bounce_anim(0, height=jump), run_time=1.0)
-        self.remove(*self.words.values())
-        self.words, self.wscale = {}, {}
+        self._win(4, 0.65, 1.6, 1.0)
 
     # k : the camera pans back down to the number line; the game leaves upward
     @subscene
     def back_to_line(self):
-        self._whoosh(1.5)
-        self.play(self.camera.frame.animate.shift(DOWN * GAME_DY), run_time=1.5)
+        self._pan_down(1.5)
         self.remove(*self.rows)            # off-frame now; keeps the snapshot light
         self.rows = []
 
     # l : Random Compatible Answers at 4.08, below the line
     @subscene
     def compatible(self):
-        m = self._marker(4.08, ["Random", "Compatible", "Answers", "98.20%"],
-                         side=DOWN)
-        self._pop_in(m, 0.4)
+        self._pop_in(self.compatible_marker(), 0.4)

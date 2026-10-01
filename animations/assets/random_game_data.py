@@ -1,29 +1,35 @@
-"""Scene 13g-j's game of Random Compatible Answers — SOURCED, then cached.
+"""The Random Compatible Answers games of scenes 13 and 14 — SOURCED, then cached.
 
-The script's game against FLUKE: DICEY, GUESS, VALUE, FLUTE, FLUKE, each word after
-DICEY one of the answers still consistent with every reply so far. This module
-scores it with math/wordle.py `pattern`, lists the compatible answers after each
-guess, draws the random highlight hops, and writes `random_game_cache.json`; the
-SCENE reads that cache, so a render imports nothing from the pipeline.
+  "13"  the script's 13g-j game against FLUKE: DICEY, GUESS, VALUE, FLUTE, FLUKE
+  "14"  14a's game against WOVEN: CHOSE (the "word of our choice"), then VIDEO,
+        NOVEL, WOVEN at random from the compatible answers (the user's pick from
+        sampled games, 2026-10-01: CHOSE's games run 3.99 guesses on average, and
+        4 guesses is their most common length)
+
+Each word after the first is one of the answers still consistent with every reply
+so far. This module scores each game with math/wordle.py `pattern`, lists the
+compatible answers after each guess, draws the random highlight hops, and writes
+one cache per game (`CACHES`); the SCENE reads its cache, so a render imports
+nothing from the pipeline.
 
 Regenerate (from this directory):
 
     ../../.venv/bin/python random_game_data.py
 
 Provenance for everything it writes:
-  words, answer — the script's 13g-j (the user's; found as one of the 69 such games
-                  ending on FLUKE, all of them checked the same way as here)
+  words, answer — the game's (above)
   codes         — math/wordle.py `pattern(word, answer)`; the build asserts the
-                  script's colourings (BBBYB, BYYBB, BBYYG, GGGBG, GGGGG). The script
-                  writes GUESS's turn without its colouring; BYYBB is the real one
+                  colourings given here (13: the script's, except GUESS's BYYBB,
+                  which the script leaves out)
   alive         — the answers (math/data/shared/words/mystery.txt, in file order)
-                  consistent with every reply up to and including that guess: 332,
-                  21, 5, 2, 1. The build asserts each next guess is among them, which
-                  is what makes this a Random Compatible Answers game
-  hops          — per turn, the words the highlight visits: 9 drawn at random from
-                  that turn's compatible answers (random.Random(SEED), never the same
-                  word twice in a row), then the next guess. With only 2 compatible
-                  answers the 9 alternate, since no word repeats back to back
+                  consistent with every reply up to and including that guess. The
+                  build asserts the counts, and that each next guess is among them,
+                  which is what makes it a Random Compatible Answers game
+  hops          — per turn, the words the highlight visits: hops-1 drawn at random
+                  from that turn's compatible answers (random.Random(seed), never the
+                  same word twice in a row), then the next guess. Scene 14 selects
+                  the next guess straight away (its script: "selecting the random
+                  words right away instead of after 10 cycles"), so it has one hop
 """
 import json
 import os
@@ -31,58 +37,65 @@ import random
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CACHE = os.path.join(HERE, "random_game_cache.json")
 MATH = os.path.join(HERE, "..", "..", "math")
 
-WORDS = ["dicey", "guess", "value", "flute", "fluke"]
-ANSWER = "fluke"
-SCRIPT_CODES = ["BBBYB", "BYYBB", "BBYYG", "GGGBG", "GGGGG"]
-HOPS = 10                  # highlights per turn, the last on the next guess
-SEED = 13
+GAMES = {
+    "13": {"words": ["dicey", "guess", "value", "flute", "fluke"], "answer": "fluke",
+           "codes": ["BBBYB", "BYYBB", "BBYYG", "GGGBG", "GGGGG"],
+           "alive": [332, 21, 5, 2, 1], "hops": 10, "seed": 13},
+    "14": {"words": ["chose", "video", "novel", "woven"], "answer": "woven",
+           "codes": ["BBYBY", "YBBGY", "YGGGB", "GGGGG"],
+           "alive": [66, 5, 1, 1], "hops": 1, "seed": 14},
+}
+CACHES = {"13": "random_game_cache.json", "14": "random_game_14_cache.json"}
 
 
-def _build():
+def _build(g):
     sys.path.insert(0, MATH)
     from wordle import pattern, load_words, decode
     answers = list(load_words("mystery"))
-    assert len(answers) == 2315 and all(w in answers for w in WORDS)
-    codes = [int(pattern(w, ANSWER)) for w in WORDS]
+    words, answer = g["words"], g["answer"]
+    assert len(answers) == 2315 and all(w in answers for w in words)
+    codes = [int(pattern(w, answer)) for w in words]
     shown = ["".join("BYG"[t] for t in decode(c)) for c in codes]
-    assert shown == SCRIPT_CODES, shown
+    assert shown == g["codes"], shown
     alive, left = [], answers
-    for w, c in zip(WORDS, codes):
+    for w, c in zip(words, codes):
         left = [a for a in left if int(pattern(w, a)) == c]
         alive.append(left)
-    assert [len(a) for a in alive] == [332, 21, 5, 2, 1], [len(a) for a in alive]
-    for nxt, pool in zip(WORDS[1:], alive):
+    assert [len(a) for a in alive] == g["alive"], [len(a) for a in alive]
+    for nxt, pool in zip(words[1:], alive):
         assert nxt in pool, nxt
-    rng = random.Random(SEED)
+    rng = random.Random(g["seed"])
     hops = []
-    for nxt, pool in zip(WORDS[1:], alive):
+    for nxt, pool in zip(words[1:], alive):
         seq = []
-        while len(seq) < HOPS - 1:
+        while len(seq) < g["hops"] - 1:
             w = rng.choice(pool)
             if not seq or w != seq[-1]:
                 seq.append(w)
-        if seq[-1] == nxt:                  # the landing must be a move too
+        if seq and seq[-1] == nxt:          # the landing must be a move too
             seq[-1] = rng.choice([w for w in pool if w != nxt])
         hops.append(seq + [nxt])
-    return {"words": WORDS, "answer": ANSWER, "codes": codes, "alive": alive,
+    return {"words": words, "answer": answer, "codes": codes, "alive": alive,
             "hops": hops}
 
 
-def load():
-    with open(CACHE) as f:
+def load(game):
+    with open(os.path.join(HERE, CACHES[game])) as f:
         return json.load(f)
 
 
 if __name__ == "__main__":
-    d = _build()
-    with open(CACHE, "w") as f:
-        json.dump(d, f, separators=(",", ":"))
-        f.write("\n")
-    for w, c, a in zip(d["words"], SCRIPT_CODES, d["alive"]):
-        print(f"  {w.upper()} {c}: {len(a)} compatible")
-    for h in d["hops"]:
-        print("  hops:", " ".join(h))
-    print(f"wrote {CACHE}")
+    for name, g in GAMES.items():
+        d = _build(g)
+        path = os.path.join(HERE, CACHES[name])
+        with open(path, "w") as f:
+            json.dump(d, f, separators=(",", ":"))
+            f.write("\n")
+        print(f"game {name}:")
+        for w, c, a in zip(d["words"], g["codes"], d["alive"]):
+            print(f"  {w.upper()} {c}: {len(a)} compatible")
+        for h in d["hops"]:
+            print("  hops:", " ".join(h))
+        print(f"wrote {path}")
