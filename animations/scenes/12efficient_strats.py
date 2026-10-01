@@ -80,10 +80,11 @@ from config import *
 from assets.board import STROKE, GAP, TILE, WordleBoard, get_typed_row
 from assets.pigpen import PigpenWord
 from assets.flip import Flip, flip, row_parts
-from assets.groups import (scored_row, ranked_layout, GUESS_SCALE, HEADER_W,
-                           enter_from_beyond, edge_out, REGION_HALF_W,
+from assets.groups import (GUESS_SCALE, enter_from_beyond, edge_out, REGION_HALF_W,
                            DOT_REGION_TOP, REGION_BOT)
 from assets.keys import key_cues
+from assets.second_view import (corner_spot, row_stroke as _stroke, under as _under,
+                                typed_under as _typed, group_rows)
 from assets import lists_data, strategy_data
 
 DATA = lists_data.load()
@@ -94,8 +95,6 @@ START_SCALE = 2.6          # a: SALET's size in the middle (b shrinks it to GUES
 WORDS_IN_FROM = 0.6        # i: the share of the rows' motion before their words fade in
 
 DOT_COLOR = WHITE
-CORNER_BUFF = 0.3          # the corner word's gap to the frame's edges (06)
-CORNER_MARGIN = 0.35       # clear space kept right of the corner word (06)
 
 CLUSTER_GAP = 0.06         # between rows in a grey-count cluster (h)
 CLUSTER_ASPECT = 2.0       # a cluster's width / height, before its word
@@ -110,26 +109,6 @@ CYCLE_STEPS = 6            # j: how many draws each word cycles through
 
 def _grays(g):
     return sum(1 for t in g["tiles"] if t == 0)
-
-
-def _stroke(width):
-    """06's thinned tile border for a row `width` wide."""
-    return STROKE * min(1.0, width / HEADER_W)
-
-
-def _under(row):
-    """Where a word typed under `row` goes: centre, at the board's row spacing."""
-    h = row.height
-    return row.get_center() + DOWN * (h + h * GAP / TILE)
-
-
-def _typed(word, row):
-    """`word` as a typed row, `row`'s width, under it."""
-    w = get_typed_row(word)
-    w.scale(row.width / w.width).move_to(_under(row))
-    for t in w.tiles[0]:
-        t.set_stroke(width=_stroke(row.width))
-    return w
 
 
 def _shrink_out(mob):
@@ -155,11 +134,7 @@ class Scene12(WordleBoardScene):
         self.guess = PigpenWord(SALET, revealed=True).scale(START_SCALE).move_to(ORIGIN)
         self.add(self.guess)
         # the corner is sized for the word at GUESS_SCALE, which b shrinks it to
-        w = self.guess.width * GUESS_SCALE / START_SCALE
-        h = self.guess.height * GUESS_SCALE / START_SCALE
-        self.corner = np.array([-config.frame_x_radius + CORNER_BUFF + w / 2,
-                                config.frame_y_radius - CORNER_BUFF - h / 2, 0.0])
-        self.col_left = self.corner[0] + w / 2 + CORNER_MARGIN
+        self.corner, self.col_left = corner_spot(SALET)
 
     # a : SALET in the middle, held — its VO plays over the framework's holds
     @subscene
@@ -169,10 +144,7 @@ class Scene12(WordleBoardScene):
     def _rows(self, word):
         """`word`'s groups in rank order, each as (group, scored row at its dot-view
         spot), plus the dot positions and radius."""
-        groups, spots, pos, widths, r = ranked_layout(DATA, word, left=self.col_left)
-        rows = [scored_row(word, g["code"], wd, c, stroke=_stroke(wd))
-                for g, c, wd in zip(groups, pos, widths)]
-        return groups, rows, spots, r
+        return group_rows(DATA, word, self.col_left)
 
     def _setup_dots(self):
         groups, rows, spots, r = self._rows(SALET)
