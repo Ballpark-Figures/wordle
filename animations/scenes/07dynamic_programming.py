@@ -86,9 +86,17 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                    tree contracts into the root between guesses; trees from
                    solver/run-subgroup-tree.sh                         (07zb, VO 8)
 
+  za first_full  — zoom out: every piece of BAGEL's tree moves into its place
+                   as one branch of FIRST's WHOLE optimal tree (radial, node
+                   widths as sqrt(group size), big groups near the middle),
+                   centred on FIRST; the rest fades in; the corner counts to
+                   FIRST's average (3.52, white: not the best opener)  (07zc, VO 9)
+  zb salet_full  — pan right to SALET's whole tree; the corner counts to
+                   3.42, green (the best opener)                       (07zd, VO 10)
+
   NB from s on the LETTERS run behind the script's: three script beats (s, t, u)
   are one subscene, so the script's v is subscene t, w is u, x is v, y is w and
-  z is x, za is y, zb is z.
+  z is x, za is y, zb is z, zc is za, zd is zb.
 
 REUSE MAP — every element and the one source it comes from:
   board, typing, reveal   assets/board.py `get_board`, `type_word` (its
@@ -224,6 +232,7 @@ FULL_LETTER_W = 0.35               # zc: rows at least this wide are full board 
 FULL_GLYPH_W = 0.08                # zc: narrower rows get copied letters down to this
                                    #   width (user's call: letters that cannot be read
                                    #   still read as letters); below it, bare tiles
+PAN_DIST = 17.0                    # zd: SALET's tree, this far right of FIRST's
 THUMB_CASE = 0.3                   # y: the group waiting in a corner
 THUMB_TREE = 0.2                   # z: the finished tree waiting in a corner, small
                                    #   enough to clear the lines to the left branches
@@ -329,6 +338,8 @@ class Scene07(WordleBoardScene):
     fiery_tree — TEASE's tree to a corner; FIERY's tree grows
     big_case — FIRST's 14-word BBBGG group in from the right
     big_trees — the optimal tree after AFTER, AGAIN, OTHER, then BAGEL
+    first_full — zoom out: BAGEL's tree into place in FIRST's whole tree
+    salet_full — pan right to SALET's whole tree
     """
 
     def setup_scene(self):
@@ -1274,8 +1285,10 @@ class Scene07(WordleBoardScene):
         parent's rows, the parent's guess scored as this branch scored it, the
         branch's own next guess as a black row (if it is still open), and a line from
         the parent's guess's R to the branch's FIRST R. Returns (every piece, where
-        each answer's word ends: the green row that wins it)."""
-        pieces, dest = [], {}
+        each answer's word ends: the green row that wins it). Also sets
+        `self.big_keyed` {branch key: {copies, new, line, guess}} -- zc maps each
+        piece onto the same branch of FIRST's whole tree."""
+        pieces, dest, keyed = [], {}, {}
         pitch = rw * row_aspect() * (1 + GAP / TILE)
 
         def grow(node, rows, guess, path):
@@ -1286,7 +1299,9 @@ class Scene07(WordleBoardScene):
                           for i, r in enumerate(rows)]
                 new = scored_row(node["guess"], kid["code"], rw,
                                  [x, top - len(rows) * pitch, 0])
-                pieces.extend(copies + [new, _line(_r(guess), np.array([x, top, 0.0]))])
+                line = _line(_r(guess), np.array([x, top, 0.0]))
+                pieces.extend(copies + [new, line])
+                keyed[key] = dict(copies=copies, new=new, line=line, guess=None)
                 if kid["code"] == ALL_GREEN:
                     dest[kid["answers"][0]] = new.get_center()
                 else:
@@ -1294,8 +1309,10 @@ class Scene07(WordleBoardScene):
                     nguess.scale(rw / nguess.width).move_to(
                         [x, top - (len(rows) + 1) * pitch, 0])
                     pieces.append(nguess)
+                    keyed[key]["guess"] = nguess
                     grow(kid["node"], copies + [new], nguess, key)
         grow(tree, [self.big], guess, ())
+        self.big_keyed = keyed
         return pieces, dest
 
     def _big_tree(self, guess, words, guess_time, grow_time, count_time):
@@ -1317,7 +1334,9 @@ class Scene07(WordleBoardScene):
         self.play(MoveToTarget(sprout),
                   *[w.animate.scale(0.01).move_to(dest[w.word]) for w in (words or [])],
                   run_time=grow_time)
-        self.remove(*(words or []))
+        self.remove(*(words or []), sprout)
+        self.add(*pieces)                      # top-level, so zc can move each one
+        self.big_row = row
         # finished: its average -- in zb the number COUNTS from one tree's to the next
         # (a CrispCounter) rather than fading out and in (user's call); green only for
         # the optimal guess
@@ -1361,16 +1380,16 @@ class Scene07(WordleBoardScene):
         self._big_tree(best, None, 0.4, 1.5, 0.8)
         self.avg_counter = None
 
-    # ── the whole optimal tree, radial (script zc) -- FIRST DRAFT, a still ─────
+    # ── the whole optimal trees, radial (script zc-zd) ──────────────────────────
     # SALET (the optimal opener) in black at the centre; around it every colouring
     # of SALET with the optimal next guess under it in black; around those the next
-    # colourings and guesses, out to the wins. Each node's width goes as the SQUARE
+    # colourings and guesses, out to the wins (FIRST's tree in zc, SALET's in zd,
+    # each round its own opener). Each node's width goes as the SQUARE
     # ROOT of the answers in its group (user's spec). No level rings: a node's
     # distance from the centre falls with its group's size (log scale), so big groups
     # sit near the middle and the wins at the edge, on ellipses (the frame is wider
     # than tall); each node at the middle of an angle proportional to its answers,
     # siblings ordered by `_spread` (big groups dealt evenly round SALET).
-    # A still to experiment on: no animation yet.
     def _full_row(self, word, code, width, centre):
         """A row `width` wide at `centre`: `word` scored as `code`, or typed (black)
         when `code` is None. Real letters only when wide enough to read; below
@@ -1400,51 +1419,138 @@ class Scene07(WordleBoardScene):
             cache[ch] = g.scale(1 / g.height)
         return cache[ch]
 
-    def _full_tree(self, tree):
-        """Every node and line of `tree`, placed radially (see above)."""
+    def _full_tree(self, tree, origin=ORIGIN):
+        """Every node and line of `tree`, placed radially round `origin` (see
+        above). Returns (root row, {branch path: [colouring row, next-guess row
+        (open branches only)]}, {branch path: line in from its parent}); a path is
+        the tuple of pattern codes from the root, as `_big_build`'s keys."""
         def count(n):
             return sum(len(k["answers"]) if not k["node"] else count(k["node"])
                        for k in n["kids"])
         total = count(tree)
-        pieces, lines = [], []
+        nodes, lines = {}, {}
         k_w = FULL_SCALE_W / math.sqrt(total)
-        root = self._full_row(tree["guess"], None, FULL_ROOT_W, ORIGIN)
-        pieces.append(root)
+        root = self._full_row(tree["guess"], None, FULL_ROOT_W, origin)
         pitch = lambda w: w * row_aspect() * (1 + GAP / TILE)
 
-        def place(node, a0, a1, depth, parent_c):
+        def place(node, a0, a1, depth, parent_c, path):
             a = a0
             for kid in _spread(node["kids"], depth == 1):
+                key = path + (kid["code"],)
                 n = len(kid["answers"])
                 span = (a1 - a0) * n / sum(len(k["answers"]) for k in node["kids"])
                 mid = a + span / 2
                 r = FULL_R * math.log(total / n) / math.log(total)
                 w = k_w * math.sqrt(n)
                 h = (2 if kid["node"] is not None else 1) * pitch(w)
-                c = np.array([r * FULL_X_STRETCH * math.cos(mid), r * math.sin(mid), 0.0])
-                # a node that would overlap SALET is pushed out along its angle until
-                # it clears it by FULL_CLEAR (nothing else moves)
-                while (abs(c[0]) < (FULL_ROOT_W + w) / 2 + FULL_CLEAR
-                       and abs(c[1]) < (root.height + h) / 2 + FULL_CLEAR):
+                off = lambda r: np.array([r * FULL_X_STRETCH * math.cos(mid), r * math.sin(mid), 0.0])
+                # a node that would overlap the root is pushed out along its angle
+                # until it clears it by FULL_CLEAR (nothing else moves)
+                while (abs(off(r)[0]) < (FULL_ROOT_W + w) / 2 + FULL_CLEAR
+                       and abs(off(r)[1]) < (root.height + h) / 2 + FULL_CLEAR):
                     r *= 1.03
-                    c = np.array([r * FULL_X_STRETCH * math.cos(mid), r * math.sin(mid), 0.0])
+                c = origin + off(r)
                 if kid["node"] is None:                       # a win: the green row
-                    pieces.append(self._full_row(node["guess"], kid["code"], w, c))
+                    nodes[key] = [self._full_row(node["guess"], kid["code"], w, c)]
                 else:                                          # colouring + next guess
                     p = pitch(w)
-                    pieces.append(self._full_row(node["guess"], kid["code"], w, c + UP * p / 2))
-                    pieces.append(self._full_row(kid["node"]["guess"], None, w, c + DOWN * p / 2))
-                lines.append(Line(parent_c, c, color=WHITE, stroke_width=FULL_LINE_W,
-                                  stroke_opacity=FULL_LINE_OPACITY))
+                    nodes[key] = [self._full_row(node["guess"], kid["code"], w, c + UP * p / 2),
+                                  self._full_row(kid["node"]["guess"], None, w, c + DOWN * p / 2)]
+                lines[key] = Line(parent_c, c, color=WHITE, stroke_width=FULL_LINE_W,
+                                  stroke_opacity=FULL_LINE_OPACITY).set_z_index(-1)
                 if kid["node"] is not None:
-                    place(kid["node"], a, a + span, depth + 1, c)
+                    place(kid["node"], a, a + span, depth + 1, c, key)
                 a += span
-        place(tree, FULL_START, FULL_START + 2 * math.pi, 1, ORIGIN)
-        return VGroup(*lines).set_z_index(-1), VGroup(*pieces)
+        place(tree, FULL_START, FULL_START + 2 * math.pi, 1, origin, ())
+        return root, nodes, lines
 
-    # zc (script) : the whole of SALET's optimal tree, radially -- a first-draft STILL
+    def _counter_to(self, value, color, run_time):
+        """The corner number counts to `value` (and turns `color`). A fresh
+        CrispCounter from the number on screen: one is never kept between subscenes
+        (its default formatter is a lambda, which a snapshot cannot pickle)."""
+        old = self.avg_num
+        start = float(old.text) if hasattr(old, "text") else value
+        probe = crisp_text("0.00", font_size=AVG_FS).move_to(self.avg_slot)
+        counter = CrispCounter("", ValueTracker(start), left=probe.get_left()[0],
+                               y=self.avg_slot[1], font_size=AVG_FS, color=old.get_color())
+        self.remove(old)
+        self.avg_num = counter.mob
+        self.add(self.avg_num)
+        counter.count(self, value, run_time=run_time, flash="none")
+        if color is not None:
+            self.play(self.avg_num.animate.set_color(color), run_time=0.4)
+
+    def _setup_first_full(self):
+        """FIRST's whole tree at the centre, and every piece of BAGEL's tree mapped
+        onto its branch of it: BAGEL's tree IS the branch FIRST -> - - - G G of
+        FIRST's committed optimal tree (checked identical, line for line)."""
+        self.ff_root, self.ff_nodes, self.ff_lines = self._full_tree(TREES_FULL[FIRST])
+        base = (BIG_CODE,)
+        # (on screen now, its place in FIRST's tree): the root FIRST row and the
+        # typed BAGEL under it -> the branch's colouring and next guess; the line in
+        # from the top -> that branch's line; then every branch of BAGEL's tree
+        pairs = [(self.big, self.ff_nodes[base][0]), (self.big_row, self.ff_nodes[base][1])]
+        lines = [(self.big_line, self.ff_lines[base])]
+        fading = []
+        for key, part in self.big_keyed.items():
+            target = self.ff_nodes[base + key]
+            pairs.append((part["new"], target[0]))
+            if part["guess"] is not None:
+                pairs.append((part["guess"], target[1]))
+            lines.append((part["line"], self.ff_lines[base + key]))
+            fading += [(c, target[0]) for c in part["copies"]]    # stacked rows: into it
+        mapped = {id(t) for _, t in pairs} | {id(t) for _, t in lines}
+        self.ff_rest = [self.ff_root] + [m for ms in self.ff_nodes.values() for m in ms
+                                          if id(m) not in mapped] \
+            + [l for l in self.ff_lines.values() if id(l) not in mapped]
+        self.ff_anims, self.ff_gone = [], []
+        # a piece and its counterpart cross-fade while travelling together, so the
+        # different row builds never show as a morph
+        for a, b in pairs:
+            b.generate_target()
+            b.scale(a.width / b.width).move_to(a).set_opacity(0)
+            self.ff_anims += [MoveToTarget(b),
+                              a.animate.scale(b.target.width / a.width).move_to(b.target)
+                              .set_opacity(0)]
+            self.ff_gone.append(a)
+        for a, b in lines:
+            self.ff_anims.append(Transform(a, b))
+            self.ff_gone.append(a)
+        for a, b in fading:
+            self.ff_anims.append(a.animate.scale(0.01).move_to(b).set_opacity(0))
+            self.ff_gone.append(a)
+        self.ff_anims += [FadeIn(m) for m in self.ff_rest]
+        self.ff_keep = [b for _, b in pairs] + [b for _, b in lines]
+
+    # za (script zc) : zoom out -- BAGEL's tree moves into its place as one branch of
+    #     FIRST's whole optimal tree, the view centred on FIRST, the rest of the tree
+    #     fading in round it; the corner counts to FIRST's average
     @subscene
-    def full_tree(self):
-        lines, nodes = self._full_tree(TREES_FULL["salet"])
-        self.clear()
-        self.add(lines, nodes)
+    def first_full(self):
+        self._setup_first_full()
+        self.add(*self.ff_keep)
+        self.play(*self.ff_anims, run_time=3.0)
+        self.remove(*self.ff_gone)
+        self.add(*self.ff_keep, *self.ff_rest)
+        self._counter_to(AVG[f"full:{FIRST}"], WHITE, 1.0)   # not the best opener: white
+        self.ff_anims = self.ff_gone = self.ff_keep = self.ff_rest = None
+        self.big_keyed = self.big_row = None
+
+    def _setup_salet_full(self):
+        """SALET's whole tree, one frame to the right, ready to pan to."""
+        X = config.frame_x_radius
+        root, nodes, lines = self._full_tree(TREES_FULL["salet"], RIGHT * PAN_DIST)
+        self.sf_all = [root, *[m for ms in nodes.values() for m in ms], *lines.values()]
+
+    # zb (script zd) : pan right to SALET's tree; the corner counts to its average,
+    #     green -- the optimal opener
+    @subscene
+    def salet_full(self):
+        self._setup_salet_full()
+        self.add(*self.sf_all)
+        world = VGroup(*[m for m in self._leaves()])
+        self.play(world.animate.shift(LEFT * PAN_DIST), run_time=2.5)
+        self.remove(world)
+        self.add(*world.submobjects)
+        self._counter_to(AVG["full:salet"], AVG_GREEN, 1.0)
+        self.sf_all = None

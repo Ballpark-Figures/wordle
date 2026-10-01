@@ -40,7 +40,8 @@ GROUPS = [7, 225]     # FIRST's --- G Y (TEASE's group) and G G Y - - (FIERY's),
 TRIT = {"b": 0, "y": 1, "g": 2}
 # 07zb: one group's optimal trees with a forced next guess, from
 # math/solver/run-subgroup-tree.sh -- (results dir, the forced guesses in order)
-FULL_TREES = ["salet"]   # 07zc: an opener's WHOLE optimal tree (the optimal opener)
+FULL_TREES = ["first", "salet"]   # 07zc-zd: openers' WHOLE optimal trees: the scene's
+                                  #   own FIRST, then SALET (the optimal opener)
 AVG_GROUPS = [242, 177, 26, 7, 225, 8]   # 07: FIRST's groups whose average guesses show
 SUBTREES = [("first_30_cap6", ["after", "again", "other", "plane"]),   # BYBYB, 48 answers
             ("first_8_cap6", ["after", "again", "other", "bagel"])]    # BBBGG, 14 (in use)
@@ -75,7 +76,7 @@ def _build():
         out[OPENER][str(g)] = {"guess": guess, "branches": branches}
     # 07: AVERAGE GUESSES for a whole game, per group -- the mean of the tree's own
     # per-answer guess counts (field 2 of a tree line, FIRST included)
-    out["avg"] = {}
+    out.setdefault("avg", {})
     for g in AVG_GROUPS:
         counts = [int(t[1]) for t in lines
                   if (g == 242 and len(t) == 3 and t[2] == OPENER)
@@ -88,6 +89,9 @@ def _build():
             t = _trie([l.split() for l in f if l.strip()])
         assert t["guess"] == opener
         out["full"][opener] = t
+        with gzip.open(os.path.join(TREES, f"{opener}.txt.gz"), "rt") as f:
+            counts = [int(l.split()[1]) for l in f if l.strip()]
+        out.setdefault("avg", {})[f"full:{opener}"] = sum(counts) / len(counts)
     out["subtree"] = {}
     for name, guesses in SUBTREES:
         for g in guesses:
