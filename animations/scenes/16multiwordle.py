@@ -20,7 +20,7 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   j replay_eight  — EIGHT, candidates updated                             (16j, VO 4)
   k replay_words  — WORDS                                                 (16k, VO 4)
   l replay_first  — FIRST                                                 (16l, VO 4)
-  m replay_rest   — the rest of the game                                  (16m, VO 4)
+  m replay_rest   — the rest of the game, faster, then the win wave       (16m, VO 4)
   n blank_rest    — every row but SOLVE back to black, candidates out     (16n, VO 5)
   o flip_eight    — row 2 back to coloured EIGHT in one flip              (16o, VO 5)
   p flip_words    — row 3 back to WORDS in one flip                       (16p, VO 5)
@@ -29,10 +29,11 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                     its candidates guessed, candidates updated, to the end (16r, VO 5)
 
 CANDIDATES UNDER A BOARD (16i-r): the answers still consistent with every reply that
-board has had, as WHITE DOTS while there are more than 20 and as WORDS from 20 down
-("switch to actual words once the number drops to 20 or fewer"). ONE dot size for
-the whole scene (fitted to the largest set, 342), so a count reads as an area; one
-word size, fitted to 20. Updating after a guess: the eliminated fade out, the rest
+board has had, as WHITE DOTS while there are too many to list and as WORDS below
+that: ONE COLUMN of words, each as wide as fits under its board, and the cutoff is
+however many of those fit (user's call -- the script's "20 or fewer" was for a
+two-column list). ONE dot size for the whole scene (fitted to the largest set,
+342), so a count reads as an area. Updating after a guess: the eliminated fade out, the rest
 regrid, and a set crossing 20 turns into words that grow out of their dots (07's
 move). Numbers from assets/multi_data.py -> multi_cache.json.
 
@@ -174,7 +175,9 @@ GREEDY = multi_data.load("greedy")
 RAISE = 0.9                  # boards move up this far in 16i, to make room below
 CAND_TOP_GAP = 0.15          # board bottom to the candidates' top
 CAND_BOTTOM = -4.3
-WORD_MAX = 20                # "switch to actual words once ... 20 or fewer"
+# WORDS ARE ONE COLUMN, AS WIDE AS FITS UNDER A BOARD, and the dots-to-words cutoff
+# is however many of those fit below it (user's call, 2026-10-01 -- replacing the
+# script's "20 or fewer"); `_sizes` derives it.
 DOT_COLOR = WHITE            # 06's dots
 DIM = 0.75                   # the emphasis mask's opacity over a dimmed column
 FORTH_BOARD = 3                                # board whose answer is FORTH
@@ -371,11 +374,17 @@ class Scene16(WordleBoardScene):
         b = self.boards[k]
         return (b.get_left()[0], b.get_right()[0], b.get_bottom()[1] - CAND_TOP_GAP)
 
+    def _word_slots(self, members, k):
+        left, right, top = self._region(k)
+        return ranked_word_layout([{"size": len(members), "members": members}],
+                                  left, right, top, CAND_BOTTOM, heads=0, ncols=[1])
+
     def _sizes(self):
         """The ONE dot pitch (fitted to the largest set either game shows) and the
-        word grid's column count (fitted to WORD_MAX words), for this layout."""
+        dots-to-words cutoff: the most words that fit in one column at the size a
+        lone word gets (as wide as fits under the board)."""
         if getattr(self, "_pitch", None) is not None:
-            return self._pitch, self._ncols
+            return self._pitch, self._word_max
         left, right, top = self._region(0)
         w, h = right - left, top - CAND_BOTTOM
         biggest = max(len(b["members"]) for g in (REPLAY, GREEDY)
@@ -384,24 +393,25 @@ class Scene16(WordleBoardScene):
         for _ in range(50):
             p = (lo + hi) / 2
             lo, hi = (p, hi) if int(w / p) * int(h / p) >= biggest else (lo, p)
-        group = {"size": WORD_MAX, "members": [f"w{i}" for i in range(WORD_MAX)]}
-        best = max(range(1, WORD_MAX + 1), key=lambda nc: ranked_word_layout(
-            [group], left, right, top, CAND_BOTTOM, heads=0, ncols=[nc])[1])
-        self._pitch, self._ncols = lo, best
-        return lo, best
+        full = self._word_slots(["w0"], 0)[1]
+        n = 1
+        while self._word_slots([f"w{i}" for i in range(n + 1)], 0)[1] >= full * 0.999:
+            n += 1
+        self._pitch, self._word_max = lo, n
+        return lo, n
 
     def _cand_anims(self, members_by_board):
         """ONE play's worth of animations taking every board's candidates to the
         sets given, plus what to do when it ends. Dots while a set is over WORD_MAX,
         words from there down; eliminated ones fade, survivors regrid, a set
         crossing to words grows its words out of their dots (07)."""
-        pitch, ncols = self._sizes()
+        pitch, word_max = self._sizes()
         anims, gone, new = [], [], []
         for k, members in enumerate(members_by_board):
             cur = self.cands[k]
             left, right, top = self._region(k)
             nxt = {}
-            if len(members) > WORD_MAX:
+            if len(members) > word_max:
                 spots, r = dot_grid(members, pitch, left, right, top)
                 for wd in members:
                     if wd in cur:
@@ -413,9 +423,7 @@ class Scene16(WordleBoardScene):
                         new.append(d)
                         nxt[wd] = d
             else:
-                slots, sc, _, _ = ranked_word_layout(
-                    [{"size": len(members), "members": members}], left, right, top,
-                    CAND_BOTTOM, heads=0, ncols=[ncols])
+                slots, sc, _, _ = self._word_slots(members, k)
                 for wd in members:
                     old = cur.get(wd)
                     if isinstance(old, PigpenWord):
@@ -440,13 +448,13 @@ class Scene16(WordleBoardScene):
             self.cands[k] = nxt
         return anims, new, gone
 
-    def _update_cands(self, members_by_board, run_time):
+    def _update_cands(self, members_by_board, run_time, extra=()):
         anims, new, gone = self._cand_anims(members_by_board)
         self.add(*new)
-        self.play(*anims, run_time=run_time)
+        self.play(*anims, *extra, run_time=run_time)
         self.remove(*gone)
 
-    def _play(self, game, j, type_rt, score_rt, update_rt):
+    def _play(self, game, j, type_rt, score_rt, update_rt, extra=()):
         """Guess j of `game` (multi_data's): typed into every board it reaches,
         scored, then every board's candidates updated."""
         step = game["steps"][j]
@@ -460,7 +468,7 @@ class Scene16(WordleBoardScene):
         self.play(*types, run_time=total)
         self.play(*[self.boards[k].reveal_anim(j, step["boards"][k]["code"])
                     for k in live], run_time=score_rt)
-        self._update_cands([b["members"] for b in step["boards"]], update_rt)
+        self._update_cands([b["members"] for b in step["boards"]], update_rt, extra)
 
     def _blank_flips(self, rows, shift=None):
         """Every tile of `rows` (per board) flipped to the blank face -- letters gone
@@ -519,9 +527,10 @@ class Scene16(WordleBoardScene):
     #     each board's candidates appear beneath it
     @subscene
     def replay_solve(self):
-        anims, dead = self._blank_flips(self._filled_rows(), shift=UP * RAISE)
+        anims, dead = self._blank_flips(self._filled_rows())
         self.play(*anims, run_time=1.2)
         self._drop_letters(dead)
+        self.play(*[b.animate.shift(UP * RAISE) for b in self.boards], run_time=0.8)
         self.cands = [{} for _ in self.boards]
         self._play(REPLAY, 0, 0.65, 0.9, 1.0)       # SOLVE
 
@@ -543,13 +552,14 @@ class Scene16(WordleBoardScene):
     # m : the rest of the game
     @subscene
     def replay_rest(self):
-        self._play(REPLAY, 4, 0.65, 0.9, 0.6)       # HALVE
-        self._play(REPLAY, 5, 0.65, 0.9, 0.6)       # THIRD
-        self._play(REPLAY, 6, 0.65, 0.9, 0.6)       # FORTH
-        self._play(REPLAY, 7, 0.65, 0.9, 0.6)       # FIFTH
-        self._play(REPLAY, 8, 0.65, 0.9, 0.6)       # SIXTH
-        self._play(REPLAY, 9, 0.65, 0.9, 0.6)       # SEVEN
-        self._play(REPLAY, 10, 0.65, 0.9, 0.6)      # OCTET
+        self._play(REPLAY, 4, 0.45, 0.6, 0.4)       # HALVE
+        self._play(REPLAY, 5, 0.45, 0.6, 0.4)       # THIRD
+        self._play(REPLAY, 6, 0.45, 0.6, 0.4)       # FORTH
+        self._play(REPLAY, 7, 0.45, 0.6, 0.4)       # FIFTH
+        self._play(REPLAY, 8, 0.45, 0.6, 0.4)       # SIXTH
+        self._play(REPLAY, 9, 0.45, 0.6, 0.4)       # SEVEN
+        self._play(REPLAY, 10, 0.45, 0.6, 0.4)      # OCTET
+        self._wave(2.0)
 
     # n : every row but SOLVE back to black; the candidates go
     @subscene
@@ -596,10 +606,10 @@ class Scene16(WordleBoardScene):
         self.play(*[m.animate.set_fill(opacity=0.0 if i == k else DIM)
                     for i, m in enumerate(self.masks)], run_time=run_time)
 
-    def _greedy(self, j):
+    def _greedy(self, j, extra=()):
         """16r's guess j: its board emphasised, then the guess played everywhere."""
         self._emphasize(GREEDY["steps"][j]["target"], 0.5)
-        self._play(GREEDY, j, 0.65, 0.9, 0.8)
+        self._play(GREEDY, j, 0.65, 0.9, 0.8, extra)
 
     # r : the board with the fewest candidates emphasised, a random one of its
     #     candidates guessed, every board's candidates updated -- to the end
@@ -616,7 +626,9 @@ class Scene16(WordleBoardScene):
         self._greedy(8)              # FIRST  (board 1)
         self._greedy(9)              # FORTH  (board 4)
         self._greedy(10)             # FIFTH  (board 5)
-        self._greedy(11)             # SIXTH  (board 6)
-        self.play(*[FadeOut(m) for m in self.masks], run_time=0.6)
+        # the masks lift WITH the last update, not as a quick fade of their own
+        # after it -- seven columns brightening at once read as a flash
+        self._greedy(11, extra=[m.animate.set_fill(opacity=0.0)
+                                for m in self.masks])    # SIXTH  (board 6)
         self.remove(*self.masks)
         self.masks = None
