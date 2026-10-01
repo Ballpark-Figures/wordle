@@ -191,14 +191,14 @@ class Scene17(WordleBoardScene):
     # d : GGGGY, the impossible combination, fades out
     @subscene
     def drop_impossible(self):
-        rt = 0.8
+        rt = 0.7
         self.sfx(VANISH_SFX, at=max(0.0, rt / 2 - VANISH_PEAK), gain=WHOOSH_GAIN)
         self.play(FadeOut(self.combos.pop(IMPOSSIBLE)), run_time=rt)
 
     # e : GGGGG, the all-greens combination (the game is over), fades out
     @subscene
     def drop_win(self):
-        rt = 0.8
+        rt = 0.7
         self.sfx(VANISH_SFX, at=max(0.0, rt / 2 - VANISH_PEAK), gain=WHOOSH_GAIN)
         self.play(FadeOut(self.combos.pop(WIN)), run_time=rt)
 
