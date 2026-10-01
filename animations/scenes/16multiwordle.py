@@ -16,8 +16,8 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   g back_down     — windows shift down off frame, the 8 boards back       (16g, VO 3)
   h playthrough   — SOLVE EIGHT WORDS, then FIRST .. OCTET; FORTH's *     (16h, VO 3)
 
-THE GAME HAS NO PAUSES OF ITS OWN (user's call): a solved board jumps during the
-next guess's typing, and the FOURTH footnote fades in with FIFTH's typing and out
+THE GAME HAS NO PAUSES OF ITS OWN (user's call): a solved board does not jump; one
+wave runs through all eight winning rows at the end instead. The FOURTH footnote fades in with FIFTH's typing and out
 with SIXTH's, staying up while the game goes on.
 
 ALL BOARDS IN ONE ROW (user's call, 2026-10-01 -- the script's "grid" and "2x4"
@@ -33,8 +33,10 @@ THE ROW COUNTS ARE THE REAL GAMES': 7 (Dordle), 9 (Quordle), 13 (Octordle).
 
 REUSE MAP — every element and the one source it comes from:
   boards, tiles, letters    assets/board.py `get_board`, as scene 02
-  typing / scoring / win    board.type_anim / reveal_anim / bounce_anim, every
-                            unsolved board in ONE play (one guess, all boards)
+  typing / scoring          board.type_anim / reveal_anim, every unsolved board
+                            in ONE play (one guess, all boards)
+  the closing wave          board.bounce_tiles (bounce's per-tile jumps, added
+                            for this), all 40 winning tiles in ONE LaggedStart
   keystroke sfx             assets/keys.py `key_cues` (scene 02), first board only
   browser windows           bpkfigures/browser.py `browser_window` (new, modelled
                             on youtube_card.py)
@@ -255,12 +257,9 @@ class Scene16(WordleBoardScene):
     # ── the game ──────────────────────────────────────────────────────────────
     def _guess(self, j, type_rt, score_rt, extra=()):
         """Guess j typed into every unsolved board, then scored. A board is unsolved
-        at guess j while it has a row j.
-
-        NO PAUSE OF ITS OWN BETWEEN GUESSES: a board this guess solves jumps DURING
-        the next guess's typing (held in `self.wins` until then), and `extra`
-        animations (the footnote in and out) join the typing play too. Only the
-        last guess's jump plays on its own (`_last_win`)."""
+        at guess j while it has a row j. NO jump when a board is solved (user's
+        call): the whole game's winning rows jump together at the end (`_wave`).
+        `extra` animations (the footnote in and out) join the typing play."""
         live = [k for k, b in enumerate(BOARDS) if len(b["guesses"]) > j]
         word = GUESSES[j]
         types = []
@@ -268,15 +267,17 @@ class Scene16(WordleBoardScene):
             anim, total = self.boards[k].type_anim(
                 self, j, word, type_rt, per_letter=key_cues(self) if n == 0 else None)
             types.append(anim)
-        self.play(*types, *self.wins, *extra, run_time=total)
+        self.play(*types, *extra, run_time=total)
         self.play(*[self.boards[k].reveal_anim(j, BOARDS[k]["guesses"][j]["code"])
                     for k in live], run_time=score_rt)
-        self.wins = [self.boards[k].bounce_anim(j) for k in live
-                     if BOARDS[k]["answer"] == word]
 
-    def _last_win(self, run_time):
-        self.play(*self.wins, run_time=run_time)
-        self.wins = []
+    def _wave(self, run_time, height=0.15):
+        """One wave through every board's winning row, left to right: all 40 tiles
+        in ONE LaggedStart, so it runs on across the gaps between boards."""
+        ups = []
+        for k, b in enumerate(self.boards):
+            ups += b.bounce_tiles(len(BOARDS[k]["guesses"]) - 1, height)
+        self.play(LaggedStart(*ups, lag_ratio=0.08), run_time=run_time)
 
     def _setup_footnote(self):
         b = self.boards[FORTH_BOARD]
@@ -295,7 +296,6 @@ class Scene16(WordleBoardScene):
     # h : SOLVE EIGHT WORDS, then the eight answers in order
     @subscene
     def playthrough(self):
-        self.wins = []
         self._guess(0, 0.65, 0.9)              # SOLVE
         self._guess(1, 0.65, 0.9)              # EIGHT
         self._guess(2, 0.65, 0.9)              # WORDS
@@ -310,5 +310,5 @@ class Scene16(WordleBoardScene):
         self._guess(8, 0.65, 0.9, extra=[FadeOut(self.star), FadeOut(self.foot)])  # SIXTH
         self._guess(9, 0.65, 0.9)              # SEVEN
         self._guess(10, 0.65, 0.9)             # OCTET
-        self._last_win(0.8)
+        self._wave(2.0)
         self.star = self.foot = None

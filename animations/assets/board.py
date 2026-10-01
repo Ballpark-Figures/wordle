@@ -361,6 +361,11 @@ class WordleBoard(VGroup):
     def bounce_anim(self, row, height=0.35, lag_ratio=0.12):
         """`bounce`'s animation, unplayed — to join a larger play (scene 07 fades a
         word out while the row jumps)."""
+        return LaggedStart(*self.bounce_tiles(row, height), lag_ratio=lag_ratio)
+
+    def bounce_tiles(self, row, height=0.35):
+        """`bounce`'s per-tile jumps, unstaggered -- for a wave running across
+        several boards' rows in ONE LaggedStart (scene 16's ending)."""
         ups = []
         for i in range(self.n_cols):
             parts = [self.tiles[row][i]]
@@ -368,7 +373,7 @@ class WordleBoard(VGroup):
                 parts.append(self.letters[row][i])
             ups.append(VGroup(*parts).animate(rate_func=there_and_back)
                        .shift(UP * height))
-        return LaggedStart(*ups, lag_ratio=lag_ratio)
+        return ups
 
 
 def get_board(**kwargs):
