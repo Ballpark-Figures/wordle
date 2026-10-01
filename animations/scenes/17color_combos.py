@@ -9,8 +9,8 @@ BEAT MAP:
                  go right (above the rest), everything else fades out        (17b, VO 2)
   c combos     — GGGG- and GGYY- move into their places in the grid of 21
                  combinations while the other 33 fade; then the other 19 fade in (17c, VO 2)
-  d drop_impossible — GGGGY fades out                                     (17d, VO 2)
-  e drop_win   — GGGGG, all greens, fades out                             (17e, VO 2)
+  d drop_impossible — GGGGY fades out, poof                                 (17d, VO 2)
+  e drop_win   — GGGGG, all greens, fades out, poof                        (17e, VO 2)
   (17f is NOT BUILT — its direction is not final, the user's call 2026-10-01.)
 
 REUSE MAP — every element and the one source it comes from:
@@ -23,11 +23,12 @@ REUSE MAP — every element and the one source it comes from:
                       the rest FadeOut, kept rows at z_index 1 (script)
   17c combinations    tiles greens, yellows, grays; tile gap the board's ratio
                       (TILE_BUFF), BLOCK_GAP between colour blocks (script: "slight gaps")
+  17d/e sound         self.sfx("poof") — music-library/sfx/poof.wav at library level
   colours             BOARD_NAVY via WordleBoardScene; tiles config.py TILE_STATE
 
 LAYOUT CHOICES, flagged:
   - 17b: the 5 in one column on the left, the 30 in three columns of ten on the right,
-    in their 243-grid order, all at PART_TILE; equal gaps edge -> 5 -> 30 -> edge
+    in their 243-grid order down each column, all at PART_TILE; equal gaps edge -> 5 -> 30 -> edge
     (the user's call).
   - 17c: a rectangular grid (the user's call): one column per green count, all greens
     in the last column, each column from the top, most yellows first; combinations
@@ -81,12 +82,13 @@ def _part_xs(size):
 
 
 def _part_cells(n, cols, cx, size):
-    """Centres for n five-tile rows in `cols` columns, filled row by row, centred."""
+    """Centres for n five-tile rows in `cols` columns, filled DOWN each column, top
+    to bottom, then the next column to the right (the user's call)."""
     w = size * (5 + 4 * TILE_BUFF)
     px, py = w + PART_COL_GAP * size, size * (1 + PART_ROW_GAP)
     nr = -(-n // cols)
-    return [np.array([cx + (k % cols - (cols - 1) / 2) * px,
-                      ((nr - 1) / 2 - k // cols) * py, 0.0]) for k in range(n)]
+    return [np.array([cx + (k // nr - (cols - 1) / 2) * px,
+                      ((nr - 1) / 2 - k % nr) * py, 0.0]) for k in range(n)]
 
 
 def _combo(g, y, b, size):
@@ -186,11 +188,13 @@ class Scene17(WordleBoardScene):
     # d : GGGGY, the impossible combination, fades out
     @subscene
     def drop_impossible(self):
+        self.sfx("poof")
         self.play(FadeOut(self.combos.pop(IMPOSSIBLE)), run_time=0.8)
 
     # e : GGGGG, the all-greens combination (the game is over), fades out
     @subscene
     def drop_win(self):
+        self.sfx("poof")
         self.play(FadeOut(self.combos.pop(WIN)), run_time=0.8)
 
     # f : NOT BUILT — 17f's direction is not final (the user, 2026-10-01)
