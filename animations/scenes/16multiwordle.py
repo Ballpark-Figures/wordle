@@ -18,7 +18,7 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
 
 THE GAME HAS NO PAUSES OF ITS OWN (user's call): a solved board jumps during the
 next guess's typing, and the FOURTH footnote fades in with FIFTH's typing and out
-with SEVEN's, staying up while the game goes on.
+with SIXTH's, staying up while the game goes on.
 
 ALL BOARDS IN ONE ROW (user's call, 2026-10-01 -- the script's "grid" and "2x4"
 were overridden): each board splits into two neighbours, pushing the row apart.
@@ -307,8 +307,8 @@ class Scene16(WordleBoardScene):
         # the footnote comes up WITH the next guess's typing -- no pause of its own --
         # and stays up while the game goes on
         self._guess(7, 0.65, 0.9, extra=[FadeIn(self.star), FadeIn(self.foot)])  # FIFTH
-        self._guess(8, 0.65, 0.9)              # SIXTH
-        self._guess(9, 0.65, 0.9, extra=[FadeOut(self.star), FadeOut(self.foot)])  # SEVEN
+        self._guess(8, 0.65, 0.9, extra=[FadeOut(self.star), FadeOut(self.foot)])  # SIXTH
+        self._guess(9, 0.65, 0.9)              # SEVEN
         self._guess(10, 0.65, 0.9)             # OCTET
         self._last_win(0.8)
         self.star = self.foot = None
