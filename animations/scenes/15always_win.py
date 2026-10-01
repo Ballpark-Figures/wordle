@@ -31,14 +31,15 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                    popping out there, above the line               (15h, VO 6)
   i bland_copse  — flips to BLAND COPSE RIGHT, sliding to 4.17     (15i, VO 6)
   j four_words   — the line zooms out to fit 5.02, the CHAMP FLINT RUGBY SOWED
-                   marker popping out there, below the line        (15j, VO 7)
+                   marker popping out there, above the line        (15j, VO 7)
   k bugle_champ  — flips to BUGLE CHAMP DOWNY FIRST (same 5.02)    (15k, VO 7)
   l reveal_board — the camera pans down to an empty board          (15l, VO 8)
   m five_words   — BLUNK CIMEX GRYPT VOZHD WAQFS typed             (15m, VO 9)
   n puree        — the five rows flip to the colouring PUREE, PURER, RUPEE and UPPER
                    all give                                        (15n, VO 9)
   o board_left   — the board moves to the left half                (15o, VO 9)
-  p puree_words  — PUREE PURER RUPEE UPPER fade in on the right half (15p, VO 9)
+  p puree_words  — PUREE PURER RUPEE UPPER typed at once, a column on the right half
+                   (user's call)                                   (15p, VO 9)
   q chott        — the rows flip to CHOTT DUMBO FAWNY VERGE SPILL; the four words
                    fade out                                        (15q, VO 10)
   r unsolved     — its 16 unsolved answers fade in on the right, grouped by the
@@ -49,7 +50,8 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
     (VO 12 has no subscene)
   u back_to_line — the camera pans up to the number line           (15u, VO 13)
   v two_up       — every marker but the 2-word one dims            (15v, VO 13)
-  w four_up      — the 2-word marker dims, the 4-word one returns  (15w, VO 13)
+  w four_up      — the 2-word marker dims, the 3- and 4-word ones return (user's
+                   call: the VO now says "a 3- or 4-word opener") (15w, VO 13)
   x empty_board  — the camera pans down to an empty board          (15x, VO 14)
   y climb_start  — trial 68's starting words typed: QUERY NINNY BALER MASSE
                                                                    (15y, VO 14)
@@ -79,17 +81,22 @@ REUSE MAP — every element, the one source it comes from, and how it enters:
   number line (e-k,u-w) assets/strategy_line.py `StrategyLine` — scene 14's line,
                         title, subtitle and markers, built one frame up
   pans                  StrategyLine `_pan_up` / `_pan_down` (13's pan + whoosh)
-  new markers (f,h,j)   StrategyLine `_marker` (13's cards) popping out with the pop
+  new markers (f,h,j)   StrategyLine `opener_marker` (13's cards: the words, "Then
+                        RCA", the win rate; several words as a `word_stack`, board-
+                        tight, SLATE's size: user's calls) popping out with the pop
                         sound (`_pop_in`; with a zoom, `_zoom_pop` as 13c/e)
-  zooms (h, j)          13e's rule: the leftmost marker at the left end, the new one at
-                        the right end — only when a new marker would not fit (user's
-                        call)
+  zooms (h, j)          13e's rule, the leftmost marker at the left end and the new one
+                        at the right, but at +-ZOOM_EDGE (6.5, not 13e's 6) so the
+                        full-size cards clear each other — only when a new marker
+                        would not fit (user's call)
   marker swaps (g,i,k)  StrategyLine `replace_marker` — 14c's flip-while-sliding with
                         the win rate counting (moved there from scene 14 for this)
   emphasis (v, w)       dim the rest to 0.2 (house rule: save_state / Restore)
-  answer words (p, r)   PigpenWord(revealed=True) — 04's answer words; p's four by
-                        assets/groups.py `grid_cells` (2x2); r's sixteen by
-                        `ranked_word_layout` (07's groups, filling the region)
+  p's words             one-row boards typed in ONE play, key sound on the first only
+                        (12d's), at the board's size and spacing
+  r's words             PigpenWord(revealed=True) — 04's answer words, by
+                        `ranked_word_layout` (07's groups, filling the region), its
+                        rows of groups then re-spread by `_close_columns`
   words in / out        plain FadeIn / FadeOut; s slides them off to the right
   finale (za)           the rows move and scale as one (no source: the script's own)
   colours               BOARD_NAVY via WordleBoardScene; win rates by `win_color`
@@ -112,17 +119,20 @@ SALLE, beside FALSE and SALVE. The user accepts that (2026-10-01): nobody guesse
 SALLE over SALVE. Do not re-flag it.
 
 LAYOUT CHOICES, flagged:
-  - b: the corner CLONE is typed at the flips' pace (1.2s), so it ends with them.
-  - c: the travelling rows' borders thicken to the board's STROKE.
-  - Multi-word markers show their word rows and the win rate only — no "then Random
-    Compatible" lines (SLATE's card has them): a 4-word card with them does not fit
-    above or below the line.
-  - Marker sides: 2-word and 4-word below, 3-word above, so no two cards overlap.
-  - p: the four words at 1.2x list size, 2x2, centred on the right half.
+  - b: the corner CLONE's letter i lands as the words' tile i turns over (user's
+    call: in sync), derived from the flips' lag.
+  - c: the travelling rows sit above everything they cross (z-index 1: user's
+    call); their borders thicken to the board's STROKE.
+  - Every opener card reads "Then RCA" (user's call); the 4.08 card keeps "Random
+    Compatible Answers" with its initials bold.
+  - Marker sides: 2-word below, 3- and 4-word above (the 4-word card is tall, and
+    at the right end nothing is above the line), so no two cards overlap.
+  - p: the four words at the board's size, a column centred on the right half,
+    mirroring the board.
   - r: the sixteen words grouped (their shared feedback is not drawn), largest group
-    first, filling the region right of the board; the last row of groups is spread
-    like the others (`justify_last`), since a squeezed pair of pairs read as one
-    group of four (user, 2026-10-01).
+    first, right of the board; the space between the two columns of groups equals
+    the space between their rows (user's call: the layout's last row was squeezed
+    and read as one group of four).
   - y: the board's slot order is the climb's slots 2, 0, 1, 3 (user's call: an order
     that ends on LEDGE PAWNS ROCKY THUMB; a blind opening's score ignores order).
   - za: the four rows grow to FINAL_SCALE, centred on the frame.
@@ -140,12 +150,12 @@ from assets.board import (STROKE, GAP, WordleBoard, get_board, get_typed_row,
                           get_scored_row)
 from assets.pigpen import PigpenWord
 from assets.flip import Flip, flip, row_parts
-from assets.groups import (GUESS_SCALE, grid_cells, ranked_word_layout, REGION_HALF_W,
+from assets.groups import (GUESS_SCALE, ranked_word_layout, REGION_HALF_W,
                            DOT_REGION_TOP, REGION_BOT)
 from assets.keys import key_cues
 from assets.second_view import corner_spot, row_stroke, under, typed_under, group_rows
-from assets.strategy_line import (StrategyLine, GAME_DY, shrink_out, word_line,
-                                  rate_text, word_stroke, OPTIMAL, COMPATIBLE)
+from assets.strategy_line import (StrategyLine, GAME_DY, shrink_out,
+                                  word_stroke, OPTIMAL, COMPATIBLE)
 
 DATA = lists_data.load()
 SD = strategy_data.load()
@@ -160,12 +170,15 @@ CHOTT = "chott dumbo fawny verge spill"
 SIX = "catty frond rumba spill verge whack"
 
 BOARD_SIDE_X = 4.0         # o: how far left the board moves
-SAME_SCALE = 1.2           # p: the four words' size (x list size)
-SAME_PITCH = (3.2, 0.95)   # p: their grid pitches (x, y)
 UNSOLVED_LEFT = -1.1       # r: the grouped words' region starts here
+FLIP_LAG = 0.25            # b: the word flips' lag_ratio (Flip's default), which
+                           #   CLONE's typing is timed against
+POP_RT = 0.3               # b: one CLONE letter's pop
+ZOOM_EDGE = 6.5            # h, j: where a zoom puts its end markers (13e: 6)
+LINE_DROP = -0.2           # the line sits this much lower than 13/14's and every
+MARKER_STEM_15 = 0.3       #   stem is shorter (13: 0.45), so the full-size 3- and
+                           #   4-word cards clear the subtitle and the frame edge
 FINAL_SCALE = 1.5          # za: the four rows' growth
-MULTI_W = 1.7              # a multi-word card's word rows (narrower than SLATE's 2.2, so
-                           #   cards above the line clear each other)
 
 
 def _tiles(row):
@@ -179,6 +192,39 @@ def _stack():
     rows = [WordleBoard(rows=1, cols=5) for _ in range(6)]
     VGroup(*rows).arrange(DOWN, buff=GAP).move_to(ORIGIN)
     return rows
+
+
+def _close_columns(groups, slots, sc, left, right):
+    """15r: the layout's group blocks keep their rows, but each row of blocks is
+    re-spread so the space between blocks ACROSS equals the space between block
+    rows DOWN (user's call), centred in [left, right]. `sc` is the layout's word
+    scale. Returns new slots."""
+    probe = PigpenWord(groups[0]["members"][0], revealed=True).scale(sc)
+    wd, ht = probe.width, probe.height
+    blocks = []
+    for g in groups:
+        pts = np.array([slots[w] for w in g["members"]])
+        blocks.append({"members": g["members"], "pts": pts, "cx": pts[:, 0].mean(),
+                       "top": pts[:, 1].max() + ht / 2,
+                       "bot": pts[:, 1].min() - ht / 2,
+                       "w": pts[:, 0].max() - pts[:, 0].min() + wd})
+    tops = sorted({round(b["top"], 6) for b in blocks}, reverse=True)
+    rows = [[b for b in blocks if round(b["top"], 6) == t] for t in tops]
+    out = {w: p for b in blocks for w, p in zip(b["members"], b["pts"])}
+    if len(rows) < 2:
+        return out
+    vgap = min(b["bot"] for b in rows[0]) - max(b["top"] for b in rows[1])
+    mid = (left + right) / 2
+    for r in rows:
+        r.sort(key=lambda b: b["cx"])
+        total = sum(b["w"] for b in r) + vgap * (len(r) - 1)
+        x = mid - total / 2
+        for b in r:
+            cx = x + b["w"] / 2
+            for w, p in zip(b["members"], b["pts"]):
+                out[w] = np.array([cx + p[0] - b["cx"], p[1], 0.0])
+            x += b["w"] + vgap
+    return out
 
 
 def _at(new, old):
@@ -217,7 +263,7 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
     """
 
     def setup_scene(self):
-        pass
+        self.marker_stem = MARKER_STEM_15
 
     # a : SALET in the corner and its coloured rows fade in; every optimal second
     #     word is typed under its row at once
@@ -256,11 +302,20 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
     @subscene
     def clone(self):
         self._setup_clone()
-        cc = self.corner_clone
-        typing, _ = cc.type_anim(self, 0, CLONE, 1.2, per_letter=key_cues(self),
-                                 appear=True, stroke=row_stroke(cc.width))
-        flip(self, [Flip(old, new, parts=(row_parts(old), row_parts(new)))
-                    for old, new in zip(self.words, self.clones)], 1.2, extra=[typing])
+        cc, rt = self.corner_clone, 1.2
+        # CLONE's letter i lands as every word's tile i turns over: a Flip of 5
+        # parts at lag 0.25 gives each part d = 1 / (1 + 4 * 0.25) of the run, part
+        # i starting at i * 0.25 * d and turning over half-way through it
+        d = 1 / (1 + 4 * FLIP_LAG)
+        t0, gap = d / 2 * rt, FLIP_LAG * d * rt
+        cues = key_cues(self)
+        typing, total = cc.type_anim(self, 0, CLONE, POP_RT, key_gap=gap, appear=True,
+                                     per_letter=lambda i, ch, at: cues(i, ch, t0 + at),
+                                     stroke=row_stroke(cc.width))
+        flip(self, [Flip(old, new, parts=(row_parts(old), row_parts(new)),
+                         lag_ratio=FLIP_LAG)
+                    for old, new in zip(self.words, self.clones)], rt,
+             extra=[Succession(Wait(t0), AnimationGroup(typing, run_time=total))])
         self.words, self.clones = self.clones, None
 
     # c : the corner SALET and its CLONE travel into a board's first two rows as
@@ -274,6 +329,7 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
             mob.target.scale(target.width / mob.width).move_to(target)
             for t in _tiles(mob.target):
                 t.set_stroke(width=STROKE)
+            mob.set_z_index(1)                 # over the rows it crosses (user's call)
             self.movers.append(mob)
         self.leaving = self.rows + self.words
 
@@ -296,12 +352,11 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
 
     # e : the camera pans up to scene 14's number line as it ended
     def _setup_timeline(self):
-        self._build_line(OPTIMAL[0], COMPATIBLE[0], dy=GAME_DY)
+        self._build_line(OPTIMAL[0], COMPATIBLE[0], dy=GAME_DY, line_dy=LINE_DROP)
         self.optimal_marker(grow=1.0)
         self.compatible_marker(grow=1.0)
-        self._marker(round(SLATE["mean"], 2),
-                     [word_line("slate"), "then Random", "Compatible",
-                      rate_text(SLATE["win_rate"])], grow=1.0)
+        self.opener_marker(round(SLATE["mean"], 2), ["slate"], SLATE["win_rate"],
+                           grow=1.0)
         self.add(self.line, self.title, self.subtitle)
 
     @subscene
@@ -323,20 +378,23 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
         self.add(*frame, self.line, self.title, self.subtitle)
 
     def _opener(self, key, side):
-        """A k-word opener's marker: its word rows and its win rate."""
+        """A k-word opener's marker: its words, "Then RCA", its win rate."""
         o = AW["openers"][key]
-        return self._marker(round(o["mean"], 2),
-                            [word_line(w, MULTI_W) for w in key.split()] + [rate_text(o["win_rate"])],
-                            side=side)
+        return self.opener_marker(round(o["mean"], 2), key.split(), o["win_rate"],
+                                  side=side)
 
     def _swap(self, mk, key, run_time):
         o = AW["openers"][key]
         self.replace_marker(mk, key.split(), round(o["mean"], 2), o["win_rate"], run_time)
 
     def _zoom_to(self, mk):
-        """13e's zoom: the leftmost marker at the left end, `mk` at the right."""
-        left = min(m.value for m in self.line.markers)
-        self._zoom_pop(left, mk.value, mk, 2.0, 0.4, 0.5)
+        """13e's zoom, the leftmost marker at x = -ZOOM_EDGE and `mk` at +ZOOM_EDGE
+        (13e used 6; full-size cards need the extra room to clear each other)."""
+        lo, hi = min(m.value for m in self.line.markers), mk.value
+        s = 2 * ZOOM_EDGE / (hi - lo)                  # screen units per guess
+        half = (self.line.x_range[1] - self.line.x_range[0]) / 2 / s
+        c = (lo + hi) / 2
+        self._zoom_pop(c - half, c + half, mk, 2.0, 0.4, 0.5)
 
     # f : PARSE CLINT at 3.69, below the line
     @subscene
@@ -360,10 +418,11 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
     def bland_copse(self):
         self._swap(self.three, THREE_B, 1.2)
 
-    # j : zoom out to fit CHAMP FLINT RUGBY SOWED at 5.02, below the line
+    # j : zoom out to fit CHAMP FLINT RUGBY SOWED at 5.02, above the line (right of
+    #     the title, so the tall card has room)
     @subscene
     def four_words(self):
-        self.four = self._opener(FOUR, DOWN)
+        self.four = self._opener(FOUR, UP)
         self._zoom_to(self.four)
 
     # k : flips to BUGLE CHAMP DOWNY FIRST (still 5.02)
@@ -413,16 +472,20 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
 
     # p : PUREE PURER RUPEE UPPER on the right half
     def _setup_puree_words(self):
-        ws = AW["same"]["members"]
-        cx = BOARD_SIDE_X
-        self.same = [PigpenWord(w, revealed=True).scale(SAME_SCALE)
-                     .move_to([cx + i * SAME_PITCH[0], j * SAME_PITCH[1], 0])
-                     for w, (i, j) in zip(ws, grid_cells(len(ws)))]
+        """An empty one-row board per word, in a column at the board's own size and
+        spacing, mirroring the board on the right half."""
+        self.same = [WordleBoard(rows=1, cols=5) for _ in AW["same"]["members"]]
+        VGroup(*self.same).arrange(DOWN, buff=GAP).move_to(RIGHT * BOARD_SIDE_X)
 
     @subscene
     def puree_words(self):
         self._setup_puree_words()
-        self.play(*[FadeIn(m) for m in self.same], run_time=0.8)
+        anims, total = [], 0.0
+        for i, (b, w) in enumerate(zip(self.same, AW["same"]["members"])):
+            a, total = b.type_anim(self, 0, w, 0.65, appear=True,
+                                   per_letter=key_cues(self) if i == 0 else None)
+            anims.append(a)
+        self.play(*anims, run_time=total)
 
     # q : the rows flip to CHOTT DUMBO FAWNY VERGE SPILL; the four words fade out
     @subscene
@@ -437,8 +500,8 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
         groups = [{"size": len(g["members"]), "members": g["members"]}
                   for g in AW["fixed"][CHOTT]["groups"]]
         slots, sc, _, _ = ranked_word_layout(groups, UNSOLVED_LEFT, REGION_HALF_W,
-                                             DOT_REGION_TOP, REGION_BOT, heads=0,
-                                             justify_last=True)
+                                             DOT_REGION_TOP, REGION_BOT, heads=0)
+        slots = _close_columns(groups, slots, sc, UNSOLVED_LEFT, REGION_HALF_W)
         self.unsolved_words = []
         for w, c in slots.items():
             m = PigpenWord(w, revealed=True).scale(sc).move_to(c)
@@ -482,10 +545,12 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
         self.play(*[m.animate.set_opacity(0.2) for m in self.line.markers
                     if m is not self.two], run_time=0.6)
 
-    # w : the 2-word marker dims and the 4-word one comes back
+    # w : the 2-word marker dims and the 3- and 4-word ones come back (user's call:
+    #     the VO now says "a 3- or 4-word opener")
     @subscene
     def four_up(self):
-        self.play(self.two.animate.set_opacity(0.2), Restore(self.four), run_time=0.6)
+        self.play(self.two.animate.set_opacity(0.2), Restore(self.three),
+                  Restore(self.four), run_time=0.6)
 
     # x : the camera pans down to the empty board
     @subscene

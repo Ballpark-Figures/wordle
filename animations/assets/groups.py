@@ -326,12 +326,11 @@ def dot_layout(data, guess, seed=None, blocked=(), anchors=None):
     return (groups, *_fill(groups, bs, centres, f))
 
 
-def _pack(bs, left, right, top, bottom, center_last=False, justify_last=False):
+def _pack(bs, left, right, top, bottom, center_last=False):
     """Shelf-pack blocks (dicts with w, h at scale 1) in reading order inside x in
     [left, right], y in [bottom, top]: left to right along a row, then the next row
     down; blocks in a row top-aligned and spread to fill the row's width, the last
-    row excepted (centred instead with `center_last`; spread like the rest with
-    `justify_last`). One scale for everything, the
+    row excepted (centred instead with `center_last`). One scale for everything, the
     largest that fits. Returns (scale, block centres)."""
     gap = RANK_GAP
 
@@ -366,7 +365,7 @@ def _pack(bs, left, right, top, bottom, center_last=False, justify_last=False):
     for i, sh in enumerate(rows_of):
         ws = [bs[k]["w"] * f for k in sh]
         spare = (right - left) - sum(ws) - gap * (len(sh) - 1)
-        last = i == len(rows_of) - 1 and not justify_last
+        last = i == len(rows_of) - 1
         g_eff = gap + (spare / (len(sh) - 1) if len(sh) > 1 and not last else 0)
         x = left + (spare / 2 if last and center_last else 0.0)
         for k, w in zip(sh, ws):
@@ -418,16 +417,13 @@ def _word_block(n, heads, aspect, nc=None):
 
 
 def ranked_word_layout(groups, left, right=REGION_HALF_W, top=DOT_REGION_TOP,
-                       bottom=REGION_BOT, heads=1, ncols=None, justify_last=False):
+                       bottom=REGION_BOT, heads=1, ncols=None):
     """07: `groups` (in the order given — pass them largest first) as WORD blocks,
     packed as `ranked_layout` packs dot blocks, the last row centred; each block
     under a stack of `heads` scored rows as wide as its word grid. The grid shape is the one of WORD_ASPECTS (the same for every
     block) that gives the LARGEST words. One block alone sits centred at the top.
     `ncols` (one per group) FIXES the column counts instead -- for a group that is
     already on screen and should keep its arrangement while it resizes (07f).
-    `justify_last` spreads the last row like the others instead of centring it, so
-    its groups sit as far apart as everyone else's (15r: a squeezed last row read
-    as one group).
 
     Returns (slots {word: centre}, word scale, [[header centre, top first] per
     block], [header width per block])."""
@@ -435,8 +431,7 @@ def ranked_word_layout(groups, left, right=REGION_HALF_W, top=DOT_REGION_TOP,
     for a in (WORD_ASPECTS if ncols is None else [1.0]):
         bs = [_word_block(g["size"], heads, a, None if ncols is None else ncols[i])
               for i, g in enumerate(groups)]
-        f, centres = _pack(bs, left, right, top, bottom, center_last=True,
-                           justify_last=justify_last)
+        f, centres = _pack(bs, left, right, top, bottom, center_last=True)
         if best is None or f > best[0]:
             best = (f, centres, bs)
     f, centres, bs = best

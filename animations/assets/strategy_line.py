@@ -42,6 +42,7 @@ WORD_LINE_W = 2.2         # a word's tile row's width in a marker label (SALET's
 LINE_Y = -0.4
 TITLE_BUFF = 0.6
 MARKER_FS = 30
+MARKER_STEM = 0.45        # ZoomLine's default; a scene may set self.marker_stem
 CARD_PAD = 0.22           # the marker cards' margin round their text
 CARD_RADIUS = 0.25        # the cards' corner rounding
 WIN_LOW, WIN_HIGH = LIGHT_RED, LIGHT_GREEN
@@ -91,6 +92,26 @@ def word_line(word, width=WORD_LINE_W):
     return row
 
 
+THEN_RCA = "Then RCA"     # an opener card's "then Random Compatible Answers" (user's call)
+
+
+def word_stack(words, width=WORD_LINE_W):
+    """Several words as `word_line` rows stacked at the board's row spacing (no
+    extra gap: user's call), one mobject on a card. `.is_stack` marks it for
+    replace_marker."""
+    rows = [word_line(w, width) for w in words]
+    stack = VGroup(*rows).arrange(DOWN, buff=rows[0].height * GAP / TILE)
+    stack.is_stack = True
+    return stack
+
+
+def opener_lines(words, rate):
+    """A k-word opener's card lines: the words, "Then RCA", the win rate."""
+    words = list(words)
+    head = word_line(words[0]) if len(words) == 1 else word_stack(words)
+    return [head, THEN_RCA, rate_text(rate)]
+
+
 def rate_text(rate):
     """A win rate as a marker shows it: 2 dp and a percent sign."""
     return f"{rate * 100:.2f}%"
@@ -110,10 +131,11 @@ class StrategyLine:
     """The number line and the game, as methods of the scene they are mixed into."""
 
     # ── the number line ──────────────────────────────────────────────────────
-    def _build_line(self, lo, hi, dy=0.0):
+    def _build_line(self, lo, hi, dy=0.0, line_dy=0.0):
         """The line over lo..hi, its title and subtitle above it (not added), all
-        `dy` above the frame at the origin (scene 15 sets it one frame up)."""
-        self.line = ZoomLine(lo, hi, y=LINE_Y + dy, min_label_step=1, tips=False,
+        `dy` above the frame at the origin (scene 15 sets it one frame up); the line
+        alone a further `line_dy` (scene 15 lowers it for its taller cards)."""
+        self.line = ZoomLine(lo, hi, y=LINE_Y + dy + line_dy, min_label_step=1, tips=False,
                              ends_buff=-0.1)
         self.title = crisp_text(TITLE, color=WHITE, font_size=FONT_SIZE_LG)
         self.title.to_edge(UP, buff=TITLE_BUFF).shift(UP * dy)
@@ -126,6 +148,7 @@ class StrategyLine:
         lines = lines[:-1] + [(rate, win_color(float(rate.rstrip("%")) / 100))]
         mk = self.line.add_marker(value, lines, side=side, font_size=MARKER_FS,
                                   grow=grow,
+                                  stem=getattr(self, "marker_stem", MARKER_STEM),
                                   text_color=WHITE,
                                   box={"pad": CARD_PAD, "fill": TILE_EMPTY_FILL,
                                        "stroke_color": TILE_FILLED_BORDER,
@@ -139,9 +162,17 @@ class StrategyLine:
                             grow=grow)
 
     def compatible_marker(self, grow=0.0):
+        """Its initials bold, since later cards abbreviate it "RCA" (user's call)."""
         return self._marker(COMPATIBLE[0],
-                            ["Random", "Compatible", "Answers", COMPATIBLE[1]],
+                            [(w, None, {"t2w": {w[0]: BOLD}})
+                             for w in ("Random", "Compatible", "Answers")]
+                            + [COMPATIBLE[1]],
                             side=DOWN, grow=grow)
+
+    def opener_marker(self, value, words, rate, side=UP, grow=0.0):
+        """An opener's card: its words (one row, or a board-tight stack), "Then
+        RCA", and its win rate."""
+        return self._marker(value, opener_lines(words, rate), side=side, grow=grow)
 
     def _zoom_pop(self, lo, hi, m, zoom_rt, pop_rt, lead):
         """Zoom to lo..hi, with m popping out of its dot (and the pop sound)
@@ -173,11 +204,13 @@ class StrategyLine:
 
     # ── a marker's words change as it slides (14c's, then 15's) ──────────────
     def replace_marker(self, mk, words, value, rate, run_time):
-        """The marker's first len(words) lines (word rows) flip to `words` while it
-        slides to `value` and its win rate (the last line) counts to `rate`."""
+        """The marker's word rows flip to `words` while it slides to `value` and its
+        win rate (the last line) counts to `rate`. The rows are its first line: a
+        single `word_line`, or a `word_stack` whose rows flip one each."""
         content = mk.label[1]
-        k = len(words)
-        olds, rate_mob = list(content[:k]), content[-1]
+        stack = content[0] if getattr(content[0], "is_stack", False) else None
+        olds = list(stack) if stack is not None else list(content[:len(words)])
+        rate_mob = content[-1]
         old_rate = mk.rate
         line = self.line
         dx = line.x_of(value) - line.x_of(mk.value)
@@ -190,7 +223,10 @@ class StrategyLine:
                                color_of=_pct_color)     # the colour of what it shows
         content.remove(rate_mob)
         content.add(counter.mob)
-        for o in olds:                                  # the flips carry the rows
+        # the flips carry the rows: off the card while they run. A stack leaves
+        # WHOLE -- emptied in place it would still count in the card's bounds, at
+        # the origin, and drag the card off its marker (15g, 2026-10-01)
+        for o in ([stack] if stack is not None else olds):
             content.remove(o)
         v0, left0 = mk.value, counter.left
         counter.mob.add_updater(                        # ride the card (before the count's)
@@ -202,8 +238,13 @@ class StrategyLine:
              run_time, extra=[line.move_marker(mk, value), count])
         counter.end_count()
         self.remove(*news)
-        for i, n in enumerate(news):
-            content.submobjects.insert(i, n)
+        if stack is not None:
+            new_stack = VGroup(*news)
+            new_stack.is_stack = True
+            content.submobjects.insert(0, new_stack)
+        else:
+            for i, n in enumerate(news):
+                content.submobjects.insert(i, n)
         mk.rate = rate
 
     # ── the game ─────────────────────────────────────────────────────────────

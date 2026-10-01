@@ -72,8 +72,8 @@ LAYOUT CHOICES, flagged:
     and nothing fades (13's convention).
   - Every compatible answer shown, all 66 after CHOSE.
   - The CHOSE/SLATE card hangs above the line (4.08's is below, 3.42's is far left).
-  - Its text is "then Random" / "Compatible" under the tiles (script: "CHOICE,
-    then random compatible"), capitalised as 13's markers are.
+  - Its text is "Then RCA" under the tiles (user's call, 2026-10-01; it was "then
+    Random" / "Compatible"); the 4.08 card bolds its own R, C and A to match.
   - The table's left column has no header (the script labels only the right one).
     Its title's blank is a short line of underscores (user's call).
   - Decimal places as the script writes them: 4 for turns 4 and 5, 2 for 1-3
@@ -169,9 +169,8 @@ class Scene14(StrategyLine, MovingCameraScene, WordleBoardScene):
         self._build_line(OPTIMAL[0], COMPATIBLE[0])
         self.optimal_marker(grow=1.0)
         self.compatible_marker(grow=1.0)
-        self.chose_mk = self._marker(round(CHOSE["mean"], 2),
-                                     [word_line("chose"), "then Random", "Compatible",
-                                      rate_text(CHOSE["win_rate"])])
+        self.chose_mk = self.opener_marker(round(CHOSE["mean"], 2), ["chose"],
+                                           CHOSE["win_rate"])
         self.add(self.line, self.title, self.subtitle)
 
     @subscene
