@@ -13,9 +13,10 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   a second_words — SALET in the top-left corner and its 148 groups as coloured rows
                    (scene 12's view, no dots: user's call) fade in; every optimal
                    second word is typed under its row at once      (15a, VO 1)
-  b clone        — every second word flips to CLONE                (15b, VO 2)
+  b clone        — every second word flips to CLONE, and CLONE is typed under the
+                   corner SALET (user's call)                  (15b, VO 2)
   c to_board     — the corner SALET (the uncoloured one: user's call) and the
-                   largest group's CLONE travel into rows 1 and 2 of a board in the
+                   CLONE under it travel into rows 1 and 2 of a board in the
                    middle as its other rows fade in around them; everything else
                    shrinks away                                    (15c, VO 3)
   d third        — THIRD typed into row 3                          (15d, VO 3)
@@ -111,15 +112,17 @@ SALLE, beside FALSE and SALVE. The user accepts that (2026-10-01): nobody guesse
 SALLE over SALVE. Do not re-flag it.
 
 LAYOUT CHOICES, flagged:
-  - c: CLONE comes from the largest group's slot (the first row); every CLONE is the
-    same word. The travelling rows' borders thicken to the board's STROKE.
+  - b: the corner CLONE is typed at the flips' pace (1.2s), so it ends with them.
+  - c: the travelling rows' borders thicken to the board's STROKE.
   - Multi-word markers show their word rows and the win rate only — no "then Random
     Compatible" lines (SLATE's card has them): a 4-word card with them does not fit
     above or below the line.
   - Marker sides: 2-word and 4-word below, 3-word above, so no two cards overlap.
   - p: the four words at 1.2x list size, 2x2, centred on the right half.
   - r: the sixteen words grouped (their shared feedback is not drawn), largest group
-    first, filling the region right of the board.
+    first, filling the region right of the board; the last row of groups is spread
+    like the others (`justify_last`), since a squeezed pair of pairs read as one
+    group of four (user, 2026-10-01).
   - y: the board's slot order is the climb's slots 2, 0, 1, 3 (user's call: an order
     that ends on LEDGE PAWNS ROCKY THUMB; a blind opening's score ignores order).
   - za: the four rows grow to FINAL_SCALE, centred on the frame.
@@ -243,30 +246,36 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
         self.words = [b for b, _ in self.blanks]
         self.blanks = None
 
-    # b : every second word flips to CLONE
+    # b : every second word flips to CLONE, and CLONE is typed under the corner SALET
     def _setup_clone(self):
         self.clones = [typed_under(CLONE, row) for row in self.rows]
+        self.corner_clone = WordleBoard(rows=1, cols=5)
+        self.corner_clone.scale(self.guess.width / self.corner_clone.width)
+        self.corner_clone.move_to(under(self.guess))
 
     @subscene
     def clone(self):
         self._setup_clone()
+        cc = self.corner_clone
+        typing, _ = cc.type_anim(self, 0, CLONE, 1.2, per_letter=key_cues(self),
+                                 appear=True, stroke=row_stroke(cc.width))
         flip(self, [Flip(old, new, parts=(row_parts(old), row_parts(new)))
-                    for old, new in zip(self.words, self.clones)], 1.2)
+                    for old, new in zip(self.words, self.clones)], 1.2, extra=[typing])
         self.words, self.clones = self.clones, None
 
-    # c : SALET and the first CLONE travel into a board's first two rows as its
-    #     other rows fade in; everything else shrinks away
+    # c : the corner SALET and its CLONE travel into a board's first two rows as
+    #     its other rows fade in; everything else shrinks away
     def _setup_to_board(self):
         self.board = get_board()
         self.movers = []
-        for mob, r in ((self.guess, 0), (self.words[0], 1)):
+        for mob, r in ((self.guess, 0), (self.corner_clone, 1)):
             target = self.board.rows[r]
             mob.generate_target()
             mob.target.scale(target.width / mob.width).move_to(target)
             for t in _tiles(mob.target):
                 t.set_stroke(width=STROKE)
             self.movers.append(mob)
-        self.leaving = self.rows + self.words[1:]
+        self.leaving = self.rows + self.words
 
     @subscene
     def to_board(self):
@@ -278,6 +287,7 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
         self.remove(*self.leaving)
         self.salet_row, self.clone_row = self.movers
         self.rows = self.words = self.groups = self.leaving = self.movers = None
+        self.corner_clone = None
 
     # d : THIRD typed into row 3
     @subscene
@@ -304,9 +314,13 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
     def _clear_below(self):
         """Everything but the number line off the scene — including the typing's
         wrapper groups, which keep a removed board's tiles on screen (flip.py's
-        ghost note). Only while the board's frame is out of view."""
-        keep = {self.line, self.title, self.subtitle, self.camera.frame}
-        self.remove(*[m for m in self.mobjects if m not in keep])
+        ghost note). Only while the board's frame is out of view. Everything goes
+        and the line comes back, rather than keeping it by identity: after a zoom
+        or a marker swap the line is held inside an animation's wrapper group, not
+        on the scene itself, so an identity test cleared it too (15u, 2026-10-01)."""
+        frame = [self.camera.frame] if self.camera.frame in self.mobjects else []
+        self.remove(*self.mobjects)
+        self.add(*frame, self.line, self.title, self.subtitle)
 
     def _opener(self, key, side):
         """A k-word opener's marker: its word rows and its win rate."""
@@ -423,7 +437,8 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
         groups = [{"size": len(g["members"]), "members": g["members"]}
                   for g in AW["fixed"][CHOTT]["groups"]]
         slots, sc, _, _ = ranked_word_layout(groups, UNSOLVED_LEFT, REGION_HALF_W,
-                                             DOT_REGION_TOP, REGION_BOT, heads=0)
+                                             DOT_REGION_TOP, REGION_BOT, heads=0,
+                                             justify_last=True)
         self.unsolved_words = []
         for w, c in slots.items():
             m = PigpenWord(w, revealed=True).scale(sc).move_to(c)
