@@ -56,7 +56,8 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   y climb_start  — trial 68's starting words typed: QUERY NINNY BALER MASSE
                                                                    (15y, VO 14)
   z climb        — each of its nine accepted moves flips the rows it changes, ending
-                   on LEDGE PAWNS ROCKY THUMB                      (15z, VO 14)
+                   on LEDGE PAWNS ROCKY THUMB; the counter counts down beside it, the
+                   last count growing and turning green as it reaches 0                      (15z, VO 14)
   za finale      — the two empty rows drop off the bottom; the four words grow,
                    centred                                         (15za, VO 15)
 
@@ -186,6 +187,7 @@ COUNT_GAP = 0.45           # x-z: between the label and the counter (user: wider
 UNCOUNTED = 1              # x-z: SALVE's one loss is not counted (user's call: it
                            #   needs SALLE guessed), so the counter shows count - 1
 COUNT_DONE = LIGHT_GREEN   # x-z: the counter at 0 -- the win-rate scale's green
+COUNT_GROW = 1.4           # z: how much the counter grows as it reaches 0
 FINAL_SCALE = 1.5          # za: the four rows' growth
 
 
@@ -233,6 +235,13 @@ def _close_columns(groups, slots, sc, left, right):
                 out[w] = np.array([cx + p[0] - b["cx"], p[1], 0.0])
             x += b["w"] + vgap
     return out
+
+
+def _finish(m, p):
+    """The counter `p` (0..1) of the way to done: grown towards COUNT_GROW and
+    coloured towards COUNT_DONE, about its own centre."""
+    m.scale(1 + (COUNT_GROW - 1) * p)
+    m.set_color(interpolate_color(WHITE, COUNT_DONE, p))
 
 
 def _at_once(t):
@@ -638,14 +647,21 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
     @subscene
     def climb(self):
         c, cx = self.counter, self.count_x
-        for mv in AW["climb"]["moves"]:
-            count = c.count_anim(mv["unsolved"] - UNCOUNTED, flash="none")
+        moves = AW["climb"]["moves"]
+        for k, mv in enumerate(moves):
+            v0, v1 = c.tracker.get_value(), mv["unsolved"] - UNCOUNTED
+            count = c.count_anim(v1, flash="none")
             c.mob.add_updater(lambda m: m.set_x(cx))      # centred, after the rebuild
+            if k == len(moves) - 1:
+                # the last count grows and turns green as it reaches 0, in the
+                # same play (user's call), following the count's own progress
+                tr = c.tracker
+                c.mob.add_updater(lambda m: _finish(m, (v0 - tr.get_value()) / (v0 - v1)))
             self._flip_rows({r: get_typed_row(w) for r, w in mv["rows"]}, 0.6,
                             extra=[count])
             c.end_count()
-            self.wait(0.6)                     # each number holds before the next move
-        self.play(c.mob.animate.set_color(COUNT_DONE), run_time=0.4)
+            if k < len(moves) - 1:
+                self.wait(0.6)                 # each number holds before the next move
 
     # za : the counter fades and the two empty rows drop off the bottom; the four
     #      words grow, centred
