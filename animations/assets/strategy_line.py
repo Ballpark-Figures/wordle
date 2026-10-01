@@ -101,6 +101,11 @@ def pct(v):
     return f"{v:.2f}%"
 
 
+def _pct_color(v):
+    """A counting win rate's (in percent) colour: `win_color` of what it shows."""
+    return win_color(v / 100)
+
+
 class StrategyLine:
     """The number line and the game, as methods of the scene they are mixed into."""
 
@@ -181,8 +186,8 @@ class StrategyLine:
         # the readout takes the rate's place in the card, at its left edge
         counter = CrispCounter("", ValueTracker(old_rate * 100),
                                left=rate_mob.get_left()[0], y=rate_mob.get_center()[1],
-                               font_size=MARKER_FS, color=win_color(rate), fmt=pct)
-        counter.mob.set_color(win_color(old_rate))      # the rate's own colour
+                               font_size=MARKER_FS, color=win_color(rate), fmt=pct,
+                               color_of=_pct_color)     # the colour of what it shows
         content.remove(rate_mob)
         content.add(counter.mob)
         for o in olds:                                  # the flips carry the rows

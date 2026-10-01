@@ -99,10 +99,14 @@ TABLE_TITLE = ["Random Compatible on Turn ___", "Optimal Elsewhere"]
 TITLE_GAP = 0.15                # between the title's two lines
 TABLE_TOP = 1.3                 # the header row's centre, in the table's frame
 ROW_DY = 0.72                   # scene 10's
-TURN_X = -2.2                   # the turn column's centre
-AVG_X = 1.6                     # the Average Guesses column's centre
+AVG_X = 0.0                     # the Average Guesses column's centre: the screen's
+                                # (user's call); the averages, aligned on their
+                                # decimal points, are centred on it as a block
+TURN_X = AVG_X - 3.8            # the turn column's centre, as far left as before
 HEADER_SIZE = 28                # scene 10's
 CELL_SIZE = 30                  # scene 10's
+SMALL_SIZE = 20                 # rows 4-5's third and fourth decimals (user's call)
+SMALL_GAP = 0.02                # between the two-place part and the small digits
 TABLE_DY = -GAME_DY             # the table sits one frame below the line
 DP = {1: 2, 2: 2, 3: 2, 4: 4, 5: 4}   # the script's decimal places per row
 
@@ -110,6 +114,21 @@ DP = {1: 2, 2: 2, 3: 2, 4: 4, 5: 4}   # the script's decimal places per row
 def _fmt(k):
     """Turn k's average as the table shows it."""
     return f"{TURNS[k]:.{DP[k]}f}"
+
+
+def _cell(k, dot_x):
+    """Turn k's average: the first two decimals at the cell size and any further
+    ones smaller, sharing a baseline, the decimal point at dot_x."""
+    s = _fmt(k)
+    big = crisp_text(s[:4], font_size=CELL_SIZE, color=WHITE)
+    big.move_to([0, _row_y(k), 0])
+    big.shift(RIGHT * (dot_x - big[1].get_center()[0]))      # big[1] is the "."
+    cell = VGroup(big)
+    if len(s) > 4:
+        small = crisp_text(s[4:], font_size=SMALL_SIZE, color=WHITE)
+        small.next_to(big, RIGHT, buff=SMALL_GAP).align_to(big, DOWN)  # digits: bottom = baseline
+        cell.add(small)
+    return cell
 
 
 def _row_y(k):
@@ -125,7 +144,8 @@ class Scene14(StrategyLine, MovingCameraScene, WordleBoardScene):
     turn4 — 3.4225
     turn1 — 3.61
     turn3 — 3.49
-    turn2 — 3.67; everything out
+    turn2 — 3.67
+    fade_out — everything out
     """
 
     def setup_scene(self):
@@ -178,6 +198,9 @@ class Scene14(StrategyLine, MovingCameraScene, WordleBoardScene):
         self.table_turns = VGroup(*[crisp_text(str(k), font_size=CELL_SIZE, color=WHITE)
                                     .move_to([TURN_X, _row_y(k), 0]) for k in range(1, 6)])
         self.add(self.table_title, self.table_head, self.table_turns)
+        # the decimal point's x that centres the aligned averages on AVG_X
+        block = VGroup(*[_cell(k, 0.0) for k in range(1, 6)])
+        self.dot_x = AVG_X - block.get_center()[0]
 
     @subscene
     def table(self):
@@ -190,8 +213,7 @@ class Scene14(StrategyLine, MovingCameraScene, WordleBoardScene):
     # e-i : the averages, one row at a time
     def _fill(self, k, run_time):
         """Turn k's average rises into its cell (10's `_fill_avg`)."""
-        cell = crisp_text(_fmt(k), font_size=CELL_SIZE,
-                          color=WHITE).move_to([AVG_X, _row_y(k), 0])
+        cell = _cell(k, self.dot_x)
         self.cells.add(cell)
         self.play(FadeIn(cell, shift=UP * 0.3), run_time=run_time)
 
@@ -215,9 +237,12 @@ class Scene14(StrategyLine, MovingCameraScene, WordleBoardScene):
     def turn3(self):
         self._fill(3, 0.5)
 
-    # i : 3.67 in row 2; then everything fades out
+    # i : 3.67 in row 2
     @subscene
     def turn2(self):
         self._fill(2, 0.5)
-        self.wait(1.0)
+
+    # j : everything fades out (its own beat, user's call; not yet in the Doc)
+    @subscene
+    def fade_out(self):
         self.play(FadeOut(*self.mobjects), run_time=0.8)
