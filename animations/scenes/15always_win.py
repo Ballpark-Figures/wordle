@@ -13,8 +13,8 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   a second_words — SALET in the top-left corner and its 148 groups as coloured rows
                    (scene 12's view, no dots: user's call) fade in; every optimal
                    second word is typed under its row at once      (15a, VO 1)
-  b clone        — every second word flips to CLONE, and CLONE is typed under the
-                   corner SALET (user's call)                  (15b, VO 2)
+  b clone        — CLONE typed over every second word and under the corner SALET,
+                   all at once (user's calls)                      (15b, VO 2)
   c to_board     — the corner SALET (the uncoloured one: user's call) and the
                    CLONE under it travel into rows 1 and 2 of a board in the
                    middle as its other rows fade in around them; everything else
@@ -121,8 +121,8 @@ needs SALLE guessed (worst line FALSE, SALLE, SALVE). The user accepts that
 shows every count minus 1 (UNCOUNTED) for that reason, so it ends at 0.
 
 LAYOUT CHOICES, flagged:
-  - b: the corner CLONE's letter i lands as the words' tile i turns over (user's
-    call: in sync), derived from the flips' lag.
+  - b: every CLONE typed at the normal pace (0.65s) in one play; an old letter
+    vanishes the moment its replacement lands.
   - c: the travelling rows sit above everything they cross (z-index 1: user's
     call); their borders thicken to the board's STROKE.
   - Every opener card reads "Then RCA" (user's call); the 4.08 card keeps "Random
@@ -156,7 +156,7 @@ from assets.groups import (GUESS_SCALE, ranked_word_layout, REGION_HALF_W,
                            DOT_REGION_TOP, REGION_BOT)
 from assets.keys import key_cues
 from bpkfigures.style import CrispCounter
-from assets.second_view import corner_spot, row_stroke, under, typed_under, group_rows
+from assets.second_view import corner_spot, row_stroke, under, group_rows
 from assets.strategy_line import (StrategyLine, GAME_DY, shrink_out,
                                   word_stroke, whole, OPTIMAL, COMPATIBLE)
 
@@ -174,16 +174,15 @@ SIX = "catty frond rumba spill verge whack"
 
 BOARD_SIDE_X = 4.0         # o: how far left the board moves
 UNSOLVED_LEFT = -1.1       # r: the grouped words' region starts here
-FLIP_LAG = 0.25            # b: the word flips' lag_ratio (Flip's default), which
-                           #   CLONE's typing is timed against
-POP_RT = 0.3               # b: one CLONE letter's pop
 ZOOM_EDGE = 6.5            # h, j: where a zoom puts its end markers (13e: 6)
 LINE_DROP = -0.2           # the line sits this much lower than 13/14's and every
 MARKER_STEM_15 = 0.3       #   stem is shorter (13: 0.45), so the full-size 3- and
                            #   4-word cards clear the subtitle and the frame edge
 COUNT_LABEL = ["Unsolved", "Words"]   # x-z (user's wording)
-COUNT_FS = 72              # x-z: the counter's size (the label is FONT_SIZE_LG)
-COUNT_GAP = 0.15           # x-z: between the label's lines and the counter
+COUNT_LABEL_FS = 60        # x-z: the label's size (user: bigger than LG's 48)
+COUNT_FS = 60               # x-z: the counter's size (user: smaller than 72)
+COUNT_LINE_GAP = 0.15      # x-z: between the label's two lines
+COUNT_GAP = 0.45           # x-z: between the label and the counter (user: wider)
 UNCOUNTED = 1              # x-z: SALVE's one loss is not counted (user's call: it
                            #   needs SALLE guessed), so the counter shows count - 1
 COUNT_DONE = LIGHT_GREEN   # x-z: the counter at 0 -- the win-rate scale's green
@@ -234,6 +233,13 @@ def _close_columns(groups, slots, sc, left, right):
                 out[w] = np.array([cx + p[0] - b["cx"], p[1], 0.0])
             x += b["w"] + vgap
     return out
+
+
+def _at_once(t):
+    """A rate function that is done the instant it starts: an old letter gone as
+    its typed-over replacement lands. 0 at t = 0, since a LaggedStart holds a
+    member not yet due at alpha 0 -- the same rule board.TilePop shows by."""
+    return 1.0 if t > 0 else 0.0
 
 
 def _at(new, old):
@@ -303,29 +309,32 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
 
     # b : every second word flips to CLONE, and CLONE is typed under the corner SALET
     def _setup_clone(self):
-        self.clones = [typed_under(CLONE, row) for row in self.rows]
         self.corner_clone = WordleBoard(rows=1, cols=5)
         self.corner_clone.scale(self.guess.width / self.corner_clone.width)
         self.corner_clone.move_to(under(self.guess))
 
     @subscene
     def clone(self):
+        """CLONE typed OVER every second word (user's call) and under the corner
+        SALET, all in one play at the normal pace, key sound on the first only
+        (12d's): each old letter goes the moment its new one lands."""
         self._setup_clone()
-        cc, rt = self.corner_clone, 1.2
-        # CLONE's letter i lands as every word's tile i turns over: a Flip of 5
-        # parts at lag 0.25 gives each part d = 1 / (1 + 4 * 0.25) of the run, part
-        # i starting at i * 0.25 * d and turning over half-way through it
-        d = 1 / (1 + 4 * FLIP_LAG)
-        t0, gap = d / 2 * rt, FLIP_LAG * d * rt
-        cues = key_cues(self)
-        typing, total = cc.type_anim(self, 0, CLONE, POP_RT, key_gap=gap, appear=True,
-                                     per_letter=lambda i, ch, at: cues(i, ch, t0 + at),
-                                     stroke=row_stroke(cc.width))
-        flip(self, [Flip(old, new, parts=(row_parts(old), row_parts(new)),
-                         lag_ratio=FLIP_LAG)
-                    for old, new in zip(self.words, self.clones)], rt,
-             extra=[Succession(Wait(t0), AnimationGroup(typing, run_time=total))])
-        self.words, self.clones = self.clones, None
+        cc = self.corner_clone
+        anims, total, gone = [], 0.0, []
+        a, total = cc.type_anim(self, 0, CLONE, 0.65, per_letter=key_cues(self),
+                                appear=True, stroke=row_stroke(cc.width))
+        anims.append(a)
+        n = len(CLONE)
+        for b in self.words:
+            olds = list(b.letters[0])
+            a, _ = b.type_anim(self, 0, CLONE, 0.65, stroke=row_stroke(b.width))
+            anims += [a, LaggedStart(*[FadeOut(l, rate_func=_at_once) for l in olds],
+                                     lag_ratio=1 / n)]
+            gone.append((b, olds))
+        self.play(*anims, run_time=total)
+        for b, olds in gone:
+            b.remove(*olds)
+            self.remove(*olds)
 
     # c : the corner SALET and its CLONE travel into a board's first two rows as
     #     its other rows fade in; everything else shrinks away
@@ -601,8 +610,8 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
     #     the board fades in with them
     def _setup_climb_start(self):
         cx = self._right_mid()
-        self.count_label = VGroup(*[crisp_text(t, color=WHITE, font_size=FONT_SIZE_LG)
-                                    for t in COUNT_LABEL]).arrange(DOWN, buff=COUNT_GAP)
+        self.count_label = VGroup(*[crisp_text(t, color=WHITE, font_size=COUNT_LABEL_FS)
+                                    for t in COUNT_LABEL]).arrange(DOWN, buff=COUNT_LINE_GAP)
         start = AW["climb"]["start_unsolved"] - UNCOUNTED
         self.counter = CrispCounter("", ValueTracker(start), left=0.0, y=0.0,
                                     font_size=COUNT_FS, color=WHITE,
@@ -635,6 +644,7 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
             self._flip_rows({r: get_typed_row(w) for r, w in mv["rows"]}, 0.6,
                             extra=[count])
             c.end_count()
+            self.wait(0.6)                     # each number holds before the next move
         self.play(c.mob.animate.set_color(COUNT_DONE), run_time=0.4)
 
     # za : the counter fades and the two empty rows drop off the bottom; the four
