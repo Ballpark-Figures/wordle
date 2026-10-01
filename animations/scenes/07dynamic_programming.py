@@ -1562,7 +1562,7 @@ class Scene07(MovingCameraScene, WordleBoardScene):
             if part["guess"] is not None:
                 pairs.append((part["guess"], target[1]))
             moves.append((part["line"], lines[base + key]))
-            fading += [(c, target[0]) for c in part["copies"]]    # stacked rows: into it
+            fading += [(c, part["new"], target[0]) for c in part["copies"]]
         mapped = {id(t) for _, t in pairs} | {id(t) for _, t in moves}
         self.ff_rest = [root] + [m for ms in nodes.values() for m in ms if id(m) not in mapped] \
             + [l for l in lines.values() if id(l) not in mapped]
@@ -1581,8 +1581,14 @@ class Scene07(MovingCameraScene, WordleBoardScene):
             self.ff_gone.append(a)
         self.add(start_line)
         self.remove(self.big_line)
-        for a, b in fading:
-            self.ff_anims.append(a.animate.scale(0.01).move_to(b).set_opacity(0))
+        # the stacked rows above a branch's last row travel WITH it, rigidly -- the
+        # same shift and shrink as that row -- fading as they go (they used to head
+        # for where the row STARTED, so the tops of the blocks stayed behind)
+        for a, row, b in fading:
+            k = b.target.width / row.width
+            dest = a.get_center() + (b.target.get_center() - row.get_center()) \
+                + (a.get_center() - row.get_center()) * (k - 1)
+            self.ff_anims.append(a.animate.scale(k).move_to(dest).set_opacity(0))
             self.ff_gone.append(a)
         # the corner text rides with the frame: back to where it was on screen
         for m in (self.avg_lab, self.avg_num):
