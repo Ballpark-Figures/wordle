@@ -1,10 +1,10 @@
 """Scene 17 — colour combinations: the 243 colorings collapse to 21 (G, Y, gray) counts.
 Navy background.
 
-Talking head THK precedes it, so it opens from an empty frame; THL follows.
+Talking head THK precedes it, so it opens with the 243 already on screen; THL follows.
 
 BEAT MAP:
-  a show_243   — the 243 colorings from scene 05, colours only, fade in      (17a, VO 1)
+  a show_243   — the 243 colorings from scene 05, colours only, held       (17a, VO 1)
   b two_kinds  — the 5 rows of 4 greens + a gray go left, the 30 of 2G 2Y 1 gray
                  go right (above the rest), everything else fades out        (17b, VO 2)
   c combos     — GGGG- and GGYY- move into their places in the grid of 21
@@ -16,8 +16,7 @@ BEAT MAP:
 REUSE MAP — every element and the one source it comes from:
   the 243 grid        assets/colorings.py `level` — scene 05's 9 x 27 build, moved out
                       to be shared; built with no letters, as 05n leaves it
-  17a entrance        FadeIn of the grid rows, as 05n brings the 238 back
-                      (05colorings.py `back`)
+  17a                 on screen from setup_scene, no entrance (06 after THD)
   tiles               assets/colorings.py `tile` — board tile, TILE_STATE fill + stroke
   17b motion          kept rows scaled and moved (05g's `animate.scale().move_to()`),
                       the rest FadeOut, kept rows at z_index 1 (script)
@@ -121,7 +120,7 @@ def _grid21():
 
 class Scene17(WordleBoardScene):
     """BEAT MAP
-    show_243 — the 243 colorings fade in, colours only
+    show_243 — the 243 colorings held, colours only
     two_kinds — 4G+gray to the left, 2G2Y+gray to the right, the rest fade
     combos — two move into the grid of 21, the rest fade; the other 19 fade in
     drop_impossible — GGGGY fades out
@@ -129,16 +128,14 @@ class Scene17(WordleBoardScene):
     """
 
     def setup_scene(self):
-        pass
-
-    # a : the 243 colorings from before
-    def _setup_show_243(self):
+        # on screen from frame 0: THK cuts straight to it (06's convention)
         self.grid = level(5, "")
+        self.add(*self.grid)
 
+    # a : the 243 colorings from before, held — its VO plays over the framework's holds
     @subscene
     def show_243(self):
-        self._setup_show_243()
-        self.play(FadeIn(VGroup(*self.grid)), run_time=1.0)
+        pass
 
     # b : the 5 with 4 greens and a gray to the left, the 30 with 2G 2Y 1 gray to the
     #     right, everything else fading out
