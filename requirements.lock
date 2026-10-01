@@ -14,6 +14,7 @@ decorator==5.3.1
 executing==2.2.1
 fonttools==4.63.0
 glcontext==3.0.0
+greenlet==3.5.6
 ipykernel==7.3.0
 ipython==9.16.1
 ipython_pygments_lexers==1.1.1
@@ -42,12 +43,14 @@ parso==0.8.7
 pexpect==4.9.0
 pillow==12.3.0
 platformdirs==4.11.0
+playwright==1.63.0
 prompt_toolkit==3.0.53
 psutil==7.2.2
 ptyprocess==0.7.0
 pure_eval==0.2.3
 pycairo==1.29.0
 pydub==0.25.1
+pyee==13.0.1
 pyglet==2.1.16
 pyglm==2.8.3
 Pygments==2.20.0
