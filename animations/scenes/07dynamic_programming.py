@@ -1596,6 +1596,10 @@ class Scene07(MovingCameraScene, WordleBoardScene):
             m.target.shift(-c0).scale(M, about_point=ORIGIN)
             self.ff_anims.append(MoveToTarget(m))
         self.ff_keep = [b for _, b in pairs] + [b for _, b in moves]
+        # on screen during the move: the rows' counterparts (fading in), never the
+        # lines' -- a moving line BECOMES its target, and drawing the target too left
+        # a bright line over a faint one that snapped off at the end
+        self.ff_shown = [b for _, b in pairs]
 
     # za (script zc) : zoom out -- the camera pulls back from BAGEL's tree to FIRST's
     #     whole tree, already in place above, while the branch's edge contracts and
@@ -1603,12 +1607,12 @@ class Scene07(MovingCameraScene, WordleBoardScene):
     @subscene
     def first_full(self):
         self._setup_first_full()
-        self.add(*self.ff_rest, *self.ff_keep)
+        self.add(*self.ff_rest, *self.ff_shown)
         self.play(*self.ff_anims, run_time=4.0)
         self.remove(*self.ff_gone)
         self.add(*self.ff_keep)
         self._counter_to(AVG[f"full:{FIRST}"], WHITE, 1.0)   # not the best opener: white
-        self.ff_anims = self.ff_gone = self.ff_keep = self.ff_rest = None
+        self.ff_anims = self.ff_gone = self.ff_keep = self.ff_rest = self.ff_shown = None
         self.big_keyed = self.big_row = None
 
     def _setup_salet_full(self):
