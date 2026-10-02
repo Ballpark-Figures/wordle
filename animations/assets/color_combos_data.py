@@ -19,9 +19,10 @@ THE DEFINITIONS (all the user's calls, 2026-10-02):
   board       the CUMULATIVE (greens, yellows, grays) after the history —
               math/tools/tree_states.py's definition, imported, not restated. At
               ply 1 it is just the opener's tile counts.
-  compatible  the next guess is one of the answers still standing at the position
-              (fits every clue AND is a mystery word — the notebook's
-              'possible answer').
+  compatible  the next guess FITS EVERY CLUE so far — any legal word that could
+              still be the answer by the clues, mystery word or not (the notebook's
+              'possible answer' + 'consistent non-answer'). It was 'possible answer'
+              only until 2026-10-02 (the user's call: the label is "Compatible Word").
   all new     the next guess has 5 distinct letters, none played before.
   weighting   by ANSWERS: a position holding n answers counts n times.
 
@@ -115,7 +116,8 @@ def compute():
             if combo not in ROWS:
                 dropped[k] += n
                 continue
-            compatible = guess in answers
+            compatible = all(pattern(g, guess) == tree_states.code_of(p) for g, p in hist)
+            assert compatible or guess not in answers
             played = set("".join(g for g, _ in hist))
             new = len(set(guess)) == LETTERS and not (set(guess) & played)
             kind = ("both" if compatible and new else "compatible" if compatible

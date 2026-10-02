@@ -11,15 +11,16 @@ BEAT MAP:
                  combinations while the other 33 fade; then the other 19 fade in (17c, VO 2)
   d drop_impossible — GGGGY fades out, whoosh                                (17d, VO 2)
   e drop_win   — GGGGG, all greens, fades out, whoosh                       (17e, VO 2)
-  f pie        — the 19 fade; the "Second Guess" pie fans in with its title  (17f, VO 3)
-  g table      — the pie goes; "Average Words Remaining" and the 19 combos   (17g, VO 4)
-  h fill_320   — 3G2Y: 1, bold                                             (17h, VO 4)
-  i fill_230   — 2G3Y: 1, bold                                             (17i, VO 5)
-  j bared      — BARED (scored), BEARD, BREAD rise from the bottom          (17j, VO 5)
-  k bared_off  — the three drop back off the bottom                         (17k, VO 5)
-  l-q fill_0 .. fill_5 — the values, one gray-count group per beat          (17l-q, VO 6)
+  f pie        — move up to "Second Guess" alone; then the pie fans in      (17f, VO 3)
+  g table      — move up to "Average Words Remaining" alone                 (17g, VO 4)
+  h fill_320   — the 3G2Y row and its bold 1 rise in                         (17h, VO 4)
+  i fill_230   — the 2G3Y row and its bold 1                                 (17i, VO 5)
+  j bared      — BARED (scored) / BEARD / BREAD, stacked bottom right, rise  (17j, VO 5)
+  k bared_off  — the three drop back off the bottom, together               (17k, VO 5)
+  l-q fill_0 .. fill_5 — rows + values, one gray-count group per beat,
+                 staggered upward fade                                      (17l-q, VO 6)
   r breakdown  — title flips to Strategy Breakdown (Second Guess); values out,
-                 legend in                                                  (17r, VO 7)
+                 legend in, the combinations slide left                     (17r, VO 7)
   s-x bars_0, bars_5, bars_1 .. bars_4 — the bars grow, a group per beat     (17s-x, VO 7-11)
   y third      — title flips to (Third Guess); bars morph to the third guess's (17y, VO 12)
   z fourth     — title flips to (Fourth Guess); bars morph to the fourth's    (17z, VO 12)
@@ -36,14 +37,20 @@ REUSE MAP — every element and the one source it comes from:
   17d/e sound         11j's vanish: whoosh-mids at stacks_view WHOOSH_GAIN, peaking
                       mid-fade (11pop_quiz.py `poof`)
   17f pie             bpkfigures.pie_chart get_pie_chart, callout labels, fan_all
-                      (its `extra` plays the title in with it — 08histogram.py:369's rule)
+  17f/g "move up"     `_move_up`: the old screen slides up a frame as the new one rises
+                      from below — 15's camera-pan look (strategy_line._pan_down),
+                      done by moving content since nothing here lives off-frame
   titles              crisp_text, WHITE, FONT_SIZE_LG (08's / 13's), FadeIn with content
   title changes       assets/flip.py Flip / flip() (the script's "flip")
-  table combinations  `_combo` (17c's) at ROW_TILE, left-aligned
-  table values        crisp_text FONT_SIZE_SM, decimal-aligned; 1 bold (script 17h)
-  17j words           assets/board.py get_scored_row (BARED) / get_typed_row; FadeIn /
-                      FadeOut with a shift for "come up from / go back off the bottom"
+  table combinations  `_combo` (17c's) at ROW_TILE with NO extra block gap (the user's
+                      call), left-aligned; each row arrives with its value
+  table values        crisp_text FONT_SIZE_SM, centred in the column; 1 bold (17h)
+  table rows in       LaggedStart FadeIn(shift=UP*0.3), lag 0.12 — 04new_rules.py:156
+  17j words           assets/board.py get_scored_row (BARED) / get_typed_row, stacked at
+                      the bottom right; FadeIn / FadeOut with a shift, all three at once
   bars                bpkfigures.bar_graph get_stacked_bar (added for this scene),
+                      segments compatible / something else / both / all new (all new
+                      on the right: the user's call), legend in that order,
                       entrance grow_bars(edge=LEFT), ply changes Transform per bar
   bar / pie colours   style.py LIGHT_BLUE (compatible), LIGHT_RED (all new),
                       LIGHT_PURPLE (both, all-gray row only), MUTED_GREY (something else)
@@ -58,12 +65,9 @@ LAYOUT CHOICES, flagged:
   - 17c: a rectangular grid (the user's call): one column per green count, all greens
     in the last column, each column from the top, most yellows first; combinations
     centred in fixed-pitch cells.
-  - 17f: the 19 fade out as the pie comes in; 17g builds the table fresh rather than
-    moving the 19 there (they are gone by then).
-  - 17g-z: table fixed at the left (combos from X_COMBO, values/bars from X_VAL) so
-    the bars and the legend fit to its right — it sits left of centre while it holds
-    numbers only.
-  - 17j: the three words side by side, BEARD and BREAD unscored (typed rows).
+  - 17g-q: the table centred (the user's call); 17r slides the combinations left to
+    X_COMBO so the bars (from X_VAL) and the legend fit to their right.
+  - 17j: BEARD and BREAD unscored (typed rows).
   - "Something Else" grey (no colour in the script).
 On-screen text: the titles, the pie's wedge names + percentages, the table values and
 the legend (all column 2's). 243 / 5 / 30 / 21 / 19 are spoken, not shown.
@@ -122,18 +126,25 @@ ROW_TILE = 0.25            # table combinations' tile side; also a bar's height
 ROW_PITCH = 0.34
 GROUP_GAP = 0.16           # extra gap between gray-count groups (script: "slight gaps")
 TOP_ROW_Y = 3.1
-X_COMBO = -6.6             # combinations' left edge
-X_VAL = -4.5               # values' left edge, and the bars'
+VAL_GAP = 0.6              # combinations' right edge to the values column
+X_COMBO = -6.6             # combinations' left edge once the bars are in (17r on)
+X_VAL = -4.5               # the bars' left edge
 BAR_LEN = 8.1
 VALUE_SIZE = FONT_SIZE_SM
 LEGEND_X = 4.3             # legend swatches' left edge
 LEGEND_SWATCH = 0.3
 LEGEND_PITCH = 0.55
-WORD_TILE = 0.45           # 17j: BARED / BEARD / BREAD
-WORD_Y = -3.6
-WORD_GAP = 0.6
-WORD_DROP = 2.0            # how far a word rises into its slot / drops out of it
+WORD_TILE = 0.45           # 17j: BARED / BEARD / BREAD, stacked, bottom right
+WORD_PITCH = 0.6           # row pitch in the stack
+WORD_MARGIN = 0.5          # stack's distance from the frame's right and bottom edges
+WORD_DROP = 2.0            # how far the stack rises into place / drops out of it
+ROW_RISE = 0.3             # table rows' staggered upward fade (04's / 10's)
+ROW_LAG = 0.12
+MOVE_UP_RT = 1.2           # a "move up" to the next screen
 ROWS = [tuple(int(ch) for ch in k) for k in DATA["rows"]]
+# segment order of a breakdown bar, left to right: all new letters on the RIGHT
+# (the user's call); "both" (compatible AND all new) sits next to it
+BAR_ORDER = ("compatible", "else", "both", "new")
 
 
 def _key(combo):
@@ -149,30 +160,36 @@ def _title(text):
     return crisp_text(text, color=WHITE, font_size=FONT_SIZE_LG).move_to([0, TITLE_Y, 0])
 
 
-def _value(v, y):
-    """1 in bold, anything else to one decimal (script 17h), decimal-aligned: every
-    integer part ends where the widest one ("305") does."""
+def _table_xs():
+    """(combos' left edge, values column centre) with the table — combinations plus
+    values — centred on the frame (the user's call)."""
+    combo_w = _combo(5, 0, 0, ROW_TILE).width
+    col_w = crisp_text("305.7", font_size=VALUE_SIZE).width
+    left = -(combo_w + VAL_GAP + col_w) / 2
+    return left, left + combo_w + VAL_GAP + col_w / 2
+
+
+def _value(v, y, cx):
+    """1 in bold, anything else to one decimal (script 17h), centred in its column
+    (the user's call)."""
     one = abs(v - 1) < 1e-9
     s = "1" if one else f"{v:.1f}"
     assert one or s != "1.0", v
-    w = BOLD if one else NORMAL
-    txt = crisp_text(s, color=WHITE, font_size=VALUE_SIZE, weight=w)
-    int_w = crisp_text(s.split(".")[0], color=WHITE, font_size=VALUE_SIZE, weight=w).width
-    full_w = crisp_text("305", color=WHITE, font_size=VALUE_SIZE).width
-    txt.set_y(y)
-    txt.shift(RIGHT * (X_VAL + full_w - int_w - txt.get_left()[0]))
-    return txt
+    return crisp_text(s, color=WHITE, font_size=VALUE_SIZE,
+                      weight=BOLD if one else NORMAL).move_to([cx, y, 0])
 
 
 def _bar(ply, combo, y):
     shares = DATA["bars"][str(ply)][_key(combo)]
-    return get_stacked_bar([shares[k] for k in KINDS], [KIND_COLORS[k] for k in KINDS],
+    return get_stacked_bar([shares[k] for k in BAR_ORDER],
+                           [KIND_COLORS[k] for k in BAR_ORDER],
                            length=BAR_LEN, height=ROW_TILE).shift([X_VAL, y, 0])
 
 
 def _legend():
     entries = VGroup()
-    for name, kind in zip(PIE_NAMES, ("compatible", "new", "else")):
+    for name, kind in (("Compatible Word", "compatible"), ("Something Else", "else"),
+                       ("All New Letters", "new")):                 # the bars' order
         sw = Square(side_length=LEGEND_SWATCH, fill_color=KIND_COLORS[kind],
                     fill_opacity=1, stroke_width=0)
         lab = crisp_text(name, color=WHITE, font_size=VALUE_SIZE)
@@ -211,13 +228,14 @@ def _part_cells(n, cols, cx, size):
                       ((nr - 1) / 2 - k % nr) * py, 0.0]) for k in range(n)]
 
 
-def _combo(g, y, b, size):
-    """g greens, y yellows, b grays; board tile gaps inside a block, BLOCK_GAP between.
-    Same shape as a coloring row (tiles, empty letters) so a row transforms into it."""
+def _combo(g, y, b, size, block_gap=BLOCK_GAP):
+    """g greens, y yellows, b grays; board tile gaps inside a block, `block_gap` (in
+    tiles) between. Same shape as a coloring row (tiles, empty letters) so a row
+    transforms into it. The table passes TILE_BUFF: no extra gap (the user's call)."""
     tiles, x, prev = VGroup(), 0.0, None
     for t in [2] * g + [1] * y + [0] * b:
         if prev is not None:
-            x += size * (1 + (TILE_BUFF if t == prev else BLOCK_GAP))
+            x += size * (1 + (TILE_BUFF if t == prev else block_gap))
         tiles.add(tile(t, size).move_to([x, 0, 0]))
         prev = t
     tiles.move_to(ORIGIN)
@@ -325,7 +343,15 @@ class Scene17(WordleBoardScene):
         self.sfx(VANISH_SFX, at=max(0.0, rt / 2 - VANISH_PEAK), gain=WHOOSH_GAIN)
         self.play(FadeOut(self.combos.pop(WIN)), run_time=rt)
 
-    # f : the 19 fade out; the "Second Guess" pie fans in with its title
+    def _move_up(self, old, new, run_time):
+        """The old screen slides up and out as the new one rises from below — the
+        video's "move up" (a page's height). `new` is built where it will END."""
+        h = config.frame_height
+        new.shift(DOWN * h)
+        self.play(old.animate.shift(UP * h), new.animate.shift(UP * h), run_time=run_time)
+        self.remove(old)
+
+    # f : move up to an empty screen with just the title; then the pie fans in
     def _setup_pie(self):
         p = DATA["pie"]
         self.pie = get_pie_chart([p["compatible"], p["new"], p["else"]],
@@ -337,34 +363,35 @@ class Scene17(WordleBoardScene):
     @subscene
     def pie(self):
         self._setup_pie()
-        self.pie.fan_all(self, 1.5, extra=[FadeOut(VGroup(*self.combos.values())),
-                                           FadeIn(self.title)])
+        self._move_up(VGroup(*self.combos.values()), self.title, MOVE_UP_RT)
+        self.pie.fan_all(self, 1.5)
         self.combos = None
 
-    # g : the pie goes; the table — title and the 19 combinations, no values yet
+    # g : move up again, to the table's title alone; rows arrive with their values
     def _setup_table(self):
         self.new_title = _title(TABLE_TITLE)
+        left, self.val_x = _table_xs()
         self.rows = {}
         for i, c in enumerate(ROWS):
-            y = _row_y(i, c)
-            row = _combo(*c, ROW_TILE)
-            row.shift([X_COMBO - row.get_left()[0], y - row.get_y(), 0])
+            row = _combo(*c, ROW_TILE, block_gap=TILE_BUFF)
+            row.shift([left - row.get_left()[0], _row_y(i, c) - row.get_y(), 0])
             self.rows[c] = row
         self.values = {}
 
     @subscene
     def table(self):
         self._setup_table()
-        self.play(FadeOut(self.pie), FadeOut(self.title), run_time=0.8)
-        self.play(FadeIn(self.new_title), FadeIn(VGroup(*self.rows.values())),
-                  run_time=1.0)
+        self._move_up(VGroup(self.pie, self.title), self.new_title, MOVE_UP_RT)
         self.title, self.new_title, self.pie = self.new_title, None, None
 
     def _fill(self, combos, run_time):
-        """Fade in the average words remaining for `combos`."""
-        vals = {c: _value(DATA["avg"][_key(c)], self.rows[c].get_y()) for c in combos}
-        self.values.update(vals)
-        self.play(FadeIn(VGroup(*vals.values())), run_time=run_time)
+        """`combos`' rows — combination and value together — rise in, staggered
+        (the table rows' convention, 04new_rules.py:156)."""
+        for c in combos:
+            self.values[c] = _value(DATA["avg"][_key(c)], self.rows[c].get_y(), self.val_x)
+        self.play(LaggedStart(*[FadeIn(VGroup(self.rows[c], self.values[c]),
+                                       shift=UP * ROW_RISE) for c in combos],
+                              lag_ratio=ROW_LAG), run_time=run_time)
 
     def _group(self, grays):
         return [c for c in ROWS if c[2] == grays]
@@ -379,46 +406,47 @@ class Scene17(WordleBoardScene):
     def fill_230(self):
         self._fill([(2, 3, 0)], 0.6)
 
-    # j : BARED (green, three yellows, green) then BEARD and BREAD rise from the
-    #     bottom, bottom middle
+    # j : BARED (green, three yellows, green), BEARD and BREAD, stacked at the bottom
+    #     right, rise together
     def _setup_bared(self):
         rows = [get_scored_row("bared", code("GYYYG")), get_typed_row("beard"),
                 get_typed_row("bread")]
-        for r in rows:
-            r.scale(WORD_TILE / r.tiles[0][0].width)
-        self.words = VGroup(*rows).arrange(RIGHT, buff=WORD_GAP).move_to([0, WORD_Y, 0])
+        for i, r in enumerate(rows):
+            r.scale(WORD_TILE / r.tiles[0][0].width).move_to(DOWN * i * WORD_PITCH)
+        self.words = VGroup(*rows)
+        self.words.move_to([config.frame_x_radius - WORD_MARGIN - self.words.width / 2,
+                            -config.frame_y_radius + WORD_MARGIN + self.words.height / 2, 0])
 
     @subscene
     def bared(self):
         self._setup_bared()
-        self.play(LaggedStart(*[FadeIn(w, shift=UP * WORD_DROP) for w in self.words],
-                              lag_ratio=0.4), run_time=1.5)
+        self.play(FadeIn(self.words, shift=UP * WORD_DROP), run_time=1.0)
 
-    # k : the three words go back off the bottom
+    # k : the three words go back off the bottom, together
     @subscene
     def bared_off(self):
-        self.play(*[FadeOut(w, shift=DOWN * WORD_DROP) for w in self.words], run_time=0.8)
+        self.play(FadeOut(self.words, shift=DOWN * WORD_DROP), run_time=0.8)
         self.words = None
 
     # l : the rest of the 0-gray rows
     @subscene
     def fill_0(self):
-        self._fill([c for c in self._group(0) if c not in self.values], 0.6)
+        self._fill([c for c in self._group(0) if c not in self.values], 0.8)
 
     # m : the 1-gray rows
     @subscene
     def fill_1(self):
-        self._fill(self._group(1), 0.6)
+        self._fill(self._group(1), 0.8)
 
     # n : the 2-gray rows
     @subscene
     def fill_2(self):
-        self._fill(self._group(2), 0.6)
+        self._fill(self._group(2), 0.8)
 
     # o : the 3-gray rows
     @subscene
     def fill_3(self):
-        self._fill(self._group(3), 0.6)
+        self._fill(self._group(3), 0.8)
 
     # p : the 4-gray rows
     @subscene
@@ -430,7 +458,8 @@ class Scene17(WordleBoardScene):
     def fill_5(self):
         self._fill(self._group(5), 0.6)
 
-    # r : title flips to Strategy Breakdown (Second Guess); values out, legend in
+    # r : title flips to Strategy Breakdown (Second Guess); values out, legend in; the
+    #     combinations slide left to make room for the bars
     def _setup_breakdown(self):
         self.new_title = _title(BREAKDOWN.format("Second"))
         self.legend = _legend()
@@ -439,8 +468,10 @@ class Scene17(WordleBoardScene):
     @subscene
     def breakdown(self):
         self._setup_breakdown()
+        combos = VGroup(*self.rows.values())
         flip(self, [Flip(self.title, self.new_title)], 0.8,
-             extra=[FadeOut(VGroup(*self.values.values())), FadeIn(self.legend)])
+             extra=[FadeOut(VGroup(*self.values.values())), FadeIn(self.legend),
+                    combos.animate.shift(RIGHT * (X_COMBO - combos.get_left()[0]))])
         self.title, self.new_title, self.values = self.new_title, None, None
 
     def _grow(self, grays, run_time):
