@@ -40,7 +40,7 @@
     "2": "plant",
     "3": "plant",
     "4": "plant",
-    "6": "clipt",
+    "6": "compt",
     "8": "dempt",
     "12": "mpret",
     "16": "mpret",
@@ -89,7 +89,7 @@
      "stderr": 0.0011,
      "opening": "plant",
      "source": "fallback",
-     "pending": "clipt"
+     "pending": "compt"
     },
     {
      "k": 7,
@@ -97,7 +97,7 @@
      "stderr": 0.0011,
      "opening": "plant",
      "source": "fallback",
-     "pending": "clipt"
+     "pending": "compt"
     },
     {
      "k": 8,
@@ -213,67 +213,59 @@
     },
     {
      "k": 24,
-     "misses": 1.8316,
+     "misses": 1.7767,
      "stderr": 0.0007,
-     "opening": "mpret",
-     "source": "fallback",
-     "pending": "rotan"
+     "opening": "rotan",
+     "source": "run"
     },
     {
      "k": 25,
-     "misses": 1.8018,
-     "stderr": 0.0006,
-     "opening": "mpret",
-     "source": "fallback",
-     "pending": "rotan"
+     "misses": 1.7414,
+     "stderr": 0.0007,
+     "opening": "rotan",
+     "source": "run"
     },
     {
      "k": 26,
-     "misses": 1.7739,
-     "stderr": 0.0006,
-     "opening": "mpret",
-     "source": "fallback",
-     "pending": "rotan"
+     "misses": 1.7093,
+     "stderr": 0.0007,
+     "opening": "rotan",
+     "source": "run"
     },
     {
      "k": 27,
-     "misses": 1.7478,
+     "misses": 1.6795,
      "stderr": 0.0006,
-     "opening": "mpret",
-     "source": "fallback",
-     "pending": "rotan"
+     "opening": "rotan",
+     "source": "run"
     },
     {
      "k": 28,
-     "misses": 1.7231,
+     "misses": 1.6511,
      "stderr": 0.0006,
-     "opening": "mpret",
-     "source": "fallback",
-     "pending": "rotan"
+     "opening": "rotan",
+     "source": "run"
     },
     {
      "k": 29,
-     "misses": 1.7006,
+     "misses": 1.6261,
      "stderr": 0.0006,
-     "opening": "mpret",
-     "source": "fallback",
-     "pending": "rotan"
+     "opening": "rotan",
+     "source": "run"
     },
     {
      "k": 30,
-     "misses": 1.68,
+     "misses": 1.6022,
      "stderr": 0.0006,
-     "opening": "mpret",
-     "source": "fallback",
-     "pending": "rotan"
+     "opening": "rotan",
+     "source": "run"
     },
     {
      "k": 31,
-     "misses": 1.6601,
+     "misses": 1.5795,
      "stderr": 0.0006,
-     "opening": "mpret",
-     "source": "fallback",
-     "pending": "rotan"
+     "opening": "rotan",
+     "source": "run"
     },
     {
      "k": 32,
@@ -462,67 +454,59 @@
     },
     {
      "k": 24,
-     "misses": 2.0528,
+     "misses": 2.0482,
      "stderr": 0.0003,
-     "opening": "corbe plant",
-     "source": "fallback",
-     "pending": "farce spilt"
+     "opening": "farce spilt",
+     "source": "run"
     },
     {
      "k": 25,
-     "misses": 2.0458,
+     "misses": 2.0401,
      "stderr": 0.0003,
-     "opening": "corbe plant",
-     "source": "fallback",
-     "pending": "farce spilt"
+     "opening": "farce spilt",
+     "source": "run"
     },
     {
      "k": 26,
-     "misses": 2.0393,
-     "stderr": 0.0002,
-     "opening": "corbe plant",
-     "source": "fallback",
-     "pending": "farce spilt"
+     "misses": 2.0334,
+     "stderr": 0.0003,
+     "opening": "farce spilt",
+     "source": "run"
     },
     {
      "k": 27,
-     "misses": 2.0335,
-     "stderr": 0.0002,
-     "opening": "corbe plant",
-     "source": "fallback",
-     "pending": "farce spilt"
+     "misses": 2.0275,
+     "stderr": 0.0003,
+     "opening": "farce spilt",
+     "source": "run"
     },
     {
      "k": 28,
-     "misses": 2.0281,
-     "stderr": 0.0002,
-     "opening": "corbe plant",
-     "source": "fallback",
-     "pending": "farce spilt"
+     "misses": 2.0222,
+     "stderr": 0.0003,
+     "opening": "farce spilt",
+     "source": "run"
     },
     {
      "k": 29,
-     "misses": 2.0241,
-     "stderr": 0.0002,
-     "opening": "corbe plant",
-     "source": "fallback",
-     "pending": "farce spilt"
+     "misses": 2.0174,
+     "stderr": 0.0003,
+     "opening": "farce spilt",
+     "source": "run"
     },
     {
      "k": 30,
-     "misses": 2.0199,
-     "stderr": 0.0002,
-     "opening": "corbe plant",
-     "source": "fallback",
-     "pending": "farce spilt"
+     "misses": 2.013,
+     "stderr": 0.0003,
+     "opening": "farce spilt",
+     "source": "run"
     },
     {
      "k": 31,
-     "misses": 2.0165,
+     "misses": 2.0091,
      "stderr": 0.0002,
-     "opening": "corbe plant",
-     "source": "fallback",
-     "pending": "farce spilt"
+     "opening": "farce spilt",
+     "source": "run"
     },
     {
      "k": 32,
@@ -786,8 +770,11 @@
    "winners": {
     "1": "trace",
     "2": "canst",
+    "3": "canst",
     "4": "clapt",
+    "6": "compt",
     "8": "compt",
+    "12": "compt",
     "16": "tamed"
    },
    "points": [
@@ -830,14 +817,16 @@
      "misses": 3.0083,
      "stderr": 0.0028,
      "opening": "clapt",
-     "source": "run"
+     "source": "fallback",
+     "pending": "compt"
     },
     {
      "k": 7,
      "misses": 2.9153,
      "stderr": 0.0028,
      "opening": "clapt",
-     "source": "run"
+     "source": "fallback",
+     "pending": "compt"
     },
     {
      "k": 8,
@@ -1023,10 +1012,7 @@
   "greedy 1-word race at k=6 still has 2 live",
   "greedy 3-word race at k=24 still has 3 live",
   "greedy 3-word race at k=32 still has 3 live",
-  "minavg race at k=3 not settled (16 live, 12800 games): not used yet -- the bracket below covers it",
-  "minavg race at k=6 not settled (47 live, 1600 games): not used yet -- the bracket below covers it",
-  "minavg race at k=12 not settled (49 live, 800 games): not used yet -- the bracket below covers it",
-  "minavg race at k=24 not settled (50 live, 200 games): not used yet -- the bracket below covers it",
-  "minavg race at k=32 not settled (50 live, 400 games): not used yet -- the bracket below covers it"
+  "minavg race at k=24 not settled (50 live, 3200 games): not used yet -- the bracket below covers it",
+  "minavg race at k=32 not settled (46 live, 3200 games): not used yet -- the bracket below covers it"
  ]
 }
