@@ -1010,14 +1010,13 @@
     },
     {
      "k": 32,
-     "misses": null,
+     "misses": 1.5473,
+     "stderr": 0.0018,
      "opening": "filet",
-     "source": "missing"
+     "source": "run"
     }
    ],
-   "missing": [
-    32
-   ]
+   "missing": []
   }
  },
  "notes": [
@@ -1028,6 +1027,6 @@
   "greedy 3-word triple_singletons_top10000 race at k=24 still has 3 live",
   "greedy 3-word triple_singletons_top10000 race at k=32 still has 3 live",
   "minavg race at k=24 not settled (43 live, 12800 games): leader rotan used only where its runs exist",
-  "minavg race at k=32 not settled (4 live, 51200 games): leader filet used only where its runs exist"
+  "minavg race at k=32 not settled (2 live, 102400 games): leader filet used only where its runs exist"
  ]
 }
