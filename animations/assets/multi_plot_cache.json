@@ -85,15 +85,19 @@
     },
     {
      "k": 6,
-     "misses": 3.5831,
-     "opening": "clipt",
-     "source": "race"
+     "misses": 3.5833,
+     "stderr": 0.0011,
+     "opening": "plant",
+     "source": "fallback",
+     "pending": "clipt"
     },
     {
      "k": 7,
-     "misses": null,
-     "opening": "clipt",
-     "source": "missing"
+     "misses": 3.4341,
+     "stderr": 0.0011,
+     "opening": "plant",
+     "source": "fallback",
+     "pending": "clipt"
     },
     {
      "k": 8,
@@ -146,9 +150,10 @@
     },
     {
      "k": 15,
-     "misses": null,
+     "misses": 2.318,
+     "stderr": 0.0008,
      "opening": "mpret",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 16,
@@ -208,51 +213,67 @@
     },
     {
      "k": 24,
-     "misses": 1.7771,
-     "opening": "rotan",
-     "source": "race"
+     "misses": 1.8316,
+     "stderr": 0.0007,
+     "opening": "mpret",
+     "source": "fallback",
+     "pending": "rotan"
     },
     {
      "k": 25,
-     "misses": null,
-     "opening": "rotan",
-     "source": "missing"
+     "misses": 1.8018,
+     "stderr": 0.0006,
+     "opening": "mpret",
+     "source": "fallback",
+     "pending": "rotan"
     },
     {
      "k": 26,
-     "misses": null,
-     "opening": "rotan",
-     "source": "missing"
+     "misses": 1.7739,
+     "stderr": 0.0006,
+     "opening": "mpret",
+     "source": "fallback",
+     "pending": "rotan"
     },
     {
      "k": 27,
-     "misses": null,
-     "opening": "rotan",
-     "source": "missing"
+     "misses": 1.7478,
+     "stderr": 0.0006,
+     "opening": "mpret",
+     "source": "fallback",
+     "pending": "rotan"
     },
     {
      "k": 28,
-     "misses": null,
-     "opening": "rotan",
-     "source": "missing"
+     "misses": 1.7231,
+     "stderr": 0.0006,
+     "opening": "mpret",
+     "source": "fallback",
+     "pending": "rotan"
     },
     {
      "k": 29,
-     "misses": null,
-     "opening": "rotan",
-     "source": "missing"
+     "misses": 1.7006,
+     "stderr": 0.0006,
+     "opening": "mpret",
+     "source": "fallback",
+     "pending": "rotan"
     },
     {
      "k": 30,
-     "misses": null,
-     "opening": "rotan",
-     "source": "missing"
+     "misses": 1.68,
+     "stderr": 0.0006,
+     "opening": "mpret",
+     "source": "fallback",
+     "pending": "rotan"
     },
     {
      "k": 31,
-     "misses": null,
-     "opening": "rotan",
-     "source": "missing"
+     "misses": 1.6601,
+     "stderr": 0.0006,
+     "opening": "mpret",
+     "source": "fallback",
+     "pending": "rotan"
     },
     {
      "k": 32,
@@ -262,17 +283,7 @@
      "source": "run"
     }
    ],
-   "missing": [
-    7,
-    15,
-    25,
-    26,
-    27,
-    28,
-    29,
-    30,
-    31
-   ]
+   "missing": []
   },
   "2": {
    "winners": {
@@ -451,51 +462,67 @@
     },
     {
      "k": 24,
-     "misses": 2.048,
-     "opening": "farce spilt",
-     "source": "race"
+     "misses": 2.0528,
+     "stderr": 0.0003,
+     "opening": "corbe plant",
+     "source": "fallback",
+     "pending": "farce spilt"
     },
     {
      "k": 25,
-     "misses": null,
-     "opening": "farce spilt",
-     "source": "missing"
+     "misses": 2.0458,
+     "stderr": 0.0003,
+     "opening": "corbe plant",
+     "source": "fallback",
+     "pending": "farce spilt"
     },
     {
      "k": 26,
-     "misses": null,
-     "opening": "farce spilt",
-     "source": "missing"
+     "misses": 2.0393,
+     "stderr": 0.0002,
+     "opening": "corbe plant",
+     "source": "fallback",
+     "pending": "farce spilt"
     },
     {
      "k": 27,
-     "misses": null,
-     "opening": "farce spilt",
-     "source": "missing"
+     "misses": 2.0335,
+     "stderr": 0.0002,
+     "opening": "corbe plant",
+     "source": "fallback",
+     "pending": "farce spilt"
     },
     {
      "k": 28,
-     "misses": null,
-     "opening": "farce spilt",
-     "source": "missing"
+     "misses": 2.0281,
+     "stderr": 0.0002,
+     "opening": "corbe plant",
+     "source": "fallback",
+     "pending": "farce spilt"
     },
     {
      "k": 29,
-     "misses": null,
-     "opening": "farce spilt",
-     "source": "missing"
+     "misses": 2.0241,
+     "stderr": 0.0002,
+     "opening": "corbe plant",
+     "source": "fallback",
+     "pending": "farce spilt"
     },
     {
      "k": 30,
-     "misses": null,
-     "opening": "farce spilt",
-     "source": "missing"
+     "misses": 2.0199,
+     "stderr": 0.0002,
+     "opening": "corbe plant",
+     "source": "fallback",
+     "pending": "farce spilt"
     },
     {
      "k": 31,
-     "misses": null,
-     "opening": "farce spilt",
-     "source": "missing"
+     "misses": 2.0165,
+     "stderr": 0.0002,
+     "opening": "corbe plant",
+     "source": "fallback",
+     "pending": "farce spilt"
     },
     {
      "k": 32,
@@ -505,15 +532,7 @@
      "source": "run"
     }
    ],
-   "missing": [
-    25,
-    26,
-    27,
-    28,
-    29,
-    30,
-    31
-   ]
+   "missing": []
   },
   "3": {
    "winners": {
@@ -692,51 +711,67 @@
     },
     {
      "k": 24,
-     "misses": 3.0178,
-     "opening": "crisp leant gumbo",
-     "source": "race"
+     "misses": 3.0218,
+     "stderr": 0.0003,
+     "opening": "cried plant wombs",
+     "source": "fallback",
+     "pending": "crisp leant gumbo"
     },
     {
      "k": 25,
-     "misses": null,
-     "opening": "crisp leant gumbo",
-     "source": "missing"
+     "misses": 3.0167,
+     "stderr": 0.0002,
+     "opening": "cried plant wombs",
+     "source": "fallback",
+     "pending": "crisp leant gumbo"
     },
     {
      "k": 26,
-     "misses": null,
-     "opening": "crisp leant gumbo",
-     "source": "missing"
+     "misses": 3.0129,
+     "stderr": 0.0002,
+     "opening": "cried plant wombs",
+     "source": "fallback",
+     "pending": "crisp leant gumbo"
     },
     {
      "k": 27,
-     "misses": null,
-     "opening": "crisp leant gumbo",
-     "source": "missing"
+     "misses": 3.009,
+     "stderr": 0.0002,
+     "opening": "cried plant wombs",
+     "source": "fallback",
+     "pending": "crisp leant gumbo"
     },
     {
      "k": 28,
-     "misses": null,
-     "opening": "crisp leant gumbo",
-     "source": "missing"
+     "misses": 3.0052,
+     "stderr": 0.0002,
+     "opening": "cried plant wombs",
+     "source": "fallback",
+     "pending": "crisp leant gumbo"
     },
     {
      "k": 29,
-     "misses": null,
-     "opening": "crisp leant gumbo",
-     "source": "missing"
+     "misses": 3.0021,
+     "stderr": 0.0002,
+     "opening": "cried plant wombs",
+     "source": "fallback",
+     "pending": "crisp leant gumbo"
     },
     {
      "k": 30,
-     "misses": null,
-     "opening": "crisp leant gumbo",
-     "source": "missing"
+     "misses": 2.999,
+     "stderr": 0.0002,
+     "opening": "cried plant wombs",
+     "source": "fallback",
+     "pending": "crisp leant gumbo"
     },
     {
      "k": 31,
-     "misses": null,
-     "opening": "crisp leant gumbo",
-     "source": "missing"
+     "misses": 2.9959,
+     "stderr": 0.0002,
+     "opening": "cried plant wombs",
+     "source": "fallback",
+     "pending": "crisp leant gumbo"
     },
     {
      "k": 32,
@@ -745,15 +780,7 @@
      "source": "race"
     }
    ],
-   "missing": [
-    25,
-    26,
-    27,
-    28,
-    29,
-    30,
-    31
-   ]
+   "missing": []
   },
   "improved": {
    "winners": {
@@ -996,9 +1023,10 @@
   "greedy 1-word race at k=6 still has 2 live",
   "greedy 3-word race at k=24 still has 3 live",
   "greedy 3-word race at k=32 still has 3 live",
-  "minavg race at k=3 not settled (50 live, 1600 games): not used yet -- the bracket below covers it",
-  "minavg race at k=6 not settled (50 live, 200 games): not used yet -- the bracket below covers it",
-  "minavg race at k=12 not settled (50 live, 200 games): not used yet -- the bracket below covers it",
-  "minavg race at k=32 not settled (50 live, 200 games): not used yet -- the bracket below covers it"
+  "minavg race at k=3 not settled (16 live, 12800 games): not used yet -- the bracket below covers it",
+  "minavg race at k=6 not settled (47 live, 1600 games): not used yet -- the bracket below covers it",
+  "minavg race at k=12 not settled (49 live, 800 games): not used yet -- the bracket below covers it",
+  "minavg race at k=24 not settled (50 live, 200 games): not used yet -- the bracket below covers it",
+  "minavg race at k=32 not settled (50 live, 400 games): not used yet -- the bracket below covers it"
  ]
 }

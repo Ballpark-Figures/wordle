@@ -102,28 +102,42 @@ def _sim(k, opener, trials, suffix):
 
 
 def _line(winners, trials, suffix):
-    """A race that has not settled names NO winner (it is left out of `winners`),
-    so its bracket falls back to the last settled one below it -- an unconfirmed
-    leader never decides which opener a k is run with."""
+    """Each k uses the winner of the highest bracket at or below it. A race that has
+    not settled names NO winner (it is left out of `winners`), so an unconfirmed
+    leader never decides which opener a k is run with.
+
+    WHILE A NEW WINNER'S RUN AT k IS NOT FINISHED, THE PREVIOUS WINNER'S STANDS IN
+    (user's call, 2026-10-02): the brackets below are tried in turn, nearest first,
+    and the first with a finished run at k is used -- "fallback" in its source. Only
+    if none has one does a race estimate (at the bracket's own k) or a gap appear."""
     pts, missing = [], []
     for k in KS:
-        below = [p for p in winners if p <= k]
-        b = max(below) if below else None
-        w = winners.get(b)
-        if w is None:
+        below = sorted((p for p in winners if p <= k), reverse=True)
+        if not below:
             pts.append({"k": k, "misses": None, "source": "no winner"})
             missing.append(k)
             continue
+        b, w = below[0], winners[below[0]]
         got = _sim(k, w["opening"], trials, suffix)
         if got is not None:
             pts.append({"k": k, "misses": round(got[0] - k, 4), "stderr": got[1],
                         "opening": w["opening"], "source": "run"})
-        elif k == b and w.get("mean") is not None:
-            pts.append({"k": k, "misses": round(w["mean"] - k, 4), "opening": w["opening"],
-                        "source": w["source"]})
+            continue
+        for p in below[1:]:
+            old = _sim(k, winners[p]["opening"], trials, suffix)
+            if old is not None:
+                pts.append({"k": k, "misses": round(old[0] - k, 4), "stderr": old[1],
+                            "opening": winners[p]["opening"], "source": "fallback",
+                            "pending": w["opening"]})
+                break
         else:
-            pts.append({"k": k, "misses": None, "opening": w["opening"], "source": "missing"})
-            missing.append(k)
+            if k == b and w.get("mean") is not None:
+                pts.append({"k": k, "misses": round(w["mean"] - k, 4),
+                            "opening": w["opening"], "source": w["source"]})
+            else:
+                pts.append({"k": k, "misses": None, "opening": w["opening"],
+                            "source": "missing"})
+                missing.append(k)
     return pts, missing
 
 
@@ -177,8 +191,11 @@ if __name__ == "__main__":
         name = "Improved Strategy" if key == "improved" else f"{key}-word"
         print(f"{name}: winners " + ", ".join(f"k{p}={w}" for p, w in ln["winners"].items()))
         stop = [p["k"] for p in ln["points"] if p["source"] in ("race", "exact")]
+        fb = [f"{p['k']}:{p['opening']}" for p in ln["points"] if p["source"] == "fallback"]
         print(f"   from fill-in runs: {sum(p['source'] == 'run' for p in ln['points'])}/32"
               f"   race/exact stand-ins at k={stop}   MISSING k={ln['missing']}")
+        if fb:
+            print(f"   OLDER WINNER standing in (new one's run not finished): {' '.join(fb)}")
     for note in data["notes"]:
         print("NOTE", note)
     print(f"wrote {CACHE}")
