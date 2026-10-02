@@ -42,7 +42,7 @@
     "4": "plant",
     "5": "plant",
     "6": "compt",
-    "7": "dempt",
+    "7": "compt",
     "8": "dempt",
     "10": "dempt",
     "12": "mpret",
@@ -101,8 +101,7 @@
      "misses": 3.4294,
      "stderr": 0.0011,
      "opening": "compt",
-     "source": "fallback",
-     "pending": "dempt"
+     "source": "run"
     },
     {
      "k": 8,
@@ -351,27 +350,24 @@
     },
     {
      "k": 8,
-     "misses": 2.7285,
+     "misses": 2.706,
      "stderr": 0.0008,
-     "opening": "corbe plant",
-     "source": "fallback",
-     "pending": "clamp trend"
+     "opening": "clamp trend",
+     "source": "run"
     },
     {
      "k": 9,
-     "misses": 2.6123,
+     "misses": 2.5885,
      "stderr": 0.0008,
-     "opening": "corbe plant",
-     "source": "fallback",
-     "pending": "clamp trend"
+     "opening": "clamp trend",
+     "source": "run"
     },
     {
      "k": 10,
-     "misses": 2.5107,
+     "misses": 2.4905,
      "stderr": 0.0007,
-     "opening": "corbe plant",
-     "source": "fallback",
-     "pending": "clamp trend"
+     "opening": "clamp trend",
+     "source": "run"
     },
     {
      "k": 11,
@@ -605,19 +601,17 @@
     },
     {
      "k": 8,
-     "misses": 3.2074,
+     "misses": 3.1847,
      "stderr": 0.0005,
-     "opening": "cried plant wombs",
-     "source": "fallback",
-     "pending": "bland copse might"
+     "opening": "bland copse might",
+     "source": "run"
     },
     {
      "k": 9,
-     "misses": 3.1842,
-     "stderr": 0.0005,
-     "opening": "cried plant wombs",
-     "source": "fallback",
-     "pending": "bland copse might"
+     "misses": 3.1649,
+     "stderr": 0.0004,
+     "opening": "bland copse might",
+     "source": "run"
     },
     {
      "k": 10,
@@ -1043,7 +1037,6 @@
   }
  },
  "notes": [
-  "greedy 1-word guess race at k=5 still has 3 live",
   "greedy 1-word guess race at k=6 still has 2 live",
   "greedy 1-word guess race at k=7 still has 2 live",
   "greedy 1-word mystery race at k=16 still has 2 live",
