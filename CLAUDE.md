@@ -1767,6 +1767,20 @@ that becomes true, and the survivors keep playing on a doubling schedule.
 - Data: standings + eliminations CSVs in `data/shared/multiwordle/race_*`,
   checkpoint and log under `data/local/multiwordle/`.
 
+### Scene 16's chart — the best opener FOUND goes in, from whichever race found it
+`animations/assets/multi_plot_data.py` builds the "Average Misses in Multi-Wordle"
+lines. **Standing rule (user, 2026-10-02): if any race finds an opener better than
+the one the chart uses at some k, it goes in the chart.** So at each bracket k EVERY
+settled race field for that line competes (unrestricted AND answers-only), lowest
+race mean wins -- the unrestricted pair/triple fields are screens of a ranking built
+for another question, and an answers-only race found pairs (CLAMP TREND k=8, CLAMP
+TRIBE k=16) the unrestricted one never examined. A new field is one entry in
+`FIELDS`. While a new winner's fill-in runs are unfinished, the opener it replaced
+stands in (`source: fallback`), and the module prints every stand-in.
+- **Improved-strategy shortlists are the LAST 50 openers still in the PLAIN-strategy
+  1-word race at the same k** (user's rule) -- never a top-N cut from the improved
+  race's own early rounds. A round straddling 50 is ranked by gap behind its leader.
+
 ### `run-multiwordle-exact.sh` — the one cell where sampling is unnecessary
 **`minavg` at k=1 only.** The answer is one word drawn uniformly from the 2315 and
 the rule is deterministic, so those 2315 games ARE the population: the mean is the

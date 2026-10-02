@@ -40,8 +40,11 @@
     "2": "plant",
     "3": "plant",
     "4": "plant",
+    "5": "plant",
     "6": "compt",
+    "7": "dempt",
     "8": "dempt",
+    "10": "dempt",
     "12": "mpret",
     "14": "mpret",
     "16": "mpret",
@@ -98,7 +101,8 @@
      "misses": 3.4294,
      "stderr": 0.0011,
      "opening": "compt",
-     "source": "run"
+     "source": "fallback",
+     "pending": "dempt"
     },
     {
      "k": 8,
@@ -289,11 +293,11 @@
     "3": "clint parse",
     "4": "clint parse",
     "6": "clasp drent",
-    "8": "corbe plant",
+    "8": "clamp trend",
     "12": "corbe plant",
-    "16": "corbe plant",
+    "16": "clamp tribe",
     "24": "farce spilt",
-    "32": "ridge tonal"
+    "32": "doubt range"
    },
    "points": [
     {
@@ -350,28 +354,32 @@
      "misses": 2.7285,
      "stderr": 0.0008,
      "opening": "corbe plant",
-     "source": "run"
+     "source": "fallback",
+     "pending": "clamp trend"
     },
     {
      "k": 9,
      "misses": 2.6123,
      "stderr": 0.0008,
      "opening": "corbe plant",
-     "source": "run"
+     "source": "fallback",
+     "pending": "clamp trend"
     },
     {
      "k": 10,
      "misses": 2.5107,
      "stderr": 0.0007,
      "opening": "corbe plant",
-     "source": "run"
+     "source": "fallback",
+     "pending": "clamp trend"
     },
     {
      "k": 11,
      "misses": 2.426,
      "stderr": 0.0007,
      "opening": "corbe plant",
-     "source": "run"
+     "source": "fallback",
+     "pending": "clamp trend"
     },
     {
      "k": 12,
@@ -406,56 +414,64 @@
      "misses": 2.1769,
      "stderr": 0.0004,
      "opening": "corbe plant",
-     "source": "run"
+     "source": "fallback",
+     "pending": "clamp tribe"
     },
     {
      "k": 17,
      "misses": 2.1509,
      "stderr": 0.0004,
      "opening": "corbe plant",
-     "source": "run"
+     "source": "fallback",
+     "pending": "clamp tribe"
     },
     {
      "k": 18,
      "misses": 2.1291,
      "stderr": 0.0004,
      "opening": "corbe plant",
-     "source": "run"
+     "source": "fallback",
+     "pending": "clamp tribe"
     },
     {
      "k": 19,
      "misses": 2.1114,
      "stderr": 0.0004,
      "opening": "corbe plant",
-     "source": "run"
+     "source": "fallback",
+     "pending": "clamp tribe"
     },
     {
      "k": 20,
      "misses": 2.0958,
      "stderr": 0.0003,
      "opening": "corbe plant",
-     "source": "run"
+     "source": "fallback",
+     "pending": "clamp tribe"
     },
     {
      "k": 21,
      "misses": 2.0824,
      "stderr": 0.0003,
      "opening": "corbe plant",
-     "source": "run"
+     "source": "fallback",
+     "pending": "clamp tribe"
     },
     {
      "k": 22,
      "misses": 2.0709,
      "stderr": 0.0003,
      "opening": "corbe plant",
-     "source": "run"
+     "source": "fallback",
+     "pending": "clamp tribe"
     },
     {
      "k": 23,
      "misses": 2.0619,
      "stderr": 0.0003,
      "opening": "corbe plant",
-     "source": "run"
+     "source": "fallback",
+     "pending": "clamp tribe"
     },
     {
      "k": 24,
@@ -518,7 +534,8 @@
      "misses": 2.004,
      "stderr": 0.0002,
      "opening": "ridge tonal",
-     "source": "run"
+     "source": "fallback",
+     "pending": "doubt range"
     }
    ],
    "missing": []
@@ -530,11 +547,11 @@
     "3": "chant dorse blimp",
     "4": "chant dorse blimp",
     "6": "clint drape wombs",
-    "8": "cried plant wombs",
+    "8": "bland copse might",
     "12": "cried plant wombs",
-    "16": "cried plant wombs",
+    "16": "clamp feign worst",
     "24": "crisp leant gumbo",
-    "32": "crisp leant gumbo"
+    "32": "clamp singe turbo"
    },
    "points": [
     {
@@ -591,28 +608,32 @@
      "misses": 3.2074,
      "stderr": 0.0005,
      "opening": "cried plant wombs",
-     "source": "run"
+     "source": "fallback",
+     "pending": "bland copse might"
     },
     {
      "k": 9,
      "misses": 3.1842,
      "stderr": 0.0005,
      "opening": "cried plant wombs",
-     "source": "run"
+     "source": "fallback",
+     "pending": "bland copse might"
     },
     {
      "k": 10,
      "misses": 3.1647,
      "stderr": 0.0004,
      "opening": "cried plant wombs",
-     "source": "run"
+     "source": "fallback",
+     "pending": "bland copse might"
     },
     {
      "k": 11,
      "misses": 3.1456,
      "stderr": 0.0004,
      "opening": "cried plant wombs",
-     "source": "run"
+     "source": "fallback",
+     "pending": "bland copse might"
     },
     {
      "k": 12,
@@ -647,56 +668,64 @@
      "misses": 3.0789,
      "stderr": 0.0003,
      "opening": "cried plant wombs",
-     "source": "run"
+     "source": "fallback",
+     "pending": "clamp feign worst"
     },
     {
      "k": 17,
      "misses": 3.0683,
      "stderr": 0.0003,
      "opening": "cried plant wombs",
-     "source": "run"
+     "source": "fallback",
+     "pending": "clamp feign worst"
     },
     {
      "k": 18,
      "misses": 3.0589,
      "stderr": 0.0003,
      "opening": "cried plant wombs",
-     "source": "run"
+     "source": "fallback",
+     "pending": "clamp feign worst"
     },
     {
      "k": 19,
      "misses": 3.0515,
      "stderr": 0.0003,
      "opening": "cried plant wombs",
-     "source": "run"
+     "source": "fallback",
+     "pending": "clamp feign worst"
     },
     {
      "k": 20,
      "misses": 3.0441,
      "stderr": 0.0003,
      "opening": "cried plant wombs",
-     "source": "run"
+     "source": "fallback",
+     "pending": "clamp feign worst"
     },
     {
      "k": 21,
      "misses": 3.0376,
      "stderr": 0.0003,
      "opening": "cried plant wombs",
-     "source": "run"
+     "source": "fallback",
+     "pending": "clamp feign worst"
     },
     {
      "k": 22,
      "misses": 3.0318,
      "stderr": 0.0003,
      "opening": "cried plant wombs",
-     "source": "run"
+     "source": "fallback",
+     "pending": "clamp feign worst"
     },
     {
      "k": 23,
      "misses": 3.0261,
      "stderr": 0.0003,
      "opening": "cried plant wombs",
-     "source": "run"
+     "source": "fallback",
+     "pending": "clamp feign worst"
     },
     {
      "k": 24,
@@ -764,8 +793,8 @@
     },
     {
      "k": 32,
-     "misses": 2.9819,
-     "opening": "crisp leant gumbo",
+     "misses": 2.9771,
+     "opening": "clamp singe turbo",
      "source": "race"
     }
    ],
@@ -1014,13 +1043,15 @@
   }
  },
  "notes": [
-  "greedy 1-word race at k=5 still has 3 live",
-  "greedy 1-word race at k=6 still has 2 live",
-  "greedy 1-word race at k=7 still has 2 live",
-  "greedy 1-word race at k=10 still has 2 live",
-  "greedy 3-word race at k=24 still has 3 live",
-  "greedy 3-word race at k=32 still has 3 live",
+  "greedy 1-word guess race at k=5 still has 3 live",
+  "greedy 1-word guess race at k=6 still has 2 live",
+  "greedy 1-word guess race at k=7 still has 2 live",
+  "greedy 1-word mystery race at k=16 still has 2 live",
+  "greedy 3-word triple_singletons_answers_exhaustive_top10000 race at k=4 still has 2 live",
+  "greedy 3-word triple_singletons_answers_exhaustive_top10000 race at k=16 still has 2 live",
+  "greedy 3-word triple_singletons_top10000 race at k=24 still has 3 live",
+  "greedy 3-word triple_singletons_top10000 race at k=32 still has 3 live",
   "minavg race at k=24 not settled (50 live, 3200 games): not used yet -- the bracket below covers it",
-  "minavg race at k=32 not settled (46 live, 3200 games): not used yet -- the bracket below covers it"
+  "minavg race at k=32 not settled (5497 live, 200 games): not used yet -- the bracket below covers it"
  ]
 }

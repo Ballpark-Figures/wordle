@@ -43,7 +43,15 @@ KS = list(range(1, 33))
 # a line with no race at a k simply has no winner there, so its bracket below covers
 # it -- adding a k here cannot change a line that was never raced at it.
 POWERS = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 28, 32]
-FIELDS = {1: "guess", 2: "pair_singletons_top10000", 3: "triple_singletons_top10000"}
+# EVERY race field for a line competes at each k, and the lowest race mean wins
+# (user's rule, 2026-10-02: "if we find something better than what's used in the
+# chart, we should just put it in the chart"). The unrestricted fields are each a
+# SCREEN of a ranking built for another question, so an answers-only race can find
+# an opener the unrestricted one never examined (CLAMP TREND at k=8 was outside the
+# top 10000 pairs). Add any new field here and it competes automatically.
+FIELDS = {1: ["guess", "mystery"],
+          2: ["pair_singletons_top10000", "pair_singletons_answers_top100000_top10000"],
+          3: ["triple_singletons_top10000", "triple_singletons_answers_exhaustive_top10000"]}
 T_GREEDY, T_MINAVG = 1000000, 100000
 # A race's estimate stands in for a missing fill-in ONLY once it means something: the
 # race has finished (one opening left) or its leader has played this many games. A
@@ -126,12 +134,16 @@ def _line(winners, trials, suffix):
             pts.append({"k": k, "misses": round(got[0] - k, 4), "stderr": got[1],
                         "opening": w["opening"], "source": "run"})
             continue
+        # stand-ins: this bracket's other race winners (best first), then each
+        # bracket below in turn with its winner and its alternates
+        chain = list(w.get("alts", []))
         for p in below[1:]:
-            old = _sim(k, winners[p]["opening"], trials, suffix)
+            chain += [winners[p]["opening"]] + list(winners[p].get("alts", []))
+        for op in chain:
+            old = _sim(k, op, trials, suffix)
             if old is not None:
                 pts.append({"k": k, "misses": round(old[0] - k, 4), "stderr": old[1],
-                            "opening": winners[p]["opening"], "source": "fallback",
-                            "pending": w["opening"]})
+                            "opening": op, "source": "fallback", "pending": w["opening"]})
                 break
         else:
             if k == b and w.get("mean") is not None:
@@ -146,17 +158,29 @@ def _line(winners, trials, suffix):
 
 def _build():
     out = {"ks": KS, "lines": {}, "notes": []}
-    for n, field in FIELDS.items():
+    for n, fields in FIELDS.items():
         winners = {}
         for p in POWERS:
-            r = _race("greedy", p, field)
-            if r is None:
-                continue
-            settled = r[4] == 1 or r[3] >= RACE_MIN_GAMES
-            if settled:
-                winners[p] = {"opening": r[0], "mean": r[1], "source": "race"}
-            if r[4] > 1:
-                out["notes"].append(f"greedy {n}-word race at k={p} still has {r[4]} live")
+            best, settled_here = None, []
+            for field in fields:
+                r = _race("greedy", p, field)
+                if r is None:
+                    continue
+                if r[4] > 1:
+                    out["notes"].append(f"greedy {n}-word {field} race at k={p} still has "
+                                        f"{r[4]} live")
+                if not (r[4] == 1 or r[3] >= RACE_MIN_GAMES):
+                    continue
+                settled_here.append(r)
+                if best is None or r[1] < best[1]:
+                    best = r + (field,)
+            if best is not None:
+                winners[p] = {"opening": best[0], "mean": best[1], "source": "race",
+                              "field": best[5],
+                              # the other fields' settled winners, best first: the
+                              # first stand-ins while this one's runs land
+                              "alts": [r[0] for r in sorted(settled_here, key=lambda r: r[1])
+                                       if r[0] != best[0]]}
         pts, missing = _line(winners, T_GREEDY, "")
         out["lines"][str(n)] = {"winners": {str(p): w["opening"] for p, w in winners.items()},
                                 "points": pts, "missing": missing}
@@ -166,7 +190,11 @@ def _build():
     if ex is not None:
         winners[1] = {"opening": ex[0], "mean": ex[1], "source": "exact"}
     for p in POWERS[1:]:
-        r = _race("minavg", p, MINAVG_FIELD.get(p, "guess"))
+        cands = [r for r in (_race("minavg", p, f) for f in
+                             ["guess"] + ([MINAVG_FIELD[p]] if p in MINAVG_FIELD else []))
+                 if r is not None]
+        settled_c = [r for r in cands if r[4] == 1 or r[3] >= RACE_MIN_GAMES]
+        r = min(settled_c, key=lambda r: r[1]) if settled_c else (cands[0] if cands else None)
         if r is not None:
             settled = r[4] == 1 or r[3] >= RACE_MIN_GAMES
             if settled:
