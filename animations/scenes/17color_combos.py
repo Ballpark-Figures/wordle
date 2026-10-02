@@ -15,8 +15,9 @@ BEAT MAP:
   g table      — move up to "Average Words Remaining" alone                 (17g, VO 4)
   h fill_320   — the 3G2Y row and its bold 1 rise in                         (17h, VO 4)
   i fill_230   — the 2G3Y row and its bold 1                                 (17i, VO 5)
-  j bared      — BARED (scored) / BEARD / BREAD, stacked bottom right, rise  (17j, VO 5)
-  k bared_off  — the three drop back off the bottom, together               (17k, VO 5)
+  j bared      — BARED (scored) / BEARD / BREAD, stacked bottom middle, rise
+                 together from below the frame                              (17j, VO 5)
+  k bared_off  — the three slide back off the bottom, together, no fade     (17k, VO 5)
   l-q fill_0 .. fill_5 — rows + values, one gray-count group per beat,
                  staggered upward fade                                      (17l-q, VO 6)
   r breakdown  — title flips to Strategy Breakdown (Second Guess); values out,
@@ -47,7 +48,7 @@ REUSE MAP — every element and the one source it comes from:
   table values        crisp_text FONT_SIZE_SM, centred in the column; 1 bold (17h)
   table rows in       LaggedStart FadeIn(shift=UP*0.3), lag 0.12 — 04new_rules.py:156
   17j words           assets/board.py get_scored_row (BARED) / get_typed_row, stacked at
-                      the bottom right; FadeIn / FadeOut with a shift, all three at once
+                      the bottom middle; slide in from / out below the frame, no fade
   bars                bpkfigures.bar_graph get_stacked_bar (added for this scene),
                       segments compatible / something else / both / all new (all new
                       on the right: the user's call), legend in that order,
@@ -134,10 +135,9 @@ VALUE_SIZE = FONT_SIZE_SM
 LEGEND_X = 4.3             # legend swatches' left edge
 LEGEND_SWATCH = 0.3
 LEGEND_PITCH = 0.55
-WORD_TILE = 0.45           # 17j: BARED / BEARD / BREAD, stacked, bottom right
-WORD_PITCH = 0.6           # row pitch in the stack
-WORD_MARGIN = 0.5          # stack's distance from the frame's right and bottom edges
-WORD_DROP = 2.0            # how far the stack rises into place / drops out of it
+WORD_TILE = 0.6            # 17j: BARED / BEARD / BREAD, stacked, bottom middle
+WORD_PITCH = 0.78          # row pitch in the stack
+WORD_MARGIN = 0.4          # stack's distance from the frame's bottom edge
 ROW_RISE = 0.3             # table rows' staggered upward fade (04's / 10's)
 ROW_LAG = 0.12
 MOVE_UP_RT = 1.2           # a "move up" to the next screen
@@ -407,25 +407,30 @@ class Scene17(WordleBoardScene):
         self._fill([(2, 3, 0)], 0.6)
 
     # j : BARED (green, three yellows, green), BEARD and BREAD, stacked at the bottom
-    #     right, rise together
+    #     middle, rise together from below the frame
     def _setup_bared(self):
         rows = [get_scored_row("bared", code("GYYYG")), get_typed_row("beard"),
                 get_typed_row("bread")]
         for i, r in enumerate(rows):
             r.scale(WORD_TILE / r.tiles[0][0].width).move_to(DOWN * i * WORD_PITCH)
         self.words = VGroup(*rows)
-        self.words.move_to([config.frame_x_radius - WORD_MARGIN - self.words.width / 2,
-                            -config.frame_y_radius + WORD_MARGIN + self.words.height / 2, 0])
+        self.words.move_to([0, -config.frame_y_radius + WORD_MARGIN + self.words.height / 2, 0])
+        # far enough to start / end wholly below the frame
+        self.word_drop = self.words.get_top()[1] + config.frame_y_radius + 0.1
 
     @subscene
     def bared(self):
         self._setup_bared()
-        self.play(FadeIn(self.words, shift=UP * WORD_DROP), run_time=1.0)
+        self.words.shift(DOWN * self.word_drop)
+        self.add(self.words)
+        self.play(self.words.animate.shift(UP * self.word_drop), run_time=1.0)
 
-    # k : the three words go back off the bottom, together
+    # k : the three words go back off the bottom, together (no fade: they leave the
+    #     frame anyway)
     @subscene
     def bared_off(self):
-        self.play(FadeOut(self.words, shift=DOWN * WORD_DROP), run_time=0.8)
+        self.play(self.words.animate.shift(DOWN * self.word_drop), run_time=0.8)
+        self.remove(self.words)
         self.words = None
 
     # l : the rest of the 0-gray rows
