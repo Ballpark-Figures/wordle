@@ -141,7 +141,7 @@ from assets import multi_data
 from assets.groups import dot_grid, ranked_word_layout
 from assets.pigpen import PigpenWord
 from bpkfigures.browser import browser_window
-from bpkfigures.line_graph import get_line_graph, line_point
+from bpkfigures.line_graph import get_line_graph, line_point, spread_label_ys
 from assets import multi_plot_data
 
 MEDIA = Path(__file__).resolve().parent.parent / "assets" / "web_media"
@@ -749,17 +749,18 @@ class Scene16(WordleBoardScene):
                                               color=color[n]).next_to(
                 line_point(geom, k, v), side, buff=buff)
             self.chart_labels[n].at_right = side is RIGHT
-        # right-edge labels whose lines end close together are pushed apart, from
-        # the middle of the cluster outwards, to at least LABEL_GAP between them
-        right = sorted([m for m in self.chart_labels.values() if m.at_right],
-                       key=lambda m: m.get_y())
-        for lo, hi in zip(right, right[1:]):
-            need = lo.height / 2 + hi.height / 2 + LABEL_GAP
-            gap = hi.get_y() - lo.get_y()
-            if gap < need:
-                lo.shift(DOWN * (need - gap) / 2)
-                hi.shift(UP * (need - gap) / 2)
+            self.chart_labels[n].natural_y = self.chart_labels[n].get_y()
+        self.chart_shown = []           # the lines drawn so far, in order
         self.chart_frame.shift(DOWN * FH)
+
+    def _label_ys(self, keys):
+        """Where the right-edge labels of `keys` sit: level with their own lines,
+        pushed apart only as far as the labels ON SCREEN need (user's call: a label
+        moves up when a later one arrives beside it, rather than starting moved)."""
+        right = [n for n in keys if self.chart_labels[n].at_right]
+        ys = spread_label_ys([(self.chart_labels[n].natural_y, self.chart_labels[n].height)
+                              for n in right], LABEL_GAP)
+        return dict(zip(right, ys))
 
     # t : the game moves up off the frame, the empty chart comes up into it
     @subscene
@@ -773,9 +774,18 @@ class Scene16(WordleBoardScene):
 
     def _draw(self, keys, run_time):
         """Lines drawn left to right with their end labels fading in, as yahtzee's
-        08line_graph (Create + FadeIn of the label)."""
+        08line_graph (Create + FadeIn of the label). Labels already on screen that
+        the new ones crowd slide aside in the same play."""
+        ys = self._label_ys(self.chart_shown + list(keys))
+        for n in keys:
+            if n in ys:
+                self.chart_labels[n].set_y(ys[n])
+        moves = [self.chart_labels[n].animate.set_y(ys[n]) for n in self.chart_shown
+                 if n in ys and abs(self.chart_labels[n].get_y() - ys[n]) > 1e-4]
         self.play(*[Create(self.chart_lines[n]) for n in keys],
-                  *[FadeIn(self.chart_labels[n]) for n in keys], run_time=run_time)
+                  *[FadeIn(self.chart_labels[n]) for n in keys], *moves,
+                  run_time=run_time)
+        self.chart_shown += list(keys)
 
     # u : the 3-word opener
     @subscene
