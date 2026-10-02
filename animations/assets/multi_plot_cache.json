@@ -721,51 +721,45 @@
     },
     {
      "k": 26,
-     "misses": 3.0129,
-     "stderr": 0.0002,
-     "opening": "cried plant wombs",
-     "source": "fallback",
-     "pending": "crisp leant gumbo"
+     "misses": 3.0066,
+     "stderr": 0.0003,
+     "opening": "crisp leant gumbo",
+     "source": "run"
     },
     {
      "k": 27,
-     "misses": 3.009,
-     "stderr": 0.0002,
-     "opening": "cried plant wombs",
-     "source": "fallback",
-     "pending": "crisp leant gumbo"
+     "misses": 3.0018,
+     "stderr": 0.0003,
+     "opening": "crisp leant gumbo",
+     "source": "run"
     },
     {
      "k": 28,
-     "misses": 3.0052,
-     "stderr": 0.0002,
-     "opening": "cried plant wombs",
-     "source": "fallback",
-     "pending": "crisp leant gumbo"
+     "misses": 2.9973,
+     "stderr": 0.0003,
+     "opening": "crisp leant gumbo",
+     "source": "run"
     },
     {
      "k": 29,
-     "misses": 3.0021,
-     "stderr": 0.0002,
-     "opening": "cried plant wombs",
-     "source": "fallback",
-     "pending": "crisp leant gumbo"
+     "misses": 2.9927,
+     "stderr": 0.0003,
+     "opening": "crisp leant gumbo",
+     "source": "run"
     },
     {
      "k": 30,
-     "misses": 2.999,
-     "stderr": 0.0002,
-     "opening": "cried plant wombs",
-     "source": "fallback",
-     "pending": "crisp leant gumbo"
+     "misses": 2.9892,
+     "stderr": 0.0003,
+     "opening": "crisp leant gumbo",
+     "source": "run"
     },
     {
      "k": 31,
-     "misses": 2.9959,
-     "stderr": 0.0002,
-     "opening": "cried plant wombs",
-     "source": "fallback",
-     "pending": "crisp leant gumbo"
+     "misses": 2.9855,
+     "stderr": 0.0003,
+     "opening": "crisp leant gumbo",
+     "source": "run"
     },
     {
      "k": 32,
