@@ -43,8 +43,11 @@
     "6": "compt",
     "8": "dempt",
     "12": "mpret",
+    "14": "mpret",
     "16": "mpret",
+    "20": "rotan",
     "24": "rotan",
+    "28": "rotan",
     "32": "rotan"
    },
    "points": [
@@ -85,19 +88,17 @@
     },
     {
      "k": 6,
-     "misses": 3.5833,
+     "misses": 3.5835,
      "stderr": 0.0011,
-     "opening": "plant",
-     "source": "fallback",
-     "pending": "compt"
+     "opening": "compt",
+     "source": "run"
     },
     {
      "k": 7,
-     "misses": 3.4341,
+     "misses": 3.4294,
      "stderr": 0.0011,
-     "opening": "plant",
-     "source": "fallback",
-     "pending": "compt"
+     "opening": "compt",
+     "source": "run"
     },
     {
      "k": 8,
@@ -188,28 +189,32 @@
      "misses": 1.9893,
      "stderr": 0.0007,
      "opening": "mpret",
-     "source": "run"
+     "source": "fallback",
+     "pending": "rotan"
     },
     {
      "k": 21,
      "misses": 1.9441,
      "stderr": 0.0007,
      "opening": "mpret",
-     "source": "run"
+     "source": "fallback",
+     "pending": "rotan"
     },
     {
      "k": 22,
      "misses": 1.9012,
      "stderr": 0.0007,
      "opening": "mpret",
-     "source": "run"
+     "source": "fallback",
+     "pending": "rotan"
     },
     {
      "k": 23,
      "misses": 1.8668,
      "stderr": 0.0007,
      "opening": "mpret",
-     "source": "run"
+     "source": "fallback",
+     "pending": "rotan"
     },
     {
      "k": 24,
@@ -1009,7 +1014,10 @@
   }
  },
  "notes": [
+  "greedy 1-word race at k=5 still has 3 live",
   "greedy 1-word race at k=6 still has 2 live",
+  "greedy 1-word race at k=7 still has 2 live",
+  "greedy 1-word race at k=10 still has 2 live",
   "greedy 3-word race at k=24 still has 3 live",
   "greedy 3-word race at k=32 still has 3 live",
   "minavg race at k=24 not settled (50 live, 3200 games): not used yet -- the bracket below covers it",

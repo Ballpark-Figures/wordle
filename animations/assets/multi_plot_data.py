@@ -39,7 +39,10 @@ KS = list(range(1, 33))
 # The winner at each of these k covers every k up to the next one. Powers of two
 # first (user's plan, 2026-10-01), then 3 x powers of two added to smooth the jumps
 # where the winner changes (user, 2026-10-02).
-POWERS = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32]
+# 5 x and 7 x powers of two were added for the 1-word line only (user, 2026-10-02);
+# a line with no race at a k simply has no winner there, so its bracket below covers
+# it -- adding a k here cannot change a line that was never raced at it.
+POWERS = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 28, 32]
 FIELDS = {1: "guess", 2: "pair_singletons_top10000", 3: "triple_singletons_top10000"}
 T_GREEDY, T_MINAVG = 1000000, 100000
 # A race's estimate stands in for a missing fill-in ONLY once it means something: the
