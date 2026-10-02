@@ -38,9 +38,13 @@
    "winners": {
     "1": "slate",
     "2": "plant",
+    "3": "plant",
     "4": "plant",
+    "6": "clipt",
     "8": "dempt",
+    "12": "mpret",
     "16": "mpret",
+    "24": "rotan",
     "32": "rotan"
    },
    "points": [
@@ -81,17 +85,15 @@
     },
     {
      "k": 6,
-     "misses": 3.5833,
-     "stderr": 0.0011,
-     "opening": "plant",
-     "source": "run"
+     "misses": 3.5831,
+     "opening": "clipt",
+     "source": "race"
     },
     {
      "k": 7,
-     "misses": 3.4341,
-     "stderr": 0.0011,
-     "opening": "plant",
-     "source": "run"
+     "misses": null,
+     "opening": "clipt",
+     "source": "missing"
     },
     {
      "k": 8,
@@ -123,31 +125,30 @@
     },
     {
      "k": 12,
-     "misses": 2.6578,
+     "misses": 2.6498,
      "stderr": 0.0009,
-     "opening": "dempt",
+     "opening": "mpret",
      "source": "run"
     },
     {
      "k": 13,
-     "misses": 2.5416,
+     "misses": 2.5252,
      "stderr": 0.0009,
-     "opening": "dempt",
+     "opening": "mpret",
      "source": "run"
     },
     {
      "k": 14,
-     "misses": 2.442,
+     "misses": 2.4147,
      "stderr": 0.0008,
-     "opening": "dempt",
+     "opening": "mpret",
      "source": "run"
     },
     {
      "k": 15,
-     "misses": 2.3548,
-     "stderr": 0.0008,
-     "opening": "dempt",
-     "source": "run"
+     "misses": null,
+     "opening": "mpret",
+     "source": "missing"
     },
     {
      "k": 16,
@@ -207,59 +208,51 @@
     },
     {
      "k": 24,
-     "misses": 1.8316,
-     "stderr": 0.0007,
-     "opening": "mpret",
-     "source": "run"
+     "misses": 1.7771,
+     "opening": "rotan",
+     "source": "race"
     },
     {
      "k": 25,
-     "misses": 1.8018,
-     "stderr": 0.0006,
-     "opening": "mpret",
-     "source": "run"
+     "misses": null,
+     "opening": "rotan",
+     "source": "missing"
     },
     {
      "k": 26,
-     "misses": 1.7739,
-     "stderr": 0.0006,
-     "opening": "mpret",
-     "source": "run"
+     "misses": null,
+     "opening": "rotan",
+     "source": "missing"
     },
     {
      "k": 27,
-     "misses": 1.7478,
-     "stderr": 0.0006,
-     "opening": "mpret",
-     "source": "run"
+     "misses": null,
+     "opening": "rotan",
+     "source": "missing"
     },
     {
      "k": 28,
-     "misses": 1.7231,
-     "stderr": 0.0006,
-     "opening": "mpret",
-     "source": "run"
+     "misses": null,
+     "opening": "rotan",
+     "source": "missing"
     },
     {
      "k": 29,
-     "misses": 1.7006,
-     "stderr": 0.0006,
-     "opening": "mpret",
-     "source": "run"
+     "misses": null,
+     "opening": "rotan",
+     "source": "missing"
     },
     {
      "k": 30,
-     "misses": 1.68,
-     "stderr": 0.0006,
-     "opening": "mpret",
-     "source": "run"
+     "misses": null,
+     "opening": "rotan",
+     "source": "missing"
     },
     {
      "k": 31,
-     "misses": 1.6601,
-     "stderr": 0.0006,
-     "opening": "mpret",
-     "source": "run"
+     "misses": null,
+     "opening": "rotan",
+     "source": "missing"
     },
     {
      "k": 32,
@@ -269,15 +262,29 @@
      "source": "run"
     }
    ],
-   "missing": []
+   "missing": [
+    7,
+    15,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31
+   ]
   },
   "2": {
    "winners": {
     "1": "clint parse",
     "2": "clint parse",
+    "3": "clint parse",
     "4": "clint parse",
+    "6": "clasp drent",
     "8": "corbe plant",
+    "12": "corbe plant",
     "16": "corbe plant",
+    "24": "farce spilt",
     "32": "ridge tonal"
    },
    "points": [
@@ -318,16 +325,16 @@
     },
     {
      "k": 6,
-     "misses": 2.9875,
-     "stderr": 0.001,
-     "opening": "clint parse",
+     "misses": 2.9713,
+     "stderr": 0.0009,
+     "opening": "clasp drent",
      "source": "run"
     },
     {
      "k": 7,
-     "misses": 2.8809,
+     "misses": 2.85,
      "stderr": 0.0009,
-     "opening": "clint parse",
+     "opening": "clasp drent",
      "source": "run"
     },
     {
@@ -444,59 +451,51 @@
     },
     {
      "k": 24,
-     "misses": 2.0528,
-     "stderr": 0.0003,
-     "opening": "corbe plant",
-     "source": "run"
+     "misses": 2.048,
+     "opening": "farce spilt",
+     "source": "race"
     },
     {
      "k": 25,
-     "misses": 2.0458,
-     "stderr": 0.0003,
-     "opening": "corbe plant",
-     "source": "run"
+     "misses": null,
+     "opening": "farce spilt",
+     "source": "missing"
     },
     {
      "k": 26,
-     "misses": 2.0393,
-     "stderr": 0.0002,
-     "opening": "corbe plant",
-     "source": "run"
+     "misses": null,
+     "opening": "farce spilt",
+     "source": "missing"
     },
     {
      "k": 27,
-     "misses": 2.0335,
-     "stderr": 0.0002,
-     "opening": "corbe plant",
-     "source": "run"
+     "misses": null,
+     "opening": "farce spilt",
+     "source": "missing"
     },
     {
      "k": 28,
-     "misses": 2.0281,
-     "stderr": 0.0002,
-     "opening": "corbe plant",
-     "source": "run"
+     "misses": null,
+     "opening": "farce spilt",
+     "source": "missing"
     },
     {
      "k": 29,
-     "misses": 2.0241,
-     "stderr": 0.0002,
-     "opening": "corbe plant",
-     "source": "run"
+     "misses": null,
+     "opening": "farce spilt",
+     "source": "missing"
     },
     {
      "k": 30,
-     "misses": 2.0199,
-     "stderr": 0.0002,
-     "opening": "corbe plant",
-     "source": "run"
+     "misses": null,
+     "opening": "farce spilt",
+     "source": "missing"
     },
     {
      "k": 31,
-     "misses": 2.0165,
-     "stderr": 0.0002,
-     "opening": "corbe plant",
-     "source": "run"
+     "misses": null,
+     "opening": "farce spilt",
+     "source": "missing"
     },
     {
      "k": 32,
@@ -506,15 +505,27 @@
      "source": "run"
     }
    ],
-   "missing": []
+   "missing": [
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31
+   ]
   },
   "3": {
    "winners": {
     "1": "dance horst blimp",
     "2": "chant dorse blimp",
+    "3": "chant dorse blimp",
     "4": "chant dorse blimp",
+    "6": "clint drape wombs",
     "8": "cried plant wombs",
+    "12": "cried plant wombs",
     "16": "cried plant wombs",
+    "24": "crisp leant gumbo",
     "32": "crisp leant gumbo"
    },
    "points": [
@@ -555,16 +566,16 @@
     },
     {
      "k": 6,
-     "misses": 3.258,
+     "misses": 3.2556,
      "stderr": 0.0005,
-     "opening": "chant dorse blimp",
+     "opening": "clint drape wombs",
      "source": "run"
     },
     {
      "k": 7,
-     "misses": 3.2409,
+     "misses": 3.2307,
      "stderr": 0.0005,
-     "opening": "chant dorse blimp",
+     "opening": "clint drape wombs",
      "source": "run"
     },
     {
@@ -681,59 +692,51 @@
     },
     {
      "k": 24,
-     "misses": 3.0218,
-     "stderr": 0.0003,
-     "opening": "cried plant wombs",
-     "source": "run"
+     "misses": 3.0178,
+     "opening": "crisp leant gumbo",
+     "source": "race"
     },
     {
      "k": 25,
-     "misses": 3.0167,
-     "stderr": 0.0002,
-     "opening": "cried plant wombs",
-     "source": "run"
+     "misses": null,
+     "opening": "crisp leant gumbo",
+     "source": "missing"
     },
     {
      "k": 26,
-     "misses": 3.0129,
-     "stderr": 0.0002,
-     "opening": "cried plant wombs",
-     "source": "run"
+     "misses": null,
+     "opening": "crisp leant gumbo",
+     "source": "missing"
     },
     {
      "k": 27,
-     "misses": 3.009,
-     "stderr": 0.0002,
-     "opening": "cried plant wombs",
-     "source": "run"
+     "misses": null,
+     "opening": "crisp leant gumbo",
+     "source": "missing"
     },
     {
      "k": 28,
-     "misses": 3.0052,
-     "stderr": 0.0002,
-     "opening": "cried plant wombs",
-     "source": "run"
+     "misses": null,
+     "opening": "crisp leant gumbo",
+     "source": "missing"
     },
     {
      "k": 29,
-     "misses": 3.0021,
-     "stderr": 0.0002,
-     "opening": "cried plant wombs",
-     "source": "run"
+     "misses": null,
+     "opening": "crisp leant gumbo",
+     "source": "missing"
     },
     {
      "k": 30,
-     "misses": 2.999,
-     "stderr": 0.0002,
-     "opening": "cried plant wombs",
-     "source": "run"
+     "misses": null,
+     "opening": "crisp leant gumbo",
+     "source": "missing"
     },
     {
      "k": 31,
-     "misses": 2.9959,
-     "stderr": 0.0002,
-     "opening": "cried plant wombs",
-     "source": "run"
+     "misses": null,
+     "opening": "crisp leant gumbo",
+     "source": "missing"
     },
     {
      "k": 32,
@@ -742,7 +745,15 @@
      "source": "race"
     }
    ],
-   "missing": []
+   "missing": [
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31
+   ]
   },
   "improved": {
    "winners": {
@@ -750,8 +761,7 @@
     "2": "canst",
     "4": "clapt",
     "8": "compt",
-    "16": "tamed",
-    "32": "filet"
+    "16": "tamed"
    },
    "points": [
     {
@@ -973,7 +983,7 @@
     {
      "k": 32,
      "misses": null,
-     "opening": "filet",
+     "opening": "tamed",
      "source": "missing"
     }
    ],
@@ -983,7 +993,12 @@
   }
  },
  "notes": [
+  "greedy 1-word race at k=6 still has 2 live",
+  "greedy 3-word race at k=24 still has 3 live",
   "greedy 3-word race at k=32 still has 3 live",
-  "minavg race at k=32 not settled (5497 live, 200 games): its leader is not plotted"
+  "minavg race at k=3 not settled (50 live, 1600 games): not used yet -- the bracket below covers it",
+  "minavg race at k=6 not settled (50 live, 200 games): not used yet -- the bracket below covers it",
+  "minavg race at k=12 not settled (50 live, 200 games): not used yet -- the bracket below covers it",
+  "minavg race at k=32 not settled (50 live, 200 games): not used yet -- the bracket below covers it"
  ]
 }

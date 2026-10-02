@@ -36,7 +36,10 @@ DIR = os.path.join(MATH, "data", "shared", "multiwordle")
 CACHE = os.path.join(HERE, "multi_plot_cache.json")
 
 KS = list(range(1, 33))
-POWERS = [1, 2, 4, 8, 16, 32]
+# The winner at each of these k covers every k up to the next one. Powers of two
+# first (user's plan, 2026-10-01), then 3 x powers of two added to smooth the jumps
+# where the winner changes (user, 2026-10-02).
+POWERS = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32]
 FIELDS = {1: "guess", 2: "pair_singletons_top10000", 3: "triple_singletons_top10000"}
 T_GREEDY, T_MINAVG = 1000000, 100000
 # A race's estimate stands in for a missing fill-in ONLY once it means something: the
@@ -99,9 +102,14 @@ def _sim(k, opener, trials, suffix):
 
 
 def _line(winners, trials, suffix):
+    """A race that has not settled names NO winner (it is left out of `winners`),
+    so its bracket falls back to the last settled one below it -- an unconfirmed
+    leader never decides which opener a k is run with."""
     pts, missing = [], []
     for k in KS:
-        w = winners.get(_bracket(k))
+        below = [p for p in winners if p <= k]
+        b = max(below) if below else None
+        w = winners.get(b)
         if w is None:
             pts.append({"k": k, "misses": None, "source": "no winner"})
             missing.append(k)
@@ -110,7 +118,7 @@ def _line(winners, trials, suffix):
         if got is not None:
             pts.append({"k": k, "misses": round(got[0] - k, 4), "stderr": got[1],
                         "opening": w["opening"], "source": "run"})
-        elif k == _bracket(k) and w.get("mean") is not None:
+        elif k == b and w.get("mean") is not None:
             pts.append({"k": k, "misses": round(w["mean"] - k, 4), "opening": w["opening"],
                         "source": w["source"]})
         else:
@@ -128,8 +136,8 @@ def _build():
             if r is None:
                 continue
             settled = r[4] == 1 or r[3] >= RACE_MIN_GAMES
-            winners[p] = {"opening": r[0], "mean": r[1] if settled else None,
-                          "source": "race"}
+            if settled:
+                winners[p] = {"opening": r[0], "mean": r[1], "source": "race"}
             if r[4] > 1:
                 out["notes"].append(f"greedy {n}-word race at k={p} still has {r[4]} live")
         pts, missing = _line(winners, T_GREEDY, "")
@@ -144,11 +152,11 @@ def _build():
         r = _race("minavg", p, MINAVG_FIELD.get(p, "guess"))
         if r is not None:
             settled = r[4] == 1 or r[3] >= RACE_MIN_GAMES
-            winners[p] = {"opening": r[0], "mean": r[1] if settled else None,
-                          "source": "race"}
-            if not settled:
+            if settled:
+                winners[p] = {"opening": r[0], "mean": r[1], "source": "race"}
+            else:
                 out["notes"].append(f"minavg race at k={p} not settled ({r[4]} live, "
-                                    f"{r[3]} games): its leader is not plotted")
+                                    f"{r[3]} games): not used yet -- the bracket below covers it")
     pts, missing = _line(winners, T_MINAVG, "_minavg")
     out["lines"]["improved"] = {"winners": {str(p): w["opening"] for p, w in winners.items()},
                                 "points": pts, "missing": missing}
