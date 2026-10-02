@@ -42,7 +42,9 @@ KS = list(range(1, 33))
 # 5 x and 7 x powers of two were added for the 1-word line only (user, 2026-10-02);
 # a line with no race at a k simply has no winner there, so its bracket below covers
 # it -- adding a k here cannot change a line that was never raced at it.
-POWERS = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 28, 32]
+# ... and 9, 11, 13, 15 x {1, 2} for the 1-word line as well (user, 2026-10-02).
+POWERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24, 26,
+          28, 30, 32]
 # EVERY race field for a line competes at each k, and the lowest race mean wins
 # (user's rule, 2026-10-02: "if we find something better than what's used in the
 # chart, we should just put it in the chart"). The unrestricted fields are each a

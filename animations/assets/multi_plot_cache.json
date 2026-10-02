@@ -444,11 +444,10 @@
     },
     {
      "k": 22,
-     "misses": 2.0709,
+     "misses": 2.0556,
      "stderr": 0.0003,
-     "opening": "corbe plant",
-     "source": "fallback",
-     "pending": "clamp tribe"
+     "opening": "clamp tribe",
+     "source": "run"
     },
     {
      "k": 23,
@@ -681,11 +680,10 @@
     },
     {
      "k": 21,
-     "misses": 3.0376,
+     "misses": 3.0254,
      "stderr": 0.0003,
-     "opening": "cried plant wombs",
-     "source": "fallback",
-     "pending": "clamp feign worst"
+     "opening": "clamp feign worst",
+     "source": "run"
     },
     {
      "k": 22,
