@@ -707,19 +707,17 @@
     },
     {
      "k": 24,
-     "misses": 3.0218,
+     "misses": 3.0174,
      "stderr": 0.0003,
-     "opening": "cried plant wombs",
-     "source": "fallback",
-     "pending": "crisp leant gumbo"
+     "opening": "crisp leant gumbo",
+     "source": "run"
     },
     {
      "k": 25,
-     "misses": 3.0167,
-     "stderr": 0.0002,
-     "opening": "cried plant wombs",
-     "source": "fallback",
-     "pending": "crisp leant gumbo"
+     "misses": 3.0117,
+     "stderr": 0.0003,
+     "opening": "crisp leant gumbo",
+     "source": "run"
     },
     {
      "k": 26,
@@ -1021,13 +1019,12 @@
  },
  "notes": [
   "greedy 1-word guess race at k=6 still has 2 live",
-  "greedy 1-word guess race at k=7 still has 2 live",
   "greedy 1-word mystery race at k=16 still has 2 live",
   "greedy 3-word triple_singletons_answers_exhaustive_top10000 race at k=4 still has 2 live",
   "greedy 3-word triple_singletons_answers_exhaustive_top10000 race at k=16 still has 2 live",
   "greedy 3-word triple_singletons_top10000 race at k=24 still has 3 live",
   "greedy 3-word triple_singletons_top10000 race at k=32 still has 3 live",
-  "minavg race at k=24 not settled (50 live, 6400 games): not used yet -- the bracket below covers it",
+  "minavg race at k=24 not settled (43 live, 12800 games): not used yet -- the bracket below covers it",
   "minavg race at k=32 not settled (5497 live, 200 games): not used yet -- the bracket below covers it"
  ]
 }
