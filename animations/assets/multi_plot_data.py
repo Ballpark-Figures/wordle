@@ -49,7 +49,7 @@ RACE_MIN_GAMES = 1000000
 # race's field name here once one is built; until then the full race is read.
 # (A first k=32 shortlist -- the top 50 by mean at 200 games -- broke that rule and
 # was withdrawn.)
-MINAVG_FIELD = {}
+MINAVG_FIELD = {32: "shortlist_greedy_k32_last50_top50"}   # the plain 1-word race's last 50
 MEAN = re.compile(r"# mean total guesses ([\d.]+)\s+\+/- ([\d.]+)")
 
 
