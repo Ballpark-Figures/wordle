@@ -1015,5 +1015,740 @@
         ]
       }
     ]
+  },
+  "octordle_weird": {
+    "answers": [
+      "first",
+      "halve",
+      "third",
+      "forth",
+      "fifth",
+      "sixth",
+      "seven",
+      "octet"
+    ],
+    "guesses": [
+      "trial",
+      "guess",
+      "combo",
+      "third",
+      "sixth",
+      "seven",
+      "fifth",
+      "octet",
+      "first",
+      "halve",
+      "forth"
+    ],
+    "boards": [
+      {
+        "answer": "first",
+        "in_mystery": true,
+        "guesses": [
+          {
+            "word": "trial",
+            "code": 117,
+            "tiles": [
+              1,
+              1,
+              1,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "guess",
+            "code": 6,
+            "tiles": [
+              0,
+              0,
+              0,
+              2,
+              0
+            ]
+          },
+          {
+            "word": "combo",
+            "code": 0,
+            "tiles": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "third",
+            "code": 93,
+            "tiles": [
+              1,
+              0,
+              1,
+              1,
+              0
+            ]
+          },
+          {
+            "word": "sixth",
+            "code": 138,
+            "tiles": [
+              1,
+              2,
+              0,
+              1,
+              0
+            ]
+          },
+          {
+            "word": "seven",
+            "code": 81,
+            "tiles": [
+              1,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "fifth",
+            "code": 219,
+            "tiles": [
+              2,
+              2,
+              0,
+              1,
+              0
+            ]
+          },
+          {
+            "word": "octet",
+            "code": 2,
+            "tiles": [
+              0,
+              0,
+              0,
+              0,
+              2
+            ]
+          },
+          {
+            "word": "first",
+            "code": 242,
+            "tiles": [
+              2,
+              2,
+              2,
+              2,
+              2
+            ]
+          }
+        ]
+      },
+      {
+        "answer": "halve",
+        "in_mystery": true,
+        "guesses": [
+          {
+            "word": "trial",
+            "code": 4,
+            "tiles": [
+              0,
+              0,
+              0,
+              1,
+              1
+            ]
+          },
+          {
+            "word": "guess",
+            "code": 9,
+            "tiles": [
+              0,
+              0,
+              1,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "combo",
+            "code": 0,
+            "tiles": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "third",
+            "code": 27,
+            "tiles": [
+              0,
+              1,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "sixth",
+            "code": 1,
+            "tiles": [
+              0,
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          {
+            "word": "seven",
+            "code": 36,
+            "tiles": [
+              0,
+              1,
+              1,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "fifth",
+            "code": 1,
+            "tiles": [
+              0,
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          {
+            "word": "octet",
+            "code": 3,
+            "tiles": [
+              0,
+              0,
+              0,
+              1,
+              0
+            ]
+          },
+          {
+            "word": "first",
+            "code": 0,
+            "tiles": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "halve",
+            "code": 242,
+            "tiles": [
+              2,
+              2,
+              2,
+              2,
+              2
+            ]
+          }
+        ]
+      },
+      {
+        "answer": "third",
+        "in_mystery": true,
+        "guesses": [
+          {
+            "word": "trial",
+            "code": 207,
+            "tiles": [
+              2,
+              1,
+              2,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "guess",
+            "code": 0,
+            "tiles": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "combo",
+            "code": 0,
+            "tiles": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "third",
+            "code": 242,
+            "tiles": [
+              2,
+              2,
+              2,
+              2,
+              2
+            ]
+          }
+        ]
+      },
+      {
+        "answer": "forth",
+        "in_mystery": true,
+        "guesses": [
+          {
+            "word": "trial",
+            "code": 108,
+            "tiles": [
+              1,
+              1,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "guess",
+            "code": 0,
+            "tiles": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "combo",
+            "code": 54,
+            "tiles": [
+              0,
+              2,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "third",
+            "code": 111,
+            "tiles": [
+              1,
+              1,
+              0,
+              1,
+              0
+            ]
+          },
+          {
+            "word": "sixth",
+            "code": 8,
+            "tiles": [
+              0,
+              0,
+              0,
+              2,
+              2
+            ]
+          },
+          {
+            "word": "seven",
+            "code": 0,
+            "tiles": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "fifth",
+            "code": 170,
+            "tiles": [
+              2,
+              0,
+              0,
+              2,
+              2
+            ]
+          },
+          {
+            "word": "octet",
+            "code": 90,
+            "tiles": [
+              1,
+              0,
+              1,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "first",
+            "code": 181,
+            "tiles": [
+              2,
+              0,
+              2,
+              0,
+              1
+            ]
+          },
+          {
+            "word": "halve",
+            "code": 81,
+            "tiles": [
+              1,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "forth",
+            "code": 242,
+            "tiles": [
+              2,
+              2,
+              2,
+              2,
+              2
+            ]
+          }
+        ]
+      },
+      {
+        "answer": "fifth",
+        "in_mystery": true,
+        "guesses": [
+          {
+            "word": "trial",
+            "code": 90,
+            "tiles": [
+              1,
+              0,
+              1,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "guess",
+            "code": 0,
+            "tiles": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "combo",
+            "code": 0,
+            "tiles": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "third",
+            "code": 117,
+            "tiles": [
+              1,
+              1,
+              1,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "sixth",
+            "code": 62,
+            "tiles": [
+              0,
+              2,
+              0,
+              2,
+              2
+            ]
+          },
+          {
+            "word": "seven",
+            "code": 0,
+            "tiles": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "fifth",
+            "code": 242,
+            "tiles": [
+              2,
+              2,
+              2,
+              2,
+              2
+            ]
+          }
+        ]
+      },
+      {
+        "answer": "sixth",
+        "in_mystery": true,
+        "guesses": [
+          {
+            "word": "trial",
+            "code": 90,
+            "tiles": [
+              1,
+              0,
+              1,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "guess",
+            "code": 3,
+            "tiles": [
+              0,
+              0,
+              0,
+              1,
+              0
+            ]
+          },
+          {
+            "word": "combo",
+            "code": 0,
+            "tiles": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "third",
+            "code": 117,
+            "tiles": [
+              1,
+              1,
+              1,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "sixth",
+            "code": 242,
+            "tiles": [
+              2,
+              2,
+              2,
+              2,
+              2
+            ]
+          }
+        ]
+      },
+      {
+        "answer": "seven",
+        "in_mystery": true,
+        "guesses": [
+          {
+            "word": "trial",
+            "code": 0,
+            "tiles": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "guess",
+            "code": 12,
+            "tiles": [
+              0,
+              0,
+              1,
+              1,
+              0
+            ]
+          },
+          {
+            "word": "combo",
+            "code": 0,
+            "tiles": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "third",
+            "code": 0,
+            "tiles": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "sixth",
+            "code": 162,
+            "tiles": [
+              2,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "seven",
+            "code": 242,
+            "tiles": [
+              2,
+              2,
+              2,
+              2,
+              2
+            ]
+          }
+        ]
+      },
+      {
+        "answer": "octet",
+        "in_mystery": true,
+        "guesses": [
+          {
+            "word": "trial",
+            "code": 81,
+            "tiles": [
+              1,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "guess",
+            "code": 9,
+            "tiles": [
+              0,
+              0,
+              1,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "combo",
+            "code": 108,
+            "tiles": [
+              1,
+              1,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "third",
+            "code": 81,
+            "tiles": [
+              1,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "word": "sixth",
+            "code": 3,
+            "tiles": [
+              0,
+              0,
+              0,
+              1,
+              0
+            ]
+          },
+          {
+            "word": "seven",
+            "code": 6,
+            "tiles": [
+              0,
+              0,
+              0,
+              2,
+              0
+            ]
+          },
+          {
+            "word": "fifth",
+            "code": 3,
+            "tiles": [
+              0,
+              0,
+              0,
+              1,
+              0
+            ]
+          },
+          {
+            "word": "octet",
+            "code": 242,
+            "tiles": [
+              2,
+              2,
+              2,
+              2,
+              2
+            ]
+          }
+        ]
+      }
+    ]
   }
 }

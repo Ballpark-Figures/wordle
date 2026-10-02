@@ -51,6 +51,13 @@ MULTI = {
     "octordle": (["first", "halve", "third", "forth", "fifth", "sixth", "seven", "octet"],
                  ["solve", "eight", "words",
                   "first", "halve", "third", "forth", "fifth", "sixth", "seven", "octet"]),
+    # Scene 16, end (not yet in the script) -- "an example with a weird order": the
+    # same answers after TRIAL GUESS COMBO, played in an order that keeps every board
+    # down to ONE candidate at its turn. User's pick from the scene-16 thread: the
+    # most scrambled of the 2648 orders that work (plain number order does not).
+    "octordle_weird": (["first", "halve", "third", "forth", "fifth", "sixth", "seven", "octet"],
+                       ["trial", "guess", "combo",
+                        "third", "sixth", "seven", "fifth", "octet", "first", "halve", "forth"]),
 }
 
 # name -> committed result file whose chain IS the game. Read, never typed in: the
