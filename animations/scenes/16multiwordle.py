@@ -30,6 +30,22 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   s greedy        — fewest-candidates board emphasised, a random one of
                     its candidates guessed, candidates updated, to the end (16r, VO 5)
 
+  t chart_in      — the game shifts up off frame, the empty chart up into
+                    it: "Average Misses in Multi-Wordle"                  (16s, VO 6)
+  u plot_three    — the 3-word opener's line                              (16t, VO 6)
+  v plot_one_two  — the 2-word and 1-word openers' lines                  (16u, VO 6)
+  w plot_improved — the improved strategy                                 (16v, VO 6)
+
+THE CHART IS PROVISIONAL (user's call, 2026-10-01: "build it with the best you have,
+we'll come back with better data") -- see assets/multi_plot_data.py. The 1/2/3-word
+lines are ONE fixed opener each across every k (LATEN, CLINT SOARE, CANST HORDE
+BLIMP), not the best opener per number of Wordles the script wants; the improved
+strategy has points only at k = 2, 4, 8, 16, the minavg race leaders. Average misses
+= mean total guesses - k. Styled after yahtzee's 08line_graph (bpkfigures
+line_graph, lines drawn with Create + an end label), but drawn straight onto the
+navy in WHITE ink, as 08histogram and 13 do -- no cream card (13's call: it looked
+foreign in this all-dark video).
+
 FROM o ON, THE SUBSCENE LETTERS ARE ONE AHEAD OF THE SCRIPT'S (o is the user's new
 SOLVE beat, 2026-10-01, not yet in the Doc).
 
@@ -125,6 +141,8 @@ from assets import multi_data
 from assets.groups import dot_grid, ranked_word_layout
 from assets.pigpen import PigpenWord
 from bpkfigures.browser import browser_window
+from bpkfigures.line_graph import get_line_graph, line_point
+from assets import multi_plot_data
 
 MEDIA = Path(__file__).resolve().parent.parent / "assets" / "web_media"
 GAME = game_data.load("octordle")
@@ -195,6 +213,18 @@ CAND_BOTTOM = -4.3
 # is however many of those fit below it (user's call, 2026-10-01 -- replacing the
 # script's "20 or fewer"); `_sizes` derives it.
 DOT_COLOR = WHITE            # 06's dots
+# ── the chart (16s-v) ─────────────────────────────────────────────────────────
+PLOT = multi_plot_data.load()
+PLOT_C = [-1.2, -0.35, 0]     # the plot BOX's centre; room on the right for labels
+PLOT_W, PLOT_H = 10.4, 5.4
+Y_MAX = 4.0
+X_TICKS = [1, 2, 4, 8, 16, 32]
+LINE_SW = 4.0
+LINE_LABEL = {1: "1-word opener", 2: "2-word opener", 3: "3-word opener"}
+IMPROVED_LABEL = "Improved Strategy"
+LINE_COLOR = {1: LIGHT_BLUE, 2: LIGHT_GREEN, 3: LIGHT_RED}
+IMPROVED_COLOR = LIGHT_YELLOW
+
 ALL_GREEN = 242              # wordle.pattern's code for a win
 DIM = 0.75                   # the emphasis mask's opacity over a dimmed column
 FORTH_BOARD = 3                                # board whose answer is FORTH
@@ -675,3 +705,72 @@ class Scene16(WordleBoardScene):
                                 for m in self.masks])    # SIXTH  (board 6)
         self.remove(*self.masks)
         self.masks = None
+
+    # ── the chart (16s-v of the script) ───────────────────────────────────────
+    def _setup_chart(self):
+        """The whole chart, built at home and then moved one frame down, so the
+        frame's shift up brings it in. Lines are built but not on screen yet."""
+        ks = PLOT["ks"]
+        series = [{"label": LINE_LABEL[n],
+                   "values": [p["misses"] for p in PLOT["lines"][str(n)]["points"]],
+                   "color": LINE_COLOR[n]} for n in (1, 2, 3)]
+        imp = {p["k"]: p["misses"] for p in PLOT["improved"]}
+        series.append({"label": IMPROVED_LABEL, "values": [imp.get(k) for k in ks],
+                       "color": IMPROVED_COLOR})
+        plot = get_line_graph(series, ks, center=PLOT_C, width=PLOT_W, height=PLOT_H,
+                              y_min=0.0, y_max=Y_MAX, x_tick_values=X_TICKS,
+                              title="Average Misses in Multi-Wordle",
+                              x_axis_label="Number of Wordles",
+                              y_axis_label="Average Misses",
+                              line_stroke=LINE_SW, ink_color=WHITE)
+        geom = plot.plot_geom
+        self.chart_frame = VGroup(plot.title_text, plot.x_axis, plot.y_axis,
+                                  plot.x_ticks, plot.y_ticks,
+                                  plot.x_axis_label_text, plot.y_axis_label_text)
+        self.chart_lines = {n: plot.lines[i] for i, n in enumerate((1, 2, 3, "imp"))}
+        self.chart_labels = {}
+        for n in (1, 2, 3):
+            end = line_point(geom, ks[-1], series[n - 1]["values"][-1])
+            self.chart_labels[n] = crisp_text(LINE_LABEL[n], font_size=FONT_SIZE_SM * 0.8,
+                                              color=LINE_COLOR[n]).next_to(end, RIGHT, buff=0.15)
+        self.imp_dots = VGroup(*[Dot(line_point(geom, p["k"], p["misses"]),
+                                     radius=0.07, color=IMPROVED_COLOR)
+                                 for p in PLOT["improved"]])
+        last = PLOT["improved"][-1]
+        self.chart_labels["imp"] = crisp_text(
+            IMPROVED_LABEL, font_size=FONT_SIZE_SM * 0.8, color=IMPROVED_COLOR).next_to(
+            line_point(geom, last["k"], last["misses"]), DOWN, buff=0.18)
+        # straight UNDER its last point: right of it the 1-word line runs through
+        self.chart_frame.shift(DOWN * FH)
+
+    # t : the game moves up off the frame, the empty chart comes up into it
+    @subscene
+    def chart_in(self):
+        self._setup_chart()
+        self.add(self.chart_frame)
+        self.play(*[b.animate.shift(UP * FH) for b in self.boards],
+                  self.chart_frame.animate.shift(UP * FH), run_time=1.2)
+        self.remove(*self.boards)
+        self.boards = None
+
+    def _draw(self, keys, run_time):
+        """Lines drawn left to right with their end labels fading in, as yahtzee's
+        08line_graph (Create + FadeIn of the label)."""
+        self.play(*[Create(self.chart_lines[n]) for n in keys],
+                  *[FadeIn(self.chart_labels[n]) for n in keys], run_time=run_time)
+
+    # u : the 3-word opener
+    @subscene
+    def plot_three(self):
+        self._draw([3], 2.0)
+
+    # v : the 2-word and 1-word openers
+    @subscene
+    def plot_one_two(self):
+        self._draw([2, 1], 2.0)
+
+    # w : the improved strategy -- its four raced points, joined
+    @subscene
+    def plot_improved(self):
+        self.play(Create(self.chart_lines["imp"]), FadeIn(self.imp_dots),
+                  FadeIn(self.chart_labels["imp"]), run_time=2.0)
