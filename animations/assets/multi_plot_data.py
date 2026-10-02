@@ -44,6 +44,10 @@ T_GREEDY, T_MINAVG = 1000000, 100000
 # race still in its first rounds has a leader by noise -- 200 games, standard error
 # 0.04, thousands still in -- and plotting that would be a confident wrong point.
 RACE_MIN_GAMES = 1000000
+# minavg at k=32 is raced over a SHORTLIST, not all 12972 (user's call, 2026-10-02:
+# the full race was days away) -- the 50 lowest-mean openers of the full race at
+# 200 games each. So its winner is the best of those 50, a screen.
+MINAVG_FIELD = {32: "shortlist_minavg_k32_top50_top50"}
 MEAN = re.compile(r"# mean total guesses ([\d.]+)\s+\+/- ([\d.]+)")
 
 
@@ -135,7 +139,7 @@ def _build():
     if ex is not None:
         winners[1] = {"opening": ex[0], "mean": ex[1], "source": "exact"}
     for p in POWERS[1:]:
-        r = _race("minavg", p, "guess")
+        r = _race("minavg", p, MINAVG_FIELD.get(p, "guess"))
         if r is not None:
             settled = r[4] == 1 or r[3] >= RACE_MIN_GAMES
             winners[p] = {"opening": r[0], "mean": r[1] if settled else None,
