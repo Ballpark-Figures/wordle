@@ -196,27 +196,24 @@
     },
     {
      "k": 21,
-     "misses": 1.9441,
+     "misses": 1.9067,
      "stderr": 0.0007,
-     "opening": "mpret",
-     "source": "fallback",
-     "pending": "rotan"
+     "opening": "rotan",
+     "source": "run"
     },
     {
      "k": 22,
-     "misses": 1.9012,
+     "misses": 1.8584,
      "stderr": 0.0007,
-     "opening": "mpret",
-     "source": "fallback",
-     "pending": "rotan"
+     "opening": "rotan",
+     "source": "run"
     },
     {
      "k": 23,
-     "misses": 1.8668,
+     "misses": 1.8155,
      "stderr": 0.0007,
-     "opening": "mpret",
-     "source": "fallback",
-     "pending": "rotan"
+     "opening": "rotan",
+     "source": "run"
     },
     {
      "k": 24,
@@ -419,35 +416,31 @@
     },
     {
      "k": 18,
-     "misses": 2.1291,
+     "misses": 2.1132,
      "stderr": 0.0004,
-     "opening": "corbe plant",
-     "source": "fallback",
-     "pending": "clamp tribe"
+     "opening": "clamp tribe",
+     "source": "run"
     },
     {
      "k": 19,
-     "misses": 2.1114,
+     "misses": 2.0956,
      "stderr": 0.0004,
-     "opening": "corbe plant",
-     "source": "fallback",
-     "pending": "clamp tribe"
+     "opening": "clamp tribe",
+     "source": "run"
     },
     {
      "k": 20,
-     "misses": 2.0958,
+     "misses": 2.0796,
      "stderr": 0.0003,
-     "opening": "corbe plant",
-     "source": "fallback",
-     "pending": "clamp tribe"
+     "opening": "clamp tribe",
+     "source": "run"
     },
     {
      "k": 21,
-     "misses": 2.0824,
+     "misses": 2.067,
      "stderr": 0.0003,
-     "opening": "corbe plant",
-     "source": "fallback",
-     "pending": "clamp tribe"
+     "opening": "clamp tribe",
+     "source": "run"
     },
     {
      "k": 22,
@@ -667,27 +660,24 @@
     },
     {
      "k": 18,
-     "misses": 3.0589,
+     "misses": 3.0475,
      "stderr": 0.0003,
-     "opening": "cried plant wombs",
-     "source": "fallback",
-     "pending": "clamp feign worst"
+     "opening": "clamp feign worst",
+     "source": "run"
     },
     {
      "k": 19,
-     "misses": 3.0515,
+     "misses": 3.0397,
      "stderr": 0.0003,
-     "opening": "cried plant wombs",
-     "source": "fallback",
-     "pending": "clamp feign worst"
+     "opening": "clamp feign worst",
+     "source": "run"
     },
     {
      "k": 20,
-     "misses": 3.0441,
+     "misses": 3.0324,
      "stderr": 0.0003,
-     "opening": "cried plant wombs",
-     "source": "fallback",
-     "pending": "clamp feign worst"
+     "opening": "clamp feign worst",
+     "source": "run"
     },
     {
      "k": 21,
