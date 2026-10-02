@@ -1,0 +1,58 @@
+# the LAST 50 openers still in race_greedy_k12_guess_sig5_s0 (the plain-strategy
+# 1-word race at k=12): its winner plus the 49 eliminated last, most games first.
+# NB no clean break at 50: openers eliminated at 25600 games straddle
+# the cut; that round's openers are ranked by their GAP BEHIND THE LEADER when
+# eliminated, smallest first (user's call) -- one leader per round, so this is the
+# same order as the mean.
+# User's rule (2026-10-02) for the improved strategy's shortlists.
+word,games_survived,mean_when_out,status
+mpret,1000000,14.650957,winner
+dempt,1000000,14.656243,out
+clept,204800,14.664878,out
+plant,204800,14.665654,out
+pated,102400,14.669746,out
+prent,102400,14.670303,out
+dript,102400,14.674922,out
+taped,102400,14.675869,out
+crept,102400,14.676562,out
+compt,51200,14.677070,out
+tamed,51200,14.677383,out
+clapt,51200,14.677852,out
+thrip,51200,14.677930,out
+tabid,51200,14.678340,out
+tepid,51200,14.678574,out
+pwned,51200,14.679004,out
+delph,51200,14.679902,out
+timed,51200,14.684062,out
+clipt,51200,14.685762,out
+burnt,51200,14.686387,out
+depot,51200,14.687598,out
+demit,51200,14.689160,out
+tubed,51200,14.689551,out
+bidet,51200,14.692617,out
+tempo,25600,14.690586,out
+mulct,25600,14.692383,out
+twerp,25600,14.693672,out
+therm,25600,14.693945,out
+caped,25600,14.694062,out
+flirt,25600,14.694688,out
+merit,25600,14.694727,out
+tramp,25600,14.694766,out
+paned,25600,14.694883,out
+potin,25600,14.695039,out
+print,25600,14.695391,out
+delft,25600,14.695781,out
+toman,25600,14.696055,out
+coapt,25600,14.696367,out
+apted,25600,14.697891,out
+ralph,25600,14.698008,out
+deman,25600,14.698086,out
+pleat,25600,14.698320,out
+bepat,25600,14.698359,out
+tamin,25600,14.698711,out
+point,25600,14.698984,out
+morat,25600,14.699492,out
+cubed,25600,14.700273,out
+bloat,25600,14.700352,out
+dwelt,25600,14.700508,out
+depth,25600,14.701602,out

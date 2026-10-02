@@ -1,0 +1,58 @@
+# the LAST 50 openers still in race_greedy_k3_guess_sig5_s0 (the plain-strategy
+# 1-word race at k=3): its winner plus the 49 eliminated last, most games first.
+# NB no clean break at 50: openers eliminated at 12800 games straddle
+# the cut; that round's openers are ranked by their GAP BEHIND THE LEADER when
+# eliminated, smallest first (user's call) -- one leader per round, so this is the
+# same order as the mean.
+# User's rule (2026-10-02) for the improved strategy's shortlists.
+word,games_survived,mean_when_out,status
+plant,204800,6.704741,winner
+clapt,204800,6.722178,out
+clipt,204800,6.724443,out
+clept,102400,6.728027,out
+plast,102400,6.735830,out
+clint,51200,6.744824,out
+prent,51200,6.747305,out
+clast,51200,6.749219,out
+slipt,51200,6.749707,out
+slept,51200,6.750586,out
+slant,25600,6.755195,out
+spelt,25600,6.757500,out
+spilt,25600,6.758281,out
+print,25600,6.758516,out
+perst,25600,6.759375,out
+clart,25600,6.761016,out
+drant,25600,6.763867,out
+dropt,25600,6.766992,out
+crept,25600,6.767031,out
+spalt,25600,6.767539,out
+prost,25600,6.768320,out
+dempt,25600,6.768555,out
+coapt,25600,6.768594,out
+blist,25600,6.768867,out
+prunt,25600,6.770547,out
+blent,25600,6.770703,out
+mulct,25600,6.770781,out
+trild,25600,6.772070,out
+canst,25600,6.775977,out
+larnt,25600,6.777617,out
+prest,25600,6.778359,out
+culet,25600,6.778945,out
+paint,25600,6.779609,out
+slart,25600,6.780195,out
+cleat,25600,6.780625,out
+splat,25600,6.781367,out
+blest,25600,6.784531,out
+terns,25600,6.789258,out
+blast,25600,6.791016,out
+point,25600,6.792344,out
+clasp,12800,6.777109,out
+spent,12800,6.779141,out
+talcs,12800,6.779453,out
+plait,12800,6.780547,out
+leapt,12800,6.781172,out
+palet,12800,6.781641,out
+tronc,12800,6.781719,out
+plate,12800,6.782109,out
+colts,12800,6.782188,out
+curst,12800,6.782344,out
