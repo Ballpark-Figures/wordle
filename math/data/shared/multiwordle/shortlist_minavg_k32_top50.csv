@@ -1,3 +1,5 @@
+# WITHDRAWN 2026-10-02: built as the top 50 by mean at 200 games, which is not the
+# rule (the LAST 50 still in the full race). Kept only as a record; do not race it.
 # the 50 lowest-mean LIVE openings of race_minavg_k32_guess_sig5_s0.csv, read
 # while it stood at 200 games each with 5497 live -- a SCREEN:
 # at that sample size an opener's standard error is ~0.04 guesses, so the true

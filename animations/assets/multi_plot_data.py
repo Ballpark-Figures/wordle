@@ -44,10 +44,12 @@ T_GREEDY, T_MINAVG = 1000000, 100000
 # race still in its first rounds has a leader by noise -- 200 games, standard error
 # 0.04, thousands still in -- and plotting that would be a confident wrong point.
 RACE_MIN_GAMES = 1000000
-# minavg at k=32 is raced over a SHORTLIST, not all 12972 (user's call, 2026-10-02:
-# the full race was days away) -- the 50 lowest-mean openers of the full race at
-# 200 games each. So its winner is the best of those 50, a screen.
-MINAVG_FIELD = {32: "shortlist_minavg_k32_top50_top50"}
+# A minavg race may be finished over a SHORTLIST: the LAST 50 OPENERS STILL IN that
+# k's own full race (user's rule, 2026-10-02), raced on their own. Map k to that
+# race's field name here once one is built; until then the full race is read.
+# (A first k=32 shortlist -- the top 50 by mean at 200 games -- broke that rule and
+# was withdrawn.)
+MINAVG_FIELD = {}
 MEAN = re.compile(r"# mean total guesses ([\d.]+)\s+\+/- ([\d.]+)")
 
 
