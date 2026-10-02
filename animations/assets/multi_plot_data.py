@@ -39,6 +39,11 @@ KS = list(range(1, 33))
 POWERS = [1, 2, 4, 8, 16, 32]
 FIELDS = {1: "guess", 2: "pair_singletons_top10000", 3: "triple_singletons_top10000"}
 T_GREEDY, T_MINAVG = 1000000, 100000
+# A race's estimate stands in for a missing fill-in ONLY once it means something: the
+# race has finished (one opening left) or its leader has played this many games. A
+# race still in its first rounds has a leader by noise -- 200 games, standard error
+# 0.04, thousands still in -- and plotting that would be a confident wrong point.
+RACE_MIN_GAMES = 1000000
 MEAN = re.compile(r"# mean total guesses ([\d.]+)\s+\+/- ([\d.]+)")
 
 
@@ -116,7 +121,9 @@ def _build():
             r = _race("greedy", p, field)
             if r is None:
                 continue
-            winners[p] = {"opening": r[0], "mean": r[1], "source": "race"}
+            settled = r[4] == 1 or r[3] >= RACE_MIN_GAMES
+            winners[p] = {"opening": r[0], "mean": r[1] if settled else None,
+                          "source": "race"}
             if r[4] > 1:
                 out["notes"].append(f"greedy {n}-word race at k={p} still has {r[4]} live")
         pts, missing = _line(winners, T_GREEDY, "")
@@ -130,7 +137,12 @@ def _build():
     for p in POWERS[1:]:
         r = _race("minavg", p, "guess")
         if r is not None:
-            winners[p] = {"opening": r[0], "mean": r[1], "source": "race"}
+            settled = r[4] == 1 or r[3] >= RACE_MIN_GAMES
+            winners[p] = {"opening": r[0], "mean": r[1] if settled else None,
+                          "source": "race"}
+            if not settled:
+                out["notes"].append(f"minavg race at k={p} not settled ({r[4]} live, "
+                                    f"{r[3]} games): its leader is not plotted")
     pts, missing = _line(winners, T_MINAVG, "_minavg")
     out["lines"]["improved"] = {"winners": {str(p): w["opening"] for p, w in winners.items()},
                                 "points": pts, "missing": missing}
