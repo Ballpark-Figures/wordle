@@ -954,67 +954,59 @@
     },
     {
      "k": 24,
-     "misses": 1.7446,
+     "misses": 1.7347,
      "stderr": 0.0019,
-     "opening": "tamed",
-     "source": "fallback",
-     "pending": "rotan"
+     "opening": "rotan",
+     "source": "run"
     },
     {
      "k": 25,
-     "misses": 1.7163,
+     "misses": 1.7073,
      "stderr": 0.0018,
-     "opening": "tamed",
-     "source": "fallback",
-     "pending": "rotan"
+     "opening": "rotan",
+     "source": "run"
     },
     {
      "k": 26,
-     "misses": 1.6924,
+     "misses": 1.6824,
      "stderr": 0.0018,
-     "opening": "tamed",
-     "source": "fallback",
-     "pending": "rotan"
+     "opening": "rotan",
+     "source": "run"
     },
     {
      "k": 27,
-     "misses": 1.6675,
+     "misses": 1.6545,
      "stderr": 0.0018,
-     "opening": "tamed",
-     "source": "fallback",
-     "pending": "rotan"
+     "opening": "rotan",
+     "source": "run"
     },
     {
      "k": 28,
-     "misses": 1.6452,
+     "misses": 1.6308,
      "stderr": 0.0018,
-     "opening": "tamed",
-     "source": "fallback",
-     "pending": "rotan"
+     "opening": "rotan",
+     "source": "run"
     },
     {
      "k": 29,
-     "misses": 1.6224,
+     "misses": 1.6081,
      "stderr": 0.0018,
-     "opening": "tamed",
-     "source": "fallback",
-     "pending": "rotan"
+     "opening": "rotan",
+     "source": "run"
     },
     {
      "k": 30,
-     "misses": 1.5993,
+     "misses": 1.5889,
      "stderr": 0.0018,
-     "opening": "tamed",
-     "source": "fallback",
-     "pending": "rotan"
+     "opening": "rotan",
+     "source": "run"
     },
     {
      "k": 31,
-     "misses": 1.5823,
+     "misses": 1.5707,
      "stderr": 0.0018,
-     "opening": "tamed",
-     "source": "fallback",
-     "pending": "rotan"
+     "opening": "rotan",
+     "source": "run"
     },
     {
      "k": 32,
@@ -1036,6 +1028,6 @@
   "greedy 3-word triple_singletons_top10000 race at k=24 still has 3 live",
   "greedy 3-word triple_singletons_top10000 race at k=32 still has 3 live",
   "minavg race at k=24 not settled (43 live, 12800 games): leader rotan used only where its runs exist",
-  "minavg race at k=32 not settled (8 live, 25600 games): leader filet used only where its runs exist"
+  "minavg race at k=32 not settled (4 live, 51200 games): leader filet used only where its runs exist"
  ]
 }
