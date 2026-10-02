@@ -70,7 +70,7 @@ LOC=data/local/strsts/$TAG
 OUT=$OUTDIR/opener_totals_$TAG.csv
 mkdir -p "$OUTDIR" "$LOC"
 
-. "$(dirname "${BASH_SOURCE[0]}")/_guard.sh"
+. "$MATH/solver/_guard.sh"
 guard_output strturns "$OUT" || exit 1
 
 FLAGS="--guess-space all --topk $TOPK --allow-unsolved --small-n $SMALLN"

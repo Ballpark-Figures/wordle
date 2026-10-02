@@ -82,7 +82,7 @@ LOC=data/local/ultraturns/$TAG
 OUT=$OUTDIR/optimal_$TAG.csv
 mkdir -p "$OUTDIR" "$LOC"
 
-. "$(dirname "${BASH_SOURCE[0]}")/_guard.sh"
+. "$MATH/solver/_guard.sh"
 guard_output ultraturns "$OUT" || exit 1
 
 FLAGS="--sweep --optimal-only --topk $TOPK --print-openers"

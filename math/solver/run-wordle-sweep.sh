@@ -592,7 +592,7 @@ fi
 
 # Shared refuse-if-something-else-writes-this-file guard.  Its second check is
 # by process NAME, which is "python" here, so only the output-file half applies.
-. "$(dirname "${BASH_SOURCE[0]}")/_guard.sh"
+. "$MATH/solver/_guard.sh"
 guard_output wordle_sweep.py "$OUT" || exit 1
 
 FLAGS="-t $T --fallback $FALLBACK --seed $SEED --words $WORDS --win-within $WIN --out $OUT"

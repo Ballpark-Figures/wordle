@@ -194,7 +194,7 @@ fi
 # process NAME, which is "python" here, so only the output-file half applies --
 # and that is the half that matters: two races appending to one checkpoint would
 # each resume from the other's state.
-. "$(dirname "${BASH_SOURCE[0]}")/_guard.sh"
+. "$MATH/solver/_guard.sh"
 guard_output wordle_race.py "$OUT" || exit 1
 
 mkdir -p "$OUTDIR" "$LOC"

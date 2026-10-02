@@ -224,7 +224,7 @@ if [ "$DRYRUN" -eq 1 ]; then
     exit 0
 fi
 
-. "$(dirname "${BASH_SOURCE[0]}")/_guard.sh"
+. "$MATH/solver/_guard.sh"
 guard_output wturns "$OUT" || exit 1
 
 # --tt-save is deliberately absent -- see the long note in run-ultra-sweep.sh.

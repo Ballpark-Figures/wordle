@@ -172,7 +172,7 @@ fi
 
 mkdir -p "$OUTDIR" "$LOC"
 
-. "$(dirname "${BASH_SOURCE[0]}")/_guard.sh"
+. "$MATH/solver/_guard.sh"
 guard_output optturns "$OUT" || exit 1
 
 # NOTHING SAVES A TABLE HERE, deliberately -- see the long note in

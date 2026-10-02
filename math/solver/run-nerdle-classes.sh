@@ -74,7 +74,7 @@ fi
 
 # Shared refuse-if-something-else-writes-this-file guard.  Its second check is
 # by process NAME, which is "python" here, so only the output-file half applies.
-. "$(dirname "${BASH_SOURCE[0]}")/_guard.sh"
+. "$MATH/solver/_guard.sh"
 guard_output nerdle_classes.py "$OUT" || exit 1
 
 # BSD date has no -Is; this form works on both macOS and Linux.

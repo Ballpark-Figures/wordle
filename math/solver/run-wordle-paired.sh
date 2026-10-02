@@ -111,7 +111,7 @@ if [ "$DRYRUN" = 1 ]; then
     exit 0
 fi
 
-. "$(dirname "${BASH_SOURCE[0]}")/_guard.sh"
+. "$MATH/solver/_guard.sh"
 guard_output paired_compare.py "$OUT" || exit 1
 
 echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] wordle paired compare $STEM" \

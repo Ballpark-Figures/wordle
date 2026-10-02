@@ -78,7 +78,7 @@ mkdir -p "$OUTDIR" "$LOC"
 
 # Shared refuse-if-something-else-writes-this-file guard.  Its second check is
 # by process NAME, which is "python" here, so only the output-file half applies.
-. "$(dirname "${BASH_SOURCE[0]}")/_guard.sh"
+. "$MATH/solver/_guard.sh"
 guard_output nerdle_enumerate.py "$OUT" || exit 1
 
 FLAGS="--width $WIDTH --method $METHOD --out $OUT"
