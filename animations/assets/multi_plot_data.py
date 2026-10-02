@@ -84,9 +84,11 @@ def _race(strategy, k, field):
     live = [r for r in rows if r["status"] == "live" and r["mean"]]
     if not live:
         return None
-    best = min(live, key=lambda r: float(r["mean"]))
+    live.sort(key=lambda r: float(r["mean"]))
+    best = live[0]
+    # [5]: every opening still in, best first -- a provisional leader's stand-ins
     return (best["opening"], float(best["mean"]), float(best["stderr"]),
-            int(best["games"]), len(live))
+            int(best["games"]), len(live), [r["opening"] for r in live])
 
 
 def _exact_k1():
@@ -184,10 +186,10 @@ def _build():
                 # stands in everywhere else. If the lead changes, so does this.
                 lead = min(unsettled_here, key=lambda r: r[1])
                 winners[p] = {"opening": lead[0], "mean": None, "source": "race",
-                              "provisional": True, "alts": []}
+                              "provisional": True, "alts": lead[5][1:]}
             if best is not None:
                 winners[p] = {"opening": best[0], "mean": best[1], "source": "race",
-                              "field": best[5],
+                              "field": best[-1],
                               # the other fields' settled winners, best first: the
                               # first stand-ins while this one's runs land
                               "alts": [r[0] for r in sorted(settled_here, key=lambda r: r[1])
@@ -215,9 +217,12 @@ def _build():
             if settled:
                 winners[p] = {"opening": r[0], "mean": r[1], "source": "race"}
             else:
-                # PROVISIONAL -- see the greedy loop above
+                # PROVISIONAL -- see the greedy loop above. While the race runs, the
+                # openings still in it stand in before any lower bracket, best first:
+                # a lead flipping between two tied openers must not throw away the
+                # one whose runs exist (FILET overtook ROTAN at k=24 by 0.0004).
                 winners[p] = {"opening": r[0], "mean": None, "source": "race",
-                              "provisional": True}
+                              "provisional": True, "alts": r[5][1:]}
                 out["notes"].append(f"minavg race at k={p} not settled ({r[4]} live, "
                                     f"{r[3]} games): leader {r[0]} used only where its "
                                     f"runs exist")

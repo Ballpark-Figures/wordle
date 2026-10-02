@@ -784,7 +784,7 @@
     "8": "compt",
     "12": "compt",
     "16": "tamed",
-    "24": "rotan",
+    "24": "filet",
     "32": "filet"
    },
    "provisional": [
@@ -957,56 +957,64 @@
      "misses": 1.7347,
      "stderr": 0.0019,
      "opening": "rotan",
-     "source": "run"
+     "source": "fallback",
+     "pending": "filet"
     },
     {
      "k": 25,
      "misses": 1.7073,
      "stderr": 0.0018,
      "opening": "rotan",
-     "source": "run"
+     "source": "fallback",
+     "pending": "filet"
     },
     {
      "k": 26,
      "misses": 1.6824,
      "stderr": 0.0018,
      "opening": "rotan",
-     "source": "run"
+     "source": "fallback",
+     "pending": "filet"
     },
     {
      "k": 27,
      "misses": 1.6545,
      "stderr": 0.0018,
      "opening": "rotan",
-     "source": "run"
+     "source": "fallback",
+     "pending": "filet"
     },
     {
      "k": 28,
      "misses": 1.6308,
      "stderr": 0.0018,
      "opening": "rotan",
-     "source": "run"
+     "source": "fallback",
+     "pending": "filet"
     },
     {
      "k": 29,
      "misses": 1.6081,
      "stderr": 0.0018,
      "opening": "rotan",
-     "source": "run"
+     "source": "fallback",
+     "pending": "filet"
     },
     {
      "k": 30,
      "misses": 1.5889,
      "stderr": 0.0018,
      "opening": "rotan",
-     "source": "run"
+     "source": "fallback",
+     "pending": "filet"
     },
     {
      "k": 31,
      "misses": 1.5707,
      "stderr": 0.0018,
      "opening": "rotan",
-     "source": "run"
+     "source": "fallback",
+     "pending": "filet"
     },
     {
      "k": 32,
@@ -1026,7 +1034,7 @@
   "greedy 3-word triple_singletons_answers_exhaustive_top10000 race at k=16 still has 2 live",
   "greedy 3-word triple_singletons_top10000 race at k=24 still has 3 live",
   "greedy 3-word triple_singletons_top10000 race at k=32 still has 3 live",
-  "minavg race at k=24 not settled (43 live, 12800 games): leader rotan used only where its runs exist",
+  "minavg race at k=24 not settled (30 live, 25600 games): leader filet used only where its runs exist",
   "minavg race at k=32 not settled (2 live, 102400 games): leader filet used only where its runs exist"
  ]
 }
