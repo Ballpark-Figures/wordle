@@ -5,8 +5,9 @@ for the two Octordle games the scene plays. SOURCED, then cached.
 
 TWO GAMES on the same eight answers (game_data.py's MULTI["octordle"]):
 
-  replay  — 16i-m: the scripted game again, SOLVE EIGHT WORDS then the answers in
-            order (the guesses are game_data's; nothing is chosen here).
+  replay  — 16i-m: the "weird order" game, TRIAL GUESS COMBO then THIRD SIXTH SEVEN
+            FIFTH OCTET FIRST HALVE FORTH (game_data's MULTI["octordle_weird"];
+            user's call to make this the replay; nothing is chosen here).
   greedy  — 16r: SOLVE, then the strategy the voiceover describes — "figure out which
             of our boards has the fewest options left, and we guess there" — which IS
             math/multiwordle.py's `greedy` rule, played by its own `play_game`:
@@ -49,7 +50,8 @@ def _build():
     ai = {w: i for i, w in enumerate(A)}
     P = np.load(os.path.join(ROOT, "math", "data", "local", "patterns", "patterns.npy"))
 
-    answers, replay = game_data.MULTI["octordle"]
+    answers, replay = game_data.MULTI["octordle_weird"]
+    assert answers == game_data.MULTI["octordle"][0]   # the same eight boards
     for a in answers:
         assert a in ai, f"{a} is not one of the 2315: no candidate set to show"
     aidx = np.array([ai[a] for a in answers])

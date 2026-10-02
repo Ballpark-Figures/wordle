@@ -15,13 +15,21 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   f variants      — Octordle to the top-right cell, the other five in     (16f, VO 2)
   g back_down     — windows shift down off frame, the 8 boards back       (16g, VO 3)
   h playthrough   — SOLVE EIGHT WORDS, then FIRST .. OCTET; FORTH's *     (16h, VO 3)
-  i replay_solve  — the game flips back to black, boards up, SOLVE again,
+  i replay_trial  — the game flips back to black, boards up, then TRIAL;
                     each board's candidates appear beneath it             (16i, VO 4)
-  j replay_eight  — EIGHT, candidates updated                             (16j, VO 4)
-  k replay_words  — WORDS                                                 (16k, VO 4)
-  l replay_first  — FIRST                                                 (16l, VO 4)
-  m replay_rest   — the rest of the game, faster, then the win wave       (16m, VO 4)
-  n blank_rest    — every row but SOLVE back to black, candidates out     (16n, VO 5)
+  j replay_guess  — GUESS, candidates updated                             (16j, VO 4)
+  k replay_combo  — COMBO                                                 (16k, VO 4)
+  l replay_third  — THIRD, the first answer, out of order                 (16l, VO 4)
+  m replay_rest   — SIXTH SEVEN FIFTH OCTET FIRST HALVE FORTH, faster,
+                    then the win wave                                     (16m, VO 4)
+  n blank_rest    — every row but the first back to black, the first
+                    from TRIAL to SOLVE; candidates out                   (16n, VO 5)
+
+16i-m IS A DIFFERENT GAME FROM 16h (user's call, 2026-10-01; the script still says
+SOLVE EIGHT WORDS in order): TRIAL GUESS COMBO, then the answers in a "weird order"
+-- the most scrambled of the 2648 orders that keep every board down to one candidate
+at its turn (plain number order does not). game_data "octordle_weird". Because
+n-r are written about SOLVE EIGHT WORDS, n turns the first row into SOLVE.
   o flip_eight    — row 2 back to coloured EIGHT in one flip              (16o, VO 5)
   p flip_words    — row 3 back to WORDS in one flip                       (16p, VO 5)
   q after_solve   — rows 2-3 back to black, SOLVE's candidates back       (16q, VO 5)
@@ -115,6 +123,7 @@ MEDIA = Path(__file__).resolve().parent.parent / "assets" / "web_media"
 GAME = game_data.load("octordle")
 GUESSES = GAME["guesses"]
 BOARDS = GAME["boards"]                     # in answer order: FIRST .. OCTET
+WEIRD = game_data.load("octordle_weird")["boards"]   # 16i-m's game, same answers
 
 FH = config.frame_height                    # one whole frame, for the shifts
 
@@ -327,12 +336,13 @@ class Scene16(WordleBoardScene):
         self.play(*[self.boards[k].reveal_anim(j, BOARDS[k]["guesses"][j]["code"])
                     for k in live], run_time=score_rt)
 
-    def _wave(self, run_time, height=0.15):
+    def _wave(self, run_time, boards=BOARDS, height=0.15):
         """One wave through every board's winning row, left to right: all 40 tiles
-        in ONE LaggedStart, so it runs on across the gaps between boards."""
+        in ONE LaggedStart, so it runs on across the gaps between boards. `boards`
+        is the game's game_data boards, which say each board's winning row."""
         ups = []
         for k, b in enumerate(self.boards):
-            ups += b.bounce_tiles(len(BOARDS[k]["guesses"]) - 1, height)
+            ups += b.bounce_tiles(len(boards[k]["guesses"]) - 1, height)
         self.play(LaggedStart(*ups, lag_ratio=0.08), run_time=run_time)
 
     def _setup_footnote(self):
@@ -504,72 +514,83 @@ class Scene16(WordleBoardScene):
         return [[r for r in range(b.n_rows) if b.letters[r][0] is not None]
                 for b in self.boards]
 
-    def _flip_word_in(self, j, run_time):
-        """Row j of every board it reached flips back to REPLAY's coloured guess j,
-        all tiles at once ("in one flip")."""
-        step = REPLAY["steps"][j]
-        flips = []
+    def _flip_word_anims(self, j):
+        """Row j of every board flips to 16h's coloured guess j (SOLVE, EIGHT, WORDS
+        -- the game n-q are written about), all tiles at once ("in one flip"). A
+        tile already showing a letter swaps it at the midpoint. Returns (flips,
+        old letters to remove after)."""
+        flips, dead = [], []
         for k, b in enumerate(self.boards):
-            code = step["boards"][k]["code"]
-            if code is None:
-                continue
+            code = BOARDS[k]["guesses"][j]["code"]
             trits = [(code // 3 ** (4 - i)) % 3 for i in range(5)]
-            for c, ch in enumerate(step["word"]):
-                tile = b.tiles[j][c]
+            for c, ch in enumerate(GUESSES[j]):
+                tile, old = b.tiles[j][c], b.letters[j][c]
                 letter = b._letter(ch, tile).set_opacity(0)
+                if old is not None:
+                    dead.append((b, j, c, old))
                 b.letters[j][c] = letter
                 b.add(letter)
                 self.add(letter)
-                flips.append(TileFlip(tile, None, TILE_STATE[trits[c]], swap_to=letter))
-        self.play(*flips, run_time=run_time)
+                flips.append(TileFlip(tile, old, TILE_STATE[trits[c]], swap_to=letter))
+        return flips, dead
 
-    # i : the game flips back to black as the boards move up; SOLVE again, and
-    #     each board's candidates appear beneath it
+    def _flip_word_in(self, j, run_time):
+        flips, dead = self._flip_word_anims(j)
+        self.play(*flips, run_time=run_time)
+        for b, r, c, old in dead:
+            b.remove(old)
+            self.remove(old)
+
+    # i : the game flips back to black, then the boards move up; TRIAL, and each
+    #     board's candidates appear beneath it
     @subscene
-    def replay_solve(self):
+    def replay_trial(self):
         anims, dead = self._blank_flips(self._filled_rows())
         self.play(*anims, run_time=1.2)
         self._drop_letters(dead)
         self.play(*[b.animate.shift(UP * RAISE) for b in self.boards], run_time=0.8)
         self.cands = [{} for _ in self.boards]
-        self._play(REPLAY, 0, 0.65, 0.9, 1.0)       # SOLVE
+        self._play(REPLAY, 0, 0.65, 0.9, 1.0)       # TRIAL
 
-    # j : EIGHT
+    # j : GUESS
     @subscene
-    def replay_eight(self):
+    def replay_guess(self):
         self._play(REPLAY, 1, 0.65, 0.9, 1.0)
 
-    # k : WORDS
+    # k : COMBO
     @subscene
-    def replay_words(self):
+    def replay_combo(self):
         self._play(REPLAY, 2, 0.65, 0.9, 1.0)
 
-    # l : FIRST
+    # l : THIRD -- the first answer, out of order
     @subscene
-    def replay_first(self):
+    def replay_third(self):
         self._play(REPLAY, 3, 0.65, 0.9, 1.0)
 
-    # m : the rest of the game
+    # m : the rest of the game, faster, then the win wave
     @subscene
     def replay_rest(self):
-        self._play(REPLAY, 4, 0.45, 0.6, 0.4)       # HALVE
-        self._play(REPLAY, 5, 0.45, 0.6, 0.4)       # THIRD
-        self._play(REPLAY, 6, 0.45, 0.6, 0.4)       # FORTH
-        self._play(REPLAY, 7, 0.45, 0.6, 0.4)       # FIFTH
-        self._play(REPLAY, 8, 0.45, 0.6, 0.4)       # SIXTH
-        self._play(REPLAY, 9, 0.45, 0.6, 0.4)       # SEVEN
-        self._play(REPLAY, 10, 0.45, 0.6, 0.4)      # OCTET
-        self._wave(2.0)
+        self._play(REPLAY, 4, 0.45, 0.6, 0.4)       # SIXTH
+        self._play(REPLAY, 5, 0.45, 0.6, 0.4)       # SEVEN
+        self._play(REPLAY, 6, 0.45, 0.6, 0.4)       # FIFTH
+        self._play(REPLAY, 7, 0.45, 0.6, 0.4)       # OCTET
+        self._play(REPLAY, 8, 0.45, 0.6, 0.4)       # FIRST
+        self._play(REPLAY, 9, 0.45, 0.6, 0.4)       # HALVE
+        self._play(REPLAY, 10, 0.45, 0.6, 0.4)      # FORTH
+        self._wave(2.0, WEIRD)
 
-    # n : every row but SOLVE back to black; the candidates go
+    # n : every row but the first back to black, and the first flips from TRIAL to
+    #     16h's coloured SOLVE -- the row the rest of section 5 is about (o-r are
+    #     written for SOLVE EIGHT WORDS); the candidates go
     @subscene
     def blank_rest(self):
         rows = [[r for r in rs if r > 0] for rs in self._filled_rows()]
         anims, dead = self._blank_flips(rows)
+        solve, swapped = self._flip_word_anims(0)
         cands = [m for c in self.cands for m in c.values()]
-        self.play(*anims, *[FadeOut(m) for m in cands], run_time=1.2)
+        self.play(*anims, *solve, *[FadeOut(m) for m in cands], run_time=1.2)
         self.remove(*cands)
-        self._drop_letters(dead)
+        self._drop_letters(dead + swapped)
         self.cands = [{} for _ in self.boards]
 
     # o : row 2 back to the coloured EIGHT, in one flip
@@ -588,8 +609,8 @@ class Scene16(WordleBoardScene):
         anims, dead = self._blank_flips([[1, 2] for _ in self.boards])
         self.play(*anims, run_time=1.0)
         self._drop_letters(dead)
-        assert GREEDY["steps"][0] == REPLAY["steps"][0]     # both open on SOLVE
-        self._update_cands([b["members"] for b in REPLAY["steps"][0]["boards"]], 1.0)
+        assert GREEDY["steps"][0]["word"] == GUESSES[0] == "solve"
+        self._update_cands([b["members"] for b in GREEDY["steps"][0]["boards"]], 1.0)
 
     def _setup_masks(self):
         self.masks = []
