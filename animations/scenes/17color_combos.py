@@ -80,7 +80,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 
 from config import *
-from assets.colorings import level, code, trits, slot, TILE_BUFF, tile
+from assets.colorings import level, code, trits, slot, TILE_BUFF, GRID_BUFF, tile
 from assets.stacks_view import WHOOSH_GAIN
 from assets.board import get_scored_row, get_typed_row
 from assets.flip import Flip, flip
@@ -204,8 +204,8 @@ def _counts(c):
 
 
 def _block_w(cols, size):
-    """Width of `cols` columns of five-tile rows at tile side `size`."""
-    w = size * (5 + 4 * TILE_BUFF)
+    """Width of `cols` columns of five-tile (grid-spaced) rows at tile side `size`."""
+    w = size * (5 + 4 * GRID_BUFF)
     return cols * w + (cols - 1) * PART_COL_GAP * size
 
 
@@ -221,7 +221,7 @@ def _part_xs(size):
 def _part_cells(n, cols, cx, size):
     """Centres for n five-tile rows in `cols` columns, filled DOWN each column, top
     to bottom, then the next column to the right (the user's call)."""
-    w = size * (5 + 4 * TILE_BUFF)
+    w = size * (5 + 4 * GRID_BUFF)
     px, py = w + PART_COL_GAP * size, size * (1 + PART_ROW_GAP)
     nr = -(-n // cols)
     return [np.array([cx + (k // nr - (cols - 1) / 2) * px,

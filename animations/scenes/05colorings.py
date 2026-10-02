@@ -174,15 +174,16 @@ class Scene05(WordleBoardScene):
         self._grow(4, 0.8)
         self.grid, self.level = self.level, None
 
-    # g : everything else fades; GGYGG grows to board size at the centre
+    # g : everything else fades; GGYGG grows to board size at the centre — into a
+    #     board-spaced row (the grid's tile gap is wider than the board's)
     @subscene
     def focus(self):
-        self.focus_row = self.grid[_slot(FOCUS)]
-        others = VGroup(*[r for r in self.grid if r is not self.focus_row])
+        row = self.grid[_slot(FOCUS)]
+        others = VGroup(*[r for r in self.grid if r is not row])
+        self.focus_row = _coloring(_trits(FOCUS), WORD, TILE).move_to(ORIGIN)
         self.focus_row.set_z_index(1)
-        f = TILE / self.focus_row.tiles[0].width
-        self.play(FadeOut(others),
-                  self.focus_row.animate.scale(f).move_to(ORIGIN), run_time=1.2)
+        self.play(FadeOut(others), ReplacementTransform(row, self.focus_row),
+                  run_time=1.2)
         self.grid = None
 
     def _emph(self, on, run_time):

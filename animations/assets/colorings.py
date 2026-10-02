@@ -21,6 +21,8 @@ BUILD_W, BUILD_H = 15.6, 8.6
 CELL_GAP = 0.04            # gap between sibling cells, as a fraction of the box
 SPLITS = [(1, 3), (3, 1), (1, 3), (3, 1), (3, 1)]     # (rows, cols) per letter
 TILE_BUFF = GAP / TILE     # tile gap as a fraction of tile size — the board's ratio
+GRID_BUFF = 0.2            # the 243 grid's tile gap (the user's call, 2026-10-02: a bit
+                           # wider than the board's, so small rows read as five tiles)
 
 
 def code(tiles):
@@ -68,10 +70,12 @@ def tile(t, size):
                   fill_color=TILE_STATE[t], fill_opacity=1.0)
 
 
-def coloring(ts, word, size):
-    """A scored row: `.tiles` in their colours, `.letters` on top (board look)."""
+def coloring(ts, word, size, buff=TILE_BUFF):
+    """A scored row: `.tiles` in their colours, `.letters` on top (board look). `buff`
+    is the tile gap as a fraction of the tile: the board's by default, GRID_BUFF in
+    the 243 grid."""
     tiles = VGroup(*[tile(t, size) for t in ts])
-    tiles.arrange(RIGHT, buff=size * TILE_BUFF)
+    tiles.arrange(RIGHT, buff=size * buff)
     letters = letters_on(tiles, word)
     row = VGroup(tiles, letters)
     row.tiles, row.letters = tiles, letters
@@ -99,7 +103,7 @@ def tile_size(k):
     for r, c in SPLITS[:k]:
         w = (w - (c - 1) * w * CELL_GAP) / c
         h = (h - (r - 1) * h * CELL_GAP) / r
-    return max(min(w * 0.98 / (k + TILE_BUFF * (k - 1)), h * 0.94), 0.01)
+    return max(min(w * 0.98 / (k + GRID_BUFF * (k - 1)), h * 0.94), 0.01)
 
 
 def level(k, word):
@@ -108,7 +112,7 @@ def level(k, word):
     cs = centers(SPLITS[:k], 0.0, 0.0, BUILD_W, BUILD_H)
     rows = []
     for i, digits in enumerate(product(range(3), repeat=k)):
-        row = coloring([ORDER[d] for d in digits], word[:k], size)
+        row = coloring([ORDER[d] for d in digits], word[:k], size, buff=GRID_BUFF)
         row.move_to([*cs[i], 0.0])
         rows.append(row)
     return rows
