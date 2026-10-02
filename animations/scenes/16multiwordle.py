@@ -220,6 +220,7 @@ PLOT_W, PLOT_H = 10.4, 5.4
 Y_MAX = 4.0
 X_TICKS = list(range(4, 33, 4))   # linear, every 4 (user's call)
 LINE_SW = 4.0
+LABEL_GAP = 0.06              # least space between two right-edge line labels
 LINE_LABEL = {1: "1-word opener", 2: "2-word opener", 3: "3-word opener"}
 IMPROVED_LABEL = "Improved Strategy"
 LINE_COLOR = {1: LIGHT_BLUE, 2: LIGHT_GREEN, 3: LIGHT_RED}
@@ -740,13 +741,24 @@ class Scene16(WordleBoardScene):
         self.chart_labels = {}
         for i, n in enumerate(keys):
             k, v = [(k, v) for k, v in zip(ks, series[i]["values"]) if v is not None][-1]
-            # at the right edge if the line runs the whole axis; a line that stops
-            # short (results still landing) is labelled UNDER its last point, or
-            # the label sits across the lines that carry on past it
-            side, buff = (RIGHT, 0.15) if k == ks[-1] else (DOWN, 0.18)
+            # at the right edge if the line runs (nearly) the whole axis; a line
+            # that stops well short (results still landing) is labelled UNDER its
+            # last point, or the label sits across the lines that carry on past it
+            side, buff = (RIGHT, 0.15) if k >= ks[-1] - 2 else (DOWN, 0.18)
             self.chart_labels[n] = crisp_text(label[n], font_size=FONT_SIZE_SM * 0.8,
                                               color=color[n]).next_to(
                 line_point(geom, k, v), side, buff=buff)
+            self.chart_labels[n].at_right = side is RIGHT
+        # right-edge labels whose lines end close together are pushed apart, from
+        # the middle of the cluster outwards, to at least LABEL_GAP between them
+        right = sorted([m for m in self.chart_labels.values() if m.at_right],
+                       key=lambda m: m.get_y())
+        for lo, hi in zip(right, right[1:]):
+            need = lo.height / 2 + hi.height / 2 + LABEL_GAP
+            gap = hi.get_y() - lo.get_y()
+            if gap < need:
+                lo.shift(DOWN * (need - gap) / 2)
+                hi.shift(UP * (need - gap) / 2)
         self.chart_frame.shift(DOWN * FH)
 
     # t : the game moves up off the frame, the empty chart comes up into it

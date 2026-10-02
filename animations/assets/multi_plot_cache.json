@@ -81,75 +81,87 @@
     },
     {
      "k": 6,
-     "misses": null,
+     "misses": 3.5833,
+     "stderr": 0.0011,
      "opening": "plant",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 7,
-     "misses": null,
+     "misses": 3.4341,
+     "stderr": 0.0011,
      "opening": "plant",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 8,
-     "misses": 3.2577,
+     "misses": 3.2573,
+     "stderr": 0.001,
      "opening": "dempt",
-     "source": "race"
+     "source": "run"
     },
     {
      "k": 9,
-     "misses": null,
+     "misses": 3.0882,
+     "stderr": 0.001,
      "opening": "dempt",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 10,
-     "misses": null,
+     "misses": 2.9298,
+     "stderr": 0.001,
      "opening": "dempt",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 11,
-     "misses": null,
+     "misses": 2.7866,
+     "stderr": 0.0009,
      "opening": "dempt",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 12,
-     "misses": null,
+     "misses": 2.6578,
+     "stderr": 0.0009,
      "opening": "dempt",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 13,
-     "misses": null,
+     "misses": 2.5416,
+     "stderr": 0.0009,
      "opening": "dempt",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 14,
-     "misses": null,
+     "misses": 2.442,
+     "stderr": 0.0008,
      "opening": "dempt",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 15,
-     "misses": null,
+     "misses": 2.3548,
+     "stderr": 0.0008,
      "opening": "dempt",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 16,
-     "misses": 2.2324,
+     "misses": 2.234,
+     "stderr": 0.0008,
      "opening": "mpret",
-     "source": "race"
+     "source": "run"
     },
     {
      "k": 17,
-     "misses": null,
+     "misses": 2.1612,
+     "stderr": 0.0008,
      "opening": "mpret",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 18,
@@ -243,16 +255,6 @@
     }
    ],
    "missing": [
-    6,
-    7,
-    9,
-    10,
-    11,
-    12,
-    13,
-    14,
-    15,
-    17,
     18,
     19,
     20,
@@ -302,87 +304,101 @@
     },
     {
      "k": 4,
-     "misses": 3.136,
+     "misses": 3.1401,
+     "stderr": 0.001,
      "opening": "clint parse",
-     "source": "race"
+     "source": "run"
     },
     {
      "k": 5,
-     "misses": null,
+     "misses": 3.08,
+     "stderr": 0.001,
      "opening": "clint parse",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 6,
-     "misses": null,
+     "misses": 2.9875,
+     "stderr": 0.001,
      "opening": "clint parse",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 7,
-     "misses": null,
+     "misses": 2.8809,
+     "stderr": 0.0009,
      "opening": "clint parse",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 8,
-     "misses": 2.7282,
+     "misses": 2.7285,
+     "stderr": 0.0008,
      "opening": "corbe plant",
-     "source": "race"
+     "source": "run"
     },
     {
      "k": 9,
-     "misses": null,
+     "misses": 2.6123,
+     "stderr": 0.0008,
      "opening": "corbe plant",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 10,
-     "misses": null,
+     "misses": 2.5107,
+     "stderr": 0.0007,
      "opening": "corbe plant",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 11,
-     "misses": null,
+     "misses": 2.426,
+     "stderr": 0.0007,
      "opening": "corbe plant",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 12,
-     "misses": null,
+     "misses": 2.3546,
+     "stderr": 0.0006,
      "opening": "corbe plant",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 13,
-     "misses": null,
+     "misses": 2.2954,
+     "stderr": 0.0006,
      "opening": "corbe plant",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 14,
-     "misses": null,
+     "misses": 2.2473,
+     "stderr": 0.0005,
      "opening": "corbe plant",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 15,
-     "misses": null,
+     "misses": 2.208,
+     "stderr": 0.0005,
      "opening": "corbe plant",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 16,
-     "misses": 2.1768,
+     "misses": 2.1769,
+     "stderr": 0.0004,
      "opening": "corbe plant",
-     "source": "race"
+     "source": "run"
     },
     {
      "k": 17,
-     "misses": null,
+     "misses": 2.1509,
+     "stderr": 0.0004,
      "opening": "corbe plant",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 18,
@@ -476,17 +492,6 @@
     }
    ],
    "missing": [
-    5,
-    6,
-    7,
-    9,
-    10,
-    11,
-    12,
-    13,
-    14,
-    15,
-    17,
     18,
     19,
     20,
@@ -522,93 +527,108 @@
     },
     {
      "k": 2,
-     "misses": 3.2447,
+     "misses": 3.2455,
+     "stderr": 0.0005,
      "opening": "chant dorse blimp",
-     "source": "race"
+     "source": "run"
     },
     {
      "k": 3,
-     "misses": null,
+     "misses": 3.2759,
+     "stderr": 0.0005,
      "opening": "chant dorse blimp",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 4,
      "misses": 3.2807,
+     "stderr": 0.0005,
      "opening": "chant dorse blimp",
-     "source": "race"
+     "source": "run"
     },
     {
      "k": 5,
-     "misses": null,
+     "misses": 3.272,
+     "stderr": 0.0005,
      "opening": "chant dorse blimp",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 6,
-     "misses": null,
+     "misses": 3.258,
+     "stderr": 0.0005,
      "opening": "chant dorse blimp",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 7,
-     "misses": null,
+     "misses": 3.2409,
+     "stderr": 0.0005,
      "opening": "chant dorse blimp",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 8,
-     "misses": 3.2064,
+     "misses": 3.2074,
+     "stderr": 0.0005,
      "opening": "cried plant wombs",
-     "source": "race"
+     "source": "run"
     },
     {
      "k": 9,
-     "misses": null,
+     "misses": 3.1842,
+     "stderr": 0.0005,
      "opening": "cried plant wombs",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 10,
-     "misses": null,
+     "misses": 3.1647,
+     "stderr": 0.0004,
      "opening": "cried plant wombs",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 11,
-     "misses": null,
+     "misses": 3.1456,
+     "stderr": 0.0004,
      "opening": "cried plant wombs",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 12,
-     "misses": null,
+     "misses": 3.1293,
+     "stderr": 0.0004,
      "opening": "cried plant wombs",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 13,
-     "misses": null,
+     "misses": 3.1146,
+     "stderr": 0.0004,
      "opening": "cried plant wombs",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 14,
-     "misses": null,
+     "misses": 3.1007,
+     "stderr": 0.0004,
      "opening": "cried plant wombs",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 15,
-     "misses": null,
+     "misses": 3.0889,
+     "stderr": 0.0003,
      "opening": "cried plant wombs",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 16,
-     "misses": 3.0773,
+     "misses": 3.0789,
+     "stderr": 0.0003,
      "opening": "cried plant wombs",
-     "source": "race"
+     "source": "run"
     },
     {
      "k": 17,
@@ -708,17 +728,6 @@
     }
    ],
    "missing": [
-    3,
-    5,
-    6,
-    7,
-    9,
-    10,
-    11,
-    12,
-    13,
-    14,
-    15,
     17,
     18,
     19,
@@ -851,99 +860,115 @@
     },
     {
      "k": 16,
-     "misses": 2.0812,
+     "misses": 2.0804,
+     "stderr": 0.0021,
      "opening": "tamed",
-     "source": "race"
+     "source": "run"
     },
     {
      "k": 17,
-     "misses": null,
+     "misses": 2.0218,
+     "stderr": 0.0021,
      "opening": "tamed",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 18,
-     "misses": null,
+     "misses": 1.9676,
+     "stderr": 0.002,
      "opening": "tamed",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 19,
-     "misses": null,
+     "misses": 1.9233,
+     "stderr": 0.002,
      "opening": "tamed",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 20,
-     "misses": null,
+     "misses": 1.8805,
+     "stderr": 0.0019,
      "opening": "tamed",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 21,
-     "misses": null,
+     "misses": 1.84,
+     "stderr": 0.0019,
      "opening": "tamed",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 22,
-     "misses": null,
+     "misses": 1.8063,
+     "stderr": 0.0019,
      "opening": "tamed",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 23,
-     "misses": null,
+     "misses": 1.7741,
+     "stderr": 0.0019,
      "opening": "tamed",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 24,
-     "misses": null,
+     "misses": 1.7446,
+     "stderr": 0.0019,
      "opening": "tamed",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 25,
-     "misses": null,
+     "misses": 1.7163,
+     "stderr": 0.0018,
      "opening": "tamed",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 26,
-     "misses": null,
+     "misses": 1.6924,
+     "stderr": 0.0018,
      "opening": "tamed",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 27,
-     "misses": null,
+     "misses": 1.6675,
+     "stderr": 0.0018,
      "opening": "tamed",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 28,
-     "misses": null,
+     "misses": 1.6452,
+     "stderr": 0.0018,
      "opening": "tamed",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 29,
-     "misses": null,
+     "misses": 1.6224,
+     "stderr": 0.0018,
      "opening": "tamed",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 30,
-     "misses": null,
+     "misses": 1.5993,
+     "stderr": 0.0018,
      "opening": "tamed",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 31,
-     "misses": null,
+     "misses": 1.5823,
+     "stderr": 0.0018,
      "opening": "tamed",
-     "source": "missing"
+     "source": "run"
     },
     {
      "k": 32,
@@ -952,21 +977,6 @@
     }
    ],
    "missing": [
-    17,
-    18,
-    19,
-    20,
-    21,
-    22,
-    23,
-    24,
-    25,
-    26,
-    27,
-    28,
-    29,
-    30,
-    31,
     32
    ]
   }
