@@ -189,11 +189,10 @@
     },
     {
      "k": 20,
-     "misses": 1.9893,
+     "misses": 1.9577,
      "stderr": 0.0007,
-     "opening": "mpret",
-     "source": "fallback",
-     "pending": "rotan"
+     "opening": "rotan",
+     "source": "run"
     },
     {
      "k": 21,
@@ -371,11 +370,10 @@
     },
     {
      "k": 11,
-     "misses": 2.426,
-     "stderr": 0.0007,
-     "opening": "corbe plant",
-     "source": "fallback",
-     "pending": "clamp trend"
+     "misses": 2.4081,
+     "stderr": 0.0006,
+     "opening": "clamp trend",
+     "source": "run"
     },
     {
      "k": 12,
@@ -407,19 +405,17 @@
     },
     {
      "k": 16,
-     "misses": 2.1769,
+     "misses": 2.1625,
      "stderr": 0.0004,
-     "opening": "corbe plant",
-     "source": "fallback",
-     "pending": "clamp tribe"
+     "opening": "clamp tribe",
+     "source": "run"
     },
     {
      "k": 17,
-     "misses": 2.1509,
+     "misses": 2.1356,
      "stderr": 0.0004,
-     "opening": "corbe plant",
-     "source": "fallback",
-     "pending": "clamp tribe"
+     "opening": "clamp tribe",
+     "source": "run"
     },
     {
      "k": 18,
@@ -615,19 +611,17 @@
     },
     {
      "k": 10,
-     "misses": 3.1647,
+     "misses": 3.1475,
      "stderr": 0.0004,
-     "opening": "cried plant wombs",
-     "source": "fallback",
-     "pending": "bland copse might"
+     "opening": "bland copse might",
+     "source": "run"
     },
     {
      "k": 11,
-     "misses": 3.1456,
+     "misses": 3.133,
      "stderr": 0.0004,
-     "opening": "cried plant wombs",
-     "source": "fallback",
-     "pending": "bland copse might"
+     "opening": "bland copse might",
+     "source": "run"
     },
     {
      "k": 12,
@@ -659,19 +653,17 @@
     },
     {
      "k": 16,
-     "misses": 3.0789,
+     "misses": 3.066,
      "stderr": 0.0003,
-     "opening": "cried plant wombs",
-     "source": "fallback",
-     "pending": "clamp feign worst"
+     "opening": "clamp feign worst",
+     "source": "run"
     },
     {
      "k": 17,
-     "misses": 3.0683,
+     "misses": 3.0558,
      "stderr": 0.0003,
-     "opening": "cried plant wombs",
-     "source": "fallback",
-     "pending": "clamp feign worst"
+     "opening": "clamp feign worst",
+     "source": "run"
     },
     {
      "k": 18,
@@ -842,19 +834,17 @@
     },
     {
      "k": 6,
-     "misses": 3.0083,
-     "stderr": 0.0028,
-     "opening": "clapt",
-     "source": "fallback",
-     "pending": "compt"
+     "misses": 2.9878,
+     "stderr": 0.0027,
+     "opening": "compt",
+     "source": "run"
     },
     {
      "k": 7,
-     "misses": 2.9153,
-     "stderr": 0.0028,
-     "opening": "clapt",
-     "source": "fallback",
-     "pending": "compt"
+     "misses": 2.8763,
+     "stderr": 0.0027,
+     "opening": "compt",
+     "source": "run"
     },
     {
      "k": 8,
@@ -1044,7 +1034,7 @@
   "greedy 3-word triple_singletons_answers_exhaustive_top10000 race at k=16 still has 2 live",
   "greedy 3-word triple_singletons_top10000 race at k=24 still has 3 live",
   "greedy 3-word triple_singletons_top10000 race at k=32 still has 3 live",
-  "minavg race at k=24 not settled (50 live, 3200 games): not used yet -- the bracket below covers it",
+  "minavg race at k=24 not settled (50 live, 6400 games): not used yet -- the bracket below covers it",
   "minavg race at k=32 not settled (5497 live, 200 games): not used yet -- the bracket below covers it"
  ]
 }
