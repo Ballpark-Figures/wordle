@@ -218,7 +218,7 @@ PLOT = multi_plot_data.load()
 PLOT_C = [-1.2, -0.35, 0]     # the plot BOX's centre; room on the right for labels
 PLOT_W, PLOT_H = 10.4, 5.4
 Y_MAX = 4.0
-X_TICKS = [1, 2, 4, 8, 16, 32]
+X_TICKS = list(range(4, 33, 4))   # linear, every 4 (user's call)
 LINE_SW = 4.0
 LINE_LABEL = {1: "1-word opener", 2: "2-word opener", 3: "3-word opener"}
 IMPROVED_LABEL = "Improved Strategy"
@@ -679,9 +679,16 @@ class Scene16(WordleBoardScene):
         self.play(*[m.animate.set_fill(opacity=0.0 if i == k else DIM)
                     for i, m in enumerate(self.masks)], run_time=run_time)
 
-    def _greedy(self, j, extra=()):
-        """16r's guess j: its board emphasised, then the guess played everywhere."""
+    def _greedy(self, j, lift=False):
+        """16r's guess j: its board emphasised, then the guess played everywhere.
+        `lift` fades the masks off with this guess's candidate update.
+
+        THE LIFT IS BUILT HERE, AFTER `_emphasize`, NEVER BY THE CALLER: `.animate`
+        keeps its target on the mobject itself (`.target`), so a lift built before
+        `_emphasize` had its target overwritten by the emphasis's own -- it then
+        animated nothing, and the masks vanished in one frame when removed."""
         self._emphasize(GREEDY["steps"][j]["target"], 0.5)
+        extra = [m.animate.set_fill(opacity=0.0) for m in self.masks] if lift else []
         self._play(GREEDY, j, 0.65, 0.9, 0.8, extra)
 
     # s : the board with the fewest candidates emphasised, a random one of its
@@ -701,8 +708,7 @@ class Scene16(WordleBoardScene):
         self._greedy(10)             # FIFTH  (board 5)
         # the masks lift WITH the last update, not as a quick fade of their own
         # after it -- seven columns brightening at once read as a flash
-        self._greedy(11, extra=[m.animate.set_fill(opacity=0.0)
-                                for m in self.masks])    # SIXTH  (board 6)
+        self._greedy(11, lift=True)  # SIXTH  (board 6)
         self.remove(*self.masks)
         self.masks = None
 
@@ -764,10 +770,11 @@ class Scene16(WordleBoardScene):
     def plot_three(self):
         self._draw([3], 2.0)
 
-    # v : the 2-word and 1-word openers
+    # v : the 2-word opener, then the 1-word opener -- one at a time
     @subscene
     def plot_one_two(self):
-        self._draw([2, 1], 2.0)
+        self._draw([2], 2.0)
+        self._draw([1], 2.0)
 
     # w : the improved strategy -- its four raced points, joined
     @subscene
