@@ -46,10 +46,13 @@
     "8": "dempt",
     "10": "dempt",
     "12": "mpret",
+    "13": "mpret",
     "14": "mpret",
     "16": "mpret",
     "20": "rotan",
+    "22": "rotan",
     "24": "rotan",
+    "26": "rotan",
     "28": "rotan",
     "32": "rotan"
    },
@@ -451,11 +454,10 @@
     },
     {
      "k": 23,
-     "misses": 2.0619,
+     "misses": 2.0454,
      "stderr": 0.0003,
-     "opening": "corbe plant",
-     "source": "fallback",
-     "pending": "clamp tribe"
+     "opening": "clamp tribe",
+     "source": "run"
     },
     {
      "k": 24,
@@ -687,19 +689,17 @@
     },
     {
      "k": 22,
-     "misses": 3.0318,
+     "misses": 3.0199,
      "stderr": 0.0003,
-     "opening": "cried plant wombs",
-     "source": "fallback",
-     "pending": "clamp feign worst"
+     "opening": "clamp feign worst",
+     "source": "run"
     },
     {
      "k": 23,
-     "misses": 3.0261,
+     "misses": 3.0147,
      "stderr": 0.0003,
-     "opening": "cried plant wombs",
-     "source": "fallback",
-     "pending": "clamp feign worst"
+     "opening": "clamp feign worst",
+     "source": "run"
     },
     {
      "k": 24,
@@ -1017,7 +1017,12 @@
  "notes": [
   "greedy 1-word guess race at k=6 still has 2 live",
   "greedy 1-word guess race at k=7 still has 2 live",
+  "greedy 1-word guess race at k=9 still has 2 live",
+  "greedy 1-word guess race at k=11 still has 2 live",
+  "greedy 1-word guess race at k=15 still has 4 live",
   "greedy 1-word mystery race at k=16 still has 2 live",
+  "greedy 1-word guess race at k=18 still has 10 live",
+  "greedy 1-word guess race at k=30 still has 2 live",
   "greedy 3-word triple_singletons_answers_exhaustive_top10000 race at k=4 still has 2 live",
   "greedy 3-word triple_singletons_answers_exhaustive_top10000 race at k=16 still has 2 live",
   "greedy 3-word triple_singletons_top10000 race at k=24 still has 3 live",
