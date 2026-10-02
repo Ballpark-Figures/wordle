@@ -61,6 +61,7 @@
     "30": "rotan",
     "32": "rotan"
    },
+   "provisional": [],
    "points": [
     {
      "k": 1,
@@ -302,6 +303,7 @@
     "24": "farce spilt",
     "32": "doubt range"
    },
+   "provisional": [],
    "points": [
     {
      "k": 1,
@@ -543,6 +545,7 @@
     "24": "crisp leant gumbo",
     "32": "clamp singe turbo"
    },
+   "provisional": [],
    "points": [
     {
      "k": 1,
@@ -780,8 +783,14 @@
     "6": "compt",
     "8": "compt",
     "12": "compt",
-    "16": "tamed"
+    "16": "tamed",
+    "24": "rotan",
+    "32": "filet"
    },
+   "provisional": [
+    24,
+    32
+   ],
    "points": [
     {
      "k": 1,
@@ -948,61 +957,69 @@
      "misses": 1.7446,
      "stderr": 0.0019,
      "opening": "tamed",
-     "source": "run"
+     "source": "fallback",
+     "pending": "rotan"
     },
     {
      "k": 25,
      "misses": 1.7163,
      "stderr": 0.0018,
      "opening": "tamed",
-     "source": "run"
+     "source": "fallback",
+     "pending": "rotan"
     },
     {
      "k": 26,
      "misses": 1.6924,
      "stderr": 0.0018,
      "opening": "tamed",
-     "source": "run"
+     "source": "fallback",
+     "pending": "rotan"
     },
     {
      "k": 27,
      "misses": 1.6675,
      "stderr": 0.0018,
      "opening": "tamed",
-     "source": "run"
+     "source": "fallback",
+     "pending": "rotan"
     },
     {
      "k": 28,
      "misses": 1.6452,
      "stderr": 0.0018,
      "opening": "tamed",
-     "source": "run"
+     "source": "fallback",
+     "pending": "rotan"
     },
     {
      "k": 29,
      "misses": 1.6224,
      "stderr": 0.0018,
      "opening": "tamed",
-     "source": "run"
+     "source": "fallback",
+     "pending": "rotan"
     },
     {
      "k": 30,
      "misses": 1.5993,
      "stderr": 0.0018,
      "opening": "tamed",
-     "source": "run"
+     "source": "fallback",
+     "pending": "rotan"
     },
     {
      "k": 31,
      "misses": 1.5823,
      "stderr": 0.0018,
      "opening": "tamed",
-     "source": "run"
+     "source": "fallback",
+     "pending": "rotan"
     },
     {
      "k": 32,
      "misses": null,
-     "opening": "tamed",
+     "opening": "filet",
      "source": "missing"
     }
    ],
@@ -1018,7 +1035,7 @@
   "greedy 3-word triple_singletons_answers_exhaustive_top10000 race at k=16 still has 2 live",
   "greedy 3-word triple_singletons_top10000 race at k=24 still has 3 live",
   "greedy 3-word triple_singletons_top10000 race at k=32 still has 3 live",
-  "minavg race at k=24 not settled (43 live, 12800 games): not used yet -- the bracket below covers it",
-  "minavg race at k=32 not settled (5497 live, 200 games): not used yet -- the bracket below covers it"
+  "minavg race at k=24 not settled (43 live, 12800 games): leader rotan used only where its runs exist",
+  "minavg race at k=32 not settled (8 live, 25600 games): leader filet used only where its runs exist"
  ]
 }

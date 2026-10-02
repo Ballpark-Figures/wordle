@@ -163,7 +163,7 @@ def _build():
     for n, fields in FIELDS.items():
         winners = {}
         for p in POWERS:
-            best, settled_here = None, []
+            best, settled_here, unsettled_here = None, [], []
             for field in fields:
                 r = _race("greedy", p, field)
                 if r is None:
@@ -172,10 +172,19 @@ def _build():
                     out["notes"].append(f"greedy {n}-word {field} race at k={p} still has "
                                         f"{r[4]} live")
                 if not (r[4] == 1 or r[3] >= RACE_MIN_GAMES):
+                    unsettled_here.append(r)
                     continue
                 settled_here.append(r)
                 if best is None or r[1] < best[1]:
                     best = r + (field,)
+            if best is None and unsettled_here:
+                # PROVISIONAL (user's call, 2026-10-02): a race still running names
+                # its current leader, but with no estimate -- it is used only where
+                # that leader's own runs exist, and the opener it would replace
+                # stands in everywhere else. If the lead changes, so does this.
+                lead = min(unsettled_here, key=lambda r: r[1])
+                winners[p] = {"opening": lead[0], "mean": None, "source": "race",
+                              "provisional": True, "alts": []}
             if best is not None:
                 winners[p] = {"opening": best[0], "mean": best[1], "source": "race",
                               "field": best[5],
@@ -185,6 +194,8 @@ def _build():
                                        if r[0] != best[0]]}
         pts, missing = _line(winners, T_GREEDY, "")
         out["lines"][str(n)] = {"winners": {str(p): w["opening"] for p, w in winners.items()},
+                                "provisional": [p for p, w in winners.items()
+                                                if w.get("provisional")],
                                 "points": pts, "missing": missing}
 
     winners = {}
@@ -196,16 +207,24 @@ def _build():
                              ["guess"] + ([MINAVG_FIELD[p]] if p in MINAVG_FIELD else []))
                  if r is not None]
         settled_c = [r for r in cands if r[4] == 1 or r[3] >= RACE_MIN_GAMES]
-        r = min(settled_c, key=lambda r: r[1]) if settled_c else (cands[0] if cands else None)
+        # nothing settled: the SHORTLIST race (when there is one) is the one being run
+        # to a winner, so its leader is the provisional one -- not the abandoned full race
+        r = min(settled_c, key=lambda r: r[1]) if settled_c else (cands[-1] if cands else None)
         if r is not None:
             settled = r[4] == 1 or r[3] >= RACE_MIN_GAMES
             if settled:
                 winners[p] = {"opening": r[0], "mean": r[1], "source": "race"}
             else:
+                # PROVISIONAL -- see the greedy loop above
+                winners[p] = {"opening": r[0], "mean": None, "source": "race",
+                              "provisional": True}
                 out["notes"].append(f"minavg race at k={p} not settled ({r[4]} live, "
-                                    f"{r[3]} games): not used yet -- the bracket below covers it")
+                                    f"{r[3]} games): leader {r[0]} used only where its "
+                                    f"runs exist")
     pts, missing = _line(winners, T_MINAVG, "_minavg")
     out["lines"]["improved"] = {"winners": {str(p): w["opening"] for p, w in winners.items()},
+                                "provisional": [p for p, w in winners.items()
+                                                if w.get("provisional")],
                                 "points": pts, "missing": missing}
     return out
 
@@ -222,7 +241,10 @@ if __name__ == "__main__":
         f.write("\n")
     for key, ln in data["lines"].items():
         name = "Improved Strategy" if key == "improved" else f"{key}-word"
-        print(f"{name}: winners " + ", ".join(f"k{p}={w}" for p, w in ln["winners"].items()))
+        print(f"{name}: winners " + ", ".join(f"k{p}={w}" for p, w in ln["winners"].items())
+              + ("" if not ln.get("provisional") else
+                 "   (PROVISIONAL, race still running: "
+                 + ", ".join(f"k{p}" for p in ln["provisional"]) + ")"))
         stop = [p["k"] for p in ln["points"] if p["source"] in ("race", "exact")]
         fb = [f"{p['k']}:{p['opening']}" for p in ln["points"] if p["source"] == "fallback"]
         print(f"   from fill-in runs: {sum(p['source'] == 'run' for p in ln['points'])}/32"
