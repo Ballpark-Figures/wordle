@@ -22,19 +22,26 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   l replay_third  — THIRD, the first answer, out of order                 (16l, VO 4)
   m replay_rest   — SIXTH SEVEN FIFTH OCTET FIRST HALVE FORTH, faster,
                     then the win wave                                     (16m, VO 4)
-  n blank_rest    — every row but the first back to black, the first
-                    from TRIAL to SOLVE; candidates out                   (16n, VO 5)
+  n blank_all     — every row back to black, candidates out               (16n, VO 5)
+  o solve_again   — SOLVE typed and scored (NOT IN THE SCRIPT YET)        (--,  VO 5)
+  p flip_eight    — row 2 back to coloured EIGHT in one flip              (16o, VO 5)
+  q flip_words    — row 3 back to WORDS in one flip                       (16p, VO 5)
+  r after_solve   — rows 2-3 back to black, SOLVE's candidates back       (16q, VO 5)
+  s greedy        — fewest-candidates board emphasised, a random one of
+                    its candidates guessed, candidates updated, to the end (16r, VO 5)
+
+FROM o ON, THE SUBSCENE LETTERS ARE ONE AHEAD OF THE SCRIPT'S (o is the user's new
+SOLVE beat, 2026-10-01, not yet in the Doc).
 
 16i-m IS A DIFFERENT GAME FROM 16h (user's call, 2026-10-01; the script still says
 SOLVE EIGHT WORDS in order): TRIAL GUESS COMBO, then the answers in a "weird order"
 -- the most scrambled of the 2648 orders that keep every board down to one candidate
-at its turn (plain number order does not). game_data "octordle_weird". Because
-n-r are written about SOLVE EIGHT WORDS, n turns the first row into SOLVE.
-  o flip_eight    — row 2 back to coloured EIGHT in one flip              (16o, VO 5)
-  p flip_words    — row 3 back to WORDS in one flip                       (16p, VO 5)
-  q after_solve   — rows 2-3 back to black, SOLVE's candidates back       (16q, VO 5)
-  r greedy        — fewest-candidates board emphasised, a random one of
-                    its candidates guessed, candidates updated, to the end (16r, VO 5)
+at its turn (plain number order does not). game_data "octordle_weird". Because the
+rest of section 5 is written about SOLVE EIGHT WORDS, n blanks the whole game and o
+plays SOLVE afresh.
+
+A SOLVED BOARD SHOWS NOTHING BENEATH IT (user's call): its last word fades on the
+update after the guess that solves it.
 
 CANDIDATES UNDER A BOARD (16i-r): the answers still consistent with every reply that
 board has had, as WHITE DOTS while there are too many to list and as WORDS below
@@ -188,6 +195,7 @@ CAND_BOTTOM = -4.3
 # is however many of those fit below it (user's call, 2026-10-01 -- replacing the
 # script's "20 or fewer"); `_sizes` derives it.
 DOT_COLOR = WHITE            # 06's dots
+ALL_GREEN = 242              # wordle.pattern's code for a win
 DIM = 0.75                   # the emphasis mask's opacity over a dimmed column
 FORTH_BOARD = 3                                # board whose answer is FORTH
 
@@ -421,7 +429,9 @@ class Scene16(WordleBoardScene):
             cur = self.cands[k]
             left, right, top = self._region(k)
             nxt = {}
-            if len(members) > word_max:
+            if not members:
+                pass                           # solved: everything below it leaves
+            elif len(members) > word_max:
                 spots, r = dot_grid(members, pitch, left, right, top)
                 for wd in members:
                     if wd in cur:
@@ -478,7 +488,10 @@ class Scene16(WordleBoardScene):
         self.play(*types, run_time=total)
         self.play(*[self.boards[k].reveal_anim(j, step["boards"][k]["code"])
                     for k in live], run_time=score_rt)
-        self._update_cands([b["members"] for b in step["boards"]], update_rt, extra)
+        # a SOLVED board shows nothing beneath it (user's call): its word goes on
+        # the update of the guess that solves it
+        self._update_cands([[] if b["code"] in (None, ALL_GREEN) else b["members"]
+                            for b in step["boards"]], update_rt, extra)
 
     def _blank_flips(self, rows, shift=None):
         """Every tile of `rows` (per board) flipped to the blank face -- letters gone
@@ -579,31 +592,40 @@ class Scene16(WordleBoardScene):
         self._play(REPLAY, 10, 0.45, 0.6, 0.4)      # FORTH
         self._wave(2.0, WEIRD)
 
-    # n : every row but the first back to black, and the first flips from TRIAL to
-    #     16h's coloured SOLVE -- the row the rest of section 5 is about (o-r are
-    #     written for SOLVE EIGHT WORDS); the candidates go
+    # n : every row back to black; the candidates go
     @subscene
-    def blank_rest(self):
-        rows = [[r for r in rs if r > 0] for rs in self._filled_rows()]
-        anims, dead = self._blank_flips(rows)
-        solve, swapped = self._flip_word_anims(0)
+    def blank_all(self):
+        anims, dead = self._blank_flips(self._filled_rows())
         cands = [m for c in self.cands for m in c.values()]
-        self.play(*anims, *solve, *[FadeOut(m) for m in cands], run_time=1.2)
+        self.play(*anims, *[FadeOut(m) for m in cands], run_time=1.2)
         self.remove(*cands)
-        self._drop_letters(dead + swapped)
+        self._drop_letters(dead)
         self.cands = [{} for _ in self.boards]
 
-    # o : row 2 back to the coloured EIGHT, in one flip
+    # o : SOLVE typed and scored on every board -- the opener the rest of section 5
+    #     is about (p-s are written for SOLVE EIGHT WORDS)
+    @subscene
+    def solve_again(self):
+        types = []
+        for k, b in enumerate(self.boards):
+            anim, total = b.type_anim(self, 0, GUESSES[0], 0.65,
+                                      per_letter=key_cues(self) if k == 0 else None)
+            types.append(anim)
+        self.play(*types, run_time=total)
+        self.play(*[b.reveal_anim(0, BOARDS[k]["guesses"][0]["code"])
+                    for k, b in enumerate(self.boards)], run_time=0.9)
+
+    # p : row 2 back to the coloured EIGHT, in one flip
     @subscene
     def flip_eight(self):
         self._flip_word_in(1, 0.6)
 
-    # p : row 3 back to WORDS, in one flip
+    # q : row 3 back to WORDS, in one flip
     @subscene
     def flip_words(self):
         self._flip_word_in(2, 0.6)
 
-    # q : rows 2 and 3 back to black, and SOLVE's candidates back
+    # r : rows 2 and 3 back to black, and SOLVE's candidates back
     @subscene
     def after_solve(self):
         anims, dead = self._blank_flips([[1, 2] for _ in self.boards])
@@ -632,7 +654,7 @@ class Scene16(WordleBoardScene):
         self._emphasize(GREEDY["steps"][j]["target"], 0.5)
         self._play(GREEDY, j, 0.65, 0.9, 0.8, extra)
 
-    # r : the board with the fewest candidates emphasised, a random one of its
+    # s : the board with the fewest candidates emphasised, a random one of its
     #     candidates guessed, every board's candidates updated -- to the end
     @subscene
     def greedy(self):
