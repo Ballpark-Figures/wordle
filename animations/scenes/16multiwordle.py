@@ -36,11 +36,11 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   v plot_one_two  — the 2-word and 1-word openers' lines                  (16u, VO 6)
   w plot_improved — the improved strategy                                 (16v, VO 6)
 
-THE CHART IS PROVISIONAL (user's call, 2026-10-01: "build it with the best you have,
-we'll come back with better data") -- see assets/multi_plot_data.py. The 1/2/3-word
-lines are ONE fixed opener each across every k (LATEN, CLINT SOARE, CANST HORDE
-BLIMP), not the best opener per number of Wordles the script wants; the improved
-strategy has points only at k = 2, 4, 8, 16, the minavg race leaders. Average misses
+THE CHART'S DATA IS THE USER'S PLAN (2026-10-01): the best single / pair / triple
+opener at each power of two, raced, then each winner run at every k up to the next
+power -- see assets/multi_plot_data.py, which also leaves out any k not yet run (the
+line is drawn straight across) and uses a race's own estimate at its power of two
+until the fill-in exists. Re-run it as results land. Average misses
 = mean total guesses - k. Styled after yahtzee's 08line_graph (bpkfigures
 line_graph, lines drawn with Create + an end label), but drawn straight onto the
 navy in WHITE ink, as 08histogram and 13 do -- no cream card (13's call: it looked
@@ -715,14 +715,17 @@ class Scene16(WordleBoardScene):
     # ── the chart (16s-v of the script) ───────────────────────────────────────
     def _setup_chart(self):
         """The whole chart, built at home and then moved one frame down, so the
-        frame's shift up brings it in. Lines are built but not on screen yet."""
+        frame's shift up brings it in. Lines are built but not on screen yet. A k
+        with no value yet (multi_plot_data's "missing") is skipped, so the line is
+        drawn straight across it."""
         ks = PLOT["ks"]
-        series = [{"label": LINE_LABEL[n],
-                   "values": [p["misses"] for p in PLOT["lines"][str(n)]["points"]],
-                   "color": LINE_COLOR[n]} for n in (1, 2, 3)]
-        imp = {p["k"]: p["misses"] for p in PLOT["improved"]}
-        series.append({"label": IMPROVED_LABEL, "values": [imp.get(k) for k in ks],
-                       "color": IMPROVED_COLOR})
+        keys = (1, 2, 3, "imp")
+        label = {**LINE_LABEL, "imp": IMPROVED_LABEL}
+        color = {**LINE_COLOR, "imp": IMPROVED_COLOR}
+        cache_key = {1: "1", 2: "2", 3: "3", "imp": "improved"}
+        series = [{"label": label[n], "color": color[n],
+                   "values": [pt["misses"] for pt in PLOT["lines"][cache_key[n]]["points"]]}
+                  for n in keys]
         plot = get_line_graph(series, ks, center=PLOT_C, width=PLOT_W, height=PLOT_H,
                               y_min=0.0, y_max=Y_MAX, x_tick_values=X_TICKS,
                               title="Average Misses in Multi-Wordle",
@@ -733,20 +736,17 @@ class Scene16(WordleBoardScene):
         self.chart_frame = VGroup(plot.title_text, plot.x_axis, plot.y_axis,
                                   plot.x_ticks, plot.y_ticks,
                                   plot.x_axis_label_text, plot.y_axis_label_text)
-        self.chart_lines = {n: plot.lines[i] for i, n in enumerate((1, 2, 3, "imp"))}
+        self.chart_lines = {n: plot.lines[i] for i, n in enumerate(keys)}
         self.chart_labels = {}
-        for n in (1, 2, 3):
-            end = line_point(geom, ks[-1], series[n - 1]["values"][-1])
-            self.chart_labels[n] = crisp_text(LINE_LABEL[n], font_size=FONT_SIZE_SM * 0.8,
-                                              color=LINE_COLOR[n]).next_to(end, RIGHT, buff=0.15)
-        self.imp_dots = VGroup(*[Dot(line_point(geom, p["k"], p["misses"]),
-                                     radius=0.07, color=IMPROVED_COLOR)
-                                 for p in PLOT["improved"]])
-        last = PLOT["improved"][-1]
-        self.chart_labels["imp"] = crisp_text(
-            IMPROVED_LABEL, font_size=FONT_SIZE_SM * 0.8, color=IMPROVED_COLOR).next_to(
-            line_point(geom, last["k"], last["misses"]), DOWN, buff=0.18)
-        # straight UNDER its last point: right of it the 1-word line runs through
+        for i, n in enumerate(keys):
+            k, v = [(k, v) for k, v in zip(ks, series[i]["values"]) if v is not None][-1]
+            # at the right edge if the line runs the whole axis; a line that stops
+            # short (results still landing) is labelled UNDER its last point, or
+            # the label sits across the lines that carry on past it
+            side, buff = (RIGHT, 0.15) if k == ks[-1] else (DOWN, 0.18)
+            self.chart_labels[n] = crisp_text(label[n], font_size=FONT_SIZE_SM * 0.8,
+                                              color=color[n]).next_to(
+                line_point(geom, k, v), side, buff=buff)
         self.chart_frame.shift(DOWN * FH)
 
     # t : the game moves up off the frame, the empty chart comes up into it
@@ -776,8 +776,7 @@ class Scene16(WordleBoardScene):
         self._draw([2], 2.0)
         self._draw([1], 2.0)
 
-    # w : the improved strategy -- its four raced points, joined
+    # w : the improved strategy
     @subscene
     def plot_improved(self):
-        self.play(Create(self.chart_lines["imp"]), FadeIn(self.imp_dots),
-                  FadeIn(self.chart_labels["imp"]), run_time=2.0)
+        self._draw(["imp"], 2.0)
