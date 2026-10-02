@@ -44,16 +44,21 @@
     "6": "compt",
     "7": "compt",
     "8": "dempt",
+    "9": "dempt",
     "10": "dempt",
+    "11": "dempt",
     "12": "mpret",
     "13": "mpret",
     "14": "mpret",
+    "15": "mpret",
     "16": "mpret",
+    "18": "rotan",
     "20": "rotan",
     "22": "rotan",
     "24": "rotan",
     "26": "rotan",
     "28": "rotan",
+    "30": "rotan",
     "32": "rotan"
    },
    "points": [
@@ -178,16 +183,16 @@
     },
     {
      "k": 18,
-     "misses": 2.0952,
-     "stderr": 0.0007,
-     "opening": "mpret",
+     "misses": 2.0833,
+     "stderr": 0.0008,
+     "opening": "rotan",
      "source": "run"
     },
     {
      "k": 19,
-     "misses": 2.0402,
-     "stderr": 0.0007,
-     "opening": "mpret",
+     "misses": 2.0176,
+     "stderr": 0.0008,
+     "opening": "rotan",
      "source": "run"
     },
     {
@@ -517,11 +522,10 @@
     },
     {
      "k": 32,
-     "misses": 2.004,
+     "misses": 1.9964,
      "stderr": 0.0002,
-     "opening": "ridge tonal",
-     "source": "fallback",
-     "pending": "doubt range"
+     "opening": "doubt range",
+     "source": "run"
     }
    ],
    "missing": []
@@ -767,9 +771,10 @@
     },
     {
      "k": 32,
-     "misses": 2.9771,
+     "misses": 2.9766,
+     "stderr": 0.0002,
      "opening": "clamp singe turbo",
-     "source": "race"
+     "source": "run"
     }
    ],
    "missing": []
@@ -1017,12 +1022,7 @@
  "notes": [
   "greedy 1-word guess race at k=6 still has 2 live",
   "greedy 1-word guess race at k=7 still has 2 live",
-  "greedy 1-word guess race at k=9 still has 2 live",
-  "greedy 1-word guess race at k=11 still has 2 live",
-  "greedy 1-word guess race at k=15 still has 4 live",
   "greedy 1-word mystery race at k=16 still has 2 live",
-  "greedy 1-word guess race at k=18 still has 10 live",
-  "greedy 1-word guess race at k=30 still has 2 live",
   "greedy 3-word triple_singletons_answers_exhaustive_top10000 race at k=4 still has 2 live",
   "greedy 3-word triple_singletons_answers_exhaustive_top10000 race at k=16 still has 2 live",
   "greedy 3-word triple_singletons_top10000 race at k=24 still has 3 live",
