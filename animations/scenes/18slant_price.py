@@ -17,8 +17,10 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                   percentages rise in                                    (18c, VO 2)
   d high_tier   — copies of L I O N C the same; then the rest of column 1 and all of
                   column 2                                               (18d, VO 3)
-  e crate       — copies of C R A T E travel down into a word under the list (18e, VO 4)
-  f lions       — copies of L I O N S into a word under it               (18f, VO 4)
+  e crate       — copies of C R A T E travel from the table's left column into a
+                  word under the list; the used letters fade in the column and
+                  the list (user's calls)                                (18e, VO 4)
+  f lions       — the same for L I O N S, into a word under it           (18f, VO 4)
   g near_optimal — pan down to "Near Optimal Strategy"                   (18g, VO 5)
   h slant       — SLANT typed at the top                                 (18h, VO 6)
   i left_branch — a white line extends down-left, five boxes popping out along it:
@@ -47,8 +49,10 @@ REUSE MAP — every element, the one source it comes from, and how it enters:
                       (StrategyLine's "(Win Rate)" subtitle)
   table (b-d)         14d's / 10's: bold heads at 28, cells at 30; FadeIn with the
                       title (13a's: title and content together)
-  letter copies (c-f) copies of the list's own boxed tiles, Transformed into their
-                      places (09d's per-letter moves, tier_list.morph_into)
+  letter copies (c-f) copies of the boxed tiles, Transformed into their places
+                      (09d's per-letter moves, tier_list.morph_into): from the list
+                      in c-d, from the table's column in e-f (user's call)
+  used letters (e, f) dimmed to tier_list.DIM_OPACITY in the column and the list
   cells (c, d)        14's `_fill`: FadeIn rising 0.3; coloured red -> green by
                       StrategyLine `win_color` with its halfway point at 50% (user's
                       call: colour-coded; the midpoint is the VO's "half")
@@ -127,6 +131,8 @@ CORNER_SCALE = 0.40               # 09e's corner size
 CORNER_UR = (7.6, 4.1)            # its top-right corner here (room under it for words)
 WORD_W = 2.6                      # e, f: the two words' width
 WORD_TOP_GAP = 0.45               # e: the list's bottom to CRATE's top
+USED_OPACITY = tl.DIM_OPACITY     # e, f: a used letter, in the column and the list
+                                  #   (the tier list's own dimmed look)
 
 # ── the table (14d's / 10's sizes) ───────────────────────────────────────────
 TITLE_TEXT = "Appearances in First ___ Guesses"
@@ -319,6 +325,10 @@ class Scene18(StrategyLine, MovingCameraScene, WordleBoardScene):
         self.cells += self._fill(self._cells(TOP_TIER + HIGH_TIER, 0, 1), 0.5)
 
     # e, f : copies of a word's letters travel down into a typed row under the list
+    def _column_tile(self, ch):
+        """The table's boxed copy of letter `ch` (its left column, c-d)."""
+        return self.table_letters[(TOP_TIER + HIGH_TIER).index(ch.upper())]
+
     def _word_in(self, word, top_y, run_time):
         row = get_typed_row(word)
         row.scale(WORD_W / row.width).move_to([self.tier_list.get_x(), top_y, 0],
@@ -327,8 +337,12 @@ class Scene18(StrategyLine, MovingCameraScene, WordleBoardScene):
             t.set_stroke(width=_stroke(row))
         movers, anims = [], []
         for i, ch in enumerate(word):
-            m = self._tile(ch).copy()
-            anims += [Transform(m.box, row.tiles[0][i]), Transform(m.glyph, row.letters[0][i])]
+            src = self._column_tile(ch)           # the table's left column (user's call)
+            m = src.copy()
+            anims += [Transform(m.box, row.tiles[0][i]), Transform(m.glyph, row.letters[0][i]),
+                      # the letter, once used, fades in the column AND the list
+                      src.animate.set_opacity(USED_OPACITY),
+                      self._tile(ch).animate.set_opacity(USED_OPACITY)]
             movers.append(m)
         self.add(*movers)
         self.play(*anims, run_time=run_time)
