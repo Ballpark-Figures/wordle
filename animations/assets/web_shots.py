@@ -13,7 +13,8 @@ cannot reach it: every recipe below is a URL plus the clicks that get to the boa
 Output: `animations/assets/web_media/<game>.png`, 1920x1080 unless `--size` says
 otherwise (scene 16 uses 1920x1490), dark colour scheme
 requested (a site with no dark mode, like Dordle, stays light) unless a recipe names
-its own scheme as a third field. A screenshot is a
+its own (the recipe's options dict, which can also set a page zoom and a
+full-page capture). A screenshot is a
 POINT-IN-TIME capture of a live site — today's puzzle, today's layout — so re-running
 replaces it; nothing here is computed. The sites change, so a recipe that stops
 finding its click target FAILS LOUDLY rather than saving the menu under the board's
@@ -49,9 +50,16 @@ def _block_ads(route):
         return route.abort()
     return route.continue_()      # after load / after each click: these are JS apps with animations
 
-# game -> (url, [click steps]). A step is a Playwright locator description:
+# game -> (url, [click steps], {options}). A step is a Playwright locator description:
 #   ("text", "Play")        the first visible element whose text is exactly that
 #   ("frame", url_part)     switch into the iframe whose url contains url_part
+# options (all optional) are `_run`'s: scheme ("dark"), zoom (1.0), full_page (False)
+# the 80,000 Hours pages are captured ZOOMED, as Chrome's page zoom would show them:
+# laid out in a 1920/ZOOM-wide window and captured at ZOOM x the pixel density, so
+# the PNG is still 1920 wide but the site's text column fills more of it
+ZOOM_80K = 1.5
+LIGHT_80K = {"scheme": "light", "zoom": ZOOM_80K}
+
 GAMES = {
     # the itch.io page, as a browser shows it; the game is an iframe inside it.
     # (Loaded on its own, the iframe draws in the top-left of a blank white page.)
@@ -70,22 +78,27 @@ GAMES = {
     # the sponsor read (80,000 Hours): plain pages, no clicks, LIGHT scheme -- the
     # site as a visitor normally sees it
     "80k_doctor":   ("https://80000hours.org/articles/how-many-lives-does-a-doctor-save-part-1/",
-                     [], "light"),
-    "80k_problems": ("https://80000hours.org/career-guide/world-problems/", [], "light"),
+                     [], LIGHT_80K),
+    "80k_problems": ("https://80000hours.org/career-guide/world-problems/", [], LIGHT_80K),
     "80k_elie":     ("https://80000hours.org/podcast/episodes/elie-hassenfeld-givewell-critiques-and-lessons/",
-                     [], "light"),
+                     [], LIGHT_80K),
     "80k_oster":    ("https://80000hours.org/podcast/episodes/emily-oster-pregnancy-parenting-careers/",
-                     [], "light"),
+                     [], LIGHT_80K),
     "80k_silver":   ("https://80000hours.org/podcast/episodes/nate-silver-effective-altruism-sbf-art-of-risk/",
-                     [], "light"),
-    # the sign-up page the read's link lands on (the sponsorship's own tracked URL)
+                     [], LIGHT_80K),
+    # the sign-up page the read's link lands on (the sponsorship's own tracked URL);
+    # the WHOLE page, since scene 23 scrolls down it
     "80k_guide":    ("https://80000hours.org/gettheguide/?utm_source=youtube&utm_campaign=2026-80KMAR-ballpark&utm_medium=sponsorship",
-                     [], "light"),
+                     [], {**LIGHT_80K, "full_page": True}),
 }
 
 
-def _run(game, url, steps, browser, full_page=False, view=VIEW, scheme="dark"):
-    ctx = browser.new_context(viewport=view, color_scheme=scheme)
+def _run(game, url, steps, browser, full_page=False, view=VIEW, scheme="dark", zoom=1.0):
+    # zoom: lay the page out in a window 1/zoom the size, at zoom x the pixel
+    # density, so the capture keeps `view`'s pixel size with everything bigger
+    css = {"width": round(view["width"] / zoom), "height": round(view["height"] / zoom)}
+    ctx = browser.new_context(viewport=css, device_scale_factor=zoom,
+                              color_scheme=scheme)
     ctx.route("**/*", _block_ads)
     page = ctx.new_page()
     try:
@@ -127,8 +140,8 @@ def main():
     ap.add_argument("--list", action="store_true", help="print the recipes and stop")
     a = ap.parse_args()
     if a.list:
-        for g, (u, s, *sc) in GAMES.items():
-            print(f"{g:13s} {u}  {s}  {sc[0] if sc else 'dark'}")
+        for g, (u, s, *opts) in GAMES.items():
+            print(f"{g:13s} {u}  {s}  {opts[0] if opts else ''}")
         return
     bad = [g for g in a.games if g not in GAMES]
     if bad:
@@ -139,9 +152,11 @@ def main():
         w, h = (int(x) for x in a.size.lower().split("x"))
         ok = []
         for g in todo:
-            url, steps, *scheme = GAMES[g]
-            ok.append(_run(g, url, steps, browser, a.full_page,
-                           {"width": w, "height": h}, *scheme))
+            url, steps, *opts = GAMES[g]
+            opts = dict(opts[0]) if opts else {}
+            full = a.full_page or opts.pop("full_page", False)
+            ok.append(_run(g, url, steps, browser, full,
+                           {"width": w, "height": h}, **opts))
         browser.close()
     if not all(ok):
         sys.exit(1)
