@@ -47,7 +47,8 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   j and o-r fill a whole row the same way: average, then opener.
   DEFINITIONS (the user's): CARNET (l), CERATINS (o), SAPROLITE (p), METEORITICS
   (r) and RAS (w) each get a one-line definition, fading UP in after the word
-  is typed — under the word, RAS's to its right — and fading OUT during the first
+  is typed — centred in the row below the word, RAS's to its right,
+  behind the next word typed over it — and fading OUT during the first
   letter pop of the next word typed (an opener, or 3's path's first row in x).
   An average rises in (as i's rows do); an opener is TYPED in as tiles, as SALET is, its letters
   coloured vowel red / consonant blue (hangman's rule, Y a vowel — the user's).
@@ -69,8 +70,8 @@ REUSE MAP — every element and the one source it comes from:
                  for letters on a dark panel), via board.type_word's letter_color
   letter flips   assets/board.py TileFlip, with the swap_to / to_center / to_scale
                  options added for this scene (off by default)
-  definitions    assets/gloss.py gloss (italic part of speech), GLOSS_FS 24 as
-                 scene 16's ROTAN; FadeIn(shift=UP * 0.2) as scene 08's
+  definitions    assets/gloss.py gloss (italic part of speech), GLOSS_FS 28 as
+                 scene 06's; FadeIn(shift=UP * 0.2) as scene 08's
                  TARSE definition, plain FadeOut
 
 NUMBERS — all SOURCED, from assets/word_lengths_data.py -> word_lengths_cache.json:
@@ -206,8 +207,8 @@ DEFINITIONS = {
     "ras": "n. An Ethiopian royal",
 }
 BESIDE = {"ras"}                          # definitions to the RIGHT of the word
-GLOSS_FS = 24                             # scene 16's under-word definition size
-GLOSS_BUFF = 0.1                          # below the tiles (in the next row's band)
+GLOSS_FS = 28                             # scene 06's under-word definition size
+GLOSS_Z = -1                              # behind the next word, typed over it
 GLOSS_BUFF_RIGHT = 0.3                    # right of the tiles
 
 TABLE = {int(L): t for L, t in DATA["table"].items()}
@@ -495,7 +496,9 @@ class Scene10(WordleDarkScene):
         if word in BESIDE:
             d.next_to(self.opener_row, RIGHT, buff=GLOSS_BUFF_RIGHT)
         else:
-            d.next_to(self.opener_row, DOWN, buff=GLOSS_BUFF, aligned_edge=LEFT)
+            # centred in the row below, flush left with the word
+            d.move_to([0, _row_y(L) - ROW_DY, 0]).align_to(self.opener_row, LEFT)
+        d.set_z_index(GLOSS_Z)
         self.definition = d
         # rising in, as scene 08's TARSE definition does
         self.play(FadeIn(d, shift=UP * 0.2), run_time=run_time)
