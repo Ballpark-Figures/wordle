@@ -144,6 +144,7 @@ from assets.board import (LETTER_FRAC, get_board, get_typed_row, get_scored_row,
 from assets.pigpen import PigpenWord, WORD_W
 from assets.keys import key_cues
 from assets.flip import Flip, flip, row_parts
+from assets.branch import branch_line as _line, mid_tile as _r
 from assets.groups import (ranked_layout, ranked_word_layout, scored_row, HEADER_W,
                            GUESS_SCALE, GUESS_Y, HEAD_ROW_GAP, row_aspect, enter_from_beyond,
                            edge_out, grid_cells)
@@ -167,7 +168,6 @@ DOT_COLOR = WHITE                  # 06's dots
 CORNER_BUFF = 0.3                  # 06's corner word's gap to the frame's edges
 CORNER_MARGIN = 0.35               # 06's clear space right of the corner word
 ALL_GREEN = 242                    # pattern code of the all-green reply (FIRST is an answer)
-LINE_W = 1.5                       # branch lines (hangman 18's tree edges: white, behind)
 FRONT_Z = 5                        # d, f: the kept group, above what leaves
 OFF_CLEAR = 0.3                    # how far past the top edge things leaving go
 K_FLY = 3.0                        # k: how many frame heights FIRST shoots up
@@ -240,16 +240,8 @@ WORD_Y = -3.4                      # j: its one word, under it
 WIN_SCALE = 0.8                    # that word's size (1 = scene 04's list size)
 
 
-def _r(row):
-    """The centre of `row`'s R tile — the middle tile — where every branch line ends.
-    Takes a scored row (board.get_scored_row) or the left FIRST (its five tiles first)."""
-    tiles = row.tiles[0] if hasattr(row, "tiles") else row
-    return tiles[2].get_center()
-
-
-def _line(a, b):
-    """A branch line from `a` to `b`: white, thin, behind the tiles (hangman 18's edges)."""
-    return Line(a, b, color=WHITE, stroke_width=LINE_W).set_z_index(-1)
+# _r / _line (the branch lines and where they end) live in assets/branch.py, shared
+# with scene 18.
 
 
 def _avg_block():

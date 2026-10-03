@@ -61,3 +61,9 @@ def _double_rows():
 WORDLE_DOUBLE_LETTERS = _double_rows()
 WORDLE_DOUBLE_NAMES = WORDLE_NAMES[:6] + [("LOW", "up"), ("LOW", "square"),
                                           ("LOW", "down")]
+
+# ── the lists' panels on the navy background (09e on, and scene 18) ───────────
+# Moved here from scene 09 when scene 18 needed the same colour.
+from manim import WHITE, interpolate_color                     # noqa: E402
+from bpkfigures.style import BOARD_NAVY                         # noqa: E402
+PANEL_ON_NAVY = interpolate_color(BOARD_NAVY, WHITE, 0.22)     # lighter panels
