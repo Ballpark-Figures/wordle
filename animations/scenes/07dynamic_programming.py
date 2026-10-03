@@ -91,12 +91,10 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                    widths as sqrt(group size), big groups near the middle),
                    centred on FIRST; the rest fades in; the corner counts to
                    FIRST's average (3.52, white: not the best opener)  (07zc, VO 9)
-  zb salet_full  — pan right to SALET's whole tree; the corner counts to
-                   3.42, green (the best opener)                       (07zd, VO 10)
 
   NB from s on the LETTERS run behind the script's: three script beats (s, t, u)
   are one subscene, so the script's v is subscene t, w is u, x is v, y is w and
-  z is x, za is y, zb is z, zc is za, zd is zb.
+  z is x, za is y, zb is z, zc is za.
 
 REUSE MAP — every element and the one source it comes from:
   board, typing, reveal   assets/board.py `get_board`, `type_word` (its
@@ -233,7 +231,6 @@ FULL_LETTER_W = 0.35               # zc: rows at least this wide are full board 
 FULL_GLYPH_W = 0.08                # zc: narrower rows get copied letters down to this
                                    #   width (user's call: letters that cannot be read
                                    #   still read as letters); below it, bare tiles
-PAN_DIST = 17.0                    # zd: SALET's tree, this far right of FIRST's
 FULL_BELOW = 0.4                   # zc: zb's frame starts this far below FIRST's tree
 THUMB_CASE = 0.3                   # y: the group waiting in a corner
 THUMB_TREE = 0.2                   # z: the finished tree waiting in a corner, small
@@ -341,7 +338,6 @@ class Scene07(MovingCameraScene, WordleBoardScene):
     big_case — FIRST's 14-word BBBGG group in from the right
     big_trees — the optimal tree after AFTER, AGAIN, OTHER, then BAGEL
     first_full — zoom out: BAGEL's tree into place in FIRST's whole tree
-    salet_full — pan right to SALET's whole tree
     """
 
     def setup_scene(self):
@@ -1606,18 +1602,3 @@ class Scene07(MovingCameraScene, WordleBoardScene):
         self.ff_avg = self.ff_avg_off = None
         self.big_keyed = self.big_row = None
 
-    def _setup_salet_full(self):
-        """SALET's whole tree one frame to the right, with its own average block
-        already showing (green: the best opener)."""
-        root, nodes, lines, _ = self._full_tree(TREES_FULL["salet"], RIGHT * PAN_DIST)
-        self.sf_all = [root, *[m for ms in nodes.values() for m in ms], *lines.values(),
-                       self._avg_at(RIGHT * PAN_DIST, AVG["full:salet"], AVG_GREEN)]
-
-    # zb (script zd) : the camera pans right to SALET's tree, its average block with
-    #     it; FIRST's leaves with FIRST's tree
-    @subscene
-    def salet_full(self):
-        self._setup_salet_full()
-        self.add(*self.sf_all)
-        self.play(self.camera.frame.animate.move_to(RIGHT * PAN_DIST), run_time=2.5)
-        self.sf_all = None
