@@ -26,7 +26,8 @@ Provenance:
   depth 10     the openers whose hard minimum is 10 (19r's words, asserted)
   examples     19g/h: EVERY WORD AN ANSWER (the user's call, 2026-10-03) -- the
                best-ranked hard opener (by (total, word)) among the top 1000 that
-               is an answer word and whose tree has a line of answer words only where guess 2 keeps a YELLOW letter in its
+               is an answer word (19g: not TRACE, featured later) and whose tree has a line of
+               answer words only where guess 2 keeps a YELLOW letter in its
                yellow square (that letter once in the opener) / plays a letter guess 1
                showed GREY (and nowhere green or yellow), keeping no yellow in its
                square, so each example shows one thing; the first such line in its
@@ -62,6 +63,8 @@ N_ANSWERS = 2315
 TOP = 1000
 TURNS = list(range(5, 11))            # the table's rows (19m-p)
 REFUSED = "solve"                     # 19c's word, refused after AGAIN vs GREAT
+NOT_EXAMPLE = {"trace"}               # 19g's opener may not be TRACE, which the scene
+                                      #   labels and dissects later (the user's call)
 
 # the script's lists, ASSERTED against the data (never used in place of it)
 SCRIPT_DEPTH10 = ("aight aught bight bigot dight digit gigot gitch gothy hight jigot "
@@ -124,7 +127,7 @@ def _examples(wordle, top, answers):
             if len(seq) < 4 or any(x not in answers for x in seq[0::2]):
                 continue
             g1, c1, g2 = seq[0], seq[1], seq[2]
-            if keep_yellow is None and any(
+            if keep_yellow is None and w not in NOT_EXAMPLE and any(
                     c1[i] == "y" and g2[i] == g1[i] and g1.count(g1[i]) == 1
                     for i in range(5)):
                 keep_yellow = seq
