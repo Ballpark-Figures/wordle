@@ -374,7 +374,7 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
 
     # g, h : an example line typed and scored on one board
     def _play_line(self, board, line, lag_ratio=0.45):
-        """`lag_ratio` 0 flips a row's tiles all at once (19h, the user's call)."""
+        """`lag_ratio` 0 flips a row's tiles all at once (19g and 19h, the user's call)."""
         for row, (w, code) in enumerate(zip(line["words"], line["codes"])):
             self._type(board, row, w, 0.65)
             board.reveal(self, row, code, 1.6 if lag_ratio else 0.6,
@@ -382,7 +382,7 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
 
     @subscene
     def keep_yellow(self):
-        self._play_line(self.left, EX["keep_yellow"])
+        self._play_line(self.left, EX["keep_yellow"], lag_ratio=0)
 
     @subscene
     def keep_grey(self):
