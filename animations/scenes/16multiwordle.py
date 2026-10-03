@@ -290,7 +290,7 @@ class Scene16(WordleBoardScene):
         self.windows = None
         self.foot = None
         self.cands = None            # per board: {word: Dot or PigpenWord}
-        self.masks = None
+        self.masks = self.dimmed = None
 
     @staticmethod
     def _board(layout, i):
@@ -478,12 +478,16 @@ class Scene16(WordleBoardScene):
         self._pitch, self._word_max = lo, n
         return lo, n
 
-    def _cand_anims(self, members_by_board):
+    def _cand_anims(self, members_by_board, refade=None):
         """ONE play's worth of animations taking every board's candidates to the
         sets given, plus what to do when it ends. Dots while a set is over WORD_MAX,
         words from there down; eliminated ones fade, survivors regrid, a set
-        crossing to words grows its words out of their dots (07)."""
+        crossing to words grows its words out of their dots (07). A board that is
+        DIMMED (16s) gets its new candidates dimmed too; `refade[k]`, if given,
+        refades board k's survivors as they move (the end-of-16s lift)."""
         pitch, word_max = self._sizes()
+        dimmed = getattr(self, "dimmed", None) or [False] * len(members_by_board)
+        refade = refade or [None] * len(members_by_board)
         anims, gone, new = [], [], []
         for k, members in enumerate(members_by_board):
             cur = self.cands[k]
@@ -495,10 +499,13 @@ class Scene16(WordleBoardScene):
                 spots, r = dot_grid(members, pitch, left, right, top)
                 for wd in members:
                     if wd in cur:
-                        anims.append(cur[wd].animate.move_to(spots[wd]))
+                        mv = cur[wd].animate.move_to(spots[wd])
+                        anims.append(mv if refade[k] is None else mv.fade(refade[k]))
                         nxt[wd] = cur[wd]
                     else:
                         d = Dot(point=spots[wd], radius=r, color=DOT_COLOR)
+                        if dimmed[k]:
+                            d.fade(DIM)
                         anims.append(FadeIn(d))
                         new.append(d)
                         nxt[wd] = d
@@ -507,10 +514,13 @@ class Scene16(WordleBoardScene):
                 for wd in members:
                     old = cur.get(wd)
                     if isinstance(old, PigpenWord):
-                        anims.append(old.animate.move_to(slots[wd]))
+                        mv = old.animate.move_to(slots[wd])
+                        anims.append(mv if refade[k] is None else mv.fade(refade[k]))
                         nxt[wd] = old
                         continue
                     m = PigpenWord(wd, revealed=True).scale(sc).move_to(slots[wd])
+                    if dimmed[k]:
+                        m.fade(DIM)
                     if old is None:
                         anims.append(FadeIn(m))
                     else:                        # grows out of its dot (07)
@@ -528,13 +538,13 @@ class Scene16(WordleBoardScene):
             self.cands[k] = nxt
         return anims, new, gone
 
-    def _update_cands(self, members_by_board, run_time, extra=()):
-        anims, new, gone = self._cand_anims(members_by_board)
+    def _update_cands(self, members_by_board, run_time, extra=(), refade=None):
+        anims, new, gone = self._cand_anims(members_by_board, refade)
         self.add(*new)
         self.play(*anims, *extra, run_time=run_time)
         self.remove(*gone)
 
-    def _play(self, game, j, type_rt, score_rt, update_rt, extra=()):
+    def _play(self, game, j, type_rt, score_rt, update_rt, extra=(), refade=None):
         """Guess j of `game` (multi_data's): typed into every board it reaches,
         scored, then every board's candidates updated."""
         step = game["steps"][j]
@@ -546,12 +556,16 @@ class Scene16(WordleBoardScene):
                 per_letter=key_cues(self) if n == 0 else None)
             types.append(anim)
         self.play(*types, run_time=total)
+        if self.masks:
+            self._follow_tiles(True)
         self.play(*[self.boards[k].reveal_anim(j, step["boards"][k]["code"])
                     for k in live], run_time=score_rt)
+        if self.masks:
+            self._follow_tiles(False)
         # a SOLVED board shows nothing beneath it (user's call): its word goes on
         # the update of the guess that solves it
         self._update_cands([[] if b["code"] in (None, ALL_GREEN) else b["members"]
-                            for b in step["boards"]], update_rt, extra)
+                            for b in step["boards"]], update_rt, extra, refade)
 
     def _blank_flips(self, rows, row_lag=0.35):
         """Every tile of `rows` (per board) flipped to the blank face, letters gone,
@@ -692,35 +706,125 @@ class Scene16(WordleBoardScene):
         self._update_cands([b["members"] for b in GREEDY["steps"][0]["boards"]], 1.0)
 
     def _setup_masks(self):
-        """One mask per board, covering just that board and the candidate area under
-        it, with a margin that stops short of its neighbours. (Full-frame columns
-        that met edge to edge showed seams and lines where they touched -- user's
-        report.)"""
+        """Dimming that NEVER COVERS BARE NAVY. Cairo blends a navy mask over the
+        navy background ONE SHADE OFF at any opacity between 0 and 1 (measured:
+        (21,40,62) against (22,40,63) at 0.25), so every emphasis fade showed each
+        mask as a patch of slightly different navy -- the user's "weird lighting on
+        the column". So each board's dimming is: a WORDLE_BG square exactly over
+        every tile's body (an empty tile is that colour, so it stays put while letters
+        and colours darken), the tile BORDERS faded, and its candidates faded by a
+        factor (`Mobject.fade`, multiplicative, so a word keeps its own look). The
+        gaps between tiles and the ground under the board are never covered."""
         self.masks = []
         for b in self.boards:
-            top, bottom = b.get_top()[1] + MASK_PAD, CAND_BOTTOM - MASK_PAD
-            m = Rectangle(width=b.width + 2 * MASK_PAD, height=top - bottom, stroke_width=0,
-                          fill_color=BOARD_NAVY, fill_opacity=0.0)
-            m.move_to([b.get_center()[0], (top + bottom) / 2, 0]).set_z_index(50)
-            self.masks.append(m)
+            group = VMobject(stroke_width=0, fill_color=WORDLE_BG, fill_opacity=0.0)
+            group.set_points(self._tile_mask_points(b))
+            self.masks.append(group.set_z_index(50))
+        self.dimmed = [False] * len(self.boards)
         self.add(*self.masks)
 
+    @staticmethod
+    def _refade(dim):
+        """`Mobject.fade` darkness taking a mobject INTO the dimmed state (dim) or
+        back OUT of it (not dim) -- the two multiply to 1."""
+        return DIM if dim else 1 - 1 / (1 - DIM)
+
+    def _scale_opacity(self, holder, mobs, ratio):
+        """ONE animation multiplying every fill/stroke opacity in `mobs` by `ratio`
+        over its run (multiplicative, so a word keeps its own look). Driven through
+        `holder`, a mobject ALREADY ON SCREEN: animating a fresh VGroup of the tiles
+        made manim ADD that group, pulling the tiles out of their boards and drawing
+        them over their letters -- every dimmed letter vanished."""
+        data = [(m, m.fill_rgbas[:, 3].copy(), m.stroke_rgbas[:, 3].copy())
+                for mob in mobs for m in mob.family_members_with_points()]
+
+        def update(_, alpha):
+            k = 1 + (ratio - 1) * alpha
+            for m, f, st in data:
+                m.fill_rgbas[:, 3] = np.minimum(f * k, 1.0)
+                m.stroke_rgbas[:, 3] = np.minimum(st * k, 1.0)
+        return UpdateFromAlphaFunc(holder, update)
+
+    def _dim_anims(self, i, dim, cands=True):
+        """Board i into (or out of) its dimmed state: its mask, and ONE opacity
+        animation for its tile borders and candidates."""
+        ratio = 1 - DIM if dim else 1 / (1 - DIM)
+        tiles = [t for row in self.boards[i].tiles for t in row]
+        anims = [self.masks[i].animate.set_fill(opacity=DIM if dim else 0.0)]
+        anims.append(self._stroke_anim(i, tiles, dim))
+        if cands and self.cands[i]:
+            anims.append(self._scale_opacity(self.boards[i], list(self.cands[i].values()),
+                                             ratio))
+        return anims
+
+    def _stroke_anim(self, i, tiles, dim):
+        """Tile BORDERS to their dimmed (or full) opacity, in place."""
+        s0 = [t.stroke_rgbas[:, 3].copy() for t in tiles]
+        s1 = 1 - DIM if dim else 1.0
+
+        def update(_, alpha):
+            for t, a0 in zip(tiles, s0):
+                t.stroke_rgbas[:, 3] = a0 + (s1 - a0) * alpha
+        return UpdateFromAlphaFunc(self.boards[i], update)
+
+    @staticmethod
+    def _tile_mask_points(board):
+        """ONE path holding a square over every tile of `board` (each its own closed
+        subpath), sized to the tile as it stands -- a flipping tile is squashed. One
+        mobject per board, not one per tile: 520 separate squares made every frame
+        and manim's per-play hashing so slow that 16s took five minutes."""
+        pts = []
+        for row in board.tiles:
+            for t in row:
+                c, hw, hh = t.get_center(), t.width / 2, max(t.height, 1e-3) / 2
+                corners = [c + [-hw, hh, 0], c + [hw, hh, 0], c + [hw, -hh, 0],
+                           c + [-hw, -hh, 0], c + [-hw, hh, 0]]
+                for a, z in zip(corners, corners[1:]):
+                    pts += [a, a + (z - a) / 3, a + 2 * (z - a) / 3, z]
+        return np.array(pts)
+
+    def _follow_tiles(self, on):
+        """While tiles FLIP (a reveal), each board's mask follows its tiles' heights
+        -- a dimmed tile squashes too, and a full-height mask would hang over navy as
+        a dark square. ONE updater per board, attached only for those plays."""
+        for b, mask in zip(self.boards, self.masks):
+            if on:
+                mask.add_updater(lambda m, b=b: m.set_points(self._tile_mask_points(b)))
+            else:
+                mask.clear_updaters()
+
     def _emphasize(self, k, run_time):
-        """Board k (and its candidates) at full strength, every other column dimmed."""
-        self.play(*[m.animate.set_fill(opacity=0.0 if i == k else DIM)
-                    for i, m in enumerate(self.masks)], run_time=run_time)
+        """Board k (and its candidates) at full strength, every other board dimmed."""
+        anims = []
+        for i in range(len(self.boards)):
+            if self.dimmed[i] != (i != k):
+                anims += self._dim_anims(i, i != k)
+                self.dimmed[i] = i != k
+        if anims:
+            self.play(*anims, run_time=run_time)
+        else:                        # the same board again: keep the beat's pace
+            self.wait(run_time)
 
     def _greedy(self, j, lift=False):
-        """16r's guess j: its board emphasised, then the guess played everywhere.
-        `lift` fades the masks off with this guess's candidate update.
+        """16s's guess j: its board emphasised, then the guess played everywhere.
+        `lift` undims every board with this guess's candidate update: the masks and
+        borders as extra animations, the candidates inside the update itself (a
+        survivor's move and its undim are ONE `.animate`, or one target overwrites
+        the other).
 
         THE LIFT IS BUILT HERE, AFTER `_emphasize`, NEVER BY THE CALLER: `.animate`
         keeps its target on the mobject itself (`.target`), so a lift built before
         `_emphasize` had its target overwritten by the emphasis's own -- it then
         animated nothing, and the masks vanished in one frame when removed."""
         self._emphasize(GREEDY["steps"][j]["target"], 0.5)
-        extra = [m.animate.set_fill(opacity=0.0) for m in self.masks] if lift else []
-        self._play(GREEDY, j, 0.65, 0.9, 0.8, extra)
+        extra, refade = [], None
+        if lift:
+            refade = [self._refade(False) if d else None for d in self.dimmed]
+            for i, d in enumerate(self.dimmed):
+                if d:
+                    extra += self._dim_anims(i, False, cands=False)
+            self.dimmed = [False] * len(self.boards)
+        self._play(GREEDY, j, 0.65, 0.9, 0.8, extra, refade)
 
     # s : the board with the fewest candidates emphasised, a random one of its
     #     candidates guessed, every board's candidates updated -- to the end
@@ -741,7 +845,7 @@ class Scene16(WordleBoardScene):
         # after it -- seven columns brightening at once read as a flash
         self._greedy(11, lift=True)  # SIXTH  (board 6)
         self.remove(*self.masks)
-        self.masks = None
+        self.masks = self.dimmed = None
 
     # ── the chart (16s-v of the script) ───────────────────────────────────────
     def _setup_chart(self):
