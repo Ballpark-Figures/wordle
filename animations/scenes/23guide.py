@@ -7,7 +7,7 @@ down it. The address bar reads 80000hours.org/ballpark, the read's link. Ends wi
 the window on screen.
 
 BEAT MAP
-  a scroll — the page scrolls down one screen inside the window
+  a scroll — the page scrolls down 2.5 screens inside the window
 
 REUSE MAP
   browser window    assets/sponsor_pages.py `window`, as scenes 21-22
@@ -22,7 +22,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 from config import *
 from assets import sponsor_pages
 
-SCROLL = 1.0           # how far down the page, in screens
+SCROLL = 2.5           # how far down the page, in screens
 
 
 class Scene23(WordleScene):
@@ -33,4 +33,4 @@ class Scene23(WordleScene):
     # a : the page scrolls down
     @subscene
     def scroll(self):
-        self.play(self.win.scroll_by(SCROLL), run_time=1.5)
+        self.play(self.win.scroll_by(SCROLL), run_time=3.0)
