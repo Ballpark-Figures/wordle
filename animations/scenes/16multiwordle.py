@@ -32,17 +32,15 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
 
   t chart_in      — the game shifts up off frame, the empty chart up into
                     it: "Average Misses in Multi-Wordle"                  (16s, VO 6)
-  u plot_three    — the 3-word opener's line                              (16t, VO 6)
-  v opener_three  — CLAMP SINGE TURBO, stacked, under the chart           (--,  VO 6)
-  w plot_two      — the 2-word opener's line                              (16u, VO 6)
-  x opener_two    — flips to DOUBT RANGE (TURBO flips away)               (--,  VO 6)
-  y plot_one      — the 1-word opener's line                              (16u, VO 6)
-  z opener_one    — flips to ROTAN (RANGE away); its definition appears   (--,  VO 6)
-  za opener_plant — ROTAN flips to PLANT; the definition flips away       (--,  VO 6)
-  zb plot_improved — the improved strategy; PLANT fades                   (16v, VO 6)
+  u plot_three    — the 3-word line; CLAMP SINGE TURBO flips in, stacked   (16t, VO 6)
+  v plot_two      — the 2-word line; flips to DOUBT RANGE (TURBO away)    (16u, VO 6)
+  w plot_one      — the 1-word line; flips to ROTAN (RANGE away), then
+                    its definition                                        (16u, VO 6)
+  x opener_plant  — ROTAN flips to PLANT; definition flips out by line   (--,  VO 6)
+  y plot_improved — the improved strategy; PLANT flips out               (16v, VO 6)
 
-THE OPENER BEATS (v, x, z, za) ARE THE USER'S, 2026-10-03, not in the script yet, and
-16u (2- and 1-word lines) is split across w and y to let x sit between them.
+16u (2- and 1-word lines) is split into v and w, and x (ROTAN to PLANT) is new
+(user's calls, 2026-10-03) -- neither is in the script yet.
 
 THE CHART'S DATA IS THE USER'S PLAN (2026-10-01): the best single / pair / triple
 opener at each power of two, raced, then each winner run at every k up to the next
@@ -129,9 +127,9 @@ REUSE MAP — every element and the one source it comes from:
                             size and spot, invisible, and grows to its slot
   emphasis                  dim the rest (house rule), as masks (see above)
   openers under the chart   typed rows, assets/board.py get_typed_row, as 08's TARSE
-  (v-zb)                    callout; a top-aligned stack whose 3-row form is centred on
+  (u-y)                     callout; a top-aligned stack whose 3-row form is centred on
                             CALLOUT_AT; switches are the board's TileFlip, letters
-                            swapped, rows left over squashed away; gone in zb
+                            swapped, rows left over squashed away; gone in y
   ROTAN's definition        assets/gloss.py `gloss` (italic part of speech), left-
                             aligned under the word, as 06/08
   second game               assets/multi_data.py load("greedy")
@@ -158,6 +156,26 @@ from assets.pigpen import PigpenWord
 from bpkfigures.browser import browser_window
 from bpkfigures.line_graph import get_line_graph, line_point, spread_label_ys
 from assets import multi_plot_data
+
+
+class Squash(Animation):
+    """Mobjects flipping in (`appear`) or away: each squashed about its own centre,
+    height driven by `alpha` the way TileFlip drives it (set directly each frame, so
+    no Transform has to align a tile with its letter). Hidden on the collapsed frame,
+    or the outline shows there as a line; the caller removes what flipped away."""
+
+    def __init__(self, parts, appear, **kwargs):
+        self.parts, self.appear = list(parts), appear
+        self.h = [p.height for p in self.parts]
+        self.c = [p.get_center() for p in self.parts]
+        super().__init__(Group(*self.parts), **kwargs)
+
+    def interpolate_mobject(self, alpha):
+        a = self.rate_func(alpha)
+        f = a if self.appear else 1 - a
+        for p, h, c in zip(self.parts, self.h, self.c):
+            p.stretch_to_fit_height(max(h * f, 1e-4)).move_to(c)
+            p.set_opacity(1.0 if f > 0.02 else 0.0)
 
 MEDIA = Path(__file__).resolve().parent.parent / "assets" / "web_media"
 GAME = game_data.load("octordle")
@@ -248,7 +266,7 @@ CALLOUT_OPENERS = {3: ["clamp", "singe", "turbo"], 2: ["doubt", "range"],
                    1: ["rotan"], "alt": ["plant"]}   # ROTAN, then flipped into PLANT
 # ROTAN's definition, under it -- the shared gloss (italic part of speech), broken by
 # hand as 06's are
-ROTAN_GLOSS = ["n. A cane used for corporal", "punishment (Singapore, Malaysia)"]
+ROTAN_GLOSS = ["n. A cane used for", "corporal punishment", "(Singapore, Malaysia)"]
 GLOSS_FS = 24
 GLOSS_BUFF = 0.15
 LINE_LABEL = {1: "1-word opener", 2: "2-word opener", 3: "3-word opener"}
@@ -810,6 +828,25 @@ class Scene16(WordleBoardScene):
         self.remove(*self.boards)
         self.boards = None
 
+    @staticmethod
+    def _cells(row):
+        return [VGroup(row.tiles[0][c], row.letters[0][c]) for c in range(row.n_cols)]
+
+    def _flip_out(self, row):
+        """`row` flips away tile by tile: each tile and its letter squashed to nothing
+        (and faded, or its outline shows as a line on the last frame)."""
+        return LaggedStart(*[Squash(cell, appear=False) for cell in self._cells(row)],
+                           lag_ratio=0.25)
+
+    def _flip_in(self, row):
+        """`row` flips IN tile by tile -- the reverse of `_flip_out`. Puts the row on
+        screen (hidden until its flip starts) and returns the animation."""
+        for cell in self._cells(row):
+            cell.set_opacity(0)
+        self.add(row)
+        return LaggedStart(*[Squash(cell, appear=True) for cell in self._cells(row)],
+                           lag_ratio=0.25)
+
     def _flip_callout(self, words, run_time):
         """The opener under the chart flips to `words`, in place: each row that carries
         over flips tile by tile to its new word (the board's TileFlip, letters swapped
@@ -817,9 +854,7 @@ class Scene16(WordleBoardScene):
         anims, dead, gone = [], [], []
         for i, row in enumerate(self.callout_rows):
             if i >= len(words):
-                # squashed AND faded, or its outline shows as a line for the last
-                # frame before it is removed
-                anims.append(row.animate.stretch_to_fit_height(1e-3).set_opacity(0))
+                anims.append(self._flip_out(row))
                 gone.append(row)
                 continue
             flips = []
@@ -857,64 +892,49 @@ class Scene16(WordleBoardScene):
                   run_time=run_time)
         self.chart_shown += list(keys)
 
-    # u : the 3-word opener
+    # u : the 3-word opener's line, CLAMP SINGE TURBO flipping in under the chart
     @subscene
     def plot_three(self):
-        self._draw([3], 2.0)
+        self._draw([3], 2.0, [LaggedStart(*[self._flip_in(r) for r in self.callout_rows],
+                                          lag_ratio=0.15)])
 
-    # v : CLAMP SINGE TURBO, under the chart
-    @subscene
-    def opener_three(self):
-        group = VGroup(*self.callout_rows)
-        self.play(FadeIn(group), run_time=0.8)
-        # each row on screen BY ITSELF: a row later flipped away is removed on its
-        # own, and inside the FadeIn's group that removal does nothing -- a squashed
-        # sliver of TURBO stayed under DOUBT RANGE until this
-        self.remove(group)
-        self.add(*self.callout_rows)
-
-    # w : the 2-word opener
-    @subscene
-    def plot_two(self):
-        self._draw([2], 2.0)
-
-    # x : CLAMP SINGE TURBO flips to DOUBT RANGE (TURBO flips away)
-    @subscene
-    def opener_two(self):
-        anims, dead, gone = self._flip_callout(CALLOUT_OPENERS[2], 1.0)
-        self.play(*anims, run_time=1.0)
+    def _draw_and_flip(self, n, words, run_time):
+        anims, dead, gone = self._flip_callout(words, run_time)
+        self._draw([n], run_time, anims)
         self._finish_flip(dead, gone)
 
-    # y : the 1-word opener
+    # v : the 2-word opener's line; the opener flips to DOUBT RANGE (TURBO away)
     @subscene
-    def plot_one(self):
-        self._draw([1], 2.0)
+    def plot_two(self):
+        self._draw_and_flip(2, CALLOUT_OPENERS[2], 2.0)
 
     def _setup_gloss(self):
         self.gloss = gloss(ROTAN_GLOSS, GLOSS_FS).next_to(
             self.callout_rows[0], DOWN, buff=GLOSS_BUFF, aligned_edge=LEFT)
 
-    # z : DOUBT RANGE flips to ROTAN (RANGE flips away); ROTAN's definition appears
+    # w : the 1-word opener's line; the opener flips to ROTAN (RANGE away), then its
+    #     definition
     @subscene
-    def opener_one(self):
-        anims, dead, gone = self._flip_callout(CALLOUT_OPENERS[1], 1.0)
-        self.play(*anims, run_time=1.0)
-        self._finish_flip(dead, gone)
+    def plot_one(self):
+        self._draw_and_flip(1, CALLOUT_OPENERS[1], 2.0)
         self._setup_gloss()
         self.play(FadeIn(self.gloss), run_time=0.6)
 
-    # za : ROTAN flips to PLANT; the definition flips away
+    # x : ROTAN flips to PLANT; the definition flips out, line by line
     @subscene
     def opener_plant(self):
         anims, dead, gone = self._flip_callout(CALLOUT_OPENERS["alt"], 1.0)
-        self.play(*anims, self.gloss.animate.stretch_to_fit_height(1e-3).set_opacity(0),
-                  run_time=1.0)
+        out = LaggedStart(*[Squash([line], appear=False) for line in self.gloss],
+                          lag_ratio=0.25)
+        self.play(*anims, out, run_time=1.0)
         self._finish_flip(dead, gone)
         self.remove(self.gloss)
         self.gloss = None
 
-    # zb : the improved strategy; PLANT fades as it draws
+    # y : the improved strategy; PLANT flips out as it draws
     @subscene
     def plot_improved(self):
-        self._draw(["imp"], 2.0, [FadeOut(VGroup(*self.callout_rows))])
+        rows = self.callout_rows
+        self._draw(["imp"], 2.0, [self._flip_out(r) for r in rows])
+        self.remove(*rows)
         self.callout_rows = []
