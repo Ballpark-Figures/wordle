@@ -32,8 +32,8 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   n hard_5        — Hard's row 5                                         (19n, VO 6)
   o hard_6        — Hard's row 6                                         (19o, VO 6)
   p hard_7_10     — Hard's rows 7-10                                     (19p, VO 6)
-  q depth10       — everything fades but Hard's row-10 number; it turns into
-                    14 dots, then the 14 words, left half             (19q, VO 7)
+  q depth10       — everything fades as Hard's row-10 number turns into 14
+                    dots; then they become the 14 words, left half    (19q, VO 7)
   r ight_game     — right half: EIGHT ... WIGHT flip in, scored against WIGHT (19r)
   s aught         — AUGHT moves to the top of the game and is scored     (19s, VO 7)
   t families      — pan down to the families table (Max Guesses / Family / # Words)
@@ -522,21 +522,22 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
     @subscene
     def depth10(self):
         self._setup_depth10()
+        # 1: everything else fades out WHILE the 14 becomes 14 dots where it stands,
+        #    in the words' own arrangement
         gone = [*self.t_static, *[c for k, c in self.hard_cells.items() if k != "10"]]
-        self.play(*[FadeOut(m) for m in gone], run_time=0.8)
-        self.remove(*gone)
         self.ten = self.hard_cells["10"]
-        self.t_title = self.t_heads = self.t_labels = None
-        self.t_static = self.normal_cells = self.hard_cells = None
-        # 1: the 14 becomes 14 dots where it stands, in the words' own arrangement
         p = self.ten.get_center()
         cells = grid_cells(len(self.ten_words))
         dots = [Dot(point=p + np.array([cx * TEN_DOT_PITCH, cy * TEN_DOT_PITCH, 0]),
                     radius=TEN_DOT_R, color=DOT_COLOR) for cx, cy in cells]
         copies = [self.ten.copy() for _ in dots]
         self.remove(self.ten)
-        self.play(*[ReplacementTransform(c, d) for c, d in zip(copies, dots)],
+        self.play(*[FadeOut(m) for m in gone],
+                  *[ReplacementTransform(c, d) for c, d in zip(copies, dots)],
                   run_time=0.8)
+        self.remove(*gone)
+        self.t_title = self.t_heads = self.t_labels = None
+        self.t_static = self.normal_cells = self.hard_cells = None
         # 2: each dot travels to its word's place and becomes the word on the way —
         #    06b's word-to-dot cross-shrink, reversed
         words = list(self.ten_words.values())
