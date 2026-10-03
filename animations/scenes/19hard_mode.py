@@ -179,7 +179,7 @@ F_ROW_Y0 = 3.15
 F_ROW_DY = 0.5
 F_COL_X = (-4.4, -1.2, 1.6)          # Max Guesses, Family, # Words
 F_TEMPLATE_W = 2.0
-TRACE_C = (6.15, 0.0)               # right of the centred table
+TRACE_C = (None, 0.0)                # x: centred right of the numbers (19v)
 TRACE_W = 2.6
 
 # ── z: the fast openers (one frame right of the families) ────────────────────
@@ -629,7 +629,10 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
 
     @subscene
     def trace_up(self):
-        self.trace_row = _typed("trace", TRACE_W, (TRACE_C[0], F_DY + TRACE_C[1]))
+        # centred between the # Words numbers' right edge and the frame's
+        right = max(m.get_right()[0] for m in self.f_text[2::2])
+        x = (right + self.camera.frame.get_right()[0]) / 2
+        self.trace_row = _typed("trace", TRACE_W, (x, F_DY + TRACE_C[1]))
         self.t_pieces = [(ch, VGroup(self.trace_row.tiles[0][i],
                                      self.trace_row.letters[0][i]))
                          for i, ch in enumerate("trace")]
