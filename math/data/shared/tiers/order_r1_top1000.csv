@@ -1,0 +1,32 @@
+# greedy token order, best first: the ranking notebooks/letter_explorer.ipynb computes over the pooled optimal trees.  Exact and deterministic -- no sampling, no seed.
+# THE ORDER IS COMPUTED; THE TIER CUTS ARE NOT IN THIS FILE.  Read them off top2_diff and record them in math/tiers.py.
+# The trees minimise TOTAL guesses subject to resolving every answer within 6, so any ranking derived here inherits that constraint.
+# settings max_repeat=1 num_trees=1000 tokens=26 paths=2315000 solver=optturns weighting=uniform min_gap=0.5 openers_sha=82c5827ddd75a09c
+# openers salet, reast, crate, trace, slate, crane, carle, slane, +992 more
+step,token,set_before_outside,pairs_outside_before_set,top2_diff
+1,e,0.0,1.6757,0.8817
+2,a,0.0,3.6574,0.2975
+3,r,0.0,5.3522,0.2499
+4,t,0.0,6.6738,0.0701
+5,s,0.0253,7.4716,0.9245
+6,l,0.0789,8.5142,0.8143
+7,i,0.1685,9.6724,0.0454
+8,o,0.2726,10.1223,0.0702
+9,n,0.5139,9.9666,0.5614
+10,c,0.8208,9.627,1.152
+11,d,1.2138,9.6853,0.232
+12,p,1.7511,9.2442,1.078
+13,h,2.0791,9.2374,0.1277
+14,u,2.4066,8.8019,0.4161
+15,b,2.7043,8.2667,0.0884
+16,m,3.074,7.3198,0.2023
+17,g,3.4796,6.0897,0.2371
+18,y,3.9141,4.6485,0.828
+19,f,4.1975,3.6447,0.3231
+20,k,4.4659,2.6708,0.199
+21,w,4.7,1.6432,0.3376
+22,v,4.8615,0.741,0.8428
+23,x,4.8974,0.5681,0.0347
+24,z,4.9334,0.3897,0.0093
+25,j,4.9694,0.1838,0.055
+26,q,5.0,0.0,
