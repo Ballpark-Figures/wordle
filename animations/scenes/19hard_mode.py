@@ -83,7 +83,7 @@ games' codes from assets/game_data.py, computed by math/wordle.py pattern):
   examples (g,h) the best-ranked hard opener with such a line, its first one
   families       deep_families_d7.csv cut by FAMILIES.md's rule (asserted = script)
   fast openers   feasible at 5, ranked by hard total (asserted = the script's)
-  letter table   coverage_top1000_hardturns.csv — NOT YET SAVED (see below)
+  letter table   coverage_top1000_hardturns.csv (letter_explorer.ipynb, HARD_MODE)
 
 FLAGGED — choices and gaps for the user:
   - m: the script says "2315 in row 5"; the table counts OPENERS (its row 10 is the
@@ -97,10 +97,8 @@ FLAGGED — choices and gaps for the user:
   - x: "ATC in WATCH" built as the A T C of the .ATCH row (the table shows templates).
   - v: TRACE "put up" as a typed row rising in, not typed letter by letter.
   - z: the ten openers in one ranked column, not a grid.
-  - za: BLOCKED on two things the scene will not invent — hard mode's letter coverage
-    (letter_explorer.ipynb under WORDLE_SOLVER=hardturns, then letter_coverage.save)
-    and hard mode's tier CUTS (math/tiers.py HARD_TIERS). Until both exist it shows
-    the title and column heads only.
+  - za: hard mode's tiers are the user's cuts on the hardturns greedy order (math/
+    tiers.py HARD_TIERS); the table's rows are its top two tiers' letters, as 18's.
 """
 from pathlib import Path
 import sys
