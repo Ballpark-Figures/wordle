@@ -15,8 +15,8 @@ openers one frame right of those, hard mode's letter table one frame below that.
 BEAT MAP — one subscene per Script.md beat, letters matching:
   a blank         — the empty board, held                                (19a, VO 1)
   b again         — AGAIN typed and scored against GREAT                 (19b, VO 1)
-  c solve         — SOLVE typed; the row shakes, refused                 (19c, VO 1)
-  d again_twice   — SOLVE deleted; AGAIN typed and scored twice more     (19d, VO 2)
+  c solve         — SOLVE typed; the row shakes, refused; SOLVE deleted  (19c, VO 1)
+  d again_twice   — AGAIN typed and scored twice more                    (19d, VO 2)
   e great         — GREAT typed and scored; the winning bounce           (19e, VO 2)
   f split         — every tile flips back to empty as the board moves left; an
                     empty copy moves out of it to the right              (19f, VO 3)
@@ -91,8 +91,8 @@ FLAGGED — choices and gaps for the user:
     Normal's rows 6-10 are left blank ("already populated with ... in row 5").
   - VO 6 "about 1 in every seven openers can't even guarantee a win in 6": the data
     says 2022 of 12972 = 15.6%, about 1 in 6.4.
-  - c/d: SOLVE stays on the row after the shake (as the real game); it is backspaced
-    at the start of d, before AGAIN is typed.
+  - c: after the shake SOLVE is backspaced, right to left, as the real game's delete
+    key (the user's call: in c, not d).
   - e: GREAT bounces as 02's winning row does; g/h's last rows do not.
   - x: "ATC in WATCH" built as the A T C of the .ATCH row (the table shows templates).
   - v: TRACE "put up" as a typed row rising in, not typed letter by letter.
@@ -317,16 +317,16 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
         self._type(self.board, 0, g["word"], 0.65)
         self.board.reveal(self, 0, g["code"], 1.6)
 
-    # c : SOLVE typed into the next row; refused, the row shakes
+    # c : SOLVE typed into the next row; refused, the row shakes; then backspaced
     @subscene
     def solve(self):
         self._type(self.board, 1, REFUSED, 0.65)
         self.board.shake(self, 1, 0.6)
+        self.board.delete_word(self, 1, 0.4)
 
-    # d : SOLVE backspaced; AGAIN typed and scored, twice
+    # d : AGAIN typed and scored, twice
     @subscene
     def again_twice(self):
-        self.board.delete_word(self, 1, 0.4)
         for row in (1, 2):
             g = RULES["guesses"][row]
             self._type(self.board, row, g["word"], 0.65)
