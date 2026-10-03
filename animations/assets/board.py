@@ -184,6 +184,24 @@ class RowShake(Animation):
         self._dx = dx
 
 
+class Backspace(Animation):
+    """Delete-key presses, evenly spaced: `pairs` [(tile, letter)] in the order they
+    are deleted. Press k lands at alpha k / n, where its letter vanishes and its tile
+    takes the empty border — discrete, like the real key. Alpha-driven (TilePop's
+    rule), so it is exact at any frame rate and needs no updater."""
+
+    def __init__(self, pairs, **kwargs):
+        self.pairs = pairs
+        super().__init__(VGroup(*[m for p in pairs for m in p]), **kwargs)
+
+    def interpolate_mobject(self, alpha):
+        n = len(self.pairs)
+        for k, (tile, letter) in enumerate(self.pairs):
+            gone = alpha >= k / n
+            letter.set_opacity(0.0 if gone else 1.0)
+            tile.set_stroke(TILE_EMPTY_BORDER if gone else TILE_FILLED_BORDER)
+
+
 class WordleBoard(VGroup):
     def __init__(self, rows=ROWS, cols=COLS, **kwargs):
         super().__init__(**kwargs)
@@ -346,24 +364,25 @@ class WordleBoard(VGroup):
         amp = amplitude * self.tiles[row][0].width
         scene.play(RowShake(parts, amp), run_time=run_time, rate_func=linear)
 
-    def delete_word(self, scene, row, run_time):
-        """Backspace the typed `row`, right to left: each letter disappears and its
-        tile's border goes back to empty, as the real game's delete key does. The
-        letters leave the board, so the row can be typed again."""
-        steps = []
-        for i in reversed(range(self.n_cols)):
-            letter = self.letters[row][i]
-            if letter is None:
-                continue
-            steps.append(AnimationGroup(
-                FadeOut(letter),
-                self.tiles[row][i].animate.set_stroke(TILE_EMPTY_BORDER)))
-        scene.play(LaggedStart(*steps, lag_ratio=1.0), run_time=run_time)
-        for i in range(self.n_cols):
-            if self.letters[row][i] is not None:
-                self.remove(self.letters[row][i])
-                scene.remove(self.letters[row][i])
-                self.letters[row][i] = None
+    def delete_word(self, scene, row, run_time, per_press=None):
+        """Backspace the typed `row`, right to left, ONE KEYPRESS PER LETTER, as the
+        real game's delete key does: on each press a letter VANISHES and its tile's
+        border goes back to empty — no fade. The presses are `run_time / n` apart,
+        the first at the start. `per_press(i, at)` fires for each press (i the
+        column, `at` its offset in seconds), so the scene can place a key sound —
+        type_word's `per_letter` hook, minus the letter (it is the same key). The letters leave the board, so the row
+        can be typed again."""
+        cols = [i for i in reversed(range(self.n_cols)) if self.letters[row][i] is not None]
+        gap = run_time / len(cols)
+        if per_press is not None:
+            for k, i in enumerate(cols):
+                per_press(i, k * gap)
+        scene.play(Backspace([(self.tiles[row][i], self.letters[row][i]) for i in cols]),
+                   run_time=run_time, rate_func=linear)
+        for i in cols:
+            self.remove(self.letters[row][i])
+            scene.remove(self.letters[row][i])
+            self.letters[row][i] = None
 
     # ── growing past six rows ──────────────────────────────────────────────────
     def add_row(self, scene, run_time, height, center=ORIGIN):

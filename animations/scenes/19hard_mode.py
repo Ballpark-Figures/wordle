@@ -49,7 +49,8 @@ REUSE MAP — every element, its one source, and how it enters / leaves:
   board, typing, scoring, bounce   assets/board.py get_board / type_word (+ keys.py
                     key_cues) / reveal / bounce, as 02
   refusal (c)       board.shake — NEW in board.py (RowShake), the real game's jiggle
-  delete (d)        board.delete_word — NEW in board.py, the real backspace
+  delete (c)        board.delete_word — NEW in board.py: discrete keypresses, right
+                    to left, each with the delete key's sound (keys.backspace_cues)
   flip out (f)      board.TileFlip(swap_to=None, to_center=...) — 10's flip that
                     travels; the copy is a plain get_board sliding out
   histogram (i-l)   assets/histogram_view.py (08's bars / chrome) at full_view(3.40,
@@ -117,7 +118,7 @@ from assets import histogram_view as hv
 from assets.board import STROKE, GAP, TILE, TileFlip, WordleBoard, get_board, get_typed_row
 from assets.groups import grid_cells
 from assets.strategy_line import win_color
-from assets.keys import key_cues
+from assets.keys import key_cues, backspace_cues
 from assets.word_stacks import StacksCamera, PITCH, DIM
 from assets.stacks_view import (StacksView, pinned, ASPECT, WHOOSH_SFX, WHOOSH_GAIN,
                                 WHOOSH_PEAK)
@@ -321,7 +322,7 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
     def solve(self):
         self._type(self.board, 1, REFUSED, 0.65)
         self.board.shake(self, 1, 0.6)
-        self.board.delete_word(self, 1, 0.4)
+        self.board.delete_word(self, 1, 0.6, per_press=backspace_cues(self))
 
     # d : AGAIN typed and scored, twice
     @subscene

@@ -51,3 +51,17 @@ def key_cues(scene):
     def per_letter(i, ch, at):
         scene.sfx(key_for(ch), at=at)
     return per_letter
+
+
+# THE DELETE KEY (scene 19c's backspace): one physical key, so ONE sound for every
+# press. All 25 captures already belong to letters, so it borrows the one Q and Z
+# share — the two rarest letters, so the doubling is the least likely to be heard.
+BACKSPACE = KEY_SOUNDS[_Q]
+
+
+def backspace_cues(scene):
+    """A `per_press` callback for `WordleBoard.delete_word`: the delete key on
+    every press, at the press's own moment."""
+    def per_press(i, at):
+        scene.sfx(BACKSPACE, at=at)
+    return per_press
