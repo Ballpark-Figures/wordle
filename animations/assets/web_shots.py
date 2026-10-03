@@ -1,4 +1,5 @@
-"""Screenshot the multi-Wordle games' BOARD pages, for scene 16's browser mock.
+"""Screenshot the pages shown in browser mocks: the multi-Wordle games' BOARD pages
+(scene 16) and the 80,000 Hours pages of the sponsor read (scenes 21-22).
 
     .venv/bin/python animations/assets/web_shots.py            # every game
     .venv/bin/python animations/assets/web_shots.py octordle   # just one
@@ -11,7 +12,8 @@ cannot reach it: every recipe below is a URL plus the clicks that get to the boa
 
 Output: `animations/assets/web_media/<game>.png`, 1920x1080 unless `--size` says
 otherwise (scene 16 uses 1920x1490), dark colour scheme
-requested (a site with no dark mode, like Dordle, stays light). A screenshot is a
+requested (a site with no dark mode, like Dordle, stays light) unless a recipe names
+its own scheme as a third field. A screenshot is a
 POINT-IN-TIME capture of a live site — today's puzzle, today's layout — so re-running
 replaces it; nothing here is computed. The sites change, so a recipe that stops
 finding its click target FAILS LOUDLY rather than saving the menu under the board's
@@ -65,11 +67,22 @@ GAMES = {
                      [("text", "Daily Duotrigordle")]),
     "sexaginta":    ("https://sexaginta-quattuordle.pages.dev/",
                      [("text", "daily")]),
+    # the sponsor read (80,000 Hours): plain pages, no clicks, LIGHT scheme -- the
+    # site as a visitor normally sees it
+    "80k_doctor":   ("https://80000hours.org/articles/how-many-lives-does-a-doctor-save-part-1/",
+                     [], "light"),
+    "80k_problems": ("https://80000hours.org/career-guide/world-problems/", [], "light"),
+    "80k_elie":     ("https://80000hours.org/podcast/episodes/elie-hassenfeld-givewell-critiques-and-lessons/",
+                     [], "light"),
+    "80k_oster":    ("https://80000hours.org/podcast/episodes/emily-oster-pregnancy-parenting-careers/",
+                     [], "light"),
+    "80k_silver":   ("https://80000hours.org/podcast/episodes/nate-silver-effective-altruism-sbf-art-of-risk/",
+                     [], "light"),
 }
 
 
-def _run(game, url, steps, browser, full_page=False, view=VIEW):
-    ctx = browser.new_context(viewport=view, color_scheme="dark")
+def _run(game, url, steps, browser, full_page=False, view=VIEW, scheme="dark"):
+    ctx = browser.new_context(viewport=view, color_scheme=scheme)
     ctx.route("**/*", _block_ads)
     page = ctx.new_page()
     try:
@@ -111,8 +124,8 @@ def main():
     ap.add_argument("--list", action="store_true", help="print the recipes and stop")
     a = ap.parse_args()
     if a.list:
-        for g, (u, s) in GAMES.items():
-            print(f"{g:13s} {u}  {s}")
+        for g, (u, s, *sc) in GAMES.items():
+            print(f"{g:13s} {u}  {s}  {sc[0] if sc else 'dark'}")
         return
     bad = [g for g in a.games if g not in GAMES]
     if bad:
@@ -121,8 +134,11 @@ def main():
     with sync_playwright() as p:
         browser = p.chromium.launch(channel="chrome", headless=True)
         w, h = (int(x) for x in a.size.lower().split("x"))
-        ok = [_run(g, *GAMES[g], browser, a.full_page, {"width": w, "height": h})
-              for g in todo]
+        ok = []
+        for g in todo:
+            url, steps, *scheme = GAMES[g]
+            ok.append(_run(g, url, steps, browser, a.full_page,
+                           {"width": w, "height": h}, *scheme))
         browser.close()
     if not all(ok):
         sys.exit(1)

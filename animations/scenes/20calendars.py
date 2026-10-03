@@ -1,4 +1,7 @@
-"""TEST — a career in calendars, for the 80,000 Hours ad read. Not a content scene.
+"""Scene 20 — a career in calendars, for the 80,000 Hours sponsor read (the script's
+unlabelled row 34, VO: "40 years ... 50 weeks a year ... 40 hours a week"). Light
+blue background. Promoted from test scene 96; scenes 21-22 are the read's browser
+pages.
 
 40 years -> 2000 working weeks -> 80,000 hours, in yahtzee 03dice's "grow" style:
 every parent is split into copies of itself, and each copy flies out and becomes
@@ -143,7 +146,7 @@ def _diagonal(anims_xy, step, item_frac):
                        lag_ratio=lag)
 
 
-class Scene96(WordleScene):
+class Scene20(WordleScene):
     def setup_scene(self):
         pass
 
