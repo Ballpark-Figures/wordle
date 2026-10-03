@@ -78,6 +78,9 @@ GAMES = {
                      [], "light"),
     "80k_silver":   ("https://80000hours.org/podcast/episodes/nate-silver-effective-altruism-sbf-art-of-risk/",
                      [], "light"),
+    # the sign-up page the read's link lands on (the sponsorship's own tracked URL)
+    "80k_guide":    ("https://80000hours.org/gettheguide/?utm_source=youtube&utm_campaign=2026-80KMAR-ballpark&utm_medium=sponsorship",
+                     [], "light"),
 }
 
 

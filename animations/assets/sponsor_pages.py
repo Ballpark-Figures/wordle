@@ -1,4 +1,4 @@
-"""The 80,000 Hours pages shown in the sponsor read's browser window (scenes 21-22).
+"""The 80,000 Hours pages shown in the sponsor read's browser window (scenes 21-23).
 
 One place for every page's screenshot, address and tab title, and for the window
 they sit in, so the two scenes cannot drift apart.
@@ -29,6 +29,9 @@ PAGES = {
                      "#178 – Emily Oster on what the evidence actually says about pregnancy and parenting"),
     "80k_silver":   ("80000hours.org/podcast/episodes/nate-silver-effective-altruism-sbf-art-of-risk",
                      "#204 – Nate Silver on making sense of SBF, and his biggest critiques of effective altruism"),
+    # the address as Chrome shows it: the full tracked link, scheme hidden
+    "80k_guide":    ("80000hours.org/gettheguide/?utm_source=youtube&utm_campaign=2026-80KMAR-ballpark&utm_medium=sponsorship",
+                     "Get the career guide"),
 }
 
 
