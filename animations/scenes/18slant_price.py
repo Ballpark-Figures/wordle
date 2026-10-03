@@ -18,8 +18,8 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   d high_tier   — copies of L I O N C the same; then the rest of column 1 and all of
                   column 2                                               (18d, VO 3)
   e crate       — copies of C R A T E travel from the table's left column into a
-                  word under the list; the used letters fade in the column and
-                  the list (user's calls)                                (18e, VO 4)
+                  word under the list, each copy leaving a faded letter behind
+                  in the column; the list's letters fade (user's calls)                                (18e, VO 4)
   f lions       — the same for L I O N S, into a word under it           (18f, VO 4)
   g near_optimal — pan down to "Near Optimal Strategy"                   (18g, VO 5)
   h slant       — SLANT typed at the top                                 (18h, VO 6)
@@ -52,7 +52,8 @@ REUSE MAP — every element, the one source it comes from, and how it enters:
   letter copies (c-f) copies of the boxed tiles, Transformed into their places
                       (09d's per-letter moves, tier_list.morph_into): from the list
                       in c-d, from the table's column in e-f (user's call)
-  used letters (e, f) dimmed to tier_list.DIM_OPACITY in the column and the list
+  used letters (e, f) tier_list.DIM_OPACITY: the column's set at once under the
+                      departing copy, the list's faded as it travels
   cells (c, d)        14's `_fill`: FadeIn rising 0.3; coloured red -> green by
                       StrategyLine `win_color` with its halfway point at 50% (user's
                       call: colour-coded; the midpoint is the VO's "half")
@@ -339,9 +340,10 @@ class Scene18(StrategyLine, MovingCameraScene, WordleBoardScene):
         for i, ch in enumerate(word):
             src = self._column_tile(ch)           # the table's left column (user's call)
             m = src.copy()
+            # the column's letter is ALREADY faded under the full-opacity copy that
+            # leaves it (user's call); the list's fades as the copy travels
+            src.set_opacity(USED_OPACITY)
             anims += [Transform(m.box, row.tiles[0][i]), Transform(m.glyph, row.letters[0][i]),
-                      # the letter, once used, fades in the column AND the list
-                      src.animate.set_opacity(USED_OPACITY),
                       self._tile(ch).animate.set_opacity(USED_OPACITY)]
             movers.append(m)
         self.add(*movers)
