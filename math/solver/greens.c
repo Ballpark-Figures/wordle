@@ -1135,6 +1135,8 @@ static void usage(void) {
       "  --topk K, -k K    beam: recurse into the K evenest splitters at every\n"
       "                    branching point, the ROOT included -- so it examines K\n"
       "                    OPENERS too, and reports the best of THOSE, not of 12972.\n"
+      "  --screen-only     --sweep only: run the root screen, print how many openers\n"
+      "                    the starting incumbent leaves to search, and stop\n"
       "  --seed-incumbent V  --sweep only: start the incumbent at V instead of\n"
       "                    solving a first opener serially.  V must be a badge count\n"
       "                    some REAL strategy inside this search already achieves\n"
@@ -1154,6 +1156,7 @@ int main(int argc, char **argv) {
     const char *guesslist = NULL, *answerlist = NULL, *patpath = NULL;
     int depth = 6, ttbits = 28, threads = 0, sweep = 0, noout = 0;
     int seed_inc = 0;                     /* 0 = no seed: solve a first opener */
+    int screen_only = 0;                  /* stop after the root screen and cut count */
 
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--opener") && i + 1 < argc) {
@@ -1177,6 +1180,7 @@ int main(int argc, char **argv) {
             seed_inc = atoi(argv[++i]);
             if (seed_inc < 1) { fprintf(stderr, "--seed-incumbent must be >= 1\n"); return 1; }
         }
+        else if (!strcmp(argv[i], "--screen-only")) screen_only = 1;
         else if (!strcmp(argv[i], "--data") && i + 1 < argc) datadir = argv[++i];
         else if (!strcmp(argv[i], "--guess-list") && i + 1 < argc) guesslist = argv[++i];
         else if (!strcmp(argv[i], "--answer-list") && i + 1 < argc) answerlist = argv[++i];
@@ -1197,6 +1201,10 @@ int main(int argc, char **argv) {
         return 1;
     }
     if (!nopen && !sweep) { usage(); return 1; }
+    if (screen_only && !sweep) {
+        fprintf(stderr, "--screen-only only means something to --sweep\n");
+        return 1;
+    }
     if (seed_inc && !sweep) {
         fprintf(stderr, "--seed-incumbent only means something to --sweep\n");
         return 1;
@@ -1528,12 +1536,34 @@ int main(int argc, char **argv) {
         incumbent = seed_inc;
         nbest = 0;
         seeded = 1;
-        printf("seed: incumbent starts at %d of %d (a value "
-               "a smaller beam at this depth already achieves); openers below it are cut, not solved\n",
+        printf("seed: incumbent starts at %d of %d (a value a strategy is already "
+               "known to achieve); openers below it are cut, not solved\n",
                seed_inc, NA);
     } else if (seed_inc) {
         printf("seed: %d is not above the resumed incumbent %d, so it changes nothing\n",
                seed_inc, incumbent);
+    }
+
+    /* HOW MANY OPENERS WILL ACTUALLY BE SEARCHED.  The quartiles only bracket
+     * it, and the CSV cannot say it early: the walk visits the highest bounds
+     * first, so the instant `cut` rows arrive only after every opener above the
+     * line has been started.  The root cut is `bound < incumbent`, so this count
+     * is exact for the incumbent the walk STARTS with; a later improvement can
+     * only cut more. */
+    if (incumbent > 0) {
+        int nsearch = 0, ncut = 0;
+        for (int i = 0; i < nord; i++) {
+            int g = (int)(ord[i] & 0xFFFFF);
+            if (done[g]) continue;
+            if (ub[g] < incumbent) ncut++; else nsearch++;
+        }
+        printf("root cut: %d openers have a bound >= the incumbent %d and will be searched; "
+               "%d are below it and cut without search (%d already done)\n",
+               nsearch, incumbent, ncut, ndone);
+    }
+    if (screen_only) {
+        printf("--screen-only: stopping before any search\n");
+        return 0;
     }
 
     double t0 = now_s();
