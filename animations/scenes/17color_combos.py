@@ -21,7 +21,7 @@ BEAT MAP:
   l-q fill_0 .. fill_5 — rows + values, one gray-count group per beat,
                  staggered upward fade                                      (17l-q, VO 6)
   r breakdown  — title flips to Strategy Breakdown (Second Guess); values out,
-                 legend in, the combinations slide left                     (17r, VO 7)
+                 legend in, the combinations slide left, values fading with them (17r, VO 7)
   s-x bars_0, bars_5, bars_1 .. bars_4 — the bars grow, a group per beat     (17s-x, VO 7-11)
   y third      — title flips to (Third Guess); bars morph to the third guess's (17y, VO 12)
   z fourth     — title flips to (Fourth Guess); bars morph to the fourth's    (17z, VO 12)
@@ -471,9 +471,11 @@ class Scene17(WordleBoardScene):
     def breakdown(self):
         self._setup_breakdown()
         combos = VGroup(*self.rows.values())
+        dx = RIGHT * (X_COMBO - combos.get_left()[0])
+        # the values travel with their rows as they fade (the user's call)
         flip(self, [Flip(self.title, self.new_title)], 0.8,
-             extra=[FadeOut(VGroup(*self.values.values())), FadeIn(self.legend),
-                    combos.animate.shift(RIGHT * (X_COMBO - combos.get_left()[0]))])
+             extra=[FadeOut(VGroup(*self.values.values()), shift=dx), FadeIn(self.legend),
+                    combos.animate.shift(dx)])
         self.title, self.new_title, self.values = self.new_title, None, None
 
     def _grow(self, grays, run_time):
