@@ -39,7 +39,7 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   u families      — pan down to the families table (Max Guesses / Family / # Words)
                                                                          (19u, VO 8)
   v trace_up      — TRACE on the right                                   (19v, VO 8)
-  w emph_er       — everything dims but the E and R tiles               (19w, VO 8)
+  w emph_er       — everything dims but E and R, in the words with BOTH  (19w, VO 8)
   x emph_atc      — instead, A T C in .ATCH and in TRACE                 (19x, VO 8)
   y unemph        — everything back                                      (19y, VO 8)
   z fast          — pan right to "Top Fast Openers"                      (19z, VO 9)
@@ -166,6 +166,9 @@ T_COL_X = (-3.2, 0.0, 3.2)           # turns, Normal, Hard
 WORDS_C = (-4.0, 0.0)                # the 14 words' grid centre
 WORD_W19 = 1.5
 WORD_PITCH = (1.75, 0.62)
+TEN_DOT_PITCH = 0.22                 # r: the dots the 14 becomes, in the grid's arrangement
+TEN_DOT_R = 0.06
+DOT_COLOR = WHITE                    # the answer dots are white, as in 06 / 07 / 12 / 16
 GAME_H = 8.1                         # the 10-row board's height
 GAME_C = (4.0, 0.0)
 
@@ -176,8 +179,8 @@ F_ROW_Y0 = 3.15
 F_ROW_DY = 0.5
 F_COL_X = (-4.4, -1.2, 1.6)          # Max Guesses, Family, # Words
 F_TEMPLATE_W = 2.0
-TRACE_C = (5.2, 0.0)
-TRACE_W = 3.0
+TRACE_C = (6.15, 0.0)               # right of the centred table
+TRACE_W = 2.6
 
 # ── z: the fast openers (one frame right of the families) ────────────────────
 Z_DX = FRAME_W16
@@ -297,8 +300,10 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
         self.remove(*[m for m in self.mobjects if m is not frame and m not in keep])
 
     def _fill(self, cells, run_time):
-        """14's `_fill`: the cells rise into place."""
-        self.play(*[FadeIn(c, shift=UP * RISE) for c in cells], run_time=run_time)
+        """The cells rise into place one after another — the video's table stagger
+        (04 / 10 / 17: LaggedStart, lag 0.12, rising 0.3)."""
+        self.play(LaggedStart(*[FadeIn(c, shift=UP * RISE) for c in cells],
+                              lag_ratio=0.12), run_time=run_time)
 
     # a : the empty board, held (on screen from setup_scene)
     @subscene
@@ -403,6 +408,10 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
         self.stacks.refresh(self.camera.frame)
         self.chrome = hv.HistogramChrome(VIEW, AXIS_LO, AXIS_HI)
         self.add(self.stacks, self.chrome)
+        # BEHIND everything: manim redraws only the mobjects from the first one with
+        # an updater onward and freezes the rest into a still — the stacks carry the
+        # move's updater, so the boards, ahead of them, rode the camera (fixed 19i)
+        self.bring_to_back(self.stacks)
 
     @subscene
     def histogram(self):
@@ -411,25 +420,37 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
         self._clear_except([self.stacks, self.chrome])
         self.left = self.right = None
 
-    # j : every word's slice slides from its normal-mode place to its hard-mode one
+    # j : the histogram becomes hard mode's — each bar changes height IN PLACE
+    #     (yahtzee 13's morph_panning: bars pair by bin), new bars growing from the
+    #     axis on the right. The stacks swap for plain bars of identical look while
+    #     they move, and back afterwards with every word at its hard-mode place.
+    def _bars(self, bins):
+        """One plain bar per bin over the whole range, `bins`' words tall —
+        histogram_view.layer_bars, which draws exactly what the stacks draw."""
+        counts = np.bincount(np.array(bins) - BIN_LO, minlength=self.n_bins)
+        return hv.layer_bars(counts, hv.BAR_COLOR, squash=VIEW[3],
+                             bins=np.arange(BIN_LO, BIN_LO + self.n_bins))
+
+    def _setup_shift(self):
+        self.n_bins = max(max(HIST["bins"]), max(DATA["hist"]["bins"])) - BIN_LO + 1
+        self.bars_n = self._bars(HIST["bins"])
+        self.bars_h = self._bars(DATA["hist"]["bins"])
+
     @subscene
     def shift(self):
+        self._setup_shift()
+        self.remove(self.stacks)
+        self.add(self.bars_n)
+        self.bring_to_back(self.bars_n)
+        self.play(Transform(self.bars_n, self.bars_h), run_time=3.0)
         s = self.stacks
-        x0, r0 = s.x.copy(), s.row.copy()
-        x1 = s.x0 + (np.array(DATA["hist"]["bins"]) - s.bin0) * PITCH
-        r1 = np.array(DATA["hist"]["rows"], dtype=float)
-        t = ValueTracker(0.0)
-
-        def slide(m):
-            u = t.get_value()
-            m.x = x0 + (x1 - x0) * u
-            m.row = r0 + (r1 - r0) * u
-            m.refresh(self.camera.frame)
-
-        s.add_updater(slide)
-        self.play(t.animate.set_value(1.0), run_time=3.0)
-        s.remove_updater(slide)
-        self.remove(t)
+        s.x = s.x0 + (np.array(DATA["hist"]["bins"]) - s.bin0) * PITCH
+        s.row = np.array(DATA["hist"]["rows"], dtype=float)
+        s.refresh(self.camera.frame)
+        self.remove(self.bars_n)
+        self.add(s)
+        self.bring_to_back(s)
+        self.bars_n = self.bars_h = None
 
     # k, l : SALET, then TRACE, called out (08's callouts)
     @subscene
@@ -447,8 +468,8 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
                                 for h, x in zip(("Normal", "Hard"), T_COL_X[1:])])
         ys = {k: T_HEAD_Y - (i + 1) * T_ROW_DY for i, k in enumerate(TURNS)}
         self.t_labels = VGroup(*[_cell(k, T_COL_X[0], ys[k]) for k in TURNS])
-        self.normal_cells = {"5": _cell(f"{DATA['table']['normal']['5']:,}",
-                                        T_COL_X[1], ys["5"])}
+        self.normal_cells = {k: _cell(f"{DATA['table']['normal'][k]:,}", T_COL_X[1], ys[k])
+                             for k in TURNS}
         self.hard_cells = {k: _cell(f"{DATA['table']['hard'][k]:,}", T_COL_X[2], ys[k])
                            for k in TURNS}
         self.t_static = [self.t_title, self.t_heads, self.t_labels,
@@ -460,9 +481,12 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
     @subscene
     def turns_table(self):
         self._setup_turns_table()
+        # the callouts STOP being placed: a pinned callout is held at a fraction of
+        # the FRAME, so it rode the camera down (fixed 19m). Let go, they are plain
+        # mobjects at their place in the world and leave with the histogram.
+        self.callouts = []
         self._move_view(LOWER, run_time=1.5, whoosh=True)
         # the seam back: everything on screen to the ordinary frame, invisibly
-        self._drop_callouts(["salet", "trace"])
         self._clear_except(self.t_static)
         for m in self.t_static:
             hv.from_view(m, VIEW, shift=DOWN * VH)
@@ -480,7 +504,7 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
 
     @subscene
     def hard_7_10(self):
-        self._fill([self.hard_cells[k] for k in TURNS[2:]], 0.6)
+        self._fill([self.hard_cells[k] for k in TURNS[2:]], 1.0)
 
     # q : everything fades but Hard's row-10 number
     @subscene
@@ -502,11 +526,26 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
     @subscene
     def depth10(self):
         self._setup_depth10()
+        # 1: the 14 becomes 14 dots where it stands, in the words' own arrangement
         p = self.ten.get_center()
-        self.play(FadeOut(self.ten),
-                  LaggedStart(*[GrowFromPoint(r, p) for r in self.ten_words.values()],
-                              lag_ratio=0.05), run_time=1.2)
+        cells = grid_cells(len(self.ten_words))
+        dots = [Dot(point=p + np.array([cx * TEN_DOT_PITCH, cy * TEN_DOT_PITCH, 0]),
+                    radius=TEN_DOT_R, color=DOT_COLOR) for cx, cy in cells]
+        copies = [self.ten.copy() for _ in dots]
         self.remove(self.ten)
+        self.play(*[ReplacementTransform(c, d) for c, d in zip(copies, dots)],
+                  run_time=0.8)
+        # 2: each dot travels to its word's place and becomes the word on the way —
+        #    06b's word-to-dot cross-shrink, reversed
+        words = list(self.ten_words.values())
+        for w, d in zip(words, dots):
+            w.save_state()
+            w.scale(0.1).move_to(d).set_opacity(0)
+        self.add(*words)
+        self.play(*[Restore(w) for w in words],
+                  *[d.animate.move_to(w.saved_state).scale(0.1).set_opacity(0)
+                    for w, d in zip(words, dots)], run_time=1.2)
+        self.remove(*dots)
         self.ten = None
 
     # s : the IGHT game flips in on the right, scored against WIGHT, its top row
@@ -575,6 +614,7 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
             self.f_text += [d, n]
             self.f_pieces += [(f["family"], ch, p) for ch, p in pieces]
             self.f_rows.add(d, row, n)
+        self.f_rows.set_x(0)               # centred across the frame (the user's call)
         self.add(self.f_rows)
 
     @subscene
@@ -605,7 +645,7 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
 
     @subscene
     def emph_er(self):
-        self._emph(lambda fam, ch: ch in "er", 0.8)
+        self._emph(lambda fam, ch: ch in "er" and "e" in fam and "r" in fam, 0.8)
 
     @subscene
     def emph_atc(self):

@@ -24,10 +24,12 @@ Provenance:
   table        openers by minimum turns to guarantee a solve: normal all at 5;
                hard 5 if feasible at 5, else the escalating sweep's depth
   depth 10     the openers whose hard minimum is 10 (19r's words, asserted)
-  examples     19g/h: the best-ranked hard opener (by (total, word)) among the top
-               1000 whose tree has a line where guess 2 keeps a YELLOW letter in its
+  examples     19g/h: EVERY WORD AN ANSWER (the user's call, 2026-10-03) -- the
+               best-ranked hard opener (by (total, word)) among the top 1000 that
+               is an answer word and whose tree has a line of answer words only where guess 2 keeps a YELLOW letter in its
                yellow square (that letter once in the opener) / plays a letter guess 1
-               showed GREY (and nowhere green or yellow); the first such line in its
+               showed GREY (and nowhere green or yellow), keeping no yellow in its
+               square, so each example shows one thing; the first such line in its
                tree file. Codes re-derived with wordle.pattern and checked against
                the tree's own strings
   families     math/data/shared/families/deep_families_d7.csv cut by FAMILIES.md's
@@ -111,13 +113,15 @@ def _line_codes(wordle, seq):
     return words, codes
 
 
-def _examples(wordle, top):
+def _examples(wordle, top, answers):
     keep_yellow = keep_grey = None
     for w in top:
+        if w not in answers:
+            continue
         for line in gzip.open(os.path.join(TREES, f"{w}.txt.gz"), "rt"):
             p = line.split()
             seq = p[2:]
-            if len(seq) < 4:
+            if len(seq) < 4 or any(x not in answers for x in seq[0::2]):
                 continue
             g1, c1, g2 = seq[0], seq[1], seq[2]
             if keep_yellow is None and any(
@@ -126,7 +130,9 @@ def _examples(wordle, top):
                 keep_yellow = seq
             absent = {g1[i] for i in range(5) if c1[i] == "b"} - \
                      {g1[i] for i in range(5) if c1[i] != "b"}
-            if keep_grey is None and any(ch in absent for ch in g2):
+            # the grey example shows ONLY the grey: no yellow kept in its square
+            if keep_grey is None and any(ch in absent for ch in g2) and not any(
+                    c1[i] == "y" and g2[i] == g1[i] for i in range(5)):
                 keep_grey = seq
         if keep_yellow and keep_grey:
             break
@@ -204,13 +210,14 @@ def _build():
     assert fast == SCRIPT_FAST, fast
 
     top = ranked[:TOP]
+    answers = set(open(os.path.join(SHARED, "words", "mystery.txt")).read().split())
     out = {
         "hist": {"bins": [hbins[w] for w in words], "rows": [hrow[w] for w in words],
                  "totals": [H[w][0] for w in words]},
         "best": {w: H[w][0] / N_ANSWERS for w in ("salet", "trace")},
         "table": table,
         "depth10": depth10,
-        "examples": _examples(wordle, top),
+        "examples": _examples(wordle, top, answers),
         "families": families,
         "fast": fast,
         "coverage": None,

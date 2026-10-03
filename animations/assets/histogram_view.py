@@ -176,14 +176,19 @@ class HistogramChrome(VGroup):
         self.add(self.axis, self.ticks, self.xlabel, self.heading)
 
 
-def layer_bars(counts, color):
+def layer_bars(counts, color, bins=None, squash=SQUASH):
     """A sub-histogram LAYER: one bar per histogram bar, `counts[i]` words tall (the
     words of bar i meeting the condition), drawn over the full bars on the same
-    baseline and scale — so a layer can never stand taller than its bar."""
-    bar_x = (np.unique(DATA["bins"]) - BIN_LO) * PITCH
+    baseline and scale — so a layer can never stand taller than its bar.
+
+    `bins` names the bar of each count (default: the normal histogram's own bars).
+    Scene 19 passes every bin from normal mode's lowest to hard mode's highest, so
+    one set of bars can morph from one distribution to the other, at its own view's
+    `squash` (08's by default)."""
+    bar_x = ((np.unique(DATA["bins"]) if bins is None else np.asarray(bins)) - BIN_LO) * PITCH
     g = VGroup()
     for x, n in zip(bar_x, counts):
-        h = max(n, 1e-3) * STEP * SQUASH
+        h = max(n, 1e-3) * STEP * squash
         r = Rectangle(width=WORD_W, height=h, stroke_width=0, fill_color=color,
                       fill_opacity=1.0 if n > 0 else 0.0)
         r.move_to([x, h / 2, 0])
