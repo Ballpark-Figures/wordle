@@ -46,8 +46,8 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                    yet: needs one after the opener_3 beat                    (VO 7)
   j and o-r fill a whole row the same way: average, then opener.
   DEFINITIONS (the user's): CARNET (l), CERATINS (o), SAPROLITE (p), METEORITICS
-  (r) and RAS (w) each get a one-line definition, flipped ON after the word is
-  typed — under the word, RAS's to its right — and flipped OFF during the first
+  (r) and RAS (w) each get a one-line definition, fading UP in after the word
+  is typed — under the word, RAS's to its right — and fading OUT during the first
   letter pop of the next word typed (an opener, or 3's path's first row in x).
   An average rises in (as i's rows do); an opener is TYPED in as tiles, as SALET is, its letters
   coloured vowel red / consonant blue (hangman's rule, Y a vowel — the user's).
@@ -70,8 +70,8 @@ REUSE MAP — every element and the one source it comes from:
   letter flips   assets/board.py TileFlip, with the swap_to / to_center / to_scale
                  options added for this scene (off by default)
   definitions    assets/gloss.py gloss (italic part of speech), GLOSS_FS 24 as
-                 scene 16's ROTAN; in and out by TileFlip appear / vanish, as
-                 16's ROTAN definition flips out
+                 scene 16's ROTAN; FadeIn(shift=UP * 0.2) as scene 08's
+                 TARSE definition, plain FadeOut
 
 NUMBERS — all SOURCED, from assets/word_lengths_data.py -> word_lengths_cache.json:
   counts per row   SALET's committed optimal tree (constrained to 6 guesses),
@@ -196,8 +196,8 @@ CELL_SIZE = 30
 
 
 # The openers' definitions (the user's wording), each on ONE line: under its word,
-# except RAS's, to its right. Each flips on after its word is typed and flips off
-# with the first letter of the next word typed.
+# except RAS's, to its right. Each fades up in after its word is typed and fades
+# out with the first letter of the next word typed.
 DEFINITIONS = {
     "carnet": "n. A ticket booklet",
     "ceratins": "n. Alt spelling of keratins",
@@ -462,7 +462,7 @@ class Scene10(WordleDarkScene):
         self.play(FadeIn(cell, shift=UP * 0.3), *extra, run_time=run_time)
 
     def _type_flipping_gloss_out(self, board, row, word, run_time, **kwargs):
-        """`board.type_word`, with the definition on screen (if any) flipping off
+        """`board.type_word`, with the definition on screen (if any) fading out
         during the FIRST letter's pop, in the same play."""
         anim, total = board.type_anim(self, row, word, run_time,
                                       per_letter=key_cues(self), appear=True, **kwargs)
@@ -472,8 +472,7 @@ class Scene10(WordleDarkScene):
         n = len(word)
         pop = total * n / (2 * n - 1)       # one TilePop's length (type_anim's lag 1/n)
         anim.run_time = total
-        out = AnimationGroup(*[TileFlip(line, None, None, vanish=True)
-                               for line in self.definition], run_time=pop)
+        out = FadeOut(self.definition, run_time=pop)
         self.play(AnimationGroup(anim, out))
         self.remove(self.definition)
         self.definition = None
@@ -489,7 +488,7 @@ class Scene10(WordleDarkScene):
         return row
 
     def _gloss_in(self, L, run_time):
-        """Length L's opener's definition flips on, one line, under the word (to its
+        """Length L's opener's definition fades up into place, one line, under the word (to its
         right for RAS)."""
         word = TABLE[L]["opener"]
         d = gloss([DEFINITIONS[word]], GLOSS_FS)
@@ -498,8 +497,8 @@ class Scene10(WordleDarkScene):
         else:
             d.next_to(self.opener_row, DOWN, buff=GLOSS_BUFF, aligned_edge=LEFT)
         self.definition = d
-        self.play(AnimationGroup(*[TileFlip(line, None, None, appear=True)
-                                   for line in d]), run_time=run_time)
+        # rising in, as scene 08's TARSE definition does
+        self.play(FadeIn(d, shift=UP * 0.2), run_time=run_time)
 
     def _fill_both(self, L, avg_run_time, opener_run_time):
         """A whole row, as every row filled in one beat is: average, then opener."""
