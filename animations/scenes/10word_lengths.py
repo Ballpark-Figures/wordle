@@ -45,6 +45,10 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   x path_3       — RAS's all-grey path, the same way. Also not a script beat
                    yet: needs one after the opener_3 beat                    (VO 7)
   j and o-r fill a whole row the same way: average, then opener.
+  DEFINITIONS (the user's): CARNET (l), CERATINS (o), SAPROLITE (p), METEORITICS
+  (r) and RAS (w) each get a one-line definition, flipped ON after the word is
+  typed — under the word, RAS's to its right — and flipped OFF during the first
+  letter pop of the next word typed (an opener, or 3's path's first row in x).
   An average rises in (as i's rows do); an opener is TYPED in as tiles, as SALET is, its letters
   coloured vowel red / consonant blue (hangman's rule, Y a vowel — the user's).
   EVERY LETTER CHANGE IS A FLIP (the user's): a tile turns over and shows its new
@@ -65,6 +69,9 @@ REUSE MAP — every element and the one source it comes from:
                  for letters on a dark panel), via board.type_word's letter_color
   letter flips   assets/board.py TileFlip, with the swap_to / to_center / to_scale
                  options added for this scene (off by default)
+  definitions    assets/gloss.py gloss (italic part of speech), GLOSS_FS 24 as
+                 scene 16's ROTAN; in and out by TileFlip appear / vanish, as
+                 16's ROTAN definition flips out
 
 NUMBERS — all SOURCED, from assets/word_lengths_data.py -> word_lengths_cache.json:
   counts per row   SALET's committed optimal tree (constrained to 6 guesses),
@@ -110,6 +117,7 @@ from assets.keys import key_cues
 from bpkfigures.tier_list import tile_color
 from assets.background import bg_to
 from assets import word_lengths_data
+from assets.gloss import gloss
 
 DATA = word_lengths_data.load()
 DIST = [(n, DATA["distribution"][n]) for n in sorted(DATA["distribution"], key=int)]
@@ -187,6 +195,21 @@ HEADER_SIZE = 28
 CELL_SIZE = 30
 
 
+# The openers' definitions (the user's wording), each on ONE line: under its word,
+# except RAS's, to its right. Each flips on after its word is typed and flips off
+# with the first letter of the next word typed.
+DEFINITIONS = {
+    "carnet": "n. A ticket booklet",
+    "ceratins": "n. Alt spelling of keratins",
+    "saprolite": "n. A chemically weathered rock",
+    "meteoritics": "n. The science of meteors",
+    "ras": "n. An Ethiopian royal",
+}
+BESIDE = {"ras"}                          # definitions to the RIGHT of the word
+GLOSS_FS = 24                             # scene 16's under-word definition size
+GLOSS_BUFF = 0.1                          # below the tiles (in the next row's band)
+GLOSS_BUFF_RIGHT = 0.3                    # right of the tiles
+
 TABLE = {int(L): t for L, t in DATA["table"].items()}
 GREY_PATHS = {int(L): p for L, p in DATA["grey_paths"].items()}
 # the corner the all-grey paths sit in: top-right, clear of the header and of the
@@ -195,6 +218,7 @@ CORNER_UR = (7.2, 3.8)
 CORNER_W = 3.0
 CORNER_H = 4.1
 assert sorted(TABLE) == LENGTHS
+assert set(DEFINITIONS) <= {t["opener"] for t in TABLE.values()}
 
 
 def _row_y(L):
@@ -437,14 +461,45 @@ class Scene10(WordleDarkScene):
         # rising in, as the table's rows do in i
         self.play(FadeIn(cell, shift=UP * 0.3), *extra, run_time=run_time)
 
+    def _type_flipping_gloss_out(self, board, row, word, run_time, **kwargs):
+        """`board.type_word`, with the definition on screen (if any) flipping off
+        during the FIRST letter's pop, in the same play."""
+        anim, total = board.type_anim(self, row, word, run_time,
+                                      per_letter=key_cues(self), appear=True, **kwargs)
+        if self.definition is None:
+            self.play(anim, run_time=total)
+            return
+        n = len(word)
+        pop = total * n / (2 * n - 1)       # one TilePop's length (type_anim's lag 1/n)
+        anim.run_time = total
+        out = AnimationGroup(*[TileFlip(line, None, None, vanish=True)
+                               for line in self.definition], run_time=pop)
+        self.play(AnimationGroup(anim, out))
+        self.remove(self.definition)
+        self.definition = None
+
     def _fill_opener(self, L, run_time):
         """Length L's best opener typed into its row as tiles (they appear as their
-        letters land), with the keystroke sounds."""
+        letters land), with the keystroke sounds. Returns the row."""
         row = get_board(rows=1, cols=L).scale(TABLE_TILE_SCALE)
         row.move_to([0, _row_y(L), 0]).align_to(np.array([OPENER_X, 0, 0]), LEFT)
-        row.type_word(self, 0, TABLE[L]["opener"], run_time,
-                      per_letter=key_cues(self), appear=True,
-                      letter_color=tile_color)
+        self._type_flipping_gloss_out(row, 0, TABLE[L]["opener"], run_time,
+                                      letter_color=tile_color)
+        self.opener_row = row
+        return row
+
+    def _gloss_in(self, L, run_time):
+        """Length L's opener's definition flips on, one line, under the word (to its
+        right for RAS)."""
+        word = TABLE[L]["opener"]
+        d = gloss([DEFINITIONS[word]], GLOSS_FS)
+        if word in BESIDE:
+            d.next_to(self.opener_row, RIGHT, buff=GLOSS_BUFF_RIGHT)
+        else:
+            d.next_to(self.opener_row, DOWN, buff=GLOSS_BUFF, aligned_edge=LEFT)
+        self.definition = d
+        self.play(AnimationGroup(*[TileFlip(line, None, None, appear=True)
+                                   for line in d]), run_time=run_time)
 
     def _fill_both(self, L, avg_run_time, opener_run_time):
         """A whole row, as every row filled in one beat is: average, then opener."""
@@ -468,13 +523,13 @@ class Scene10(WordleDarkScene):
         """The path played as a game: each row typed, then quick-flipped (all its
         tiles at once) to its score."""
         for row, g in enumerate(GREY_PATHS[L]["guesses"]):
-            board.type_word(self, row, g["word"], type_run_time,
-                            per_letter=key_cues(self), appear=True)
+            self._type_flipping_gloss_out(board, row, g["word"], type_run_time)
             board.reveal(self, row, g["code"], flip_run_time, lag_ratio=0)
 
     # j : SALET's row, the same way as every other whole row
     @subscene
     def salet_row(self):
+        self.definition = None              # the opener definition on screen, if any
         self._fill_both(5, 0.5, 0.65)
 
     # k : length 6's average
@@ -486,6 +541,7 @@ class Scene10(WordleDarkScene):
     @subscene
     def opener_6(self):
         self._fill_opener(6, 0.78)
+        self._gloss_in(6, 0.6)
 
     # m : length 7's average
     @subscene
@@ -501,11 +557,13 @@ class Scene10(WordleDarkScene):
     @subscene
     def both_8(self):
         self._fill_both(8, 0.5, 1.04)
+        self._gloss_in(8, 0.6)
 
     # p : both for 9
     @subscene
     def both_9(self):
         self._fill_both(9, 0.5, 1.17)
+        self._gloss_in(9, 0.6)
 
     # q : both for 10
     @subscene
@@ -516,6 +574,7 @@ class Scene10(WordleDarkScene):
     @subscene
     def both_11(self):
         self._fill_both(11, 0.5, 1.43)
+        self._gloss_in(11, 0.6)
 
     # s : length 4's average
     @subscene
@@ -545,6 +604,7 @@ class Scene10(WordleDarkScene):
     @subscene
     def opener_3(self):
         self._fill_opener(3, 0.39)
+        self._gloss_in(3, 0.6)
 
     # x : length 3's tree's all-grey path played out in the corner
     @subscene
