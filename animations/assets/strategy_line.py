@@ -71,10 +71,11 @@ def word_stroke(width):
     return STROKE * min(1.0, width / HEADER_W)
 
 
-def win_color(rate):
-    """A win rate (0..1) on the red -> green scale: halfway at WIN_MID, via a
-    power law in the loss rate, interpolated round the hue wheel."""
-    p = math.log(0.5) / math.log(1 - WIN_MID)
+def win_color(rate, mid=WIN_MID):
+    """A win rate (0..1) on the red -> green scale: halfway at `mid` (default
+    WIN_MID), via a power law in the loss rate, interpolated round the hue wheel.
+    `mid` lets another 0..1 share use the same scale (scene 18's table: 0.5)."""
+    p = math.log(0.5) / math.log(1 - mid)
     t = 1 - (1 - rate) ** p
     (h0, s0, v0), (h1, s1, v1) = (colorsys.rgb_to_hsv(*ManimColor(c).to_rgb())
                                   for c in (WIN_LOW, WIN_HIGH))

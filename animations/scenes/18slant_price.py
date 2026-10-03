@@ -21,16 +21,18 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   f lions       — copies of L I O N S into a word under it               (18f, VO 4)
   g near_optimal — pan down to "Near Optimal Strategy"                   (18g, VO 5)
   h slant       — SLANT typed at the top                                 (18h, VO 6)
-  i left_branch — a white line drawn down-left; five boxes at its end: three split
-                  green / yellow, two black                              (18i, VO 6)
-  j left_rca    — "Random Compatible Answers" rises in under them, three lines (18j)
-  k right_branch — a white line drawn down-right; three grey boxes, two black (18k)
+  i left_branch — a white line extends down-left, five boxes popping out along it:
+                  three split green / yellow, two black                  (18i, VO 6)
+  j left_rca    — a line down from them, a "Random Compatible Answers" card popping
+                  out along it (user's call)                             (18j, VO 6)
+  k right_branch — the same down-right: three grey boxes, two black      (18k, VO 6)
   l price       — PRICE typed directly below                             (18l, VO 6)
-  m right_rca   — "Random Compatible Answers" rises in under it          (18m, VO 6)
+  m right_rca   — a line down from PRICE, its card popping out (as j)    (18m, VO 6)
   n average     — "Average Guesses: 3.67" rises in at the bottom         (18n, VO 6)
   o timeline    — pan down to the number line, Optimal (3.42) at the left and Random
                   Compatible Answers (4.08) at the right, scene 15's markers in
-                  between; the SLANT PRICE card pops out at 3.67          (18o, VO 7)
+                  between; the SLANT PRICE card ("Strategy", user's call) pops out
+                  at 3.67                                                (18o, VO 7)
 
 REUSE MAP — every element, the one source it comes from, and how it enters:
   tier list (a)       bpkfigures.tier_list `filled_list` at 09's LIST_SCALE, panels
@@ -47,25 +49,29 @@ REUSE MAP — every element, the one source it comes from, and how it enters:
                       title (13a's: title and content together)
   letter copies (c-f) copies of the list's own boxed tiles, Transformed into their
                       places (09d's per-letter moves, tier_list.morph_into)
-  cells (c, d)        14's `_fill`: FadeIn rising 0.3
+  cells (c, d)        14's `_fill`: FadeIn rising 0.3; coloured red -> green by
+                      StrategyLine `win_color` with its halfway point at 50% (user's
+                      call: colour-coded; the midpoint is the VO's "half")
   words (e, f)        assets/board.py `get_typed_row`; each box -> tile, glyph -> letter
   pans (g, o)         StrategyLine `_pan_down` (13's pan + whoosh)
   screen title (g)    crisp_text WHITE FONT_SIZE_LG at TITLE_BUFF (13's / 14's)
   typing (h, l)       WordleBoard.type_word(appear=True) + assets/keys.py `key_cues`
                       (13's `_type`)
-  branch lines (i, k) assets/branch.py — 07's tree edges (white, 1.5, behind, middle
-                      tile to middle tile), moved out of 07 for this scene; Create (07c)
+  branch lines (i-m)  assets/branch.py — 07's tree edges (white, 1.5, behind, middle
+                      tile to middle tile), moved out of 07 for this scene; each
+                      extends with its row / card popping out along it (`BranchPop`,
+                      the number line's marker pop with the branch as the stem)
   pattern boxes (i,k) assets/board.py tiles: grey = TILE_ABSENT, black = an untouched
                       tile (TILE_EMPTY_FILL / TILE_EMPTY_BORDER); the split tiles are
                       two triangles, TILE_CORRECT top-left, TILE_PRESENT bottom-right
-  "Random Compatible  crisp_text, initials bold as StrategyLine's RCA card; FadeIn
-   Answers" (j, m)    rising 0.3 (14's cells)
+  RCA cards (j, m)    the number line's RCA card: bpkfigures `stack_lines` (baseline
+                      pitch), initials bold, StrategyLine's card style
   average (n)         crisp_text WHITE FONT_SIZE_MD; FadeIn rising 0.3
   number line (o)     assets/strategy_line.py `StrategyLine`: `_build_line(3.42, 4.08)`
                       with scene 15's LINE_DROP and stem; Optimal / SLATE / CRANE SPILT
                       / Random Compatible markers as scene 15 left them (grow=1.0)
-  new marker (o)      `opener_marker` (a board-tight word_stack, "Then RCA", the win
-                      rate), popped out by `_pop_in` with the pop sound
+  new marker (o)      StrategyLine `_marker`: a board-tight word_stack, "Strategy"
+                      (user's call, not "Then RCA"), the win rate; `_pop_in`
   colours             BOARD_NAVY via WordleBoardScene; tiles config.py TILE_*
 
 EVERY NUMBER is sourced (assets/slant_price_data.py -> slant_price_cache.json):
@@ -95,10 +101,13 @@ from bpkfigures import tier_list as tl
 from assets import tier_data as td
 from assets import slant_price_data, random_compatible_data, always_win_data
 from assets.board import STROKE, GAP, TILE, WordleBoard, get_typed_row
-from assets.branch import branch_line, mid_tile
+from assets.branch import branch_line, mid_tile, BranchPop
 from assets.keys import key_cues
 from assets.strategy_line import (StrategyLine, GAME_DY, TITLE_BUFF, OPTIMAL,
-                                  COMPATIBLE)
+                                  COMPATIBLE, CARD_PAD, CARD_RADIUS, MARKER_FS,
+                                  win_color, word_stack, rate_text)
+from bpkfigures.number_line import stack_lines
+from bpkfigures.card import card_behind
 
 DATA = slant_price_data.load()
 STRAT = DATA["strategy"]
@@ -138,8 +147,9 @@ ROW_TILE = 0.62                   # its rows' tile side
 SLANT_Y = 2.3
 BRANCH_X = 4.0                    # the two pattern rows' centres, either side
 PATTERN_Y = 0.4
-RCA_GAP = 0.3                     # a row's bottom to "Random Compatible Answers"
-RCA_LINE_GAP = 0.1
+RCA_LINK = 0.35                   # j, m: the line showing between a row and its card
+TABLE_MID = 0.5                   # c, d: the share coloured halfway (yellow) on the
+                                  #   win-rate red -> green scale -- the VO's "half"
 AVG_Y = -3.7
 
 # ── the number line (two frames down; scene 15's line) ───────────────────────
@@ -190,15 +200,21 @@ def _pattern_row(kind, center):
     return row
 
 
-def _rca(top_center):
-    """'Random Compatible Answers' on three lines, initials bold (StrategyLine's RCA
-    card), its top at `top_center`."""
-    lines = VGroup(*[crisp_text(w, font_size=FONT_SIZE_MD, color=WHITE,
-                                t2w={w[0]: BOLD})
-                     for w in ("Random", "Compatible", "Answers")])
-    lines.arrange(DOWN, buff=RCA_LINE_GAP)
-    lines.move_to(top_center, aligned_edge=UP)
-    return lines
+def _rca_card(top_center):
+    """'Random Compatible Answers' on the number line's RCA card: three lines on a
+    baseline pitch (bpkfigures `stack_lines`, as every marker card -- NOT
+    `arrange`, which spaces bounding boxes, so the p in "Compatible" pushed
+    "Answers" down), initials bold, on StrategyLine's card. Its top at
+    `top_center`."""
+    lines = stack_lines([(w, None, {"t2w": {w[0]: BOLD}})
+                         for w in ("Random", "Compatible", "Answers")],
+                        font_size=MARKER_FS, color=WHITE).set_z_index(1)
+    card = card_behind(lines, pad=CARD_PAD, fill=TILE_EMPTY_FILL,
+                       stroke_color=TILE_FILLED_BORDER, stroke_width=STROKE,
+                       corner_radius=CARD_RADIUS)
+    out = VGroup(card, lines)
+    out.move_to(top_center, aligned_edge=UP)
+    return out
 
 
 def _pct(count):
@@ -279,9 +295,13 @@ class Scene18(StrategyLine, MovingCameraScene, WordleBoardScene):
 
     def _cells(self, letters, first_row, col):
         """Column `col`'s (0 or 1) percentages for `letters`."""
-        return [crisp_text(_pct(DATA["coverage"][ch.lower()][col]), font_size=CELL_SIZE,
-                           color=WHITE).move_to([COL_X[col], self._row_y(first_row + k), 0])
-                for k, ch in enumerate(letters)]
+        out = []
+        for k, ch in enumerate(letters):
+            n = DATA["coverage"][ch.lower()][col]
+            out.append(crisp_text(_pct(n), font_size=CELL_SIZE, color=WHITE)
+                       .set_color(win_color(n / DATA["paths"], mid=TABLE_MID))
+                       .move_to([COL_X[col], self._row_y(first_row + k), 0]))
+        return out
 
     def _fill(self, cells, run_time):
         """14's `_fill`: the cells rise into place."""
@@ -358,13 +378,23 @@ class Scene18(StrategyLine, MovingCameraScene, WordleBoardScene):
         self.slant_row.type_word(self, 0, STRAT["opener"], 0.65,
                                  per_letter=key_cues(self), appear=True)
 
-    # i, k : a branch line, then the five boxes at its end
+    # i, k : a branch line extends and the five boxes pop out along it
     def _branch(self, kind, x, run_time):
         row = _pattern_row(kind, [x, B_DY + PATTERN_Y, 0])
-        line = branch_line(mid_tile(self.slant_row), mid_tile(row))
-        self.play(Create(line), run_time=run_time)
-        self.play(FadeIn(row), run_time=0.5)
+        a, b = mid_tile(self.slant_row), mid_tile(row)
+        line = branch_line(a, b)
+        self.add(line, row)
+        self.play(BranchPop(line, row, a, b), run_time=run_time)
         return line, row
+
+    # j, m : a line down from a row, its Random Compatible Answers card popping out
+    def _rca_branch(self, row, run_time):
+        card = _rca_card(row.get_bottom() + DOWN * RCA_LINK)
+        a, b = mid_tile(row), card.get_center()
+        line = branch_line(a, b)
+        self.add(line, card)
+        self.play(BranchPop(line, card, a, b), run_time=run_time)
+        return line, card
 
     @subscene
     def left_branch(self):
@@ -372,8 +402,7 @@ class Scene18(StrategyLine, MovingCameraScene, WordleBoardScene):
 
     @subscene
     def left_rca(self):
-        self.left_words = _rca(self.left_row.get_bottom() + DOWN * RCA_GAP)
-        self.play(FadeIn(self.left_words, shift=UP * 0.3), run_time=0.6)
+        self.left_link, self.left_words = self._rca_branch(self.left_row, 0.6)
 
     @subscene
     def right_branch(self):
@@ -390,8 +419,7 @@ class Scene18(StrategyLine, MovingCameraScene, WordleBoardScene):
 
     @subscene
     def right_rca(self):
-        self.right_words = _rca(self.price_row.get_bottom() + DOWN * RCA_GAP)
-        self.play(FadeIn(self.right_words, shift=UP * 0.3), run_time=0.6)
+        self.right_link, self.right_words = self._rca_branch(self.price_row, 0.6)
 
     @subscene
     def average(self):
@@ -410,9 +438,11 @@ class Scene18(StrategyLine, MovingCameraScene, WordleBoardScene):
         self.opener_marker(round(CRANE_SPILT["mean"], 2), FIRST_PAIR,
                            CRANE_SPILT["win_rate"], side=DOWN, grow=1.0)
         self.add(self.line, self.title, self.subtitle)
-        self.sp_marker = self.opener_marker(round(STRAT["mean"], 2),
-                                            [STRAT["opener"], STRAT["second"]],
-                                            STRAT["win_rate"], side=UP)
+        # "Strategy" in place of the opener cards' "Then RCA" (user's call)
+        self.sp_marker = self._marker(round(STRAT["mean"], 2),
+                                      [word_stack([STRAT["opener"], STRAT["second"]]),
+                                       "Strategy", rate_text(STRAT["win_rate"])],
+                                      side=UP, grow=0.0)
 
     @subscene
     def timeline(self):
