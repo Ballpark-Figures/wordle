@@ -157,26 +157,6 @@ from bpkfigures.browser import browser_window
 from bpkfigures.line_graph import get_line_graph, line_point, spread_label_ys
 from assets import multi_plot_data
 
-
-class Squash(Animation):
-    """Mobjects flipping in (`appear`) or away: each squashed about its own centre,
-    height driven by `alpha` the way TileFlip drives it (set directly each frame, so
-    no Transform has to align a tile with its letter). Hidden on the collapsed frame,
-    or the outline shows there as a line; the caller removes what flipped away."""
-
-    def __init__(self, parts, appear, **kwargs):
-        self.parts, self.appear = list(parts), appear
-        self.h = [p.height for p in self.parts]
-        self.c = [p.get_center() for p in self.parts]
-        super().__init__(Group(*self.parts), **kwargs)
-
-    def interpolate_mobject(self, alpha):
-        a = self.rate_func(alpha)
-        f = a if self.appear else 1 - a
-        for p, h, c in zip(self.parts, self.h, self.c):
-            p.stretch_to_fit_height(max(h * f, 1e-4)).move_to(c)
-            p.set_opacity(1.0 if f > 0.02 else 0.0)
-
 MEDIA = Path(__file__).resolve().parent.parent / "assets" / "web_media"
 GAME = game_data.load("octordle")
 GUESSES = GAME["guesses"]
@@ -832,43 +812,57 @@ class Scene16(WordleBoardScene):
     def _cells(row):
         return [VGroup(row.tiles[0][c], row.letters[0][c]) for c in range(row.n_cols)]
 
+    def _tile_flips(self, row, **kw):
+        """`row`'s tiles flipping one after another -- the board's TileFlip, at the
+        lag every flip under the chart uses, so all of them read alike."""
+        return LaggedStart(*[TileFlip(row.tiles[0][c], row.letters[0][c], TILE_EMPTY_FILL,
+                                      stroke=TILE_FILLED_BORDER, **kw)
+                             for c in range(row.n_cols)], lag_ratio=0.25)
+
     def _flip_out(self, row):
-        """`row` flips away tile by tile: each tile and its letter squashed to nothing
-        (and faded, or its outline shows as a line on the last frame)."""
-        return LaggedStart(*[Squash(cell, appear=False) for cell in self._cells(row)],
-                           lag_ratio=0.25)
+        """`row` flips away: the board's TileFlip, gone at the turn."""
+        return self._tile_flips(row, vanish=True)
 
     def _flip_in(self, row):
-        """`row` flips IN tile by tile -- the reverse of `_flip_out`. Puts the row on
-        screen (hidden until its flip starts) and returns the animation."""
-        for cell in self._cells(row):
-            cell.set_opacity(0)
+        """`row` flips IN -- the reverse of `_flip_out`. Puts the row on screen
+        (hidden until each tile turns) and returns the animation."""
         self.add(row)
-        return LaggedStart(*[Squash(cell, appear=True) for cell in self._cells(row)],
-                           lag_ratio=0.25)
+        return self._tile_flips(row, appear=True)
 
-    def _flip_callout(self, words, run_time):
+    def _flip_callout(self, words):
         """The opener under the chart flips to `words`, in place: each row that carries
-        over flips tile by tile to its new word (the board's TileFlip, letters swapped
-        at the midpoint); each row left over flips away (squashed to nothing)."""
+        over flips tile by tile to its new word (letters swapped at the midpoint);
+        each row left over flips away."""
         anims, dead, gone = [], [], []
         for i, row in enumerate(self.callout_rows):
             if i >= len(words):
                 anims.append(self._flip_out(row))
                 gone.append(row)
                 continue
-            flips = []
+            news = []
             for c, ch in enumerate(words[i]):
                 tile, old = row.tiles[0][c], row.letters[0][c]
                 new = row._letter(ch, tile).set_opacity(0)
+                self.add(new)
+                news.append(new)
+                dead.append((row, old))
+            anims.append(LaggedStart(*[TileFlip(row.tiles[0][c], row.letters[0][c],
+                                                TILE_EMPTY_FILL, stroke=TILE_FILLED_BORDER,
+                                                swap_to=news[c])
+                                       for c in range(row.n_cols)], lag_ratio=0.25))
+            for c, new in enumerate(news):
                 row.letters[0][c] = new
                 row.add(new)
-                self.add(new)
-                flips.append(TileFlip(tile, old, TILE_EMPTY_FILL, stroke=TILE_FILLED_BORDER,
-                                      swap_to=new))
-                dead.append((row, old))
-            anims.append(LaggedStart(*flips, lag_ratio=0.25))
         return anims, dead, gone
+
+    @staticmethod
+    def _timed(anims, flip, run_time):
+        """`anims` played together over the first `flip` seconds of a `run_time` play,
+        so every flip under the chart takes the same time whatever it rides with."""
+        group = AnimationGroup(*anims, run_time=flip)
+        if run_time <= flip:
+            return group
+        return Succession(group, Wait(run_time - flip))
 
     def _finish_flip(self, dead, gone):
         for row, old in dead:
@@ -895,18 +889,18 @@ class Scene16(WordleBoardScene):
     # u : the 3-word opener's line, CLAMP SINGE TURBO flipping in under the chart
     @subscene
     def plot_three(self):
-        self._draw([3], 2.0, [LaggedStart(*[self._flip_in(r) for r in self.callout_rows],
-                                          lag_ratio=0.15)])
+        flips = [self._flip_in(r) for r in self.callout_rows]
+        self._draw([3], 2.0, [self._timed(flips, 1.0, 2.0)])
 
-    def _draw_and_flip(self, n, words, run_time):
-        anims, dead, gone = self._flip_callout(words, run_time)
-        self._draw([n], run_time, anims)
+    def _draw_and_flip(self, n, words, run_time, flip):
+        anims, dead, gone = self._flip_callout(words)
+        self._draw([n], run_time, [self._timed(anims, flip, run_time)])
         self._finish_flip(dead, gone)
 
     # v : the 2-word opener's line; the opener flips to DOUBT RANGE (TURBO away)
     @subscene
     def plot_two(self):
-        self._draw_and_flip(2, CALLOUT_OPENERS[2], 2.0)
+        self._draw_and_flip(2, CALLOUT_OPENERS[2], 2.0, flip=1.0)
 
     def _setup_gloss(self):
         self.gloss = gloss(ROTAN_GLOSS, GLOSS_FS).next_to(
@@ -916,15 +910,15 @@ class Scene16(WordleBoardScene):
     #     definition
     @subscene
     def plot_one(self):
-        self._draw_and_flip(1, CALLOUT_OPENERS[1], 2.0)
+        self._draw_and_flip(1, CALLOUT_OPENERS[1], 2.0, flip=1.0)
         self._setup_gloss()
         self.play(FadeIn(self.gloss), run_time=0.6)
 
     # x : ROTAN flips to PLANT; the definition flips out, line by line
     @subscene
     def opener_plant(self):
-        anims, dead, gone = self._flip_callout(CALLOUT_OPENERS["alt"], 1.0)
-        out = LaggedStart(*[Squash([line], appear=False) for line in self.gloss],
+        anims, dead, gone = self._flip_callout(CALLOUT_OPENERS["alt"])
+        out = LaggedStart(*[TileFlip(line, None, None, vanish=True) for line in self.gloss],
                           lag_ratio=0.25)
         self.play(*anims, out, run_time=1.0)
         self._finish_flip(dead, gone)
@@ -935,6 +929,6 @@ class Scene16(WordleBoardScene):
     @subscene
     def plot_improved(self):
         rows = self.callout_rows
-        self._draw(["imp"], 2.0, [self._flip_out(r) for r in rows])
+        self._draw(["imp"], 2.0, [self._timed([self._flip_out(r) for r in rows], 1.0, 2.0)])
         self.remove(*rows)
         self.callout_rows = []

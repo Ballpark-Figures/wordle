@@ -48,12 +48,18 @@ class TileFlip(Animation):
                  built at the tile's END pose; the flip positions it.
       to_center  the tile travels here during the flip (a board moving as it flips)
       to_scale   the tile (and its letters) grow by this factor during the flip
+
+    AND TWO MORE for flipping something ON or OFF screen with this same motion
+    (scene 16's opener under the chart): `vanish` hides the tile and its letter at
+    the midpoint instead of showing a new face, `appear` keeps them hidden until the
+    midpoint. The fill is untouched, so `tile` may be any mobject (a line of text).
     """
 
     _KEEP = object()                     # swap_to's default: the letter stays
 
     def __init__(self, tile, letter, fill, stroke=None, swap_to=_KEEP,
-                 to_center=None, to_scale=1.0, **kwargs):
+                 to_center=None, to_scale=1.0, vanish=False, appear=False, **kwargs):
+        self.vanish, self.appear = vanish, appear
         self.tile, self.letter, self.fill = tile, letter, fill
         self.stroke = fill if stroke is None else stroke   # the new face's border
         self.h_tile = tile.height
@@ -81,6 +87,13 @@ class TileFlip(Animation):
     def interpolate_mobject(self, alpha):
         a = self.rate_func(alpha)
         scale = max(abs(np.cos(np.pi * a)), 1e-3)
+        if self.vanish or self.appear:          # on or off screen: same motion,
+            shown = (a >= 0.5) == self.appear   # hidden on the far side of the turn
+            for m, h in ((self.tile, self.h_tile), (self.letter, self.h_letter)):
+                if m is not None and h:
+                    m.stretch_to_fit_height(h * scale).move_to(self.center)
+                    m.set_opacity(1.0 if shown else 0.0)
+            return
         if a >= 0.5 and not self._swapped:      # past the midpoint: the tile has
             self._swapped = True                # turned over, so show the new face
             self.tile.set_fill(self.fill, opacity=1.0).set_stroke(self.stroke, STROKE)
