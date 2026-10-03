@@ -231,8 +231,9 @@ LABEL_GAP = 0.06              # least space between two right-edge line labels
 # an opener shown under the chart while its line is drawn (user's call): typed rows,
 # as 08's TARSE, centred on CALLOUT_AT in the chart's own coordinates
 CALLOUT_AT = (16, 1.0)        # (number of Wordles, average misses)
-CALLOUT_W = 1.5               # one word's width
-CALLOUT_GAP = 0.25            # between the words of an opener
+CALLOUT_W = 2.0               # one word's width
+CALLOUT_GAP = 0.25            # between ROTAN and PLANT, side by side
+# a multi-word OPENER is a stack of rows (user's call), at the board's own row spacing
 CALLOUT_OPENERS = {3: ["clamp", "singe", "turbo"], 2: ["doubt", "range"],
                    1: ["rotan", "plant"]}
 # ROTAN's definition, under it -- the shared gloss (italic part of speech), broken by
@@ -776,8 +777,11 @@ class Scene16(WordleBoardScene):
         self.callouts = {}
         for n, words in CALLOUT_OPENERS.items():
             rows = VGroup(*[get_typed_row(w).scale_to_fit_width(CALLOUT_W) for w in words])
-            rows.arrange(RIGHT, buff=CALLOUT_GAP).move_to(at)
-            self.callouts[n] = rows
+            if n == 1:          # ROTAN with PLANT beside it: a winner and an alternative
+                rows.arrange(RIGHT, buff=CALLOUT_GAP)
+            else:               # an opener: one row under the other, as on a board
+                rows.arrange(DOWN, buff=rows[0].height * GAP / TILE)
+            self.callouts[n] = rows.move_to(at)
         rotan = self.callouts[1][0]
         self.callouts[1] = VGroup(self.callouts[1], gloss(ROTAN_GLOSS, GLOSS_FS).next_to(
             rotan, DOWN, buff=GLOSS_BUFF, aligned_edge=LEFT))
