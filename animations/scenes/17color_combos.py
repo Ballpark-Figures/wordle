@@ -34,7 +34,8 @@ REUSE MAP — every element and the one source it comes from:
   17b motion          kept rows scaled and moved (05g's `animate.scale().move_to()`),
                       the rest FadeOut, kept rows at z_index 1 (script)
   17c combinations    tiles greens, yellows, grays; tile gap the board's ratio
-                      (TILE_BUFF), BLOCK_GAP between colour blocks (script: "slight gaps")
+                      is the 243 grid's (GRID_BUFF) all scene long, BLOCK_GAP between
+                      colour blocks (script: "slight gaps")
   17d/e sound         11j's vanish: whoosh-mids at stacks_view WHOOSH_GAIN, peaking
                       mid-fade (11pop_quiz.py `poof`)
   17f pie             bpkfigures.pie_chart get_pie_chart, callout labels, fan_all
@@ -80,7 +81,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 
 from config import *
-from assets.colorings import level, code, trits, slot, TILE_BUFF, GRID_BUFF, tile
+from assets.colorings import level, code, trits, slot, GRID_BUFF, tile
 from assets.stacks_view import WHOOSH_GAIN
 from assets.board import get_scored_row, get_typed_row
 from assets.flip import Flip, flip
@@ -100,7 +101,7 @@ RIGHT_COLS = 3             # the 30 in three columns of ten; the 5 in one column
 
 # ── 17c: the grid of 21 ────────────────────────────────────────────────────────
 COMBO_TILE = 0.32
-BLOCK_GAP = 0.45           # gap between colour blocks, in tiles (tile gap is TILE_BUFF)
+BLOCK_GAP = 0.45           # gap between colour blocks, in tiles (tile gap is GRID_BUFF)
 COMBO_PITCH = 8.0          # column pitch, in tiles (the widest combination is 6.8)
 LINE_PITCH = 1.1           # row pitch
 IMPOSSIBLE = (4, 1, 0)     # 17d: 4 greens and a yellow can never happen
@@ -229,13 +230,15 @@ def _part_cells(n, cols, cx, size):
 
 
 def _combo(g, y, b, size, block_gap=BLOCK_GAP):
-    """g greens, y yellows, b grays; board tile gaps inside a block, `block_gap` (in
-    tiles) between. Same shape as a coloring row (tiles, empty letters) so a row
-    transforms into it. The table passes TILE_BUFF: no extra gap (the user's call)."""
+    """g greens, y yellows, b grays; the 243 grid's tile gap (GRID_BUFF) inside a
+    block — one tile spacing through the whole scene (the user's call) — and
+    `block_gap` (in tiles) between. Same shape as a coloring row (tiles, empty
+    letters) so a row transforms into it. The table passes GRID_BUFF: no extra gap
+    (the user's call)."""
     tiles, x, prev = VGroup(), 0.0, None
     for t in [2] * g + [1] * y + [0] * b:
         if prev is not None:
-            x += size * (1 + (TILE_BUFF if t == prev else block_gap))
+            x += size * (1 + (GRID_BUFF if t == prev else block_gap))
         tiles.add(tile(t, size).move_to([x, 0, 0]))
         prev = t
     tiles.move_to(ORIGIN)
@@ -373,7 +376,7 @@ class Scene17(WordleBoardScene):
         left, self.val_x = _table_xs()
         self.rows = {}
         for i, c in enumerate(ROWS):
-            row = _combo(*c, ROW_TILE, block_gap=TILE_BUFF)
+            row = _combo(*c, ROW_TILE, block_gap=GRID_BUFF)
             row.shift([left - row.get_left()[0], _row_y(i, c) - row.get_y(), 0])
             self.rows[c] = row
         self.values = {}
