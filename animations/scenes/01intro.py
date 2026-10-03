@@ -26,19 +26,21 @@ BEAT MAP
                      TIME, each word's letters coming back with it
   i noise          — no change; the noise the VO asks for — PING_SFX twice, one
                      for ADIEU and one for AUDIO
-  j left_ten       — zoom out to the left 10 bins, squashing again; the starters
-                     drop back, everything stays dimmed
-  k those_words    — zoom out until THOSE and WORDS are in frame, WORDS' column the
-                     last on the right. Each word lights up and gets its callout —
-                     a full-size copy just above it, growing out of the tip of a
-                     short white line — THE MOMENT it and its callout are on screen,
-                     with PING_SFX. (WORDS arrives only at the zoom's end: the frame
-                     is built to stop at its column.) ADIEU and AUDIO are lit and
-                     called out here too, OFF SCREEN, so l can simply reveal them
-  l hello          — zoom out to HELLO, uncovering ADIEU and AUDIO already there;
+  j zoom_weird     — zoom out just far enough to show WEIRD, squashing again; the
+                     starters drop back, everything stays dimmed
+  k show_weird     — WEIRD lights up and gets its callout — a full-size copy just
+                     above it, growing out of the tip of a short white line — with
+                     PING_SFX
+  l those_words    — zoom out until THOSE and WORDS are in frame, WORDS' column the
+                     last on the right. Each lights up and gets its callout THE
+                     MOMENT it and its callout are on screen, with PING_SFX. (WORDS
+                     arrives only at the zoom's end: the frame is built to stop at
+                     its column.) ADIEU and AUDIO are lit and called out here too,
+                     OFF SCREEN, so m can simply reveal them
+  m hello          — zoom out to HELLO, uncovering ADIEU and AUDIO already there;
                      HELLO lights up and gets its callout the moment it is on screen
-  m zoom_out       — (added by the user, not yet in the Doc) out the rest of the
-                     way to the whole histogram; callouts and emphasis fade
+  n zoom_out       — (added by the user, not in the Doc) out the rest of the way
+                     to the whole histogram; callouts and emphasis fade
 
 LETTERS: they fade out during the fill once the stacks outgrow legibility, and from
 then on ONLY an emphasised word carries them (the user's rule).
@@ -52,6 +54,8 @@ REUSE MAP
                              as words land in f, notify-app-03 (PING_SFX) from h on
   the histogram              assets/word_stacks.py WordStacks + StacksCamera
                              (bulk drawing — see its docstring for why)
+  camera moves, emphasis,    assets/stacks_view.py StacksView (_move_view, the
+  callouts                   callouts; shared with scene 08)
   every average, bin, tile   assets/intro_data.py -> intro_cache.json: the
                              committed optturns sweep + math/wordle.py pattern()
   label numbers              the cache's `labels` (rounded to 2 dp)
@@ -83,7 +87,8 @@ from assets.keys import key_cues
 from assets import intro_data
 from assets.word_stacks import (WordStacks, StacksCamera, PITCH, STEP, SIDE,
                                 WORD_W)
-from assets.board import TILE
+from assets.stacks_view import (StacksView, ASPECT, FRAME_W, CALLOUT_W, PING_SFX,
+                                PING_GAIN, WHOOSH_SFX, WHOOSH_GAIN, WHOOSH_PEAK)
 from bpkfigures.sfx import sfx_path, wav_info
 
 DATA = intro_data.load()
@@ -93,9 +98,7 @@ ANSWER_CODE = {w: DATA["codes"][IDX[w]] for w in DATA["pinned"]}
 START_BIN = DATA["bins"][IDX["start"]]
 BIN_LO, BIN_HI = min(DATA["bins"]), max(DATA["bins"])
 
-ASPECT = 16 / 9
-FRAME_W = 16.0
-LABEL_FS = 40                 # "3.58 guesses"
+LABEL_FS = 40                # "3.58 guesses"
 LABEL_BUFF = 0.35             # gap under the word
 SIDE_MARGIN = 1.0             # beside the leftmost stack in the zoomed views
 FILL_BASE = 0.4               # fill: frame centre rises 0.4 per unit of extra height
@@ -113,15 +116,9 @@ FILL_SMOOTH = 301             # f: steps the word count is averaged over (~1.5s)
 FILL_LOOK = 60                # f: the squash looks this many steps ahead, so it
                               # flattens smoothly rather than in row-sized jerks
 WORD_SFX = "notify-text"      # f: the sound of a word landing in the histogram
-PING_SFX = "notify-app-03"    # h onward: a word emphasised / called out, and i's noise
-PING_GAIN = -6.0              # dB — played quieter than the library's level
 NOISE_GAIN = -12.0            # dB — i's two pings, quieter still (user's call)
-WHOOSH_SFX = "whoosh"         # under every camera move (d, e, f's pan, g, j-m)
-WHOOSH_GAIN = -8.0            # dB — played quieter than the library's level
-WHOOSH_PEAK = 0.5             # s into the whoosh file where it is loudest (MEASURED
-                              # at import: -4.4 dB at 0.4s, -4.2 at 0.6s); a move's
-                              # whoosh is placed to peak at the move's midpoint, its
-                              # fastest moment, since every move eases in and out
+# PING_SFX (h onward: a word emphasised / called out, and i's noise) and WHOOSH_SFX
+# (under every camera move: d, e, f's pan, g, j-m) come from assets/stacks_view.py
 FILL_SFX_MAX_PER_S = 15.0     # f: one cue per word, but no more than this many a
                               # second — at the fill's peak ~40 words land PER FRAME,
                               # and hundreds of overlapping copies of a 1.1s sound
@@ -138,24 +135,24 @@ FILL_SEED = 1                 # f: which bar each word goes to is random; seeded
 FILL_LETTER_FADE = 0.05       # f: letters fade out over this much of the zoom,
                               # finishing just as the rows first start to flatten
 STARTERS = ["irate", "train", "arise", "crane", "raise", "slate", "stare"]
-CALLED_OUT = ["those", "words", "hello", "adieu", "audio"]
+CALLED_OUT = ["weird", "those", "words", "hello", "adieu", "audio"]
 
 # CALLOUTS sit a little ABOVE their word in the histogram, joined to it by a short
 # white line (the user's call — they may overlap the stacks). Sizes are in SCREEN
 # terms (fractions of the frame), so a callout stays legible while the camera zooms.
-CALLOUT_W = 0.12              # a callout word's width, as a fraction of frame width
-CALLOUT_LIFT = 0.05           # line length, as a fraction of frame height
-CALLOUT_GROW = 0.3            # seconds for a callout (line + word) to grow in
-TILE_OVER_WORD = TILE / WORD_W   # a scored row's height over its width
-LINE_STROKE = 3.0             # line width as it would be in a 16-wide frame
-CALLOUT_DX = {"words": -0.07, "adieu": 0.07, "hello": -0.07}
+# The machinery and its sizes are assets/stacks_view.py's.
+CALLOUT_DX ={"words": -0.07, "adieu": 0.07, "hello": -0.07}
                               # sideways lean, as a fraction of frame width: WORDS'
                               # callout leans left so it fits in k, whose right edge
                               # is WORDS' column; ADIEU's leans right so it stays out
                               # of k's frame until l reveals it; HELLO's leans left
                               # so it fits (and so appears) sooner in l's zoom
-WORDS_AT = 0.72               # k, l: WORDS sits this far up the frame, leaving
-                              # room above it for its callout
+TOP_WORD = "weird"            # the HIGHEST called-out word (row 522; WORDS is 412)
+TOP_AT = 0.80                 # j-m: it sits this far up every frame, leaving room
+                              # above for its callout. Chosen so the full view's
+                              # tallest stack is no bigger on screen than it already
+                              # is in m's frame, i.e. the closing zoom never grows
+                              # the chart upward (the complaint that set this up)
 
 
 def x_of_bin(b):
@@ -420,28 +417,39 @@ def view_centred(bins, top_rows, s, bottom=-1.5):
 # g: the starters' bins centred, every starter in frame, rows at full height
 VIEW_STARTERS = view_centred([DATA["bins"][IDX[w]] for w in STARTERS],
                              _rows_of(STARTERS), 1.0)
-# j: the left 10 bins, squashing again
-VIEW_TEN = view_fit(_bin_right(BIN_LO + 9), 0, 0.5)
-# k: THOSE and WORDS in frame, WORDS' column the last on the right (the right edge
-# halfway into the gap after it, so ADIEU's stack is out), with room above WORDS
-# for its callout
+def _top_squash(w):
+    """The squash putting TOP_WORD at TOP_AT of a frame w wide (bottom at -1.5)."""
+    return (TOP_AT * w / ASPECT - 1.5) / (STEP * DATA["rows"][IDX[TOP_WORD]])
+
+
+def _fit_width(word):
+    """A frame from beside the first stack, just wide enough that `word` AND its
+    callout (centred on it, CALLOUT_W of the frame wide) fit: w = x + w*CALLOUT_W/2
+    + margin - left, solved for w."""
+    return (x_of_bin(DATA["bins"][IDX[word]]) + SIDE_MARGIN - (HIST_L - SIDE_MARGIN)) \
+        / (1 - CALLOUT_W / 2)
+
+
+# j: out just far enough to show WEIRD (and room for its callout in k)
+_J_W = _fit_width("weird")
+VIEW_WEIRD = (HIST_L - SIDE_MARGIN, -1.5, _J_W, _top_squash(_J_W))
+# l: THOSE and WORDS in frame, WORDS' column the last on the right (the right edge
+# halfway into the gap after it, so ADIEU's stack is out), WEIRD still at TOP_AT
 _K_RIGHT = x_of_bin(DATA["bins"][IDX["words"]]) + WORD_W / 2 + (PITCH - WORD_W) / 2
 _K_W = _K_RIGHT - (HIST_L - SIDE_MARGIN)
-_K_S = (WORDS_AT * _K_W / ASPECT - 1.5) / (STEP * DATA["rows"][IDX["words"]])
+_K_S = _top_squash(_K_W)
 VIEW_THOSE_WORDS = (HIST_L - SIDE_MARGIN, -1.5, _K_W, _K_S)
-# l: out to HELLO; ADIEU and AUDIO are between. Squashed only enough to keep WORDS
-# at WORDS_AT of the (bigger) frame — NOT k's squash, which only k's narrow frame
-# needs. Carrying k's squash here left l flatter than the full view, so m's zoom
-# OUT made the stacks grow UP on screen as the rows unsquashed.
-# (wide enough that HELLO's callout, centred on it and CALLOUT_W of the frame
-# wide, fits: w = x + w * CALLOUT_W / 2 + margin - left, solved for w)
-_L_W = (x_of_bin(DATA["bins"][IDX["hello"]]) + SIDE_MARGIN - (HIST_L - SIDE_MARGIN)) \
-    / (1 - CALLOUT_W / 2)
-_L_S = (WORDS_AT * _L_W / ASPECT - 1.5) / (STEP * DATA["rows"][IDX["words"]])
+# m: out to HELLO; ADIEU and AUDIO are between. Squashed only enough to keep WEIRD
+# at TOP_AT of the (bigger) frame — every frame from j on is set that way, so no
+# zoom out makes the stacks grow UP on screen as the rows unsquash.
+_L_W = _fit_width("hello")
+_L_S = _top_squash(_L_W)
 VIEW_HELLO = (HIST_L - SIDE_MARGIN, -1.5, _L_W, _L_S)
 
 
-class Scene01(MovingCameraScene, WordleDarkScene):
+class Scene01(StacksView, MovingCameraScene, WordleDarkScene):
+    CALLOUT_DX = CALLOUT_DX
+
     def __init__(self, **kwargs):
         super().__init__(camera_class=StacksCamera, **kwargs)
 
@@ -466,139 +474,9 @@ class Scene01(MovingCameraScene, WordleDarkScene):
         t.next_to(np.array([x, -SIDE / 2, 0]), DOWN, buff=LABEL_BUFF)
         return t
 
-    def _set_frame(self, left, bottom, w):
-        f = self.camera.frame
-        f.stretch_to_fit_width(w).stretch_to_fit_height(w / ASPECT)
-        f.move_to([left + w / 2, bottom + w / ASPECT / 2, 0])
-
-    def _apply_view(self, v):
-        left, bottom, w, s = v
-        self._set_frame(left, bottom, w)
-        self.stacks.set_state(squash=s)
-
-    @staticmethod
-    def _lerp_view(fr, to, u):
-        """The view part-way from `fr` to `to`: left and bottom linearly, width and
-        squash geometrically."""
-        lin = lambda a, b: a + (b - a) * u
-        geo = lambda a, b: float(np.exp(lin(np.log(a), np.log(b))))
-        return (lin(fr[0], to[0]), lin(fr[1], to[1]), geo(fr[2], to[2]),
-                geo(fr[3], to[3]))
-
-    def _callout_fits(self, word, view):
-        """True once `word` AND its full-size callout are both inside `view`."""
-        left, bottom, w, s = view
-        h = w / ASPECT
-        c = self.stacks.word_center(word, squash=s)
-        top = c[1] + SIDE * s / 2
-        fx = c[0] + CALLOUT_DX.get(word, 0) * w
-        fy = top + CALLOUT_LIFT * h
-        cw = CALLOUT_W * w
-        ch = cw * TILE_OVER_WORD
-        return (left <= min(c[0] - WORD_W / 2, fx - cw / 2)
-                and max(c[0] + WORD_W / 2, fx + cw / 2) <= left + w
-                and bottom <= c[1] - SIDE * s / 2 and fy + ch <= bottom + h)
-
-    def _move_view(self, to, run_time, letters=None, dim=None, weights=None,
-                   appear=(), present=(), callout_alpha=None, extra=(),
-                   rate_func=smooth, whoosh=False):
-        """Animate the view (and optionally letter opacity / emphasis) to `to`.
-
-        `appear` words get their callout THE MOMENT THEY ARE ON SCREEN — the first
-        point on this move's path where the word and its full-size callout both fit —
-        with PING_SFX at that instant; the word lights up as its callout grows in over
-        CALLOUT_GROW seconds. `present` callouts are created already fully grown (for
-        words off screen, waiting to be revealed). `callout_alpha` fades every
-        callout on screen to that opacity. `whoosh` plays WHOOSH_SFX with its
-        loudest moment at the move's midpoint.
-
-        The stacks are rebuilt every frame from the interpolated view. The updater
-        is REMOVED before returning, so nothing unpicklable reaches the snapshot."""
-        if whoosh:
-            self.sfx(WHOOSH_SFX, at=max(0.0, run_time / 2 - WHOOSH_PEAK),
-                     gain=WHOOSH_GAIN)
-        fr = self.view
-        l0, d0 = self.stacks.letter_opacity, self.stacks.dim
-        l1 = l0 if letters is None else letters
-        d1 = d0 if dim is None else dim
-        w1 = weights or {}
-        w0 = self.stacks.weights_of(w1)
-        # the play's clock: eased value u <-> seconds in
-        ts = np.linspace(0, 1, 2001)
-        us = np.array([rate_func(a) for a in ts])
-        enter = {}
-        for word in appear:
-            self._callout(word)
-            u_in = next((u for u in np.linspace(0, 1, 401)
-                         if self._callout_fits(word, self._lerp_view(fr, to, u))), 1.0)
-            enter[word] = min(float(np.interp(u_in, us, ts)) * run_time,
-                              run_time - CALLOUT_GROW)
-            self.sfx(PING_SFX, at=enter[word], gain=PING_GAIN)
-        for word in present:
-            self._callout(word)["g"] = 1.0
-        a0 = {c["word"]: c["a"] for c in self.callouts or []}
-        t = ValueTracker(0)
-
-        def upd(m):
-            u = t.get_value()
-            secs = float(np.interp(u, us, ts)) * run_time
-            self._apply_view(self._lerp_view(fr, to, u))
-            wts = {w: w0[w] + (w1[w] - w0[w]) * u for w in w1}
-            for c in self.callouts or []:
-                if c["word"] in enter:
-                    c["g"] = float(np.clip((secs - enter[c["word"]]) / CALLOUT_GROW, 0, 1))
-                    wts[c["word"]] = c["g"]
-                if callout_alpha is not None:
-                    c["a"] = a0[c["word"]] + (callout_alpha - a0[c["word"]]) * u
-            m.set_state(letters=l0 + (l1 - l0) * u, dim=d0 + (d1 - d0) * u, weights=wts)
-            m.refresh(self.camera.frame)
-            self._place_callouts()
-
-        self.stacks.add_updater(upd)
-        self.play(t.animate.set_value(1), *extra, run_time=run_time,
-                  rate_func=rate_func)
-        self.stacks.remove_updater(upd)
-        self.remove(t)
-        self.view = to
-        # let a callout's ping RING OUT inside this beat: one that starts late in the
-        # move (WORDS, HELLO) would otherwise run into the trailing hold, which the
-        # stitch trims and the edit covers with a silent still
-        if enter:
-            tail = max(enter.values()) + wav_info(sfx_path(PING_SFX))[0] - run_time
-            if tail > 0:
-                self.wait(tail)
-
-    # ── callouts: a full-size copy of a word, just above it, on a short line ───
-    def _callout(self, word):
-        """Build a callout for `word`, not yet grown in, and register it."""
-        row = get_scored_row(word, DATA["codes"][IDX[word]])
-        line = Line(ORIGIN, UP, color=WHITE)
-        c = {"word": word, "row": row, "line": line, "g": 0.0, "a": 1.0}
-        self.callouts.append(c)
-        self.add(line, row)
-        return c
-
-    def _place_callouts(self):
-        """Put every callout above its word at the current zoom and squash.
-
-        `g` grows it in: the line draws up from the word and the full-size word
-        GROWS FROM THE LINE'S TIP along with it, both at once. `a` scales the whole
-        callout's opacity."""
-        f = self.camera.frame
-        w, h = f.width, f.height
-        for c in self.callouts or []:
-            row, line, g = c["row"], c["line"], c["g"]
-            top = self.stacks.word_center(c["word"]) + \
-                UP * SIDE * self.stacks.squash / 2
-            foot = top + UP * CALLOUT_LIFT * h \
-                + RIGHT * CALLOUT_DX.get(c["word"], 0) * w     # the callout's bottom-centre
-            tip = top + (foot - top) * max(g, 1e-3)
-            line.put_start_and_end_on(top, tip)
-            line.set_stroke(WHITE, width=LINE_STROKE * w / FRAME_W,
-                            opacity=c["a"] if g > 0 else 0.0)
-            row.scale_to_fit_width(CALLOUT_W * w * max(g, 1e-2))
-            row.move_to(tip + UP * row.height / 2)
-            row.set_opacity(c["a"] if g > 0 else 0.0)
+    # ── callouts: the board's own scored row (the rest is assets/stacks_view.py) ──
+    def _callout_row(self, word):
+        return get_scored_row(word, DATA["codes"][IDX[word]])
 
     # a : empty board up from frame 0; START typed into row 0
     @subscene
@@ -777,27 +655,34 @@ class Scene01(MovingCameraScene, WordleDarkScene):
         self.sfx(PING_SFX, at=0.6, gain=NOISE_GAIN)         # AUDIO
         self.wait(1.9)
 
-    # j : out to the left 10 bins, squashing again; the rest stays dimmed
+    # j : out just far enough to show WEIRD; the starters drop back, the rest
+    # stays dimmed
     @subscene
-    def left_ten(self):
-        self._move_view(VIEW_TEN, run_time=2.5, whoosh=True, weights={w: 0 for w in STARTERS})
+    def zoom_weird(self):
+        self._move_view(VIEW_WEIRD, run_time=2.5, whoosh=True,
+                        weights={w: 0 for w in STARTERS})
 
-    # k : out until THOSE and WORDS are in frame; each lights up and gets its
+    # k : WEIRD lights up and gets its callout
+    @subscene
+    def show_weird(self):
+        self.callouts = []
+        self._move_view(VIEW_WEIRD, run_time=0.6, appear=["weird"])
+
+    # l : out until THOSE and WORDS are in frame; each lights up and gets its
     # callout the moment it (and its callout) is on screen. ADIEU and AUDIO are lit
-    # and called out now, off screen, for l to uncover.
+    # and called out now, off screen, for m to uncover.
     @subscene
     def those_words(self):
-        self.callouts = []
         self._move_view(VIEW_THOSE_WORDS, run_time=3.0, whoosh=True, appear=["those", "words"],
                         weights={"adieu": 1, "audio": 1}, present=["adieu", "audio"])
 
-    # l : out to HELLO, uncovering ADIEU and AUDIO already there; HELLO lights up and
+    # m : out to HELLO, uncovering ADIEU and AUDIO already there; HELLO lights up and
     # gets its callout the moment it is on screen
     @subscene
     def hello(self):
         self._move_view(VIEW_HELLO, run_time=2.5, whoosh=True, appear=["hello"])
 
-    # m : out the rest of the way; callouts and emphasis fade
+    # n : out the rest of the way; callouts and emphasis fade
     @subscene
     def zoom_out(self):
         self._move_view(self.full_view, run_time=3.0, whoosh=True, dim=0.0, callout_alpha=0.0,
