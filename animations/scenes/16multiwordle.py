@@ -120,6 +120,12 @@ REUSE MAP — every element and the one source it comes from:
   dots -> words             07's `_setup_focus`: each word starts at its dot's
                             size and spot, invisible, and grows to its slot
   emphasis                  dim the rest (house rule), as masks (see above)
+  openers under the chart   typed rows, assets/board.py get_typed_row, as 08's TARSE
+  (u-w)                     callout; centred on CALLOUT_AT in chart coordinates;
+                            CLAMP SINGE TURBO (u), DOUBT RANGE then ROTAN + PLANT (v),
+                            gone in w (a one-off annotation leaves with its moment)
+  ROTAN's definition        assets/gloss.py `gloss` (italic part of speech), left-
+                            aligned under the word, as 06/08
   second game               assets/multi_data.py load("greedy")
 
 ON-SCREEN TEXT, each licensed by column 2: the windows' tab titles and addresses
@@ -133,7 +139,8 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 
 from config import *
-from assets.board import get_board, ROWS, TILE, GAP, STROKE
+from assets.board import get_board, get_typed_row, ROWS, TILE, GAP, STROKE
+from assets.gloss import gloss
 from assets import game_data
 from assets.keys import key_cues
 from assets.board import TileFlip
@@ -221,6 +228,18 @@ Y_MAX = 4.0
 X_TICKS = list(range(4, 33, 4))   # linear, every 4 (user's call)
 LINE_SW = 4.0
 LABEL_GAP = 0.06              # least space between two right-edge line labels
+# an opener shown under the chart while its line is drawn (user's call): typed rows,
+# as 08's TARSE, centred on CALLOUT_AT in the chart's own coordinates
+CALLOUT_AT = (16, 1.0)        # (number of Wordles, average misses)
+CALLOUT_W = 1.5               # one word's width
+CALLOUT_GAP = 0.25            # between the words of an opener
+CALLOUT_OPENERS = {3: ["clamp", "singe", "turbo"], 2: ["doubt", "range"],
+                   1: ["rotan", "plant"]}
+# ROTAN's definition, under it -- the shared gloss (italic part of speech), broken by
+# hand as 06's are
+ROTAN_GLOSS = ["n. A cane used for corporal", "punishment (Singapore, Malaysia)"]
+GLOSS_FS = 24
+GLOSS_BUFF = 0.15
 LINE_LABEL = {1: "1-word opener", 2: "2-word opener", 3: "3-word opener"}
 IMPROVED_LABEL = "Improved Strategy"
 LINE_COLOR = {1: LIGHT_BLUE, 2: LIGHT_GREEN, 3: LIGHT_RED}
@@ -753,6 +772,16 @@ class Scene16(WordleBoardScene):
             self.chart_labels[n].at_right = side is RIGHT
             self.chart_labels[n].natural_y = self.chart_labels[n].get_y()
         self.chart_shown = []           # the lines drawn so far, in order
+        at = line_point(geom, *CALLOUT_AT)
+        self.callouts = {}
+        for n, words in CALLOUT_OPENERS.items():
+            rows = VGroup(*[get_typed_row(w).scale_to_fit_width(CALLOUT_W) for w in words])
+            rows.arrange(RIGHT, buff=CALLOUT_GAP).move_to(at)
+            self.callouts[n] = rows
+        rotan = self.callouts[1][0]
+        self.callouts[1] = VGroup(self.callouts[1], gloss(ROTAN_GLOSS, GLOSS_FS).next_to(
+            rotan, DOWN, buff=GLOSS_BUFF, aligned_edge=LEFT))
+        self.callout = None             # the one on screen
         self.chart_frame.shift(DOWN * FH)
 
     def _label_ys(self, keys):
@@ -774,7 +803,13 @@ class Scene16(WordleBoardScene):
         self.remove(*self.boards)
         self.boards = None
 
-    def _draw(self, keys, run_time):
+    def _swap_callout(self, n):
+        """Animations taking the opener under the chart to line n's (None: none)."""
+        out = [FadeOut(self.callout)] if self.callout is not None else []
+        self.callout = self.callouts.get(n) if n is not None else None
+        return out + ([FadeIn(self.callout)] if self.callout is not None else [])
+
+    def _draw(self, keys, run_time, extra=()):
         """Lines drawn left to right with their end labels fading in, as yahtzee's
         08line_graph (Create + FadeIn of the label). Labels already on screen that
         the new ones crowd slide aside in the same play."""
@@ -785,22 +820,22 @@ class Scene16(WordleBoardScene):
         moves = [self.chart_labels[n].animate.set_y(ys[n]) for n in self.chart_shown
                  if n in ys and abs(self.chart_labels[n].get_y() - ys[n]) > 1e-4]
         self.play(*[Create(self.chart_lines[n]) for n in keys],
-                  *[FadeIn(self.chart_labels[n]) for n in keys], *moves,
+                  *[FadeIn(self.chart_labels[n]) for n in keys], *moves, *extra,
                   run_time=run_time)
         self.chart_shown += list(keys)
 
     # u : the 3-word opener
     @subscene
     def plot_three(self):
-        self._draw([3], 2.0)
+        self._draw([3], 2.0, self._swap_callout(3))         # with CLAMP SINGE TURBO
 
     # v : the 2-word opener, then the 1-word opener -- one at a time
     @subscene
     def plot_one_two(self):
-        self._draw([2], 2.0)
-        self._draw([1], 2.0)
+        self._draw([2], 2.0, self._swap_callout(2))         # with DOUBT RANGE
+        self._draw([1], 2.0, self._swap_callout(1))         # with ROTAN, PLANT, gloss
 
     # w : the improved strategy
     @subscene
     def plot_improved(self):
-        self._draw(["imp"], 2.0)
+        self._draw(["imp"], 2.0, self._swap_callout(None))  # the opener fades
