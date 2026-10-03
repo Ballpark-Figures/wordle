@@ -57,7 +57,8 @@ REUSE MAP — every element, the one source it comes from, and how it enters:
   cells (c, d)        14's `_fill`: FadeIn rising 0.3; coloured red -> green by
                       StrategyLine `win_color` with its halfway point at 50% (user's
                       call: colour-coded; the midpoint is the VO's "half")
-  words (e, f)        assets/board.py `get_typed_row`; each box -> tile, glyph -> letter
+  words (e, f)        the copies themselves, moved and scaled whole onto a
+                      `get_typed_row` layout, letters recoloured white (no glyph morph)
   pans (g, o)         StrategyLine `_pan_down` (13's pan + whoosh)
   screen title (g)    crisp_text WHITE FONT_SIZE_LG at TITLE_BUFF (13's / 14's)
   typing (h, l)       WordleBoard.type_word(appear=True) + assets/keys.py `key_cues`
@@ -331,11 +332,15 @@ class Scene18(StrategyLine, MovingCameraScene, WordleBoardScene):
         return self.table_letters[(TOP_TIER + HIGH_TIER).index(ch.upper())]
 
     def _word_in(self, word, top_y, run_time):
-        row = get_typed_row(word)
-        row.scale(WORD_W / row.width).move_to([self.tier_list.get_x(), top_y, 0],
-                                              aligned_edge=UP)
-        for t in row.tiles[0]:
-            t.set_stroke(width=_stroke(row))
+        """Copies of the column's boxed letters travel into a typed row under the
+        list. Each copy is MOVED and scaled whole, its letter recoloured white and
+        its border set to the row's -- never Transformed into a board glyph, which
+        is a different rendering and morphed outline into outline (user's note).
+        The moved copies ARE the row, so nothing swaps at the end."""
+        guide = get_typed_row(word)               # where the tiles go, not drawn
+        guide.scale(WORD_W / guide.width).move_to([self.tier_list.get_x(), top_y, 0],
+                                                  aligned_edge=UP)
+        stroke = _stroke(guide)
         movers, anims = [], []
         for i, ch in enumerate(word):
             src = self._column_tile(ch)           # the table's left column (user's call)
@@ -343,14 +348,16 @@ class Scene18(StrategyLine, MovingCameraScene, WordleBoardScene):
             # the column's letter is ALREADY faded under the full-opacity copy that
             # leaves it (user's call); the list's fades as the copy travels
             src.set_opacity(USED_OPACITY)
-            anims += [Transform(m.box, row.tiles[0][i]), Transform(m.glyph, row.letters[0][i]),
-                      self._tile(ch).animate.set_opacity(USED_OPACITY)]
+            tile = guide.tiles[0][i]
+            m.generate_target()
+            m.target.scale(tile.width / m.box.width).move_to(tile.get_center())
+            m.target.glyph.set_color(TILE_TEXT)
+            m.target.box.set_stroke(width=stroke)
+            anims += [MoveToTarget(m), self._tile(ch).animate.set_opacity(USED_OPACITY)]
             movers.append(m)
         self.add(*movers)
         self.play(*anims, run_time=run_time)
-        self.remove(*movers)
-        self.add(row)
-        return row
+        return VGroup(*movers)
 
     @subscene
     def crate(self):
