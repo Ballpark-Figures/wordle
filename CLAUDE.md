@@ -975,6 +975,27 @@ its state arithmetic against `strspace.py` over a shared deterministic walk — 
     never does. Not yet chased. Under a seed it would show as "none reached".
 - **The seed opener's context was freed BEFORE its tree was written** until
   2026-09-29: harmless by luck on macOS, a segfault on every fresh Linux sweep.
+- **`--uncapped` IS THE BADGE GAME WITH NO GUESS LIMIT** (added 2026-10-03, user's
+  call; `run-greens.sh --may-lose --uncapped`, files named `uncapped`, not `d32`).
+  It runs at depth 32, which `greens.c` PROVES never binds: a yellow-free reply
+  only ever pins green positions (<= 5) and exact letter counts (<= 26), the search
+  only plays guesses that split the live set, so a line is at most 31 splitting
+  guesses plus the naming one. Because the cap never binds, the table key drops
+  the budget, so a candidate set reached at different depths shares one entry.
+  - **May-lose only**: with no limit every answer is winnable, so must-win is the
+    same quantity and is refused. `--depth` is refused too.
+  - **It CONTAINS EVERY RUN**, so under `--seed auto` with no `-k` it seeds from the
+    best may-lose row of ANY depth and K -- the one exception to same-depth-only.
+  - **Gated in `checkgreens.py` section 11 by an oracle that does not use the
+    depth-32 proof**: on the small case every guess removes a candidate, so a cap
+    of n + 1 cannot bind, and the Python reference there IS the uncapped value.
+    Also diffed against C capped at n + 1 (the table-key change alone) and as a
+    sweep; mutation-tested with the depth set to 4 (caught three ways).
+- **`--screen-only` + the `root cut:` line** (2026-10-03): every sweep now prints
+  how many openers the starting incumbent leaves to SEARCH. The quartiles only
+  bracket it, and the CSV cannot show it early (the walk visits the highest bounds
+  first, so instant cut rows arrive last). At 1387 it is **565 of 12972**, the same
+  at d15 and uncapped, because the two-ply bound has saturated with depth.
 
 ## Absurdle (adversarial Wordle) — OUR word lists, NOT Absurdle's
 - **The host never commits to a word.** It holds a CANDIDATE SET (initially the answer

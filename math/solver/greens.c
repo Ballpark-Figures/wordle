@@ -105,10 +105,38 @@ typedef uint8_t pat_t;
 /* An ARRAY BOUND, not a modelling limit: it sizes the per-depth arena.  Depth is
  * 6 because a Wordle game is 6 guesses. */
 #ifndef MAXD
-/* 16 (depths up to 15), raised from 12 on 2026-09-30 when the depth sweep reached
- * 12.  Each level costs ~0.3 MB of per-thread arena, so the bound is cheap. */
-#define MAXD       16
+/* 33, so --uncapped can run at UNCAP_D = 32 (see below).  Was 16 (depths up to
+ * 15), raised from 12 on 2026-09-30 when the depth sweep reached 12.  Each level
+ * costs ~0.3 MB of per-thread arena, so the bound is cheap: ~10 MB a thread. */
+#define MAXD       33
 #endif
+
+/* --uncapped: THE BADGE GAME WITH NO GUESS LIMIT, run as depth UNCAP_D, which is
+ * PROVABLY NON-BINDING -- so the value is the uncapped optimum, not a capped one.
+ *
+ * The proof.  A yellow-free reply to guess g says, of an answer a, exactly two
+ * kinds of thing: a[i] = g[i] at every green position, and -- for every letter
+ * c with a GREY copy in g -- count_a(c) = (greens of c in g), since any spare
+ * copy would have turned that grey yellow.  Everything else the reply implies
+ * (a[i] != g[i] at a grey, count >= greens) follows from those two.  So the
+ * candidate set after any yellow-free history is a function of a STATE: the
+ * known green positions (at most 5) and the letters whose count is pinned (at
+ * most 26).  The search only plays guesses that SPLIT the live set, so every
+ * step along a line shrinks it, so every step must grow that state -- at most
+ * 5 + 26 = 31 times.  A line is therefore at most 31 splitting guesses plus the
+ * guess that names the answer: 32.  At budget 32 the `d == 1` rule never fires
+ * with more than one candidate (31 steps would have pinned all 5 positions),
+ * and nothing is ever cut by the cap.
+ *
+ * WHY IT IS ITS OWN MODE AND NOT JUST `--depth 32`: the value of a candidate set
+ * no longer depends on the budget, so the transposition table drops the budget
+ * from its key and a set reached after 3 guesses and after 7 shares one entry.
+ * That is sound only because the cap never binds -- which is the proof above,
+ * and it holds for any history: a set reached after k guesses has budget 32-k
+ * and, by the same count, needs at most 32-k.  The proof assumes 5-letter words
+ * over a-z, which is all this binary loads. */
+#define UNCAP_D    32
+static int UNCAPPED = 0;
 
 /* How many of the evenest-splitting guesses feas() tries before falling back to
  * the full sorted scan.  A pure speed knob: the fallback keeps the search
@@ -428,6 +456,7 @@ static void tt_init(int bits, const char *loadpath) {
  * wrong value rather than missing. */
 static inline void hash_state(const uint16_t *S, int n, int d, int mode,
                               uint64_t *h0, uint64_t *h1) {
+    if (UNCAPPED) d = 0;                 /* the budget is not part of the state */
     uint64_t a = (uint64_t)d * 0x9E3779B97F4A7C15ULL;
     uint64_t b = (uint64_t)d * 0xC2B2AE3D27D4EB4FULL;
     for (int i = 0; i < n; i++) { a ^= ZOB0[S[i]]; b ^= ZOB1[S[i]]; }
@@ -443,6 +472,7 @@ static inline uint64_t tt_payload(int val, int d, int bestg) {
 
 static inline int tt_get(uint64_t h0, uint64_t h1, int d, int *val, int *bestg) {
     if (TT_OFF) return 0;
+    if (UNCAPPED) d = 0;
     Entry *b = &TT[(h0 & (TT_BUCKETS - 1)) * 2];
     for (int j = 0; j < 2; j++) {
         Entry e = b[j];
@@ -459,6 +489,7 @@ static inline int tt_get(uint64_t h0, uint64_t h1, int d, int *val, int *bestg) 
 static inline void tt_put(uint64_t h0, uint64_t h1, int d, int val, int bestg,
                           uint32_t work, long long *fills) {
     if (TT_OFF) return;
+    if (UNCAPPED) d = 0;
     Entry e;
     e.h0 = h0; e.val = val; e.d = d; e.work = work; e.pad = (uint32_t)bestg;
     e.h1x = h1 ^ tt_payload(val, d, bestg);
@@ -1135,6 +1166,9 @@ static void usage(void) {
       "  --topk K, -k K    beam: recurse into the K evenest splitters at every\n"
       "                    branching point, the ROOT included -- so it examines K\n"
       "                    OPENERS too, and reports the best of THOSE, not of 12972.\n"
+      "  --uncapped        --may-lose only: NO guess limit.  Runs at depth 32, which\n"
+      "                    provably never binds (5 positions + 26 letters + 1), and\n"
+      "                    keys the table on the candidate set alone\n"
       "  --screen-only     --sweep only: run the root screen, print how many openers\n"
       "                    the starting incumbent leaves to search, and stop\n"
       "  --seed-incumbent V  --sweep only: start the incumbent at V instead of\n"
@@ -1157,6 +1191,7 @@ int main(int argc, char **argv) {
     int depth = 6, ttbits = 28, threads = 0, sweep = 0, noout = 0;
     int seed_inc = 0;                     /* 0 = no seed: solve a first opener */
     int screen_only = 0;                  /* stop after the root screen and cut count */
+    int depth_given = 0;
 
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--opener") && i + 1 < argc) {
@@ -1166,7 +1201,8 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--out") && i + 1 < argc) outpath = argv[++i];
         else if (!strcmp(argv[i], "--no-out")) noout = 1;
         else if (!strcmp(argv[i], "--trees") && i + 1 < argc) treedir = argv[++i];
-        else if (!strcmp(argv[i], "--depth") && i + 1 < argc) depth = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--depth") && i + 1 < argc) { depth = atoi(argv[++i]); depth_given = 1; }
+        else if (!strcmp(argv[i], "--uncapped")) UNCAPPED = 1;
         else if (!strcmp(argv[i], "--tt-bits") && i + 1 < argc) ttbits = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--tt-load") && i + 1 < argc) ttload = argv[++i];
         else if (!strcmp(argv[i], "--tt-save") && i + 1 < argc) ttsave = argv[++i];
@@ -1195,6 +1231,22 @@ int main(int argc, char **argv) {
                 "  --must-win  the same, SUBJECT TO winning EVERY answer within the cap\n"
                 "They are different quantities. Use solver/run-greens.sh, which passes one.\n");
         return 1;
+    }
+    if (UNCAPPED) {
+        /* Must-win needs no separate uncapped mode: with no limit every answer
+         * is winnable (each splitting guess shrinks the set), so it IS may-lose.
+         * Refused rather than run, so the filename cannot claim a distinction. */
+        if (MUSTWIN) {
+            fprintf(stderr, "--uncapped is a --may-lose mode: with no guess limit every "
+                            "answer is winnable, so must-win would be the same quantity\n");
+            return 1;
+        }
+        if (depth_given) {
+            fprintf(stderr, "--uncapped sets the depth itself (%d, provably non-binding); "
+                            "drop --depth\n", UNCAP_D);
+            return 1;
+        }
+        depth = UNCAP_D;
     }
     if (depth < 1 || depth > MAXD - 1) {
         fprintf(stderr, "--depth must be 1..%d (MAXD is %d)\n", MAXD - 1, MAXD);
@@ -1273,6 +1325,26 @@ int main(int argc, char **argv) {
     }
     if (NG > MAXG) { fprintf(stderr, "guess list has %d words, MAXG is %d\n", NG, MAXG); return 1; }
     fprintf(stderr, "loaded %d guesses x %d answers\n", NG, NA);
+    /* The UNCAP_D proof counts at most 26 letters and 5 positions; a word outside
+     * that alphabet would break the count, so it is checked, not assumed. */
+    if (UNCAPPED) {
+        for (int pass = 0; pass < 2; pass++) {
+            char (*W)[WBUF] = pass ? AWORD : GWORD;
+            int nw = pass ? NA : NG;
+            for (int i = 0; i < nw; i++) {
+                int len = 0;
+                for (; W[i][len]; len++)
+                    if (W[i][len] < 'a' || W[i][len] > 'z') {
+                        fprintf(stderr, "--uncapped: '%s' is not a-z\n", W[i]);
+                        return 1;
+                    }
+                if (len != WORDLEN) {
+                    fprintf(stderr, "--uncapped: '%s' is not %d letters\n", W[i], WORDLEN);
+                    return 1;
+                }
+            }
+        }
+    }
 
     /* THE SALT IS UNCONDITIONAL, unlike optturns'.  Both programs key states by
      * (candidate set, depth) over the same words, so their tables would AGREE on
@@ -1288,7 +1360,8 @@ int main(int argc, char **argv) {
           ^ ((uint64_t)NG * 0xD6E8FEB86659FD93ULL)
           ^ ((uint64_t)NA * 0x9E3779B97F4A7C15ULL)
           ^ ((uint64_t)(unsigned)TOPK * 0xA24BAED4963EE407ULL)
-          ^ ((uint64_t)(unsigned)MUSTWIN * 0xF1EA5EED7A9C1B4DULL);
+          ^ ((uint64_t)(unsigned)MUSTWIN * 0xF1EA5EED7A9C1B4DULL)
+          ^ ((uint64_t)(unsigned)UNCAPPED * 0x7F4A7C159E3779B9ULL);
     for (int i = 0; i < NG; i++)
         for (int j = 0; GWORD[i][j]; j++)
             GSALT = (GSALT ^ (uint8_t)GWORD[i][j]) * 0x100000001B3ULL;
@@ -1316,6 +1389,11 @@ int main(int argc, char **argv) {
     if (MUSTWIN)
         fprintf(stderr, "objective: MUST-WIN -- max answers won with NO YELLOW, "
                         "SUBJECT TO winning all %d within %d guesses\n", NA, depth);
+    else if (UNCAPPED)
+        fprintf(stderr, "objective: max answers WON WITH NO YELLOW and NO GUESS LIMIT "
+                        "(of %d), run at depth %d, which provably never binds; an "
+                        "answer that draws a yellow is lost and may be abandoned\n",
+                NA, depth);
     else
         fprintf(stderr, "objective: max answers WON WITHIN %d GUESSES WITH NO "
                         "YELLOW (of %d); an answer that draws a yellow is lost and "
@@ -1341,8 +1419,9 @@ int main(int argc, char **argv) {
      * foreign file must fail verification rather than answer. */
     char stamp[320];
     snprintf(stamp, sizeof stamp,
-             "# greens objective=%s topk=%d depth=%d guesses=%d answers=%d",
-             MUSTWIN ? "must-win" : "may-lose", TOPK, depth, NG, NA);
+             "# greens objective=%s topk=%d depth=%d guesses=%d answers=%d%s",
+             MUSTWIN ? "must-win" : "may-lose", TOPK, depth, NG, NA,
+             UNCAPPED ? " uncapped=1" : "");
 
     FILE *out = NULL;
     if (outpath) {
