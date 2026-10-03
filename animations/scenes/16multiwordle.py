@@ -813,11 +813,11 @@ class Scene16(WordleBoardScene):
         return [VGroup(row.tiles[0][c], row.letters[0][c]) for c in range(row.n_cols)]
 
     def _tile_flips(self, row, **kw):
-        """`row`'s tiles flipping one after another -- the board's TileFlip, at the
-        lag every flip under the chart uses, so all of them read alike."""
-        return LaggedStart(*[TileFlip(row.tiles[0][c], row.letters[0][c], TILE_EMPTY_FILL,
+        """`row`'s tiles all flipping at once -- the board's TileFlip, as every flip
+        under the chart does, so all of them read alike."""
+        return AnimationGroup(*[TileFlip(row.tiles[0][c], row.letters[0][c], TILE_EMPTY_FILL,
                                       stroke=TILE_FILLED_BORDER, **kw)
-                             for c in range(row.n_cols)], lag_ratio=0.25)
+                             for c in range(row.n_cols)])
 
     def _flip_out(self, row):
         """`row` flips away: the board's TileFlip, gone at the turn."""
@@ -826,6 +826,7 @@ class Scene16(WordleBoardScene):
     def _flip_in(self, row):
         """`row` flips IN -- the reverse of `_flip_out`. Puts the row on screen
         (hidden until each tile turns) and returns the animation."""
+        row.set_opacity(0)          # hidden until it turns, which may be mid-play
         self.add(row)
         return self._tile_flips(row, appear=True)
 
@@ -846,10 +847,10 @@ class Scene16(WordleBoardScene):
                 self.add(new)
                 news.append(new)
                 dead.append((row, old))
-            anims.append(LaggedStart(*[TileFlip(row.tiles[0][c], row.letters[0][c],
-                                                TILE_EMPTY_FILL, stroke=TILE_FILLED_BORDER,
-                                                swap_to=news[c])
-                                       for c in range(row.n_cols)], lag_ratio=0.25))
+            anims.append(AnimationGroup(*[TileFlip(row.tiles[0][c], row.letters[0][c],
+                                                   TILE_EMPTY_FILL, stroke=TILE_FILLED_BORDER,
+                                                   swap_to=news[c])
+                                          for c in range(row.n_cols)]))
             for c, new in enumerate(news):
                 row.letters[0][c] = new
                 row.add(new)
@@ -857,12 +858,13 @@ class Scene16(WordleBoardScene):
 
     @staticmethod
     def _timed(anims, flip, run_time):
-        """`anims` played together over the first `flip` seconds of a `run_time` play,
-        so every flip under the chart takes the same time whatever it rides with."""
+        """`anims` played together for `flip` seconds in the MIDDLE of a `run_time`
+        play, so every flip under the chart takes the same time and lands mid-line."""
         group = AnimationGroup(*anims, run_time=flip)
         if run_time <= flip:
             return group
-        return Succession(group, Wait(run_time - flip))
+        pad = (run_time - flip) / 2
+        return Succession(Wait(pad), group, Wait(pad))
 
     def _finish_flip(self, dead, gone):
         for row, old in dead:
@@ -918,8 +920,8 @@ class Scene16(WordleBoardScene):
     @subscene
     def opener_plant(self):
         anims, dead, gone = self._flip_callout(CALLOUT_OPENERS["alt"])
-        out = LaggedStart(*[TileFlip(line, None, None, vanish=True) for line in self.gloss],
-                          lag_ratio=0.25)
+        out = AnimationGroup(*[TileFlip(line, None, None, vanish=True)
+                               for line in self.gloss])
         self.play(*anims, out, run_time=1.0)
         self._finish_flip(dead, gone)
         self.remove(self.gloss)
