@@ -215,7 +215,7 @@ CAND_BOTTOM = -4.3
 DOT_COLOR = WHITE            # 06's dots
 # ── the chart (16s-v) ─────────────────────────────────────────────────────────
 PLOT = multi_plot_data.load()
-PLOT_C = [-1.2, -0.35, 0]     # the plot BOX's centre; room on the right for labels
+PLOT_C = [0.0, -0.35, 0]      # the plot BOX's centre: centred across the frame (user's call)
 PLOT_W, PLOT_H = 10.4, 5.4
 Y_MAX = 4.0
 X_TICKS = list(range(4, 33, 4))   # linear, every 4 (user's call)
@@ -227,6 +227,7 @@ LINE_COLOR = {1: LIGHT_BLUE, 2: LIGHT_GREEN, 3: LIGHT_RED}
 IMPROVED_COLOR = LIGHT_YELLOW
 
 ALL_GREEN = 242              # wordle.pattern's code for a win
+MASK_PAD = 0.06             # an emphasis mask's margin round its board (< half the gap)
 DIM = 0.75                   # the emphasis mask's opacity over a dimmed column
 FORTH_BOARD = 3                                # board whose answer is FORTH
 
@@ -524,29 +525,26 @@ class Scene16(WordleBoardScene):
         self._update_cands([[] if b["code"] in (None, ALL_GREEN) else b["members"]
                             for b in step["boards"]], update_rt, extra)
 
-    def _blank_flips(self, rows, shift=None):
-        """Every tile of `rows` (per board) flipped to the blank face -- letters gone
-        -- as one cascade per row; `shift` moves the WHOLE board meanwhile. Returns
-        (animations, letters to remove after)."""
-        anims, dead = [], []
+    def _blank_flips(self, rows, row_lag=0.35):
+        """Every tile of `rows` (per board) flipped to the blank face, letters gone,
+        as ONE wave from the BOTTOM ROW UP (user's call): each row flips on every
+        board at once, the next row up a little after. Returns ([the animation],
+        letters to remove after)."""
+        by_row, dead = {}, []
         for k, b in enumerate(self.boards):
-            for r in range(b.n_rows):
-                flipping = r in rows[k]
-                flips = []
+            for r in rows[k]:
                 for c in range(b.n_cols):
                     tile, letter = b.tiles[r][c], b.letters[r][c]
-                    if flipping:
-                        to = None if shift is None else tile.get_center() + shift
-                        flips.append(TileFlip(tile, letter, TILE_EMPTY_FILL,
-                                              stroke=TILE_EMPTY_BORDER, swap_to=None,
-                                              to_center=to))
-                        if letter is not None:
-                            dead.append((b, r, c, letter))
-                    elif shift is not None:
-                        anims.append(tile.animate.shift(shift))
-                if flips:
-                    anims.append(LaggedStart(*flips, lag_ratio=0.25))
-        return anims, dead
+                    by_row.setdefault(r, []).append(
+                        TileFlip(tile, letter, TILE_EMPTY_FILL, stroke=TILE_EMPTY_BORDER,
+                                 swap_to=None))
+                    if letter is not None:
+                        dead.append((b, r, c, letter))
+        if not by_row:
+            return [], dead
+        wave = LaggedStart(*[AnimationGroup(*by_row[r]) for r in sorted(by_row, reverse=True)],
+                           lag_ratio=row_lag)
+        return [wave], dead
 
     def _drop_letters(self, dead):
         for b, r, c, letter in dead:
@@ -666,12 +664,16 @@ class Scene16(WordleBoardScene):
         self._update_cands([b["members"] for b in GREEDY["steps"][0]["boards"]], 1.0)
 
     def _setup_masks(self):
+        """One mask per board, covering just that board and the candidate area under
+        it, with a margin that stops short of its neighbours. (Full-frame columns
+        that met edge to edge showed seams and lines where they touched -- user's
+        report.)"""
         self.masks = []
-        gap = self.boards[1].get_left()[0] - self.boards[0].get_right()[0]
         for b in self.boards:
-            m = Rectangle(width=b.width + gap, height=FH, stroke_width=0,
+            top, bottom = b.get_top()[1] + MASK_PAD, CAND_BOTTOM - MASK_PAD
+            m = Rectangle(width=b.width + 2 * MASK_PAD, height=top - bottom, stroke_width=0,
                           fill_color=BOARD_NAVY, fill_opacity=0.0)
-            m.move_to([b.get_center()[0], 0, 0]).set_z_index(50)
+            m.move_to([b.get_center()[0], (top + bottom) / 2, 0]).set_z_index(50)
             self.masks.append(m)
         self.add(*self.masks)
 
