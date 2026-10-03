@@ -168,6 +168,22 @@ class TilePop(Animation):
                    .stretch_to_fit_width(self.l_w * s).move_to(self.center)
 
 
+class RowShake(Animation):
+    """The real game's refusal: a row jiggles sideways, `cycles` swings decaying to
+    rest, and ends EXACTLY where it began (the offset is zero at alpha 1). Shifts
+    by the change in offset each frame, so the parts can be any mobjects. Scene 19's
+    word refused by hard mode. Play it with rate_func=linear: the decay is built in."""
+
+    def __init__(self, parts, amplitude, cycles=4, **kwargs):
+        self.amp, self.cycles, self._dx = amplitude, cycles, 0.0
+        super().__init__(VGroup(*parts), **kwargs)
+
+    def interpolate_mobject(self, alpha):
+        dx = self.amp * np.sin(2 * np.pi * self.cycles * alpha) * (1 - alpha)
+        self.mobject.shift(RIGHT * (dx - self._dx))
+        self._dx = dx
+
+
 class WordleBoard(VGroup):
     def __init__(self, rows=ROWS, cols=COLS, **kwargs):
         super().__init__(**kwargs)
@@ -320,6 +336,34 @@ class WordleBoard(VGroup):
         flips = [TileFlip(self.tiles[row][i], self.letters[row][i], TILE_EMPTY_FILL,
                           stroke=TILE_FILLED_BORDER) for i in range(self.n_cols)]
         return LaggedStart(*flips, lag_ratio=lag_ratio)
+
+    # ── a refused word ────────────────────────────────────────────────────────
+    def shake(self, scene, row, run_time, amplitude=0.08):
+        """`row` jiggles sideways and settles — the real game refusing a word (scene
+        19: SOLVE, not allowed in hard mode). `amplitude` is a fraction of a tile."""
+        parts = [m for i in range(self.n_cols)
+                 for m in (self.tiles[row][i], self.letters[row][i]) if m is not None]
+        amp = amplitude * self.tiles[row][0].width
+        scene.play(RowShake(parts, amp), run_time=run_time, rate_func=linear)
+
+    def delete_word(self, scene, row, run_time):
+        """Backspace the typed `row`, right to left: each letter disappears and its
+        tile's border goes back to empty, as the real game's delete key does. The
+        letters leave the board, so the row can be typed again."""
+        steps = []
+        for i in reversed(range(self.n_cols)):
+            letter = self.letters[row][i]
+            if letter is None:
+                continue
+            steps.append(AnimationGroup(
+                FadeOut(letter),
+                self.tiles[row][i].animate.set_stroke(TILE_EMPTY_BORDER)))
+        scene.play(LaggedStart(*steps, lag_ratio=1.0), run_time=run_time)
+        for i in range(self.n_cols):
+            if self.letters[row][i] is not None:
+                self.remove(self.letters[row][i])
+                scene.remove(self.letters[row][i])
+                self.letters[row][i] = None
 
     # ── growing past six rows ──────────────────────────────────────────────────
     def add_row(self, scene, run_time, height, center=ORIGIN):

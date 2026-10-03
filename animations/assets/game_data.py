@@ -39,6 +39,14 @@ GAMES = {
     "snowy": ("snowy", ["trace", "loins", "dumpy", "snowy"]),
     # Scene 02 — Script.md 02a-02j: BEGIN, EDITS, MELEE, ENDED against ENDED.
     "rules": ("ended", ["begin", "edits", "melee", "ended"]),
+    # Scene 19b-e — "score all words against GREAT": AGAIN, then (SOLVE refused, not
+    # scored), AGAIN twice more, GREAT. hard_mode_data.py checks the hard-mode rule.
+    "hard_rules": ("great", ["again", "again", "again", "great"]),
+    # Scene 19s-t — "a game of EIGHT FIGHT ... WIGHT (scored based on WIGHT)", AUGHT
+    # moved to its top in 19t. hard_mode_data.py checks it IS aught's hard-mode tree
+    # line for WIGHT, the line FAMILIES.md describes.
+    "ight": ("wight", ["aught", "eight", "fight", "light", "might", "night", "right",
+                       "sight", "tight", "wight"]),
 }
 
 # name -> (answers, guesses in order): ONE set of guesses played on every board at

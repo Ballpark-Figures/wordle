@@ -99,6 +99,172 @@
       }
     ]
   },
+  "hard_rules": {
+    "answer": "great",
+    "in_mystery": true,
+    "guesses": [
+      {
+        "word": "again",
+        "code": 108,
+        "tiles": [
+          1,
+          1,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "word": "again",
+        "code": 108,
+        "tiles": [
+          1,
+          1,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "word": "again",
+        "code": 108,
+        "tiles": [
+          1,
+          1,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "word": "great",
+        "code": 242,
+        "tiles": [
+          2,
+          2,
+          2,
+          2,
+          2
+        ]
+      }
+    ]
+  },
+  "ight": {
+    "answer": "wight",
+    "in_mystery": true,
+    "guesses": [
+      {
+        "word": "aught",
+        "code": 26,
+        "tiles": [
+          0,
+          0,
+          2,
+          2,
+          2
+        ]
+      },
+      {
+        "word": "eight",
+        "code": 80,
+        "tiles": [
+          0,
+          2,
+          2,
+          2,
+          2
+        ]
+      },
+      {
+        "word": "fight",
+        "code": 80,
+        "tiles": [
+          0,
+          2,
+          2,
+          2,
+          2
+        ]
+      },
+      {
+        "word": "light",
+        "code": 80,
+        "tiles": [
+          0,
+          2,
+          2,
+          2,
+          2
+        ]
+      },
+      {
+        "word": "might",
+        "code": 80,
+        "tiles": [
+          0,
+          2,
+          2,
+          2,
+          2
+        ]
+      },
+      {
+        "word": "night",
+        "code": 80,
+        "tiles": [
+          0,
+          2,
+          2,
+          2,
+          2
+        ]
+      },
+      {
+        "word": "right",
+        "code": 80,
+        "tiles": [
+          0,
+          2,
+          2,
+          2,
+          2
+        ]
+      },
+      {
+        "word": "sight",
+        "code": 80,
+        "tiles": [
+          0,
+          2,
+          2,
+          2,
+          2
+        ]
+      },
+      {
+        "word": "tight",
+        "code": 80,
+        "tiles": [
+          0,
+          2,
+          2,
+          2,
+          2
+        ]
+      },
+      {
+        "word": "wight",
+        "code": 242,
+        "tiles": [
+          2,
+          2,
+          2,
+          2,
+          2
+        ]
+      }
+    ]
+  },
   "antiwordle": {
     "answer": "tower",
     "in_mystery": true,

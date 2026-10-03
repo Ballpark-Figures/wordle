@@ -51,35 +51,76 @@ def _view(left, right, tall_rows):
     return (left, -BASE_FRAC * h, w, (TOP_FRAC - BASE_FRAC) * h / (tall_rows * STEP))
 
 
-_F_SPAN = x_of(AXIS_HI) - x_of(AXIS_LO)
-VIEW_FULL = _view(x_of(AXIS_LO) - 0.04 * _F_SPAN / 0.92,
-                  x_of(AXIS_HI) + 0.04 * _F_SPAN / 0.92, TALLEST)
+def full_view(axis_lo=AXIS_LO, axis_hi=AXIS_HI, tallest=TALLEST):
+    """08's FULL view for an axis running `axis_lo`..`axis_hi`: a 4% margin each side
+    (2% clipped the end tick labels), the tallest bar (`tallest` words) at TOP_FRAC.
+    The defaults are 08's own; scene 19 widens the axis to make room for hard mode."""
+    span = x_of(axis_hi) - x_of(axis_lo)
+    return _view(x_of(axis_lo) - 0.04 * span / 0.92,
+                 x_of(axis_hi) + 0.04 * span / 0.92, tallest)
+
+
+def view_center(view):
+    """The world centre of `view`'s frame."""
+    left, bottom, w, _ = view
+    return np.array([left + w / 2, bottom + w / ASPECT / 2, 0.0])
+
+
+def view_k(view):
+    """One 16-wide design unit, in `view`'s world units."""
+    return view[2] / FRAME_W
+
+
+VIEW_FULL = full_view()
 LEFT, BOTTOM, WIDTH, SQUASH = VIEW_FULL
 HEIGHT = WIDTH / ASPECT
-K = WIDTH / FRAME_W           # one 16-wide design unit, in this view's world units
-CENTER = np.array([LEFT + WIDTH / 2, BOTTOM + HEIGHT / 2, 0.0])
+K = view_k(VIEW_FULL)         # one 16-wide design unit, in this view's world units
+CENTER = view_center(VIEW_FULL)
 
 
-def design(x, y):
+def design(x, y, view=VIEW_FULL):
     """The world point at design coordinates (x, y) of the ordinary 16 x 9 frame."""
-    return CENTER + K * np.array([x, y, 0.0])
+    return view_center(view) + view_k(view) * np.array([x, y, 0.0])
 
 
-def to_view(mob):
-    """Re-project `mob`, built in the ordinary 16 x 9 frame, into VIEW_FULL so it
-    looks exactly as it did: scaled by K about the origin, moved to the view's
-    centre, strokes widened by K (they are in world units). Returns `mob`."""
-    widths = [(m, m.get_stroke_width()) for m in mob.get_family()
-              if isinstance(m, VMobject) and len(m.points) and m.get_stroke_width() > 0]
+def _restroke(mob):
+    """(member, stroke width) for every stroked member, read before a rescale."""
+    return [(m, m.get_stroke_width()) for m in mob.get_family()
+            if isinstance(m, VMobject) and len(m.points) and m.get_stroke_width() > 0]
+
+
+def to_view(mob, view=VIEW_FULL, shift=ORIGIN):
+    """Re-project `mob`, built in the ordinary 16 x 9 frame, into `view` (VIEW_FULL
+    by default) so it looks exactly as it did: scaled by the view's K about the
+    origin, moved to the view's centre (plus `shift`, world units: scene 19 puts a
+    screen one frame above or below the histogram), strokes widened by K (they are
+    in world units). Returns `mob`."""
+    k = view_k(view)
+    widths = _restroke(mob)
     if isinstance(mob, Arrow):
-        mob.scale(K, scale_tips=True, about_point=ORIGIN)   # else its tip regrows
+        mob.scale(k, scale_tips=True, about_point=ORIGIN)   # else its tip regrows
     else:
-        mob.scale(K, about_point=ORIGIN)
-    mob.shift(CENTER)
+        mob.scale(k, about_point=ORIGIN)
+    mob.shift(view_center(view) + np.asarray(shift, dtype=float))
     # each member's OWN stroke (family=False: a group's set_stroke would repeat the
     # multiplication down the whole tree), read before scaling touched anything
     for m, w in widths:
-        m.set_stroke(width=w * K, family=False)
+        m.set_stroke(width=w * k, family=False)
+    return mob
+
+
+def from_view(mob, view=VIEW_FULL, shift=ORIGIN):
+    """`to_view`'s inverse: `mob`, placed in `view` (plus `shift`), back into the
+    ordinary 16 x 9 frame, looking exactly as it did. Returns `mob`."""
+    k = view_k(view)
+    widths = _restroke(mob)
+    mob.shift(-(view_center(view) + np.asarray(shift, dtype=float)))
+    if isinstance(mob, Arrow):
+        mob.scale(1 / k, scale_tips=True, about_point=ORIGIN)
+    else:
+        mob.scale(1 / k, about_point=ORIGIN)
+    for m, w in widths:
+        m.set_stroke(width=w / k, family=False)
     return mob
 
 
@@ -99,14 +140,17 @@ class HistogramChrome(VGroup):
     """The axis, the ticks visible at VIEW_FULL, the axis label and the title, placed
     by 08's `_place_overlay` rules for that view (08g onward: ticks labelled)."""
 
-    def __init__(self):
+    def __init__(self, view=VIEW_FULL, axis_lo=AXIS_LO, axis_hi=AXIS_HI):
+        """`view` and the axis range default to 08's; scene 19 passes its wider pair
+        (full_view(axis_hi=...)) and gets the same chrome over the longer axis."""
         super().__init__()
-        k, h = K, HEIGHT
-        self.axis = Line([x_of(AXIS_LO), 0, 0], [x_of(AXIS_HI), 0, 0], color=WHITE,
+        LEFT, BOTTOM, WIDTH, _ = view
+        k, h = view_k(view), WIDTH / ASPECT
+        self.axis = Line([x_of(axis_lo), 0, 0], [x_of(axis_hi), 0, 0], color=WHITE,
                          stroke_width=AXIS_STROKE * k)
         self.ticks = VGroup()
         lab_h = 0.0
-        for t in range(round(AXIS_LO * 100), round(AXIS_HI * 100) + 1):
+        for t in range(round(axis_lo * 100), round(axis_hi * 100) + 1):
             spacing = _tick_level(t) * PITCH / WIDTH
             op = float(np.clip((spacing - TICK_OFF) / (TICK_ON - TICK_OFF), 0, 1))
             if op <= 0:
@@ -121,8 +165,8 @@ class HistogramChrome(VGroup):
             self.ticks.add(VGroup(mark, lab))
         self.xlabel = crisp_text("Average Guesses", color=WHITE, font_size=FONT_SIZE_SM)
         self.xlabel.scale(k)
-        cx = float(np.clip(LEFT + WIDTH / 2, x_of(AXIS_LO) + self.xlabel.width / 2,
-                           x_of(AXIS_HI) - self.xlabel.width / 2))
+        cx = float(np.clip(LEFT + WIDTH / 2, x_of(axis_lo) + self.xlabel.width / 2,
+                           x_of(axis_hi) - self.xlabel.width / 2))
         self.xlabel.move_to([cx, -(TICK_LEN + TICK_GAP + XLABEL_GAP) * k - lab_h
                              - self.xlabel.height / 2, 0])
         self.heading = crisp_text(TITLE, color=WHITE, font_size=FONT_SIZE_LG).scale(k)

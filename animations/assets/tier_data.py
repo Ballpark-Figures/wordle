@@ -27,6 +27,11 @@ WORDLE_LETTERS = list(_mod.TIERS)
 WORDLE_NAMES = [(w, a) for w in ("TOP", "HIGH", "MID", "LOW") for a in ("up", "down")]
 assert len(WORDLE_NAMES) == len(WORDLE_LETTERS), "tier names and tiers disagree"
 
+# HARD MODE's list (scene 19za): the user's cuts, recorded as math/tiers.py HARD_TIERS
+# (the order is order_r1_top1000_hardturns.csv's; the CUTS are editorial). None until
+# they are recorded — the scene then leaves the list out rather than invent one.
+WORDLE_HARD_LETTERS = list(getattr(_mod, "HARD_TIERS", ())) or None
+
 # ── the Wordle list WITH DOUBLES (09k) ────────────────────────────────────────
 # The singles and doubles ranked together: the greedy order in
 # math/data/shared/tiers/order_r2_top1000.csv (max_repeat=2 — the file carries the
