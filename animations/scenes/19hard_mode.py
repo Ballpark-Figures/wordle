@@ -428,8 +428,11 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
         """One plain bar per bin over the whole range, `bins`' words tall —
         histogram_view.layer_bars, which draws exactly what the stacks draw."""
         counts = np.bincount(np.array(bins) - BIN_LO, minlength=self.n_bins)
-        return hv.layer_bars(counts, hv.BAR_COLOR, squash=VIEW[3],
+        bars = hv.layer_bars(counts, hv.BAR_COLOR, squash=VIEW[3],
                              bins=np.arange(BIN_LO, BIN_LO + self.n_bins))
+        # every bar OPAQUE: layer_bars hides an empty one, which made a bar that
+        # empties FADE as it shrank. An empty bar is 1e-3 tall, so it cannot show.
+        return bars.set_fill(opacity=1.0)
 
     def _setup_shift(self):
         self.n_bins = max(max(HIST["bins"]), max(DATA["hist"]["bins"])) - BIN_LO + 1
