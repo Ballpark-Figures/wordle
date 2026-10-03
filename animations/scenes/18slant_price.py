@@ -65,7 +65,7 @@ REUSE MAP — every element, the one source it comes from, and how it enters:
                       tile (TILE_EMPTY_FILL / TILE_EMPTY_BORDER); the split tiles are
                       two triangles, TILE_CORRECT top-left, TILE_PRESENT bottom-right
   RCA cards (j, m)    the number line's RCA card: bpkfigures `stack_lines` (baseline
-                      pitch), initials bold, StrategyLine's card style
+                      pitch), StrategyLine's card style; initials NOT bold (user's call)
   average (n)         crisp_text WHITE FONT_SIZE_MD; FadeIn rising 0.3
   number line (o)     assets/strategy_line.py `StrategyLine`: `_build_line(3.42, 4.08)`
                       with scene 15's LINE_DROP and stem; Optimal / SLATE / CRANE SPILT
@@ -204,10 +204,9 @@ def _rca_card(top_center):
     """'Random Compatible Answers' on the number line's RCA card: three lines on a
     baseline pitch (bpkfigures `stack_lines`, as every marker card -- NOT
     `arrange`, which spaces bounding boxes, so the p in "Compatible" pushed
-    "Answers" down), initials bold, on StrategyLine's card. Its top at
+    "Answers" down), on StrategyLine's card; no bold initials (user's call). Its top at
     `top_center`."""
-    lines = stack_lines([(w, None, {"t2w": {w[0]: BOLD}})
-                         for w in ("Random", "Compatible", "Answers")],
+    lines = stack_lines(["Random", "Compatible", "Answers"],
                         font_size=MARKER_FS, color=WHITE).set_z_index(1)
     card = card_behind(lines, pad=CARD_PAD, fill=TILE_EMPTY_FILL,
                        stroke_color=TILE_FILLED_BORDER, stroke_width=STROKE,
@@ -438,11 +437,6 @@ class Scene18(StrategyLine, MovingCameraScene, WordleBoardScene):
         self.opener_marker(round(CRANE_SPILT["mean"], 2), FIRST_PAIR,
                            CRANE_SPILT["win_rate"], side=DOWN, grow=1.0)
         self.add(self.line, self.title, self.subtitle)
-        # "Strategy" in place of the opener cards' "Then RCA" (user's call)
-        self.sp_marker = self._marker(round(STRAT["mean"], 2),
-                                      [word_stack([STRAT["opener"], STRAT["second"]]),
-                                       "Strategy", rate_text(STRAT["win_rate"])],
-                                      side=UP, grow=0.0)
 
     @subscene
     def timeline(self):
@@ -451,5 +445,12 @@ class Scene18(StrategyLine, MovingCameraScene, WordleBoardScene):
         frame = [self.camera.frame] if self.camera.frame in self.mobjects else []
         self.remove(*self.mobjects)
         self.add(*frame, self.line, self.title, self.subtitle)
+        # built only now, as 15f's markers are: a marker at grow=0 still shows its
+        # card's border (strokes do not shrink) as a dark speck on the line
+        # "Strategy" in place of the opener cards' "Then RCA" (user's call)
+        self.sp_marker = self._marker(round(STRAT["mean"], 2),
+                                      [word_stack([STRAT["opener"], STRAT["second"]]),
+                                       "Strategy", rate_text(STRAT["win_rate"])],
+                                      side=UP, grow=0.0)
         self._pop_in(self.sp_marker, 0.4)
 
