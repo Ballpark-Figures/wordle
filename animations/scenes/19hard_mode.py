@@ -8,7 +8,7 @@ GEOMETRY: screens one frame apart, each move a camera pan with a whoosh (13's / 
 convention), so nothing fades between screens. a-h on the ordinary frame; i-m in the
 histogram's world (it is 27x wider than the frame, 08's), with the boards one frame
 ABOVE it and the turns table one frame BELOW it; at the end of m everything on screen
-is re-projected back to the ordinary frame (09e's seam, run in reverse), so n-za are
+is re-projected back to the ordinary frame (09e's seam, run in reverse), so n-z are
 ordinary again: the turns table at the origin, the families one frame below, the fast
 openers one frame right of those, hard mode's letter table one frame below that.
 
@@ -32,18 +32,18 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   n hard_5        — Hard's row 5                                         (19n, VO 6)
   o hard_6        — Hard's row 6                                         (19o, VO 6)
   p hard_7_10     — Hard's rows 7-10                                     (19p, VO 6)
-  q fade_table    — everything fades but Hard's row-10 number            (19q, VO 7)
-  r depth10       — the number turns into the 14 words, left half        (19r, VO 7)
-  s ight_game     — right half: EIGHT ... WIGHT flip in, scored against WIGHT (19s)
-  t aught         — AUGHT moves to the top of the game and is scored     (19t, VO 7)
-  u families      — pan down to the families table (Max Guesses / Family / # Words)
-                                                                         (19u, VO 8)
-  v trace_up      — TRACE on the right                                   (19v, VO 8)
-  w emph_er       — everything dims but E and R, in the words with BOTH  (19w, VO 8)
-  x emph_atc      — instead, A T C in .ATCH and in TRACE                 (19x, VO 8)
-  y unemph        — everything back                                      (19y, VO 8)
-  z fast          — pan right to "Top Fast Openers"                      (19z, VO 9)
-  za letters      — pan down to hard mode's letter table and tier list   (19za, VO 10)
+  q depth10       — everything fades but Hard's row-10 number; it turns into
+                    14 dots, then the 14 words, left half             (19q, VO 7)
+  r ight_game     — right half: EIGHT ... WIGHT flip in, scored against WIGHT (19r)
+  s aught         — AUGHT moves to the top of the game and is scored     (19s, VO 7)
+  t families      — pan down to the families table (Max Guesses / Family / # Words)
+                                                                         (19t, VO 8)
+  u trace_up      — TRACE on the right                                   (19u, VO 8)
+  v emph_er       — everything dims but E and R, in the words with BOTH  (19v, VO 8)
+  w emph_atc      — instead, A T C in .ATCH and in TRACE                 (19w, VO 8)
+  x unemph        — everything back                                      (19x, VO 8)
+  y fast          — pan right to "Top Fast Openers"                      (19y, VO 9)
+  z letters       — pan down to hard mode's letter table and tier list   (19z, VO 10)
 
 REUSE MAP — every element, its one source, and how it enters / leaves:
   board, typing, scoring, bounce   assets/board.py get_board / type_word (+ keys.py
@@ -61,17 +61,17 @@ REUSE MAP — every element, its one source, and how it enters / leaves:
                     promote candidate)
   the seams (i, m)  histogram_view.to_view / from_view (09e's map, now offsettable and
                     invertible)
-  tables (m-p, u, z, za)  14d's / 18's: title crisp_text WHITE FONT_SIZE_LG at
+  tables (m-p, t, y, z)  14d's / 18's: title crisp_text WHITE FONT_SIZE_LG at
                     TITLE_BUFF, bold heads 28, cells 30, cells rising in (14's _fill)
-  14 words (r)      get_typed_row in groups.grid_cells (4+4+4+2), growing out of the
+  14 words (q)      get_typed_row in groups.grid_cells (4+4+4+2), growing out of the
                     number as it fades
-  game (s)          a 10-row board, row 0 held empty; rows 1-9 flip in with TileFlip
+  game (r)          a 10-row board, row 0 held empty; rows 1-9 flip in with TileFlip
                     (appear=True, 16's flip-in), already scored
-  AUGHT (t)         its row travels up into row 0, then board.reveal
+  AUGHT (s)         its row travels up into row 0, then board.reveal
   family templates  board tiles: fixed letters on TILE_CORRECT, dots as untouched
                     tiles (TILE_EMPTY_FILL / TILE_EMPTY_BORDER)
-  emphasis (w-y)    dim the rest to word_stacks.DIM (0.2), the house move
-  tier list (za)    bpkfigures.tier_list filled_list, boxed, at 18's corner size
+  emphasis (v-x)    dim the rest to word_stacks.DIM (0.2), the house move
+  tier list (z)    bpkfigures.tier_list filled_list, boxed, at 18's corner size
 
 EVERY NUMBER is sourced (assets/hard_mode_data.py -> hard_mode_cache.json; the two
 games' codes from assets/game_data.py, computed by math/wordle.py pattern):
@@ -94,10 +94,10 @@ FLAGGED — choices and gaps for the user:
   - c: after the shake SOLVE is backspaced, right to left, as the real game's delete
     key (the user's call: in c, not d).
   - e: GREAT bounces as 02's winning row does; g/h's last rows do not.
-  - x: "ATC in WATCH" built as the A T C of the .ATCH row (the table shows templates).
-  - v: TRACE "put up" as a typed row rising in, not typed letter by letter.
-  - z: the ten openers in one ranked column, not a grid.
-  - za: hard mode's tiers are the user's cuts on the hardturns greedy order (math/
+  - w: "ATC in WATCH" built as the A T C of the .ATCH row (the table shows templates).
+  - u: TRACE "put up" as a typed row rising in, not typed letter by letter.
+  - y: the ten openers in one ranked column, not a grid.
+  - z: hard mode's tiers are the user's cuts on the hardturns greedy order (math/
     tiers.py HARD_TIERS); the table's rows are its top two tiers' letters, as 18's.
 """
 from pathlib import Path
@@ -116,6 +116,7 @@ from assets import tier_data as td
 from assets import histogram_view as hv
 from assets.board import STROKE, GAP, TILE, TileFlip, WordleBoard, get_board, get_typed_row
 from assets.groups import grid_cells
+from assets.strategy_line import win_color
 from assets.keys import key_cues
 from assets.word_stacks import StacksCamera, PITCH, DIM
 from assets.stacks_view import (StacksView, pinned, ASPECT, WHOOSH_SFX, WHOOSH_GAIN,
@@ -160,7 +161,7 @@ T_HEAD_Y = 2.3
 T_ROW_DY = 0.72                      # 14's
 T_COL_X = (-3.2, 0.0, 3.2)           # turns, Normal, Hard
 
-# ── r-t: the 14 words and the IGHT game ──────────────────────────────────────
+# ── q-s: the 14 words and the IGHT game ──────────────────────────────────────
 WORDS_C = (-4.0, 0.0)                # the 14 words' grid centre
 WORD_W19 = 1.5
 WORD_PITCH = (1.75, 0.62)
@@ -170,7 +171,7 @@ DOT_COLOR = WHITE                    # the answer dots are white, as in 06 / 07 
 GAME_H = 8.1                         # the 10-row board's height
 GAME_C = (4.0, 0.0)
 
-# ── u-y: the families (one frame below) ──────────────────────────────────────
+# ── t-x: the families (one frame below) ──────────────────────────────────────
 F_DY = -FRAME_H
 F_HEAD_Y = 3.75
 F_ROW_Y0 = 3.15
@@ -180,13 +181,13 @@ F_TEMPLATE_W = 2.0
 TRACE_C = (None, 0.0)                # x: centred right of the numbers (19v)
 TRACE_W = 2.6
 
-# ── z: the fast openers (one frame right of the families) ────────────────────
+# ── y: the fast openers (one frame right of the families) ────────────────────
 Z_DX = FRAME_W16
 FAST_W = 2.6
 FAST_Y0 = 2.55
 FAST_DY = 0.66
 
-# ── za: hard mode's letter table (one frame below the fast openers) ──────────
+# ── z: hard mode's letter table (one frame below the fast openers) ──────────
 # 18's layout constants, COPIED (18 keeps them scene-local; promote candidate)
 ZA_DY = -2 * FRAME_H
 LIST_SCALE = 0.62
@@ -199,6 +200,7 @@ LETTER_X = TABLE_CX - 2.6
 COL_X = (TABLE_CX, TABLE_CX + 2.6)
 TABLE_BOX = 0.46
 SUB_BUFF = 0.15
+TABLE_MID = 0.5                      # 18's: the share coloured halfway (yellow)
 
 
 def _stroke(row):
@@ -262,8 +264,7 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
     hard_5 — Hard row 5
     hard_6 — Hard row 6
     hard_7_10 — Hard rows 7-10
-    fade_table — all but Hard's 10-row number fade
-    depth10 — the number becomes the 14 words
+    depth10 — all but Hard's 10-row number fade; it becomes the 14 words
     ight_game — the IGHT game flips in
     aught — AUGHT to the top, scored
     families — pan down to the families table
@@ -371,10 +372,12 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
         self.board = None
 
     # g, h : an example line typed and scored on one board
-    def _play_line(self, board, line):
+    def _play_line(self, board, line, lag_ratio=0.45):
+        """`lag_ratio` 0 flips a row's tiles all at once (19h, the user's call)."""
         for row, (w, code) in enumerate(zip(line["words"], line["codes"])):
             self._type(board, row, w, 0.65)
-            board.reveal(self, row, code, 1.6)
+            board.reveal(self, row, code, 1.6 if lag_ratio else 0.6,
+                         lag_ratio=lag_ratio)
 
     @subscene
     def keep_yellow(self):
@@ -382,7 +385,7 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
 
     @subscene
     def keep_grey(self):
-        self._play_line(self.right, EX["keep_grey"])
+        self._play_line(self.right, EX["keep_grey"], lag_ratio=0)
 
     # ── i-l : the histogram ───────────────────────────────────────────────────
     def _callout_row(self, word):
@@ -507,17 +510,8 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
     def hard_7_10(self):
         self._fill([self.hard_cells[k] for k in TURNS[2:]], 1.0)
 
-    # q : everything fades but Hard's row-10 number
-    @subscene
-    def fade_table(self):
-        gone = [*self.t_static, *[c for k, c in self.hard_cells.items() if k != "10"]]
-        self.play(*[FadeOut(m) for m in gone], run_time=0.8)
-        self.remove(*gone)
-        self.ten = self.hard_cells["10"]
-        self.t_title = self.t_heads = self.t_labels = None
-        self.t_static = self.normal_cells = self.hard_cells = None
-
-    # r : the number turns into the 14 words, gridded on the left half
+    # q : everything fades but Hard's row-10 number; it turns into the 14 words,
+    #     gridded on the left half (19q and 19r merged in the Doc, 2026-10-03)
     def _setup_depth10(self):
         cells = grid_cells(len(DATA["depth10"]))
         self.ten_words = {w: _typed(w, WORD_W19, (WORDS_C[0] + cx * WORD_PITCH[0],
@@ -527,6 +521,12 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
     @subscene
     def depth10(self):
         self._setup_depth10()
+        gone = [*self.t_static, *[c for k, c in self.hard_cells.items() if k != "10"]]
+        self.play(*[FadeOut(m) for m in gone], run_time=0.8)
+        self.remove(*gone)
+        self.ten = self.hard_cells["10"]
+        self.t_title = self.t_heads = self.t_labels = None
+        self.t_static = self.normal_cells = self.hard_cells = None
         # 1: the 14 becomes 14 dots where it stands, in the words' own arrangement
         p = self.ten.get_center()
         cells = grid_cells(len(self.ten_words))
@@ -549,7 +549,7 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
         self.remove(*dots)
         self.ten = None
 
-    # s : the IGHT game flips in on the right, scored against WIGHT, its top row
+    # r : the IGHT game flips in on the right, scored against WIGHT, its top row
     #     left empty for AUGHT
     def _setup_ight_game(self):
         n = len(IGHT["guesses"])
@@ -581,7 +581,7 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
         self.play(LaggedStart(*self.flips, lag_ratio=0.15), run_time=3.0)
         self.flips = None
 
-    # t : AUGHT travels up from the word grid into the game's top row; scored
+    # s : AUGHT travels up from the word grid into the game's top row; scored
     @subscene
     def aught(self):
         src = self.ten_words["aught"]
@@ -599,7 +599,7 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
         del self.ten_words["aught"]
         self.game.reveal(self, 0, IGHT["guesses"][0]["code"], 1.6)
 
-    # ── u-y : the families ────────────────────────────────────────────────────
+    # ── t-x : the families ────────────────────────────────────────────────────
     def _setup_families(self):
         y = F_DY
         heads = VGroup(*[_cell(h, x, y + F_HEAD_Y, bold=True)
@@ -659,7 +659,7 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
     def unemph(self):
         self._emph(None, 0.8)
 
-    # z : pan right to the fast openers
+    # y : pan right to the fast openers
     def _setup_fast(self):
         c = (Z_DX, F_DY)
         self.z_title = _title("Top Fast Openers", c)
@@ -675,7 +675,7 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
         self.f_rows = self.trace_row = self.f_pieces = self.t_pieces = None
         self.f_text = None
 
-    # za : pan down to hard mode's letter table (18's), the hard tier list on the
+    # z : pan down to hard mode's letter table (18's), the hard tier list on the
     #      right — both only once their data exist (see the docstring)
     def _setup_letters(self):
         c = np.array([Z_DX, ZA_DY, 0.0])
@@ -683,7 +683,7 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
                            color=WHITE)
         title.move_to(c + UP * (FRAME_H / 2 - TITLE_BUFF - title.height / 2))
         title.set_x(c[0] + TABLE_CX)
-        sub = crisp_text("(Top 1000 Openers)", font_size=FONT_SIZE_MD, color=WHITE)
+        sub = crisp_text("(Top 1000 Openers, Hard Mode)", font_size=FONT_SIZE_MD, color=WHITE)
         sub.next_to(title, DOWN, buff=SUB_BUFF)
         heads = VGroup(*[_cell(h, c[0] + x, c[1] + HEAD_Y, bold=True)
                          for h, x in zip(("1", "2"), COL_X)])
@@ -705,7 +705,9 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
                 self.za.add(b)
                 for col in (0, 1):
                     pct = 100 * cov["counts"][ch.lower()][col] / cov["paths"]
-                    self.za.add(_cell(f"{pct:.2f}%", c[0] + COL_X[col], y))
+                    share = cov["counts"][ch.lower()][col] / cov["paths"]
+                    self.za.add(_cell(f"{pct:.2f}%", c[0] + COL_X[col], y)
+                                .set_color(win_color(share, mid=TABLE_MID)))
         self.add(self.za)
 
     @subscene
