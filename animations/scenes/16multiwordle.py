@@ -33,7 +33,7 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   t chart_in      — the game shifts up off frame, the empty chart up into
                     it: "Average Misses in Multi-Wordle"                  (16s, VO 6)
   u plot_three    — the 3-word line; CLAMP SINGE TURBO flips in, stacked   (16t, VO 6)
-  v plot_two      — the 2-word line; flips to DOUBT RANGE (TURBO away)    (16u, VO 6)
+  v plot_two      — the 2-word line; flips to CLAMP TRIBE (TURBO away)    (16u, VO 6)
   w plot_one      — the 1-word line; flips to ROTAN (RANGE away), then
                     its definition                                        (16u, VO 6)
   x opener_plant  — ROTAN flips to PLANT; definition flips out by line   (--,  VO 6)
@@ -242,7 +242,7 @@ CALLOUT_W = 2.6               # one word's width
 # TOP-ALIGNED: the 3-word stack is centred on CALLOUT_AT, and every later opener starts
 # from its top row, so a switch FLIPS the rows in place (user's call) -- a row that
 # carries over flips to its new word, a row left over flips away
-CALLOUT_OPENERS = {3: ["clamp", "singe", "turbo"], 2: ["doubt", "range"],
+CALLOUT_OPENERS = {3: ["clamp", "singe", "turbo"], 2: ["clamp", "tribe"],
                    1: ["rotan"], "alt": ["plant"]}   # ROTAN, then flipped into PLANT
 # ROTAN's definition, under it -- the shared gloss (italic part of speech), broken by
 # hand as 06's are
@@ -1003,7 +1003,7 @@ class Scene16(WordleBoardScene):
         self._draw([n], run_time, [self._timed(anims, flip, run_time)])
         self._finish_flip(dead, gone)
 
-    # v : the 2-word opener's line; the opener flips to DOUBT RANGE (TURBO away)
+    # v : the 2-word opener's line; the opener flips to CLAMP TRIBE (TURBO away)
     @subscene
     def plot_two(self):
         self._draw_and_flip(2, CALLOUT_OPENERS[2], 2.0, flip=1.0)
