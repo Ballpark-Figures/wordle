@@ -1,6 +1,6 @@
 """TEST — the shared mouse cursor (bpkfigures/cursor.py), for THM's click on the
-hard-mode setting. Not a content scene: the button is a stand-in, and there is no
-sound until the click effect is in the library.
+hard-mode setting. Not a content scene: the button is a stand-in. The click is the
+library's `click` (the first click of an Apple Magic Mouse double-click).
 
 BEAT MAP
   a glide — the cursor fades in and glides to the button
@@ -38,11 +38,13 @@ class Scene96(WordleScene):
     # b : one click
     @subscene
     def click(self):
+        self.sfx("click")
         self.play(self.cursor.click(), run_time=0.35)
 
     # c : out and back in, glide + click as one play
     @subscene
     def both(self):
         self.play(self.cursor.glide_to(START), run_time=0.6)
-        self.play(Succession(self.cursor.glide_to(self.button.get_center()),
-                             self.cursor.click(), lag_ratio=1.0), run_time=1.15)
+        self.sfx("click", at=0.8)                      # the glide's run_time
+        self.play(Succession(self.cursor.glide_to(self.button.get_center(), run_time=0.8),
+                             self.cursor.click(run_time=0.35)), run_time=1.15)
