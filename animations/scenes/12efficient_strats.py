@@ -23,7 +23,8 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                    71 arrive from beyond the nearest edge                (12g, VO 2)
   h by_grays     — the typed words fade; the rows gather into six clusters by
                    their number of greys, an oval round each, that grey count's
-                   word at the bottom of its oval                        (12h, VO 3)
+                   word at the bottom of its oval, "N Grays" at the top (user's
+                   call)                                                 (12h, VO 3)
   i undo         — back: the ovals and their words fade, the rows return, the
                    typed words fade back in                              (12i, VO 3)
   j random_answers — under every SALET row its word cycles through random answers
@@ -98,7 +99,8 @@ DOT_COLOR = WHITE
 
 CLUSTER_GAP = 0.06         # between rows in a grey-count cluster (h)
 CLUSTER_ASPECT = 2.0       # a cluster's width / height, before its word
-OVAL_WORD_GAP = 0.12       # between a cluster's rows and its word
+OVAL_WORD_GAP = 0.12       # between a cluster's rows and its word (and its title)
+OVAL_TITLE_FS = FONT_SIZE_SM   # h: the "N Grays" title at the top of each oval
 OVAL_PAD = 0.25            # added to each oval axis beyond kx/ky x its content
 OVAL_KX_MAX = 1.6          # widest an oval gets over its content (flatter = shorter)
 OVAL_COL_FILL = 0.96       # an oval may use this much of its column's width
@@ -309,7 +311,9 @@ class Scene12(WordleBoardScene):
             ch = -y - CLUSTER_GAP
             label = get_typed_row(SD["by_grays"][str(n)])
             label.scale(self.guess.width / label.width)      # the corner word's size
-            blocks.append(dict(n=n, place=place, cw=cw, ch=ch, label=label))
+            title = crisp_text(f"{n} Gray" + ("" if n == 1 else "s"),
+                               font_size=OVAL_TITLE_FS)
+            blocks.append(dict(n=n, place=place, cw=cw, ch=ch, label=label, title=title))
         # a 3x2 grid, 0 greys top-left to 5 bottom-right: equal columns, each grid
         # row as tall as its tallest oval, the height left over shared out evenly
         # above, between and below; each oval centred in its cell. The rows keep
@@ -324,7 +328,9 @@ class Scene12(WordleBoardScene):
             makes it as SHORT as it can be while still containing its content box:
             axes kx*w and ky*h with 1/kx^2 + 1/ky^2 = 1."""
             lw, lh = b["label"].width, b["label"].height
-            w, h = max(b["cw"] * f, lw), b["ch"] * f + OVAL_WORD_GAP + lh
+            tw, th = b["title"].width, b["title"].height
+            w = max(b["cw"] * f, lw, tw)
+            h = th + OVAL_WORD_GAP + b["ch"] * f + OVAL_WORD_GAP + lh
             kx = min(OVAL_KX_MAX, (cell_w * OVAL_COL_FILL - OVAL_PAD) / w)
             ky = 1 / math.sqrt(1 - 1 / kx ** 2)
             return w, h, w * kx + OVAL_PAD, h * ky + OVAL_PAD
@@ -349,10 +355,13 @@ class Scene12(WordleBoardScene):
         ys = [DOT_REGION_TOP - gap - rh[0] / 2, DOT_REGION_TOP - 2 * gap - rh[0] - rh[1] / 2]
         centres = [(self.col_left + (n % 3 + 0.5) * cell_w, ys[n // 3]) for n in range(6)]
         self.home = [(row, row.get_center(), row.width) for row in self.rows]
-        self.targets, self.ovals, self.labels = [], [], []
+        self.targets, self.ovals, self.labels, self.titles = [], [], [], []
         for b, (bx, by_) in zip(blocks, centres):
             w, h, ow, oh = oval(b, f)
-            top = by_ + h / 2
+            ttl = b["title"]
+            ttl.move_to([bx, by_ + h / 2 - ttl.height / 2, 0])   # the title on top
+            self.titles.append(ttl)
+            top = by_ + h / 2 - ttl.height - OVAL_WORD_GAP
             left = bx - b["cw"] * f / 2
             for k, px, py in b["place"]:
                 self.targets.append((self.rows[k], np.array([left + px * f, top + py * f, 0.0]),
@@ -375,6 +384,7 @@ class Scene12(WordleBoardScene):
                   run_time=1.5)
         self.play(*[FadeIn(o) for o in self.ovals],
                   *[FadeIn(l) for l in self.labels],
+                  *[FadeIn(t) for t in self.titles],
                   run_time=1.0)
         self.targets = None
 
@@ -384,10 +394,11 @@ class Scene12(WordleBoardScene):
     def undo(self):
         self.play(*[FadeOut(o) for o in self.ovals],
                   *[FadeOut(l) for l in self.labels],
+                  *[FadeOut(t) for t in self.titles],
                   *[row.animate.move_to(c).scale(wd / row.width) for row, c, wd in self.home],
                   *self._ride_in(),
                   run_time=1.5)
-        self.ovals = self.labels = self.home = None
+        self.ovals = self.labels = self.titles = self.home = None
 
     def _ride_in(self):
         """Each typed word fading in UNDER its row as the rows finish moving: every
