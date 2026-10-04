@@ -33,17 +33,9 @@ class Scene23(WordleScene):
         self.win = sponsor_pages.window("80k_guide")       # on from frame 0
         self.add(self.win)
 
-    # a : the page scrolls down one window height
+    # a : the page scrolls down a few window heights
     @subscene
     def scroll_one(self):
-        self.play(self.win.scroll_by(SCROLL), run_time=1.5)
-
-    # b : another
-    @subscene
-    def scroll_two(self):
-        self.play(self.win.scroll_by(SCROLL), run_time=1.5)
-
-    # c : another
-    @subscene
-    def scroll_three(self):
-        self.play(self.win.scroll_by(SCROLL), run_time=1.5)
+        for i in range(6):
+            self.play(self.win.scroll_by(SCROLL), run_time=1.5)
+            self.wait(0.5)
