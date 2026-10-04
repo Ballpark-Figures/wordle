@@ -200,7 +200,7 @@ CELL_SIZE = 30
 # except RAS's, to its right. Each fades up in after its word is typed and fades
 # out with the first letter of the next word typed.
 DEFINITIONS = {
-    "carnet": "n. A ticket booklet",
+    "carnet": "n. A notebook",
     "ceratins": "n. Alt spelling of keratins",
     "saprolite": "n. A chemically weathered rock",
     "meteoritics": "n. The science of meteors",
