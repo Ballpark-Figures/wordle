@@ -25,14 +25,16 @@ Doc's own beat is in brackets):
   e timeline     — the camera pans up to scene 14's number line as it ended: 3.42 to
                    4.08, the Optimal, Random Compatible Answers and SLATE markers
                                                                    (15e, VO 4)
-  f two_words    — the PARSE CLINT marker pops out at 3.69, below the line, CLINT
-                   and its definition fading in right of the card (user's call)
+  f two_words    — the PARSE CLINT marker pops out at 3.69, below the line; then
+                   CLINT and its definition fade in right of the card (user's call)
                                                                    (15f, VO 5)
-  g crane_spilt  — CLINT's definition fades out; its words flip to CRANE SPILT as it
-                   slides to 3.70, the win rate counting           (15g, VO 5)
+  g crane_spilt  — its words flip to CRANE SPILT as it slides to 3.70, the win rate
+                   counting, CLINT's definition fading out         (15g, VO 5)
   h three_words  — the line zooms out to fit 4.16, the DANCE HORST BLIMP marker
-                   popping out there, above the line               (15h, VO 6)
-  i bland_copse  — flips to BLAND COPSE RIGHT, sliding to 4.17     (15i, VO 6)
+                   popping out there, above the line; then HORST and its
+                   definition fade in left of the card (user's call) (15h, VO 6)
+  i bland_copse  — flips to BLAND COPSE RIGHT, sliding to 4.17, HORST's definition
+                   fading out                                      (15i, VO 6)
   j four_words   — the line zooms out to fit 5.02, the CHAMP FLINT RUGBY SOWED
                    marker popping out there, above the line        (15j, VO 7)
   k bugle_champ  — flips to BUGLE CHAMP DOWNY FIRST (same 5.02)    (15k, VO 7)
@@ -96,9 +98,9 @@ REUSE MAP — every element, the one source it comes from, and how it enters:
                         would not fit (user's call)
   marker swaps (g,i,k)  StrategyLine `replace_marker` — 14c's flip-while-sliding with
                         the win rate counting (moved there from scene 14 for this)
-  CLINT's note (f, g)   the card's own `word_line` + assets/gloss.py `gloss` under it
-                        (06d's word-then-definition), FadeIn with the pop, FadeOut
-                        at the start of g (a bounded note: the flip replaces CLINT)
+  CLINT / HORST notes   the card's own `word_line` + assets/gloss.py `gloss` under it
+  (f-i)                 (06d's word-then-definition); FadeIn after the pop, FadeOut
+                        during the next beat's flip (the flip replaces the word)
   emphasis (u, v)       dim the rest to 0.2 (house rule: save_state / Restore)
   o's words             one-row boards typed in ONE play, key sound on the first only
                         (12d's), at the board's size and spacing
@@ -199,11 +201,13 @@ UNCOUNTED = 1              # w-y: SALVE's one loss is not counted (user's call: 
 COUNT_DONE = LIGHT_GREEN   # w-y: the counter at 0 -- the win-rate scale's green
 COUNT_GROW = 1.4           # y: how much the counter grows as it reaches 0
 FINAL_SCALE = 1.5          # z: the four rows' growth
-CLINT = "clint"            # f: the word defined beside PARSE CLINT's card (user's call)
-CLINT_GLOSS = ["n. A hard or", "flinty rock"]   # f: its definition (user's words),
-                           #   broken by hand so no line is wider than the word
-CLINT_BUFF = 0.35          # f: between the card and CLINT
-CLINT_GLOSS_BUFF = 0.15    # f: between CLINT and its definition (06's GLOSS_BUFF)
+# f, h: a word of the opener defined beside its card (user's calls): the word, its
+# definition (user's words, broken by hand so no line is much wider than the word),
+# and which side of the card it sits on
+CLINT = ("clint", ["n. A hard or", "flinty rock"], RIGHT)
+HORST = ("horst", ["n. A raised", "block of", "Earth's crust"], LEFT)
+NOTE_BUFF = 0.35           # f, h: between the card and the word
+NOTE_GLOSS_BUFF = 0.15     # f, h: between the word and its definition (06's GLOSS_BUFF)
 
 
 def _tiles(row):
@@ -279,7 +283,7 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
     timeline — pan up to scene 14's line
     two_words — PARSE CLINT at 3.69; CLINT's definition beside it
     crane_spilt — flips to CRANE SPILT at 3.70
-    three_words — zoom; DANCE HORST BLIMP at 4.16
+    three_words — zoom; DANCE HORST BLIMP at 4.16; HORST's definition beside it
     bland_copse — flips to BLAND COPSE RIGHT at 4.17
     four_words — zoom; CHAMP FLINT RUGBY SOWED at 5.02
     bugle_champ — flips to BUGLE CHAMP DOWNY FIRST
@@ -436,13 +440,14 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
         return self.opener_marker(round(o["mean"], 2), key.split(), o["win_rate"],
                                   side=side)
 
-    def _swap(self, mk, key, run_time, follow=False):
+    def _swap(self, mk, key, run_time, follow=False, extra=()):
         """`mk` flips to `key`'s opener; `follow` zooms so it lands at the right
         end (15i: it slides past the edge, so the view pans with it)."""
         o = AW["openers"][key]
         value = round(o["mean"], 2)
         zoom = self._window(value) if follow else None
-        self.replace_marker(mk, key.split(), value, o["win_rate"], run_time, zoom=zoom)
+        self.replace_marker(mk, key.split(), value, o["win_rate"], run_time, zoom=zoom,
+                            extra=extra)
 
     def _window(self, right):
         """13e's zoom window: the leftmost marker at x = -ZOOM_EDGE and the value
@@ -456,39 +461,60 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
     def _zoom_to(self, mk, zoom_rt, pop_rt, lead):
         self._zoom_pop(*self._window(mk.value), mk, zoom_rt, pop_rt, lead)
 
-    # f : PARSE CLINT at 3.69, below the line; CLINT and its definition fade in
-    #     to the right of the card
+    def _note(self, note):
+        """A word of an opener, as the card's own word row, with its definition
+        under it (06d's word-then-definition). Placed by `_place_note`."""
+        word, lines, side = note
+        row = word_line(word)
+        defn = gloss(lines, MARKER_FS)
+        defn.next_to(row, DOWN, buff=NOTE_GLOSS_BUFF, aligned_edge=LEFT)
+        out = VGroup(row, defn)
+        out.side = side
+        return out
+
+    def _place_note(self, note, mk):
+        """Beside the marker's card, where it has landed."""
+        note.next_to(mk.label, note.side, buff=NOTE_BUFF)
+
+    # f : PARSE CLINT at 3.69, below the line; once it has popped out, CLINT and
+    #     its definition fade in to the right of the card
     def _setup_two_words(self):
         self.two = self._opener(TWO, DOWN)
-        word = word_line(CLINT)                         # the card's own word rows
-        defn = gloss(CLINT_GLOSS, MARKER_FS)
-        defn.next_to(word, DOWN, buff=CLINT_GLOSS_BUFF, aligned_edge=LEFT)
-        self.clint = VGroup(word, defn)
-        self.clint.next_to(self.home_label(self.two), RIGHT, buff=CLINT_BUFF)
+        self.clint = self._note(CLINT)
 
     @subscene
     def two_words(self):
         self._setup_two_words()
-        self._pop_in(self.two, 0.4, extra=[FadeIn(self.clint)])
+        self._pop_in(self.two, 0.4)
+        self._place_note(self.clint, self.two)          # the card's landed place
+        self.play(FadeIn(self.clint), run_time=0.5)
 
-    # g : PARSE CLINT flips to CRANE SPILT, sliding to 3.70; CLINT's definition
-    #     fades out
+    # g : PARSE CLINT flips to CRANE SPILT, sliding to 3.70, CLINT's definition
+    #     fading out as it goes
     @subscene
     def crane_spilt(self):
-        self.play(FadeOut(self.clint), run_time=0.5)
+        self._swap(self.two, TWO_B, 1.2, extra=[FadeOut(self.clint)])
         self.clint = None
-        self._swap(self.two, TWO_B, 1.2)
 
-    # h : zoom out to fit DANCE HORST BLIMP at 4.16, above the line
+    # h : zoom out to fit DANCE HORST BLIMP at 4.16, above the line; once it has
+    #     popped out, HORST and its definition fade in to the left of the card
+    def _setup_three_words(self):
+        self.three = self._opener(THREE, UP)
+        self.horst = self._note(HORST)
+
     @subscene
     def three_words(self):
-        self.three = self._opener(THREE, UP)
+        self._setup_three_words()
         self._zoom_to(self.three, 1.0, 0.4, 0.3)
+        self._place_note(self.horst, self.three)        # after the zoom moved it
+        self.play(FadeIn(self.horst), run_time=0.5)
 
-    # i : flips to BLAND COPSE RIGHT, sliding to 4.17
+    # i : flips to BLAND COPSE RIGHT, sliding to 4.17, HORST's definition fading
+    #     out as it goes
     @subscene
     def bland_copse(self):
-        self._swap(self.three, THREE_B, 1.2, follow=True)
+        self._swap(self.three, THREE_B, 1.2, follow=True, extra=[FadeOut(self.horst)])
+        self.horst = None
 
     # j : zoom out to fit CHAMP FLINT RUGBY SOWED at 5.02, above the line (right of
     #     the title, so the tall card has room)

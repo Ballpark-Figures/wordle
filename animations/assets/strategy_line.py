@@ -189,22 +189,10 @@ class StrategyLine:
         self.play(self.line.zoom(lo, hi, run_time=zoom_rt),
                   Succession(Wait(start), self.line.marker_in(m, run_time=pop_rt)))
 
-    def _pop_in(self, m, run_time, extra=()):
-        """The marker's card pops out of its dot, with the pop sound; `extra`
-        animations play alongside (15f: CLINT's definition fades in)."""
+    def _pop_in(self, m, run_time):
+        """The marker's card pops out of its dot, with the pop sound."""
         self.sfx("pop")
-        self.play(self.line.marker_in(m), *extra, run_time=run_time)
-
-    def home_label(self, mk):
-        """A copy of the marker's card at its full-size, popped-out place (where it
-        lands), for placing things beside it before it pops in."""
-        g = mk.grow
-        mk.grow = 1.0
-        self.line._place_marker(mk)
-        home = mk.label.copy()
-        mk.grow = g
-        self.line._place_marker(mk)
-        return home
+        self.play(self.line.marker_in(m), run_time=run_time)
 
     # ── the camera ───────────────────────────────────────────────────────────
     def _whoosh(self, pan_rt):
@@ -222,12 +210,13 @@ class StrategyLine:
         self.play(self.camera.frame.animate.shift(UP * GAME_DY), run_time=run_time)
 
     # ── a marker's words change as it slides (14c's, then 15's) ──────────────
-    def replace_marker(self, mk, words, value, rate, run_time, zoom=None):
+    def replace_marker(self, mk, words, value, rate, run_time, zoom=None, extra=()):
         """The marker's word rows flip to `words` while it slides to `value` and its
         win rate (the last line) counts to `rate`. The rows are its first line: a
         single `word_line`, or a `word_stack` whose rows flip one each. `zoom`
         (lo, hi) zooms the line to that window in the same play (15i: the card
-        slides past the edge, so the view follows it)."""
+        slides past the edge, so the view follows it). `extra` animations play in
+        the same flip (15g/i: a word's definition fades out)."""
         content = mk.label[1]
         stack = content[0] if getattr(content[0], "is_stack", False) else None
         olds = list(stack) if stack is not None else list(content[:len(words)])
@@ -262,7 +251,7 @@ class StrategyLine:
         flip(self, [Flip(o, n, parts=(row_parts(o), row_parts(n)), travel=True)
                     for o, n in zip(olds, news)],
              run_time, extra=[line.move_marker(mk, value), count]
-             + ([line.zoom(*zoom)] if zoom is not None else []))
+             + ([line.zoom(*zoom)] if zoom is not None else []) + list(extra))
         counter.end_count()
         self.remove(*news)
         if stack is not None:
