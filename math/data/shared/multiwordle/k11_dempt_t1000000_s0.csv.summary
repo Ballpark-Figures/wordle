@@ -1,0 +1,18 @@
+# DIGEST of k11_dempt_t1000000_s0.csv (0.2 GB), which is gitignored: over GitHub's file-size limit.
+# The lines below are copied verbatim from that file's own summary block.
+# multiwordle, blind opening then the greedy rule (see math/multiwordle.py)
+# boards=11 trials=1000000 opening=dempt seed=0 strategy=greedy
+# answers drawn without replacement from the 2315 mystery words; no guess cap
+# strategy greedy, trials 1000000, boards 11, opening dempt, seed 0
+# mean total guesses 13.7866  +/- 0.0009 (standard error)
+# sd 0.9219   min 12   median 14.0   max 20
+# mean guesses per board 1.2533
+#   12 guesses   46123    4.61%
+#   13 guesses  362077   36.21%
+#   14 guesses  397560   39.76%
+#   15 guesses  154137   15.41%
+#   16 guesses   34216    3.42%
+#   17 guesses    5265    0.53%
+#   18 guesses     573    0.06%
+#   19 guesses      44    0.00%
+#   20 guesses       5    0.00%

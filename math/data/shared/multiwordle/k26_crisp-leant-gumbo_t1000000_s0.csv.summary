@@ -1,0 +1,15 @@
+# DIGEST of k26_crisp-leant-gumbo_t1000000_s0.csv (0.3 GB), which is gitignored: over GitHub's file-size limit.
+# The lines below are copied verbatim from that file's own summary block.
+# multiwordle, blind opening then the greedy rule (see math/multiwordle.py)
+# boards=26 trials=1000000 opening=crisp leant gumbo seed=0 strategy=greedy
+# answers drawn without replacement from the 2315 mystery words; no guess cap
+# strategy greedy, trials 1000000, boards 26, opening crisp leant gumbo, seed 0
+# mean total guesses 29.0066  +/- 0.0003 (standard error)
+# sd 0.2715   min 27   median 29.0   max 32
+# mean guesses per board 1.1156
+#   27 guesses     368    0.04%
+#   28 guesses   31418    3.14%
+#   29 guesses  930444   93.04%
+#   30 guesses   36766    3.68%
+#   31 guesses     991    0.10%
+#   32 guesses      13    0.00%

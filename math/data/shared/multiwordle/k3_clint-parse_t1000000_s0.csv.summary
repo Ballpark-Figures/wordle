@@ -1,0 +1,19 @@
+# DIGEST of k3_clint-parse_t1000000_s0.csv (0.1 GB), which is gitignored: over GitHub's file-size limit.
+# The lines below are copied verbatim from that file's own summary block.
+# multiwordle, blind opening then the greedy rule (see math/multiwordle.py)
+# boards=3 trials=1000000 opening=clint parse seed=0 strategy=greedy
+# answers drawn without replacement from the 2315 mystery words; no guess cap
+# strategy greedy, trials 1000000, boards 3, opening clint parse, seed 0
+# mean total guesses 6.1302  +/- 0.0010 (standard error)
+# sd 0.9769   min 4   median 6.0   max 14
+# mean guesses per board 2.0434
+#    4 guesses     406    0.04%
+#    5 guesses  284277   28.43%
+#    6 guesses  408358   40.84%
+#    7 guesses  221100   22.11%
+#    8 guesses   67285    6.73%
+#    9 guesses   15208    1.52%
+#   10 guesses    2915    0.29%
+#   11 guesses     414    0.04%
+#   12 guesses      36    0.00%
+#   14 guesses       1    0.00%

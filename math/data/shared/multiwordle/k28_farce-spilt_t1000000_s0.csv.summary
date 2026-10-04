@@ -1,0 +1,16 @@
+# DIGEST of k28_farce-spilt_t1000000_s0.csv (0.4 GB), which is gitignored: over GitHub's file-size limit.
+# The lines below are copied verbatim from that file's own summary block.
+# multiwordle, blind opening then the greedy rule (see math/multiwordle.py)
+# boards=28 trials=1000000 opening=farce spilt seed=0 strategy=greedy
+# answers drawn without replacement from the 2315 mystery words; no guess cap
+# strategy greedy, trials 1000000, boards 28, opening farce spilt, seed 0
+# mean total guesses 30.0222  +/- 0.0003 (standard error)
+# sd 0.2653   min 28   median 30.0   max 34
+# mean guesses per board 1.0722
+#   28 guesses     126    0.01%
+#   29 guesses   22715    2.27%
+#   30 guesses  933174   93.32%
+#   31 guesses   42820    4.28%
+#   32 guesses    1131    0.11%
+#   33 guesses      33    0.00%
+#   34 guesses       1    0.00%

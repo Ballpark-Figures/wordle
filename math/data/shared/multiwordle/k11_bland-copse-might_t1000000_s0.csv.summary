@@ -1,0 +1,16 @@
+# DIGEST of k11_bland-copse-might_t1000000_s0.csv (0.2 GB), which is gitignored: over GitHub's file-size limit.
+# The lines below are copied verbatim from that file's own summary block.
+# multiwordle, blind opening then the greedy rule (see math/multiwordle.py)
+# boards=11 trials=1000000 opening=bland copse might seed=0 strategy=greedy
+# answers drawn without replacement from the 2315 mystery words; no guess cap
+# strategy greedy, trials 1000000, boards 11, opening bland copse might, seed 0
+# mean total guesses 14.1330  +/- 0.0004 (standard error)
+# sd 0.4048   min 12   median 14.0   max 18
+# mean guesses per board 1.2848
+#   12 guesses      53    0.01%
+#   13 guesses   12213    1.22%
+#   14 guesses  853753   85.38%
+#   15 guesses  123081   12.31%
+#   16 guesses   10424    1.04%
+#   17 guesses     465    0.05%
+#   18 guesses      11    0.00%

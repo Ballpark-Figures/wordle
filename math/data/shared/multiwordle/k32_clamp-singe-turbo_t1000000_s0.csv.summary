@@ -1,0 +1,15 @@
+# DIGEST of k32_clamp-singe-turbo_t1000000_s0.csv (0.4 GB), which is gitignored: over GitHub's file-size limit.
+# The lines below are copied verbatim from that file's own summary block.
+# multiwordle, blind opening then the greedy rule (see math/multiwordle.py)
+# boards=32 trials=1000000 opening=clamp singe turbo seed=0 strategy=greedy
+# answers drawn without replacement from the 2315 mystery words; no guess cap
+# strategy greedy, trials 1000000, boards 32, opening clamp singe turbo, seed 0
+# mean total guesses 34.9766  +/- 0.0002 (standard error)
+# sd 0.2437   min 32   median 35.0   max 37
+# mean guesses per board 1.0930
+#   32 guesses       2    0.00%
+#   33 guesses     512    0.05%
+#   34 guesses   39942    3.99%
+#   35 guesses  942099   94.21%
+#   36 guesses   17289    1.73%
+#   37 guesses     156    0.02%

@@ -1,0 +1,19 @@
+# DIGEST of k7_compt_t1000000_s0.csv (0.1 GB), which is gitignored: over GitHub's file-size limit.
+# The lines below are copied verbatim from that file's own summary block.
+# multiwordle, blind opening then the greedy rule (see math/multiwordle.py)
+# boards=7 trials=1000000 opening=compt seed=0 strategy=greedy
+# answers drawn without replacement from the 2315 mystery words; no guess cap
+# strategy greedy, trials 1000000, boards 7, opening compt, seed 0
+# mean total guesses 10.4294  +/- 0.0011 (standard error)
+# sd 1.0660   min 8   median 10.0   max 17
+# mean guesses per board 1.4899
+#    8 guesses   11227    1.12%
+#    9 guesses  172793   17.28%
+#   10 guesses  381135   38.11%
+#   11 guesses  286636   28.66%
+#   12 guesses  113413   11.34%
+#   13 guesses   28861    2.89%
+#   14 guesses    5150    0.52%
+#   15 guesses     713    0.07%
+#   16 guesses      63    0.01%
+#   17 guesses       9    0.00%

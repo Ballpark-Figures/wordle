@@ -1,0 +1,19 @@
+# DIGEST of k6_clasp-drent_t1000000_s0.csv (0.1 GB), which is gitignored: over GitHub's file-size limit.
+# The lines below are copied verbatim from that file's own summary block.
+# multiwordle, blind opening then the greedy rule (see math/multiwordle.py)
+# boards=6 trials=1000000 opening=clasp drent seed=0 strategy=greedy
+# answers drawn without replacement from the 2315 mystery words; no guess cap
+# strategy greedy, trials 1000000, boards 6, opening clasp drent, seed 0
+# mean total guesses 8.9713  +/- 0.0009 (standard error)
+# sd 0.9326   min 7   median 9.0   max 16
+# mean guesses per board 1.4952
+#    7 guesses     823    0.08%
+#    8 guesses  354629   35.46%
+#    9 guesses  394310   39.43%
+#   10 guesses  186249   18.62%
+#   11 guesses   52389    5.24%
+#   12 guesses   10055    1.01%
+#   13 guesses    1381    0.14%
+#   14 guesses     152    0.02%
+#   15 guesses      11    0.00%
+#   16 guesses       1    0.00%

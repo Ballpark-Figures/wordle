@@ -1,0 +1,15 @@
+# DIGEST of k32_ridge-tonal_t1000000_s0.csv (0.4 GB), which is gitignored: over GitHub's file-size limit.
+# The lines below are copied verbatim from that file's own summary block.
+# multiwordle, blind opening then the greedy rule (see math/multiwordle.py)
+# boards=32 trials=1000000 opening=ridge tonal seed=0 strategy=greedy
+# answers drawn without replacement from the 2315 mystery words; no guess cap
+# strategy greedy, trials 1000000, boards 32, opening ridge tonal, seed 0
+# mean total guesses 34.0040  +/- 0.0002 (standard error)
+# sd 0.2431   min 32   median 34.0   max 37
+# mean guesses per board 1.0626
+#   32 guesses     192    0.02%
+#   33 guesses   26530    2.65%
+#   34 guesses  942885   94.29%
+#   35 guesses   29922    2.99%
+#   36 guesses     470    0.05%
+#   37 guesses       1    0.00%
