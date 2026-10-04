@@ -1,5 +1,6 @@
 """Screenshot the pages shown in browser mocks: the multi-Wordle games' BOARD pages
-(scene 16) and the 80,000 Hours pages of the sponsor read (scenes 21-22).
+(scene 16), the 80,000 Hours pages of the sponsor read (scenes 21-23), and NYT
+Wordle's own Settings panel with Hard Mode switched on (THM).
 
     .venv/bin/python animations/assets/web_shots.py            # every game
     .venv/bin/python animations/assets/web_shots.py octordle   # just one
@@ -14,7 +15,14 @@ Output: `animations/assets/web_media/<game>.png`, 1920x1080 unless `--size` says
 otherwise (scene 16 uses 1920x1490), dark colour scheme
 requested (a site with no dark mode, like Dordle, stays light) unless a recipe names
 its own (the recipe's options dict, which can also set a page zoom and a
-full-page capture). A screenshot is a
+full-page capture).
+
+A recipe with `shot` steps saves THOSE, as `<game>_<name>.png`, and no final
+screenshot -- several states of one page from one session. `box` steps write
+`<game>_boxes.json`: each named element's box in SCREENSHOT PIXELS (zoom applied),
+`[left, top, right, bottom]`, so a scene can aim at it without eyeballing.
+
+A screenshot is a
 POINT-IN-TIME capture of a live site — today's puzzle, today's layout — so re-running
 replaces it; nothing here is computed. The sites change, so a recipe that stops
 finding its click target FAILS LOUDLY rather than saving the menu under the board's
@@ -24,6 +32,7 @@ macOS only in practice (it needs Chrome.app); `pip install playwright` is the on
 dependency.
 """
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -53,6 +62,11 @@ def _block_ads(route):
 # game -> (url, [click steps], {options}). A step is a Playwright locator description:
 #   ("text", "Play")        the first visible element whose text is exactly that
 #   ("frame", url_part)     switch into the iframe whose url contains url_part
+#   ("click", css)          click the first visible element matching a CSS selector
+#   ("key", "Escape")       press a key
+#   ("hide", css)           hide every element matching a CSS selector (display: none)
+#   ("shot", name)          save a screenshot now, as <game>_<name>.png
+#   ("box", css, name)      record that element's box, into <game>_boxes.json
 # options (all optional) are `_run`'s: scheme ("dark"), zoom (1.0), full_page (False)
 # the 80,000 Hours pages are captured ZOOMED, as Chrome's page zoom would show them:
 # laid out in a 1920/ZOOM-wide window and captured at ZOOM x the pixel density, so
@@ -90,6 +104,22 @@ GAMES = {
     # the WHOLE page, since scene 23 scrolls down it
     "80k_guide":    ("https://80000hours.org/gettheguide/?utm_source=youtube&utm_campaign=2026-80KMAR-ballpark&utm_medium=sponsorship",
                      [], {**LIGHT_80K, "full_page": True}),
+    # NYT Wordle, dark, three states for THM's click on Hard Mode: the game page, the
+    # Settings panel open (Hard Mode off), and Hard Mode on. Play, then Escape closes
+    # the how-to-play modal. The logged-out page has an ad slot across the top --
+    # empty, as ads are blocked -- and it is HIDDEN (user's call), so the layout
+    # closes up as if there were no ad. Zoomed like the 80k pages.
+    "wordle":       ("https://www.nytimes.com/games/wordle/index.html",
+                     [("click", '[data-testid="Play"]'), ("key", "Escape"),
+                      ("hide", '[class*="Ad-module_adContainer"]'),
+                      ("box", '[data-testid="settings-button"]', "gear"),
+                      ("shot", "game"),
+                      ("click", '[data-testid="settings-button"]'),
+                      ("box", '[aria-label="Hard Mode"][role="switch"]', "hard_mode"),
+                      ("shot", "settings"),
+                      ("click", '[aria-label="Hard Mode"][role="switch"]'),
+                      ("shot", "hard")],
+                     {"zoom": ZOOM_80K}),
 }
 
 
@@ -105,7 +135,8 @@ def _run(game, url, steps, browser, full_page=False, view=VIEW, scheme="dark", z
         page.goto(url, wait_until="domcontentloaded", timeout=45000)
         page.wait_for_timeout(SETTLE_MS)
         scope = page
-        for kind, arg in steps:
+        shots, boxes = [], {}
+        for kind, arg, *more in steps:
             if kind == "frame":
                 frames = [f for f in page.frames if arg in f.url]
                 if not frames:
@@ -115,12 +146,41 @@ def _run(game, url, steps, browser, full_page=False, view=VIEW, scheme="dark", z
                 loc = scope.get_by_text(arg, exact=True).locator("visible=true").first
                 loc.click(timeout=15000)
                 page.wait_for_timeout(SETTLE_MS)
+            elif kind == "click":
+                scope.locator(arg).locator("visible=true").first.click(timeout=15000)
+                page.wait_for_timeout(SETTLE_MS)
+            elif kind == "key":
+                page.keyboard.press(arg)
+                page.wait_for_timeout(SETTLE_MS)
+            elif kind == "hide":
+                if scope.locator(arg).count() == 0:
+                    raise RuntimeError(f"nothing to hide matching {arg!r}")
+                scope.add_style_tag(content=f"{arg} {{ display: none !important; }}")
+                page.wait_for_timeout(1000)
+            elif kind == "shot":
+                OUT.mkdir(exist_ok=True)
+                path = OUT / f"{game}_{arg}.png"
+                page.screenshot(path=str(path), full_page=full_page)
+                shots.append(path)
+            elif kind == "box":
+                r = scope.locator(arg).locator("visible=true").first.bounding_box(timeout=15000)
+                if r is None:
+                    raise RuntimeError(f"no box for {arg!r}")
+                boxes[more[0]] = [round(v * zoom, 1) for v in
+                                  (r["x"], r["y"], r["x"] + r["width"], r["y"] + r["height"])]
             else:
                 raise ValueError(kind)
         OUT.mkdir(exist_ok=True)
-        path = OUT / f"{game}.png"
-        page.screenshot(path=str(path), full_page=full_page)
-        print(f"  ok   {game:13s} {path.relative_to(OUT.parent.parent)}")
+        if not shots:
+            path = OUT / f"{game}.png"
+            page.screenshot(path=str(path), full_page=full_page)
+            shots.append(path)
+        if boxes:
+            path = OUT / f"{game}_boxes.json"
+            path.write_text(json.dumps(boxes, indent=2) + "\n")
+            shots.append(path)
+        for path in shots:
+            print(f"  ok   {game:13s} {path.relative_to(OUT.parent.parent)}")
         return True
     except Exception as e:
         print(f"  FAIL {game:13s} {type(e).__name__}: {str(e).splitlines()[0]}")
