@@ -1,0 +1,23 @@
+# greedy letter-by-letter build (see math/greedybuild.py)
+# settings pool=custom words=4 topk=20 ssq_first=8 answers=2315
+step,opening,unsolved,ssq,placed_letter,placed_word,placed_pos
+1,_____ _____ _____ ___e_,2315,7341262,e,0,3
+2,_____ _____ _____ ___es,2315,3050656,s,3,4
+3,_____ _____ _____ _a_es,2315,1321902,a,3,1
+4,_____ _____ _a_es _o___,2305,663116,o,0,1
+5,_____ _a_es _o___ _r___,2287,352424,r,0,1
+6,_____ _a_es _o___ _r_l_,2228,197700,l,3,3
+7,_____ _a_es _o_t_ _r_l_,2070,109864,t,2,3
+8,_____ _a_es _ont_ _r_l_,1848,63990,n,2,2
+9,___c_ _a_e_ _onts _r_l_,1545,43532,c,0,3
+10,___c_ _a_e_ _onts _ril_,1236,29006,i,3,2
+11,___c_ _a_e_ _onts dril_,960,20052,d,3,0
+12,___c_ _ane_ dril_ po_ts,693,14936,p,2,0
+13,___c_ drie_ mont_ pa_ls,485,11506,m,1,0
+14,_abes dril_ mont_ p__c_,328,9272,b,0,2
+15,_abes dril_ mont_ p__ch,219,7950,h,3,4
+16,dries fabl_ mont_ p__ch,133,6870,f,0,0
+17,dries fabl_ mont_ p_uch,95,6330,u,3,2
+18,dries fabl_ month p_uck,63,5758,k,3,4
+19,dries fable monty p_uch,58,5804,e,1,4
+20,dries fable monty pouch,58,5804,o,3,1

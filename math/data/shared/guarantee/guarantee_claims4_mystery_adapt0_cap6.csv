@@ -1,0 +1,10 @@
+# guarantee sweep (see math/guarantee.py): the WORST case over every answer and
+# every draw the random follow-up could make -- exact, no sampling, no seed
+# settings pool=mystery adapt=0 cap=6 openings=6 source=/private/tmp/claude-501/-Users-patrickliscio-Documents-Ballpark-Figures-ballpark-figures-wordle/0f2afe74-9dd0-4661-a5b6-017c37792359/scratchpad/claims4.txt
+word,worst_case,guaranteed,losing_answers,losing_groups,losing_share,worst_answer,worst_line,losing_words
+tubes fling champ wordy,7,0,10,4,0.00431965,piper,tubes fling champ wordy riper viper piper,ester gauge gauze piper riper stake state stave steer viper
+tubes wordy champ fling,7,0,10,4,0.00431965,piper,tubes wordy champ fling riper viper piper,ester gauge gauze piper riper stake state stave steer viper
+light candy power bumfs,8,0,9,3,0.00388769,stake,light candy power bumfs tease state stave stake,crave craze jaunt skate stake state stave taunt vaunt
+flame shunt brick podgy,7,0,13,5,0.00561555,corer,flame shunt brick podgy cover cower corer,catch corer cover cower eager eater hatch jaunt taunt vaunt wager watch water
+stick forum waned glyph,7,0,13,5,0.00561555,rebar,stick forum waned glyph brave zebra rebar,batch catch enjoy envoy hatch jaunt piper rebar riper taunt vaunt viper zebra
+stale chirp mound gawky,7,0,25,9,0.01079914,berry,stale chirp mound gawky every ferry berry,batty berry bloat budge extra fatty ferry fiber fixer float focal fudge jaunt judge local piper riper tabby taffy tatty taunt terra vaunt viper vocal

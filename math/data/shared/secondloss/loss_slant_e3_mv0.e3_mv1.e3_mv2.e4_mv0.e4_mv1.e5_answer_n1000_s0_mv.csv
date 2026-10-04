@@ -1,0 +1,18 @@
+# EV loss vs optimal for the opener slant, by grey count and matched vowels (3- and 4-grey split), split into word-choice and followup loss
+# strategy: second word from data/shared/secondexact/exact_e3_mv0.e3_mv1.e3_mv2.e4_mv0.e4_mv1.e5_k1000.csv firing on e3_mv0.e3_mv1.e3_mv2.e4_mv0.e4_mv1.e5, follow-up answer
+# 1000 games per answer x 2315 answers, seed 0; answer weights are EXACT
+# matched_vowels = MATCHED (green/yellow) tiles on a vowel of the opener (y a vowel); -1 = the whole grey bucket, unsplit
+# A = capped optimum for the SAME opener (total 7951, 3.43456/ans), min guesses within six.  B = our forced 2nd word then the SAME
+# capped-optimal continuation.  C = the uncapped strategy.  A <= B <= C, so word-choice loss B-A and followup loss C-B
+# are each LOWER BOUNDS on the loss against unconstrained optimal play.
+# gap 0.208291 = word-choice loss 0.090281 (B-A) + followup loss 0.118010 (C-B)
+# gate: forcing each reply's own optimal 2nd move reproduces A per grey bucket, validating the residual solver
+grays,matched_vowels,answers,share,opt_mean,optword_mean,sim_mean,sim_stderr,gap,word_gap,followup_gap,contribution,word_contrib,followup_contrib,pct_of_gap,fires
+0,-1,1,0.000432,1.000000,1.000000,1.000000,0.000000,0.000000,0.000000,0.000000,0.000000,0.000000,0.000000,0.0000,0.000000
+1,-1,29,0.012527,2.275862,2.275862,2.277310,0.002227,0.001448,0.000000,0.001448,0.000018,0.000000,0.000018,0.0087,0.000000
+2,-1,264,0.114039,2.954545,2.954545,3.256477,0.001597,0.301932,0.000000,0.301932,0.034432,0.000000,0.034432,16.5307,0.000000
+3,0,339,0.146436,3.165192,3.395280,3.416711,0.000777,0.251519,0.230088,0.021431,0.036832,0.033693,0.003138,17.6828,1.000000
+3,1,436,0.188337,3.392202,3.527523,3.606589,0.000770,0.214388,0.135321,0.079067,0.040377,0.025486,0.014891,19.3850,1.000000
+4,0,706,0.304968,3.587819,3.667139,3.774320,0.000689,0.186501,0.079320,0.107181,0.056877,0.024190,0.032687,27.3065,1.000000
+4,1,223,0.096328,3.645740,3.717489,3.846417,0.001270,0.200677,0.071749,0.128928,0.019331,0.006911,0.012419,9.2807,1.000000
+5,-1,317,0.136933,3.804416,3.804416,3.953571,0.001114,0.149155,0.000000,0.149155,0.020424,0.000000,0.020424,9.8056,1.000000

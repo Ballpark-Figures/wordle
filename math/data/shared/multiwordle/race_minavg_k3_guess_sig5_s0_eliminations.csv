@@ -1,0 +1,2 @@
+# race_minavg_k3_guess_sig5_s0 -- one row per opening as it leaves the race
+opening,games,mean,diff_vs_leader,paired_stderr,sigma,leader

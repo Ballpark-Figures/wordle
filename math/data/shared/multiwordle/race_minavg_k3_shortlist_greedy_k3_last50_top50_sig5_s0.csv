@@ -1,0 +1,55 @@
+# race_minavg_k3_shortlist_greedy_k3_last50_top50_sig5_s0
+# settings strategy=minavg boards=3 sigma=5 block=100 growth=2 seed=0 openings=data/shared/multiwordle/shortlist_greedy_k3_last50.csv top=50
+# mean/stderr are the opening's OWN numbers; diff_vs_leader, paired_stderr and sigma are PAIRED against canst, and the cut uses the paired sigma
+# the leader is the best of the openings ENTERED, judged on the games actually played -- a screen, not a proof
+opening,status,games,mean,stderr,diff_vs_leader,paired_stderr,sigma,is_answer
+canst,live,409600,6.035093,0.001192,0.000000,0.000000,0.000,0
+clapt,out,409600,,,,,,0
+clart,out,409600,,,,,,0
+clint,out,102400,,,,,,0
+clast,out,102400,,,,,,0
+print,out,102400,,,,,,1
+plant,out,51200,,,,,,1
+clipt,out,51200,,,,,,0
+plast,out,51200,,,,,,0
+slant,out,51200,,,,,,1
+spilt,out,51200,,,,,,1
+drant,out,51200,,,,,,0
+spalt,out,51200,,,,,,0
+prent,out,25600,,,,,,0
+slipt,out,25600,,,,,,0
+clasp,out,25600,,,,,,1
+crept,out,12800,,,,,,1
+prost,out,12800,,,,,,0
+trild,out,12800,,,,,,0
+larnt,out,12800,,,,,,0
+paint,out,12800,,,,,,1
+slart,out,12800,,,,,,0
+point,out,12800,,,,,,1
+curst,out,12800,,,,,,0
+clept,out,6400,,,,,,0
+slept,out,6400,,,,,,1
+spelt,out,6400,,,,,,1
+perst,out,6400,,,,,,0
+dropt,out,6400,,,,,,0
+coapt,out,6400,,,,,,0
+blist,out,6400,,,,,,0
+mulct,out,6400,,,,,,0
+culet,out,6400,,,,,,0
+splat,out,6400,,,,,,1
+blast,out,6400,,,,,,1
+spent,out,6400,,,,,,1
+talcs,out,6400,,,,,,0
+plait,out,6400,,,,,,1
+palet,out,6400,,,,,,0
+colts,out,6400,,,,,,0
+dempt,out,3200,,,,,,0
+prunt,out,3200,,,,,,0
+blent,out,3200,,,,,,0
+prest,out,3200,,,,,,0
+cleat,out,3200,,,,,,1
+blest,out,3200,,,,,,0
+terns,out,3200,,,,,,0
+leapt,out,3200,,,,,,1
+tronc,out,3200,,,,,,0
+plate,out,3200,,,,,,1

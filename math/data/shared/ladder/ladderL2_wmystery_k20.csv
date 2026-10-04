@@ -1,0 +1,49 @@
+# secondexact: the EXACT best predetermined second word, and the exact value of the
+# strategy -- opener, then that word when the reply fires, then a uniformly random
+# consistent ANSWER.  No seed and no standard error: the random tail is summed 
+# exactly (math/secondexact.py states the recursion).
+# expected is over all 2315 answers; decline/fired split it by whether the rule fired.
+# settings fire=ladderL2_wmystery openers=20 follow_up=answer topk=20 third=-1 third_key=none third_decline=0 ladder=2
+# TOPK=20: each group's word is the best of the 20 ranked by the one-ply
+# score, so every total here is an UPPER BOUND, not the optimum.
+opener,fires,second,expected,total,decline,fired,qualifying,scanned,cut
+raise,ladder,cloth,3.771535,8731.1027,1702.1652,7028.9375,1846,120,0
+raise,L2|t3,cloth,3.771535,8731.1027,,,,,level2
+arise,ladder,cloth,3.792125,8778.7682,1736.9460,7041.8222,1846,120,0
+arise,L2|t3,cloth,3.792125,8778.7682,,,,,level2
+later,ladder,sonic,3.743144,8665.3789,1733.8285,6931.5504,1819,120,0
+later,L2|t3,sonic,3.743144,8665.3789,,,,,level2
+saner,ladder,clout,3.753767,8689.9700,1598.3866,7091.5833,1866,120,0
+saner,L2|t3,clout,3.753767,8689.9700,,,,,level2
+slate,ladder,corny,3.717490,8605.9882,1434.7816,7171.2067,1879,120,0
+slate,L2|t3,corny,3.717490,8605.9882,,,,,level2
+least,ladder,crony,3.728299,8631.0117,1447.5365,7183.4752,1879,120,0
+least,L2|t3,crony,3.728299,8631.0117,,,,,level2
+irate,ladder,scold,3.768647,8724.4182,1741.5324,6982.8858,1821,100,0
+irate,L2|t3,scold,3.768647,8724.4182,,,,,level2
+alter,ladder,sonic,3.746742,8673.7080,1745.6654,6928.0426,1819,120,0
+alter,L2|t3,sonic,3.746742,8673.7080,,,,,level2
+arose,ladder,glint,3.786247,8765.1607,1777.4296,6987.7311,1840,100,0
+arose,L2|t3,glint,3.786247,8765.1607,,,,,level2
+leant,ladder,crisp,3.684269,8529.0830,1287.2547,7241.8283,1924,100,0
+leant,L2|t3,crisp,3.684269,8529.0830,,,,,level2
+aisle,ladder,torch,3.770697,8729.1640,1384.7137,7344.4503,1916,100,0
+aisle,L2|t3,torch,3.770697,8729.1640,,,,,level2
+stare,ladder,cling,3.745544,8670.9339,1784.0048,6886.9292,1801,100,0
+stare,L2|t3,cling,3.745544,8670.9339,,,,,level2
+alone,ladder,crust,3.746654,8673.5036,1227.7903,7445.7133,1951,100,0
+alone,L2|t3,crust,3.746654,8673.5036,,,,,level2
+alert,ladder,sonic,3.735666,8648.0664,1738.4212,6909.6452,1819,120,0
+alert,L2|t3,sonic,3.735666,8648.0664,,,,,level2
+learn,ladder,hoist,3.742602,8664.1236,1512.3478,7151.7758,1880,120,0
+learn,L2|t3,hoist,3.742602,8664.1236,,,,,level2
+snare,ladder,clout,3.746423,8672.9699,1588.7032,7084.2667,1866,120,0
+snare,L2|t3,clout,3.746423,8672.9699,,,,,level2
+crane,ladder,spilt,3.672819,8502.5770,1326.2708,7176.3062,1918,100,0
+crane,L2|t3,spilt,3.672819,8502.5770,,,,,level2
+trace,ladder,sling,3.704070,8574.9227,1451.0216,7123.9011,1875,120,0
+trace,L2|t3,sling,3.704070,8574.9227,,,,,level2
+stale,ladder,corny,3.738190,8653.9096,1444.1392,7209.7704,1879,120,0
+stale,L2|t3,corny,3.738190,8653.9096,,,,,level2
+crate,ladder,spoil,3.707093,8581.9195,1459.9212,7121.9983,1875,120,0
+crate,L2|t3,spoil,3.707093,8581.9195,,,,,level2

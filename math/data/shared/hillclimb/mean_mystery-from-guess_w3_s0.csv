@@ -1,0 +1,5 @@
+# hill climb (see math/hillclimb.py): random starts, widening swaps
+# settings objective=mean pool=mystery candidates=guess words=3 cap=6 seed=0 sections=swap;2x0;2x1;3x0
+trial,opening,mean,ssq,steps,secs
+15,blimp dance horst,4.163887343,3319,rounds 2; swap 4; anagram 1; anagram+1 0; anagram3 1,12424.7
+2,blimp dance horst,4.163887343,3319,rounds 2; swap 4; anagram 2; anagram+1 1; anagram3 1,13344.8

@@ -1,0 +1,9 @@
+# pairs the opening could not guarantee splitting
+# settings pool=custom words=4 cap=6
+word1,word2,count
+ended,kneed,1
+odder,order,1
+stake,steak,1
+stark,starr,1
+stark,start,1
+starr,start,1

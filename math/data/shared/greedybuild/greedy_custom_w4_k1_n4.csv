@@ -1,0 +1,23 @@
+# greedy letter-by-letter build (see math/greedybuild.py)
+# settings pool=custom words=4 topk=1 ssq_first=4 answers=2315
+step,opening,unsolved,ssq,placed_letter,placed_word,placed_pos
+1,_____ _____ _____ ___e_,2315,7341262,e,0,3
+2,_____ _____ _____ ___es,2315,3050656,s,3,4
+3,_____ _____ _____ _a_es,2315,1321902,a,3,1
+4,_____ _____ _a_es _o___,2305,663116,o,0,1
+5,_____ _____ _a_es vo___,2255,596024,v,3,0
+6,_____ _____ _a_es vo__l,2188,353626,l,3,4
+7,_____ ____n _a_es vo__l,2075,212882,n,0,4
+8,____n ___t_ _a_es vo__l,1909,115696,t,0,3
+9,____n ___t_ _ares vo__l,1692,61442,r,2,2
+10,____n ___t_ cares vo__l,1412,40616,c,2,0
+11,____n __it_ cares vo__l,1105,26312,i,1,2
+12,__it_ cares p___n vo__l,834,19414,p,0,0
+13,cares d_it_ p___n vo__l,598,13398,d,0,0
+14,cares d_it_ p_g_n vo__l,415,10890,g,2,2
+15,cares d_it_ p_g_n vow_l,319,9390,w,3,2
+16,cares d_ity p_g_n vow_l,238,8224,y,1,4
+17,cares deity p_g_n vow_l,202,7786,e,1,1
+18,cares deity p_gan vow_l,184,7576,a,2,3
+19,cares deity pagan vow_l,180,7508,a,2,1
+20,cares deity pagan vowel,180,7508,e,3,3

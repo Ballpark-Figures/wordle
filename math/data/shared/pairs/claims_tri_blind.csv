@@ -1,0 +1,7 @@
+word1,word2,word3,total,expected,seconds
+stare,doing,pluck,9785,4.22678,0.0
+stare,pluck,doing,9785,4.22678,0.0
+doing,stare,pluck,9785,4.22678,0.0
+pluck,doing,stare,9785,4.22678,0.0
+pluck,stare,doing,9785,4.22678,0.0
+doing,pluck,stare,9785,4.22678,0.0

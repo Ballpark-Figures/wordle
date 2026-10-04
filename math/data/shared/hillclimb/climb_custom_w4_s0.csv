@@ -1,0 +1,174 @@
+# hill climb (see math/hillclimb.py): random starts, one-word swaps
+# settings pool=custom candidates=custom words=4 cap=6 seed=0
+trial,opening,unsolved,ssq,steps,secs
+1,putty welch gamer bonds,18,5568,6,84.5
+6,wrack glyph totem funds,21,5618,3,74.2
+2,welch fonts barge dumpy,13,5210,4,86.3
+4,weber month dicky plugs,19,5210,4,104.6
+5,phage twirl comfy bends,11,5196,7,105.6
+3,ditty whelp combs range,22,5294,3,114.1
+1,putty welch gamer bonds,18,5568,6,115.0
+8,deign crumb showy platt,25,5392,5,117.7
+7,cling peres vodka thumb,27,5222,4,123.2
+9,climb wands grope hefty,16,5170,4,73.8
+10,gawky prowl embed cunts,26,5616,4,98.3
+13,shawn gecko plumb tired,20,5214,3,69.4
+6,wrack glyph totem funds,21,5618,3,96.7
+9,climb wands grope hefty,16,5170,4,106.2
+2,welch fonts barge dumpy,13,5210,4,113.4
+11,candy growl pubes theme,24,5480,4,115.6
+15,colby thump waver dings,15,5094,4,134.3
+14,blunt midge pores whack,21,5192,4,135.1
+12,cunts while dogma perky,35,5466,3,136.7
+5,phage twirl comfy bends,11,5196,7,138.7
+4,weber month dicky plugs,19,5210,4,138.8
+1,putty welch gamer bonds,18,5568,6,149.5
+3,ditty whelp combs range,22,5294,3,150.1
+10,gawky prowl embed cunts,26,5616,4,152.8
+8,deign crumb showy platt,25,5392,5,155.5
+19,germs twink bodhi culpa,31,5260,2,92.2
+16,wipes munch rabat godly,19,5228,5,164.1
+7,cling peres vodka thumb,27,5222,4,164.4
+18,thing vardy plumb crews,17,5468,6,185.7
+20,swoop dunce right balmy,21,5228,4,95.2
+22,gnash plumb witty coder,13,5398,3,95.6
+23,mowed blush tying recap,25,5462,3,94.2
+17,mined trawl bucks glyph,25,5376,6,214.9
+21,paved swing lurch tombs,16,5134,5,110.4
+25,swamp cider thong bulky,16,5010,3,97.5
+26,paced month twigs burly,23,5236,4,103.3
+30,swoop hymen rabid cleft,45,5578,3,90.4
+32,wings tempt badly frock,18,5184,5,104.6
+35,graft bowed pumas lynch,12,5386,4,101.8
+27,baldy wharf comet pings,10,5096,5,149.7
+24,draws panic hefty mogul,26,5546,4,160.4
+31,forty humid beeps clang,33,5352,3,142.8
+29,crawl doubt gives nymph,12,5182,5,176.0
+33,flake tends rugby chomp,20,5440,3,171.9
+36,growl death punks comfy,20,5598,3,150.1
+42,midge blown crypt haves,18,5304,3,111.6
+41,might newly proud backs,15,5128,3,131.8
+38,nymph draft vocab wiles,22,5428,3,150.5
+28,prowl games bendy fitch,13,5150,5,232.5
+40,weber vomit candy plugs,22,5400,5,158.8
+34,acids rugby monte whelp,24,5482,3,224.6
+43,pinks crumb lofty waged,15,5006,4,184.3
+44,moved twang burly chips,12,5016,3,203.7
+37,dealt bower chump kings,30,5188,5,266.0
+45,tweed birch pygmy loans,24,5404,4,223.0
+48,piney chars gumbo dwelt,23,5342,4,192.5
+52,climb drugs woven patty,16,5358,3,155.1
+51,thief crump bogan welds,27,5248,4,177.3
+46,cramp wight flunk doves,11,5214,7,249.3
+50,groom typed flaws bunch,15,5444,5,211.5
+49,crimp knows bugle death,24,5284,5,247.0
+56,mowed turks pinch gable,13,5072,4,172.3
+39,flows pacer bundy might,14,5016,4,339.5
+57,beams notch wiped glory,37,5586,3,193.0
+58,rhyme glows banco tepid,26,5524,4,187.5
+47,mirth beget downy clasp,21,5380,7,289.9
+59,pings wordy lathe crumb,20,5284,5,155.7
+60,rhyme build tacks prong,33,5408,4,137.0
+54,frame pudgy wench bolts,14,5360,5,285.7
+70,germs blunt poked watch,23,5490,4,116.7
+53,comet glyph rivas bundy,29,5594,6,328.5
+71,drift vocab humps newly,19,5324,2,120.8
+55,mercy wants bough plied,21,5264,5,337.1
+62,snake light bumpy crowd,18,5128,4,228.1
+61,bower helms caput dingy,24,5250,8,268.9
+68,bawdy tucks miner glyph,26,5382,3,187.4
+67,pinch marge bytes would,22,5274,5,203.8
+73,thang films corby paved,16,5128,5,163.1
+66,chief twang slump dorky,8,5060,5,264.1
+69,pinky gable dutch worms,15,4936,4,237.8
+65,wrack tombs flung hyped,15,5174,6,275.0
+77,pints lough bawdy creme,19,5226,4,134.7
+76,munch flows bidet grape,16,5218,4,169.8
+74,punch mavis beget world,9,5194,7,243.5
+64,binge howdy craft plums,10,5132,6,335.6
+81,lumpy bangs thick rowed,9,4958,6,132.7
+78,macaw bring hoped lusty,35,5428,3,174.1
+72,wider bumps flock tangy,12,5012,7,273.5
+85,rocky plumb sight waned,13,4972,5,108.5
+63,fable might punks crowd,13,4922,5,367.2
+79,thugs named prick below,29,5226,4,190.5
+75,glens tramp bawdy vouch,16,5634,5,300.6
+84,pygmy dwarf tonic blues,20,5416,3,159.5
+80,ponds while craft begum,13,5226,4,223.7
+83,pudgy worst chink flame,14,5260,5,207.1
+94,plumb graft whiny codes,10,5054,4,112.1
+89,frond vague climb swept,28,5524,3,167.0
+88,flown cyber midst phage,13,5268,6,184.4
+90,bongo fares tidal chump,33,5446,3,182.8
+82,poked clint burgh swamy,16,4990,3,263.4
+93,repel batch minus doggy,45,5646,4,175.1
+99,vamps beret child gowns,11,5314,4,148.8
+92,flaws crimp bendy tough,15,5152,4,212.1
+95,wedge herbs futon clamp,29,5622,5,199.3
+96,kandy sower bight clump,15,5016,3,206.1
+91,worst hyped vegan climb,17,5474,4,237.2
+97,brick typed human glows,19,5110,5,210.6
+100,merle buddy patch gowns,21,5372,6,174.9
+87,crowd bunks empty gavel,14,5492,5,297.6
+86,coven madly swept burgh,20,5278,5,302.4
+98,ditch plumb knows gayer,17,5050,7,260.4
+2,lofts ranch bumpy wedge,6,5126,swap 4; anagram 3; anagram+1 0,238.6
+9,climb gowns padre hefty,10,5070,swap 4; anagram 1; anagram+1 0,273.4
+1,putty gable worms dench,10,5478,swap 6; anagram 2; anagram+1 0,297.3
+13,corks night plumb waved,6,4994,swap 3; anagram 2; anagram+1 1,308.0
+5,paler wight comfy bends,9,5062,swap 7; anagram 1; anagram+1 0,320.7
+6,dunce glyph tombs waver,8,5410,swap 3; anagram 0; anagram+1 3,321.3
+10,gawky lunch embed ports,7,5160,swap 4; anagram 0; anagram+1 1,327.1
+15,blocs dumpy fiver twang,6,5112,swap 4; anagram 2; anagram+1 1,327.2
+16,bowel munch draft gipsy,12,5244,swap 5; anagram 1; anagram+1 1,377.8
+11,burgh fancy pelts mowed,10,5178,swap 4; anagram 2; anagram+1 3,424.0
+14,debts lumen porch gawky,8,5176,swap 4; anagram 1; anagram+1 2,466.9
+12,comfy plush raged twink,5,5116,swap 3; anagram 0; anagram+1 3,477.9
+4,power dingy slack thumb,7,4988,swap 4; anagram 4; anagram+1 2,515.5
+19,germs twink baldy pouch,13,5004,swap 2; anagram 1; anagram+1 1,280.2
+21,paved swing blocs thrum,13,5160,swap 5; anagram 1; anagram+1 0,225.9
+17,frown tamed bucks glyph,9,5070,swap 6; anagram 0; anagram+1 2,522.8
+3,caved plunk forms wight,3,5084,swap 3; anagram 0; anagram+1 4,526.9
+25,swamp clued thong kirby,12,4968,swap 3; anagram 1; anagram+1 0,202.9
+8,dingy power slack thumb,7,4988,swap 5; anagram 2; anagram+1 2,558.7
+20,fords pence wight balmy,10,4952,swap 4; anagram 0; anagram+1 2,331.2
+7,chump glint waved forks,4,5106,swap 4; anagram 1; anagram+1 4,625.5
+18,gable downy thump ricks,6,4962,swap 6; anagram 1; anagram+1 3,632.4
+24,mandi pucks hefty growl,12,5194,swap 4; anagram 1; anagram+1 1,332.2
+29,lynch debut vigor swamp,8,5244,swap 5; anagram 3; anagram+1 0,248.0
+27,colby dwarf theme pings,8,5034,swap 5; anagram 0; anagram+1 2,350.4
+22,dicky plumb sower thang,7,4996,swap 3; anagram 2; anagram+1 1,429.2
+32,finch tempt badly grows,9,5136,swap 5; anagram 0; anagram+1 1,219.4
+26,boned reach twigs lumpy,10,5268,swap 4; anagram 2; anagram+1 1,467.5
+30,dumps newly vocab right,8,5256,swap 3; anagram 1; anagram+1 3,317.9
+33,chump delft gravy knows,7,5422,swap 3; anagram 3; anagram+1 2,301.2
+36,hedge plunk warts comfy,7,5146,swap 3; anagram 0; anagram+1 2,352.5
+28,beget vamps world finch,4,4998,swap 5; anagram 0; anagram+1 3,460.1
+35,grabs mowed punch lefty,7,5322,swap 4; anagram 0; anagram+1 3,381.2
+31,beret dumpy flock hangs,9,5116,swap 3; anagram 1; anagram+1 2,437.4
+40,bowls thump candy giver,9,5102,swap 5; anagram 0; anagram+1 2,321.4
+37,barks mowed punch legit,10,5108,swap 5; anagram 4; anagram+1 0,398.1
+34,lacks rugby month wiped,10,4970,swap 3; anagram 2; anagram+1 1,458.5
+41,might cubed flown parks,8,4856,swap 3; anagram 0; anagram+1 2,330.0
+44,birch twang lumpy doves,9,5058,swap 3; anagram 2; anagram+1 0,255.7
+38,clink graft humps vowed,7,5166,swap 3; anagram 1; anagram+1 4,414.2
+39,flows champ dingy tuber,7,4988,swap 4; anagram 2; anagram+1 0,416.9
+42,chump bowls draft given,7,5048,swap 3; anagram 1; anagram+1 4,364.2
+46,comps wight flunk raved,8,5092,swap 7; anagram 1; anagram+1 0,298.0
+43,hedge plunk comfy warts,7,5146,swap 4; anagram 1; anagram+1 3,407.1
+51,germs pitch fable wound,12,5018,swap 4; anagram 4; anagram+1 0,265.2
+23,forks chump glint waved,4,5106,swap 3; anagram 2; anagram+1 6,918.6
+56,mowed turks pinch gable,13,5072,swap 4; anagram 0; anagram+1 0,284.8
+48,backs duvet grown lymph,6,5150,swap 4; anagram 1; anagram+1 5,468.4
+49,champ links rugby towed,5,4940,swap 5; anagram 3; anagram+1 1,434.8
+50,delft maybe grows punch,6,5234,swap 5; anagram 1; anagram+1 3,450.6
+47,chunk beget rowdy lamps,6,5100,swap 7; anagram 0; anagram+1 4,614.3
+52,bling vamps recut howdy,6,5196,swap 3; anagram 1; anagram+1 5,490.0
+57,champ godly twink verbs,5,4968,swap 3; anagram 2; anagram+1 2,454.1
+58,dover black nymph twigs,6,5074,swap 4; anagram 1; anagram+1 3,465.7
+45,champ links rugby towed,5,4940,swap 4; anagram 1; anagram+1 2,747.5
+54,liner pudgy whack tombs,6,5024,swap 5; anagram 1; anagram+1 2,559.7
+62,rowed light bumpy snack,9,5010,swap 4; anagram 1; anagram+1 0,386.1
+59,flags rowdy pence thumb,5,5260,swap 5; anagram 0; anagram+1 3,543.6
+63,cubed might flown parks,8,4856,swap 5; anagram 3; anagram+1 0,422.9
+66,chief twang slump dorky,8,5060,swap 5; anagram 0; anagram+1 0,306.2

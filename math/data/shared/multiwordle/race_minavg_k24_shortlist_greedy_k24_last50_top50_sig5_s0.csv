@@ -1,0 +1,55 @@
+# race_minavg_k24_shortlist_greedy_k24_last50_top50_sig5_s0
+# settings strategy=minavg boards=24 sigma=5 block=100 growth=2 seed=0 openings=data/shared/multiwordle/shortlist_greedy_k24_last50.csv top=50
+# mean/stderr are the opening's OWN numbers; diff_vs_leader, paired_stderr and sigma are PAIRED against rotan, and the cut uses the paired sigma
+# the leader is the best of the openings ENTERED, judged on the games actually played -- a screen, not a proof
+opening,status,games,mean,stderr,diff_vs_leader,paired_stderr,sigma,is_answer
+rotan,live,1000000,25.736167,0.000584,0.000000,0.000000,0.000,0
+filet,live,1000000,25.736649,0.000608,0.000482,0.000764,0.631,1
+metro,out,819200,,,,,,1
+tamed,out,409600,,,,,,0
+dinar,out,204800,,,,,,0
+laten,out,102400,,,,,,0
+morat,out,102400,,,,,,0
+flirt,out,102400,,,,,,1
+brute,out,102400,,,,,,1
+peart,out,51200,,,,,,0
+carte,out,51200,,,,,,0
+truce,out,51200,,,,,,1
+merit,out,51200,,,,,,1
+earth,out,51200,,,,,,1
+moten,out,51200,,,,,,0
+tepal,out,51200,,,,,,0
+carle,out,51200,,,,,,0
+train,out,51200,,,,,,1
+potin,out,51200,,,,,,0
+thrae,out,51200,,,,,,0
+chart,out,51200,,,,,,1
+paten,out,51200,,,,,,0
+patin,out,51200,,,,,,0
+ligan,out,51200,,,,,,0
+resin,out,51200,,,,,,1
+racon,out,51200,,,,,,0
+gland,out,51200,,,,,,1
+piert,out,51200,,,,,,0
+bloat,out,51200,,,,,,1
+party,out,51200,,,,,,1
+apert,out,25600,,,,,,0
+caret,out,25600,,,,,,0
+curet,out,25600,,,,,,0
+toran,out,25600,,,,,,0
+tared,out,25600,,,,,,0
+caron,out,25600,,,,,,0
+pated,out,25600,,,,,,0
+cater,out,25600,,,,,,1
+derat,out,25600,,,,,,0
+mitre,out,25600,,,,,,0
+lacer,out,25600,,,,,,0
+metol,out,25600,,,,,,0
+heron,out,25600,,,,,,1
+perst,out,12800,,,,,,0
+trace,out,12800,,,,,,1
+trema,out,12800,,,,,,0
+therm,out,12800,,,,,,0
+acorn,out,12800,,,,,,1
+dotal,out,12800,,,,,,0
+redan,out,12800,,,,,,0

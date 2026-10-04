@@ -1,0 +1,41 @@
+# secondexact: the EXACT best predetermined second word, and the exact value of the
+# strategy -- opener, then that word when the reply fires, then a uniformly random
+# consistent ANSWER.  No seed and no standard error: the random tail is summed 
+# exactly (math/secondexact.py states the recursion).
+# expected is over all 2315 answers; decline/fired split it by whether the rule fired.
+# settings fire=e3_nz01.e3_nz02.e3_nz03.e3_nz04.e3_nz12.e3_nz13.e3_nz14.e3_nz23.e3_nz24.e3_nz34.e4_nz0.e4_nz1.e4_nz2.e4_nz3.e4_nz4.e5 openers=2 follow_up=answer topk=2 third=-1 third_key=none third_decline=0
+# TOPK=2: each group's word is the best of the 2 ranked by the one-ply
+# score, so every total here is an UPPER BOUND, not the optimum.
+opener,fires,second,expected,total,decline,fired,qualifying,scanned,cut
+roate,e5,clips,3.706180,8579.8056,1831.8071,769.0848,195,2,12969
+roate,e4_nz4,deils,3.706180,8579.8056,1831.8071,714.1573,189,2,12969
+roate,e4_nz3,knish,3.706180,8579.8056,1831.8071,312.1262,84,2,12969
+roate,e4_nz2,sclim,3.706180,8579.8056,1831.8071,699.8614,183,2,12969
+roate,e4_nz1,scold,3.706180,8579.8056,1831.8071,528.0613,137,2,12969
+roate,e4_nz0,sculk,3.706180,8579.8056,1831.8071,236.8333,67,2,12969
+roate,e3_nz34,shiel,3.706180,8579.8056,1831.8071,333.8167,95,2,12969
+roate,e3_nz24,slung,3.706180,8579.8056,1831.8071,584.7461,153,2,12969
+roate,e3_nz23,clint,3.706180,8579.8056,1831.8071,349.0833,92,2,12969
+roate,e3_nz14,clons,3.706180,8579.8056,1831.8071,325.2167,92,2,12969
+roate,e3_nz13,dunsh,3.706180,8579.8056,1831.8071,246.2667,72,2,12969
+roate,e3_nz12,nicol,3.706180,8579.8056,1831.8071,192.1667,56,2,12969
+roate,e3_nz04,siped,3.706180,8579.8056,1831.8071,648.5442,169,2,12969
+roate,e3_nz03,scuft,3.706180,8579.8056,1831.8071,123.5000,37,2,12969
+roate,e3_nz02,chynd,3.706180,8579.8056,1831.8071,373.7450,101,2,12969
+roate,e3_nz01,duing,3.706180,8579.8056,1831.8071,310.7889,84,2,12969
+raise,e5,could,3.734686,8645.7974,1703.1652,677.1802,168,2,12969
+raise,e4_nz4,olden,3.734686,8645.7974,1703.1652,693.3206,182,2,12969
+raise,e4_nz3,pluot,3.734686,8645.7974,1703.1652,359.9062,97,2,12969
+raise,e4_nz2,hotly,3.734686,8645.7974,1703.1652,621.5185,158,2,12969
+raise,e4_nz1,cyton,3.734686,8645.7974,1703.1652,726.3469,183,2,12969
+raise,e4_nz0,count,3.734686,8645.7974,1703.1652,421.7133,113,2,12969
+raise,e3_nz34,poult,3.734686,8645.7974,1703.1652,303.7000,87,2,12969
+raise,e3_nz24,denet,3.734686,8645.7974,1703.1652,345.0714,98,2,12969
+raise,e3_nz23,ymolt,3.734686,8645.7974,1703.1652,228.0667,65,2,12969
+raise,e3_nz14,plant,3.734686,8645.7974,1703.1652,582.2594,156,2,12969
+raise,e3_nz13,clapt,3.734686,8645.7974,1703.1652,327.0524,92,2,12969
+raise,e3_nz12,alant,3.734686,8645.7974,1703.1652,222.1667,66,2,12969
+raise,e3_nz04,coted,3.734686,8645.7974,1703.1652,664.0732,168,2,12969
+raise,e3_nz03,count,3.734686,8645.7974,1703.1652,128.5000,39,2,12969
+raise,e3_nz02,tronk,3.734686,8645.7974,1703.1652,197.5000,56,2,12969
+raise,e3_nz01,tronc,3.734686,8645.7974,1703.1652,444.2566,117,2,12969

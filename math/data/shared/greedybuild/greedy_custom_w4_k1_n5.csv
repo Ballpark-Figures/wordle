@@ -1,0 +1,23 @@
+# greedy letter-by-letter build (see math/greedybuild.py)
+# settings pool=custom words=4 topk=1 ssq_first=5 answers=2315
+step,opening,unsolved,ssq,placed_letter,placed_word,placed_pos
+1,_____ _____ _____ ___e_,2315,7341262,e,0,3
+2,_____ _____ _____ ___es,2315,3050656,s,3,4
+3,_____ _____ _____ _a_es,2315,1321902,a,3,1
+4,_____ _____ _a_es _o___,2305,663116,o,0,1
+5,_____ _a_es _o___ _r___,2287,352424,r,0,1
+6,_____ _a_es _o___ _rb__,2192,275392,b,3,2
+7,_____ _a_es _o___ _rb_t,2045,155822,t,3,4
+8,_____ _a_es _on__ _rb_t,1837,90580,n,2,2
+9,___l_ _a_es _on__ _rb_t,1581,49948,l,0,3
+10,___l_ _a_es _onc_ _rb_t,1262,33958,c,2,3
+11,__il_ _a_es _onc_ _rb_t,964,22896,i,0,2
+12,__il_ _onc_ _rb_t da_es,699,16060,d,1,0
+13,__il_ _rb_t da_es ponc_,466,11906,p,1,0
+14,_rb_t da_es m_il_ ponc_,301,9288,m,0,0
+15,_rb_t dares m_il_ ponc_,257,8742,r,1,2
+16,_rb_t dares m_il_ ponce,224,8344,e,3,4
+17,_rbit dares m_il_ ponce,220,8288,i,0,3
+18,dares m_il_ orbit ponce,219,8236,o,0,0
+19,dares m_ils orbit ponce,219,8236,s,1,4
+20,dares mails orbit ponce,219,8236,a,1,1

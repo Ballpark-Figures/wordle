@@ -1,0 +1,8 @@
+# hill climb (see math/hillclimb.py): random starts, widening swaps
+# settings objective=mean pool=mystery candidates=guess words=4 cap=6 seed=0 sections=swap;2x0;2x1;3x0
+trial,opening,mean,ssq,steps,secs
+10,glift chynd wombs parve,5.027141814,2449,rounds 2; swap 6; anagram 1; anagram+1 2; anagram3 0,4970.7
+4,flint champ rugby sowed,5.021922246,2439,rounds 2; swap 7; anagram 4; anagram+1 0; anagram3 1,5296.6
+2,champ rugby flint sowed,5.021922246,2439,rounds 2; swap 4; anagram 1; anagram+1 1; anagram3 2,6175.7
+1,champ flint rugby sowed,5.021922246,2439,rounds 2; swap 4; anagram 3; anagram+1 1; anagram3 0,6340.8
+9,clank shrew doubt gimpy,5.026781857,2463,rounds 2; swap 5; anagram 3; anagram+1 1; anagram3 0,6596.3

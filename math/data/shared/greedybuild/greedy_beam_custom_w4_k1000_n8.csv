@@ -1,0 +1,23 @@
+# greedy letter-by-letter build (see math/greedybuild.py)
+# settings search=beam pool=custom words=4 topk=1000 ssq_first=8 answers=2315
+step,steps,pct,opening,unsolved,ssq,placed_letter,placed_word,placed_pos
+1,20,5.0,_____ _____ _____ ___e_,,7341262,e,0,3
+2,20,10.0,_____ _____ _____ ___es,,3050656,s,3,4
+3,20,15.0,_____ _____ _____ _a_es,,1321902,a,3,1
+4,20,20.0,_____ _____ _a___ _o_es,,663116,o,2,1
+5,20,25.0,_____ _a___ _o___ _r_es,,352424,r,1,1
+6,20,30.0,_____ _a___ _o_es _r_l_,,197700,l,3,3
+7,20,35.0,_____ _a_e_ _o_l_ _r_ts,,109864,t,3,3
+8,20,40.0,_____ _al__ _one_ _r_ts,,63932,n,2,2
+9,20,45.0,_____ _al__ _ones cr_t_,1537,43114,c,3,0
+10,20,50.0,_____ _al__ _ont_ cries,1209,28740,i,3,2
+11,20,55.0,_____ _al__ cont_ dries,942,19870,d,2,0
+12,20,60.0,_____ cant_ dol_s prie_,685,14774,p,1,0
+13,20,65.0,cone_ d____ mails pr_t_,470,11408,m,0,0
+14,20,70.0,cal__ drie_ mont_ p__bs,316,9104,b,3,3
+15,20,75.0,cal__ drie_ month p__bs,204,7754,h,2,4
+16,20,80.0,comb_ drie_ g_l_h pants,122,6666,g,0,0
+17,20,85.0,crib_ do_gh mele_ pants,88,6208,e,2,1
+18,20,90.0,dries fabl_ month p_uck,63,5758,k,3,4
+19,20,95.0,combs drier gul_h panty,44,5620,u,2,1
+20,20,100.0,colby drier meath pangs,40,5702,e,2,1

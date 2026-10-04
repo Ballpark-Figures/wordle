@@ -1,0 +1,7 @@
+# greedy letter-by-letter build (see math/greedybuild.py)
+# settings search=beam pool=custom words=4 topk=50 ssq_first=8 answers=2315
+found_at,nodes,opening,unsolved,ssq
+331.6,119591,butch drill month pages,88,6078
+331.6,119591,butch drill monty pages,63,5742
+331.6,119591,beech drill monty pages,60,5750
+331.7,119591,dries fable monty pouch,58,5804

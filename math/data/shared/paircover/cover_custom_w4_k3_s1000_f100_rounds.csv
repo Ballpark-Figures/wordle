@@ -1,0 +1,10 @@
+# pair-cover loop (see math/paircover.py)
+# settings pool=custom words=4 topk=3 cap=6 seed=data/shared/answerpairs/pairsplit_mystery_by-custom.csv seed_top=1000
+round,opening,unsolved,ssq,harvested,new_pairs,total_pairs,secs
+1,chump wedge blink forts,22,5188,19,9,19,37.1
+2,heavy tumor ponds flick,45,5832,55,55,74,74.7
+3,gawky verbs lotte punch,76,6408,98,96,170,37.9
+4,dogma wifey bevel turns,116,6806,137,132,302,39.1
+5,chomp waged furry stilt,64,5896,74,67,369,36.3
+6,chomp bandy verge swift,23,5346,22,17,386,36.2
+7,plumb dench gawky first,14,5176,11,5,391,36.9

@@ -1,0 +1,23 @@
+# greedy letter-by-letter build (see math/greedybuild.py)
+# settings pool=custom words=4 topk=3 ssq_first=8 answers=2315
+step,opening,unsolved,ssq,placed_letter,placed_word,placed_pos
+1,_____ _____ _____ ___e_,2315,7341262,e,0,3
+2,_____ _____ _____ ___es,2315,3050656,s,3,4
+3,_____ _____ _____ _a_es,2315,1321902,a,3,1
+4,_____ _____ _a__s _o_e_,2305,663116,o,2,1
+5,_____ _a__s _o_e_ _r___,2287,352424,r,0,1
+6,_____ _a__s _o_e_ _r_l_,2228,197700,l,3,3
+7,_____ _a_e_ _o_ls _r_t_,2070,109864,t,3,3
+8,_____ _a_e_ _onts _r_l_,1848,63990,n,2,2
+9,___c_ _a_e_ _onts _r_l_,1545,43532,c,0,3
+10,___c_ _a_e_ _onts _ril_,1236,29006,i,3,2
+11,___c_ _a_e_ _onts dril_,960,20052,d,3,0
+12,___c_ _one_ dril_ pa_ts,693,14936,p,1,0
+13,___c_ dril_ mone_ pa_ts,485,11506,m,1,0
+14,b__c_ dril_ mone_ pa_ts,329,9276,b,0,0
+15,b__ch dril_ mone_ pa_ts,219,7954,h,0,4
+16,bone_ dril_ mu_ch pa_ts,161,7224,u,2,1
+17,boney dril_ mu_ch pa_ts,124,6680,y,0,4
+18,boney dril_ mu_ch parts,106,6420,r,3,2
+19,boney drill mu_ch parts,96,6294,l,1,4
+20,butch drill money parts,93,6230,t,0,2

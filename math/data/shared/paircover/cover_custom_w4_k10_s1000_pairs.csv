@@ -1,0 +1,27 @@
+# pairs the opening could not guarantee splitting
+# settings pool=custom words=4 cap=6
+word1,word2,count
+babel,label,1
+crave,craze,1
+eager,jager,1
+ester,steer,1
+false,salle,1
+ferry,jerry,1
+ferry,kerry,1
+folly,jolly,1
+folly,lolly,1
+forex,joker,1
+forge,gorge,1
+jolly,lolly,1
+kitty,titty,1
+movie,moxie,1
+piper,riper,1
+piper,viper,1
+rarer,razer,1
+reddy,reedy,1
+riper,viper,1
+ruder,udder,1
+skate,stake,1
+skate,state,1
+stake,state,1
+stark,starr,1

@@ -1,0 +1,15 @@
+# EV loss vs optimal for the opener slant, by grey count, split into word-choice and followup loss
+# strategy: second word from data/shared/secondexact/exact_e3.e4.e5.csv firing on e3.e4.e5, follow-up answer
+# 1000 games per answer x 2315 answers, seed 0; answer weights are EXACT
+# A = capped optimum for the SAME opener (total 7951, 3.43456/ans), min guesses within six.  B = our forced 2nd word then the SAME
+# capped-optimal continuation.  C = the uncapped strategy.  A <= B <= C, so word-choice loss B-A and followup loss C-B
+# are each LOWER BOUNDS on the loss against unconstrained optimal play.
+# gap 0.216120 = word-choice loss 0.095032 (B-A) + followup loss 0.121087 (C-B)
+# gate: forcing each reply's own optimal 2nd move reproduces A per grey bucket, validating the residual solver
+grays,answers,share,opt_mean,optword_mean,sim_mean,sim_stderr,gap,word_gap,followup_gap,contribution,word_contrib,followup_contrib,pct_of_gap,fires
+0,1,0.000432,1.000000,1.000000,1.000000,0.000000,0.000000,0.000000,0.000000,0.000000,0.000000,0.000000,0.0000,0.000000
+1,29,0.012527,2.275862,2.275862,2.275069,0.002237,-0.000793,0.000000,-0.000793,-0.000010,0.000000,-0.000010,-0.0046,0.000000
+2,264,0.114039,2.954545,2.954545,3.257371,0.001594,0.302826,0.000000,0.302826,0.034534,0.000000,0.034534,15.9791,0.000000
+3,775,0.334773,3.292903,3.478710,3.536604,0.000549,0.243701,0.185806,0.057894,0.081584,0.062203,0.019381,37.7497,1.000000
+4,929,0.401296,3.601722,3.683531,3.799587,0.000614,0.197864,0.081808,0.116056,0.079402,0.032829,0.046573,36.7399,1.000000
+5,317,0.136933,3.804416,3.804416,3.954921,0.001117,0.150505,0.000000,0.150505,0.020609,0.000000,0.020609,9.5360,1.000000

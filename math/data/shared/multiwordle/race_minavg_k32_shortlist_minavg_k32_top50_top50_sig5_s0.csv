@@ -1,0 +1,55 @@
+# race_minavg_k32_shortlist_minavg_k32_top50_top50_sig5_s0
+# settings strategy=minavg boards=32 sigma=5 block=100 growth=2 seed=0 openings=data/shared/multiwordle/shortlist_minavg_k32_top50.csv top=50
+# mean/stderr are the opening's OWN numbers; diff_vs_leader, paired_stderr and sigma are PAIRED against filet, and the cut uses the paired sigma
+# the leader is the best of the openings ENTERED, judged on the games actually played -- a screen, not a proof
+opening,status,games,mean,stderr,diff_vs_leader,paired_stderr,sigma,is_answer
+filet,live,3200,33.525000,0.009982,0.000000,0.000000,0.000,1
+flirt,live,3200,33.540000,0.010074,0.015000,0.011931,1.257,1
+dinar,live,3200,33.554063,0.009778,0.029063,0.013054,2.226,0
+rotan,live,3200,33.563125,0.009619,0.038125,0.013214,2.885,0
+timed,live,3200,33.566875,0.009803,0.041875,0.013084,3.201,0
+moten,live,3200,33.570937,0.009903,0.045937,0.013509,3.400,0
+diner,live,3200,33.572500,0.010191,0.047500,0.013439,3.535,1
+reist,live,3200,33.572812,0.009889,0.047813,0.013200,3.622,0
+drain,live,3200,33.573750,0.009757,0.048750,0.013218,3.688,1
+lobar,live,3200,33.574688,0.009934,0.049688,0.013382,3.713,0
+chant,live,3200,33.575938,0.010048,0.050937,0.013790,3.694,1
+orbit,live,3200,33.577813,0.009887,0.052812,0.013327,3.963,1
+taped,live,3200,33.577813,0.009887,0.052812,0.013341,3.959,0
+carle,live,3200,33.579687,0.009803,0.054688,0.013125,4.167,0
+palet,live,3200,33.579687,0.010088,0.054688,0.012831,4.262,0
+motel,live,3200,33.580312,0.009949,0.055313,0.013316,4.154,1
+plast,live,3200,33.582813,0.009834,0.057813,0.013106,4.411,0
+apert,live,3200,33.582813,0.009834,0.057813,0.013415,4.309,0
+hater,live,3200,33.584063,0.010335,0.059062,0.013479,4.382,1
+denar,live,3200,33.584063,0.009900,0.059062,0.013522,4.368,0
+plane,live,3200,33.586250,0.010367,0.061250,0.013667,4.482,1
+dater,live,3200,33.589062,0.009906,0.064062,0.013275,4.826,0
+patin,live,3200,33.590625,0.009843,0.065625,0.013298,4.935,0
+dingo,out,3200,,,,,,1
+broad,out,3200,,,,,,1
+perch,out,3200,,,,,,1
+tiler,out,3200,,,,,,0
+filar,out,3200,,,,,,0
+paseo,out,3200,,,,,,0
+peals,out,3200,,,,,,0
+reach,out,3200,,,,,,1
+recto,out,3200,,,,,,0
+singe,out,3200,,,,,,1
+spire,out,3200,,,,,,1
+early,out,3200,,,,,,1
+flote,out,3200,,,,,,0
+brine,out,3200,,,,,,1
+flite,out,3200,,,,,,0
+genal,out,3200,,,,,,0
+mulie,out,3200,,,,,,0
+slart,out,3200,,,,,,0
+tomia,out,3200,,,,,,0
+virge,out,3200,,,,,,0
+mason,out,3200,,,,,,1
+farce,out,1600,,,,,,1
+sugan,out,1600,,,,,,0
+apiol,out,1600,,,,,,0
+rifle,out,1600,,,,,,1
+unlit,out,1600,,,,,,1
+lurid,out,800,,,,,,1

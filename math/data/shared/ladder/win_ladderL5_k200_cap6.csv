@@ -1,0 +1,8 @@
+# exact expected guesses and win rate for committed-word LADDERS (math/ladder.py, math/openexact.py)
+# settings cap=6 answers=2315 tail=answer source=data/shared/ladder/ladderL5_k200.csv
+# EXACT: no sampling and no seed, so there is no standard error and a re-run reproduces this file
+# mean is expected guesses OUTRIGHT; win_rate is the fraction of those same games at <= cap.  NEVER table either beside an optturns-family total.
+# source_expected/delta: the ladder run's own value for the same ladder, and this walk minus it -- an independent check, since that total came out of secondexact.c
+opener,ladder,words,cap,mean,win_rate,total,lost,answers,leaves,won_outright,source_expected,delta,seconds
+trine,trine clasp<3 dough<1,3,6,3.669667603,0.994563675,8495.2805,12.585091833,2315,912,2,3.669668,-3.97e-07,0.126
+crane,crane spilt<3 dough<1,3,6,3.669809125,0.992388087,8495.6081,17.621578148,2315,930,3,3.669809,1.25e-07,0.688

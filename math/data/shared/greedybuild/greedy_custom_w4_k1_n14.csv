@@ -1,0 +1,23 @@
+# greedy letter-by-letter build (see math/greedybuild.py)
+# settings pool=custom words=4 topk=1 ssq_first=14 answers=2315
+step,opening,unsolved,ssq,placed_letter,placed_word,placed_pos
+1,_____ _____ _____ ___e_,2315,7341262,e,0,3
+2,_____ _____ _____ ___es,2315,3050656,s,3,4
+3,_____ _____ _____ _a_es,2315,1321902,a,3,1
+4,_____ _____ _a_es _o___,2305,663116,o,0,1
+5,_____ _a_es _o___ _r___,2287,352424,r,0,1
+6,_____ _a_es _o___ _r_l_,2228,197700,l,3,3
+7,_____ _a_es _o_t_ _r_l_,2070,109864,t,2,3
+8,_____ _a_es _ont_ _r_l_,1848,63990,n,2,2
+9,_a_es _i___ _ont_ _r_l_,1590,41496,i,0,1
+10,_a_es _i___ _r_l_ cont_,1243,28706,c,2,0
+11,_a_es _i___ cont_ dr_l_,965,19814,d,2,0
+12,_a_es cont_ dr_l_ pi___,689,14742,p,1,0
+13,_a_es cont_ dr_l_ pim__,476,11386,m,3,2
+14,_abes cont_ dr_l_ pim__,318,9194,b,0,2
+15,_abes cont_ dr_ly pim__,243,8160,y,2,4
+16,_abes conte dr_ly pim__,210,7894,e,1,4
+17,_abes conte dr_ly pimp_,208,7856,p,3,3
+18,_abes conte dryly pimp_,206,7846,y,2,2
+19,babes conte dryly pimp_,206,7812,b,0,0
+20,babes conte dryly pimps,206,7812,s,3,4

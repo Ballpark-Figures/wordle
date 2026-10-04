@@ -1,0 +1,55 @@
+# race_minavg_k32_shortlist_greedy_k32_last50_top50_sig5_s0
+# settings strategy=minavg boards=32 sigma=5 block=100 growth=2 seed=0 openings=data/shared/multiwordle/shortlist_greedy_k32_last50.csv top=50
+# mean/stderr are the opening's OWN numbers; diff_vs_leader, paired_stderr and sigma are PAIRED against filet, and the cut uses the paired sigma
+# the leader is the best of the openings ENTERED, judged on the games actually played -- a screen, not a proof
+opening,status,games,mean,stderr,diff_vs_leader,paired_stderr,sigma,is_answer
+filet,live,819200,33.544653,0.000631,0.000000,0.000000,0.000,1
+rotan,out,819200,,,,,,0
+metro,out,102400,,,,,,1
+brute,out,102400,,,,,,1
+laten,out,51200,,,,,,0
+dinar,out,51200,,,,,,0
+flirt,out,51200,,,,,,1
+truce,out,51200,,,,,,1
+earth,out,25600,,,,,,1
+tamed,out,25600,,,,,,0
+peart,out,25600,,,,,,0
+ligan,out,25600,,,,,,0
+party,out,25600,,,,,,1
+tried,out,25600,,,,,,1
+gland,out,25600,,,,,,1
+crate,out,25600,,,,,,1
+trace,out,12800,,,,,,1
+thrae,out,12800,,,,,,0
+tiled,out,12800,,,,,,0
+react,out,12800,,,,,,1
+chart,out,12800,,,,,,1
+carte,out,12800,,,,,,0
+lobar,out,12800,,,,,,0
+feart,out,12800,,,,,,0
+tapir,out,12800,,,,,,1
+chant,out,12800,,,,,,1
+carle,out,6400,,,,,,0
+apert,out,6400,,,,,,0
+tepal,out,6400,,,,,,0
+morat,out,6400,,,,,,0
+plane,out,6400,,,,,,1
+racon,out,6400,,,,,,0
+acorn,out,6400,,,,,,1
+tared,out,6400,,,,,,0
+bloat,out,6400,,,,,,1
+reist,out,6400,,,,,,0
+lacer,out,6400,,,,,,0
+caret,out,6400,,,,,,0
+triad,out,6400,,,,,,1
+moten,out,6400,,,,,,0
+medal,out,6400,,,,,,1
+thane,out,6400,,,,,,0
+twire,out,6400,,,,,,0
+baron,out,6400,,,,,,1
+heart,out,6400,,,,,,1
+orbit,out,6400,,,,,,1
+caron,out,3200,,,,,,0
+resin,out,3200,,,,,,1
+ratio,out,3200,,,,,,1
+clear,out,3200,,,,,,1

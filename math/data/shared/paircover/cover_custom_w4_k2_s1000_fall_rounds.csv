@@ -1,0 +1,33 @@
+# pair-cover loop (see math/paircover.py)
+# settings pool=custom words=4 topk=2 cap=6 seed=data/shared/answerpairs/pairsplit_mystery_by-custom.csv seed_top=1000
+round,opening,unsolved,ssq,harvested,new_pairs,total_pairs,secs
+1,chump bawdy fling trees,18,5148,18,9,18,40.7
+2,knave prost child begum,43,5728,46,46,64,8.9
+3,wonky fever turds clamp,52,5856,50,49,113,49.4
+4,gawky throb fives clump,51,5628,49,45,158,34.7
+5,dingy theft brows clamp,17,5346,14,10,168,22.8
+6,dying hawks bevel trump,30,5452,28,21,189,29.7
+7,fudge horny evict palms,36,5536,48,38,227,52.7
+8,bawdy flung cheek trips,21,5304,26,17,244,43.3
+9,bowed fungi myrrh splat,31,5412,30,22,266,51.8
+10,knobs wedge vichy trump,48,5912,44,37,303,43.6
+11,block dwarf vying temps,14,5218,11,5,308,35.0
+12,blown jacks fudge tramp,40,6060,30,19,327,53.4
+13,bevel finch wordy stamp,32,5318,36,22,349,50.1
+14,block fight vardy temps,24,5540,26,15,364,46.0
+15,gawky delve bunch ports,25,5356,32,17,381,43.2
+16,flown might ducky rapes,17,5116,16,4,385,48.3
+17,hawks flung moved crypt,14,5306,10,6,391,35.6
+18,blink freer howdy pacts,42,5594,38,17,408,43.4
+19,jumbo fling chevy parts,56,5794,57,24,432,41.3
+20,wedge flock myrrh punts,30,6208,29,17,449,54.2
+21,waved fight combo plans,37,5924,38,26,475,48.2
+22,dwarf vying block temps,14,5218,11,0,475,53.2
+23,gawky delve thumb crops,28,5454,30,14,489,222.8
+24,twink fjord chevy lamps,56,5698,58,36,525,1721.2
+25,rugby flank vowed chips,30,5722,37,24,549,39.0
+26,rugby twink famed helps,22,5344,19,4,553,43.6
+27,rugby theft mandi plows,39,5604,35,9,562,48.5
+28,gawky munch bevel trips,23,5456,27,7,569,52.6
+29,fudge twink myrrh claps,23,5494,15,4,573,39.7
+30,hedge favor twink plums,31,5532,37,18,591,41.4

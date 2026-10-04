@@ -1,0 +1,5 @@
+# pair-cover loop (see math/paircover.py)
+# settings pool=custom words=4 topk=10 cap=6 seed=data/shared/answerpairs/pairsplit_mystery_by-custom.csv seed_top=1000
+round,opening,unsolved,ssq,harvested,new_pairs,total_pairs,secs
+1,glyph famed brown tucks,9,5070,7,2,7,136.6
+2,overt pangs climb howdy,17,5426,17,17,24,1306.5

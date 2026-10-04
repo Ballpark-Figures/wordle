@@ -1,0 +1,34 @@
+# pair-cover loop (see math/paircover.py)
+# settings pool=custom words=4 topk=2 cap=6 seed=data/shared/answerpairs/pairsplit_mystery_by-custom.csv seed_top=1000
+round,opening,unsolved,ssq,harvested,new_pairs,total_pairs,secs
+1,chomp fudge blink warts,27,5010,23,11,23,10.0
+2,envoy pratt limbs dutch,64,6216,85,85,108,21.3
+3,twang fever sorry clump,101,6764,114,113,221,10.5
+4,howdy geeks brava flint,112,6858,149,144,365,8.8
+5,pudgy whack limbs forte,29,5280,26,17,382,10.2
+6,cupid gawky tombs enrol,30,5488,28,16,398,10.7
+7,cupid wight verbs manly,16,5358,15,6,404,10.8
+8,hoped jacky wrung limbs,71,5838,61,46,450,10.6
+9,fetch vapid rugby monks,33,5530,47,31,481,11.1
+10,watch vapid flunk germs,36,5690,28,20,501,11.2
+11,thumb fleck rowdy pings,17,5390,12,4,505,11.4
+12,thumb fleck vapid grows,21,5450,20,12,517,11.3
+13,depth comfy bevel warns,42,5766,34,22,539,11.6
+14,thick rugby moved flaps,17,5304,21,7,546,12.0
+15,thick rowdy plumb genes,11,5178,11,3,549,11.8
+16,thick pudgy blown farms,18,5160,14,4,553,11.7
+17,putty fjord winch lambs,72,6044,74,52,605,11.5
+18,hedge curvy twink lamps,22,5284,20,16,621,13.8
+19,fleck thumb vying wards,21,5538,19,11,632,13.3
+20,fleck pudgy haven tombs,34,5802,29,18,650,12.9
+21,hedge croft japan bowls,61,6510,62,41,691,11.1
+22,fleck myrrh vapid tongs,36,5424,34,15,706,9.7
+23,wreck thumb vying flaps,35,5854,32,7,713,11.2
+24,wedge curvy limbs plant,31,5562,29,7,720,11.1
+25,flock hedge pivot barns,40,5516,40,17,737,11.1
+26,myrrh twink judge clasp,45,6234,40,17,754,10.9
+27,begum chevy frown spilt,48,6048,49,22,776,10.9
+28,wedge comfy britt spank,37,5696,39,24,800,10.8
+29,flock embed harry punts,39,5568,36,13,813,11.0
+30,hedge curvy limbo pawns,48,5752,52,23,836,10.9
+31,flock waved might burns,22,5210,23,7,843,11.3

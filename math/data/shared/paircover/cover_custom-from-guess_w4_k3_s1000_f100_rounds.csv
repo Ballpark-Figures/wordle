@@ -1,0 +1,13 @@
+# pair-cover loop (see math/paircover.py)
+# settings pool=custom words=4 topk=3 cap=6 seed=data/shared/answerpairs/pairsplit_mystery_by-custom.csv seed_top=1000
+round,opening,unsolved,ssq,harvested,new_pairs,total_pairs,secs
+1,bumph dwang flock verts,18,5190,12,9,12,34.5
+2,edify tarns clomb phage,34,5610,32,32,44,154.5
+3,wavey stick erupt blond,91,6376,118,118,162,118.3
+4,humfs wingy kerve adopt,85,6334,85,84,246,36.0
+5,milch gowfs bever tanky,47,5574,49,46,292,37.7
+6,mulch gibed pawky fents,17,5566,15,11,303,37.8
+7,lymph budge frock twins,15,5432,11,7,310,38.5
+8,clump gadje rowth binks,27,5210,31,22,332,37.9
+9,clamp theft yrivd bungs,21,5608,23,15,347,37.1
+10,champ flurr gyved twins,16,5550,16,11,358,35.5

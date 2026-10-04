@@ -1,0 +1,23 @@
+# greedy letter-by-letter build (see math/greedybuild.py)
+# settings pool=custom words=4 topk=1 ssq_first=7 answers=2315
+step,opening,unsolved,ssq,placed_letter,placed_word,placed_pos
+1,_____ _____ _____ ___e_,2315,7341262,e,0,3
+2,_____ _____ _____ ___es,2315,3050656,s,3,4
+3,_____ _____ _____ _a_es,2315,1321902,a,3,1
+4,_____ _____ _a_es _o___,2305,663116,o,0,1
+5,_____ _a_es _o___ _r___,2287,352424,r,0,1
+6,_____ _a_es _o___ _r_l_,2228,197700,l,3,3
+7,_____ _a_es _o_t_ _r_l_,2070,109864,t,2,3
+8,___c_ _a_es _o_t_ _r_l_,1844,73068,c,0,3
+9,___c_ _a_es _ont_ _r_l_,1545,43532,n,2,2
+10,___c_ _a_es _ont_ _ril_,1236,29006,i,3,2
+11,___c_ _a_es _ont_ dril_,960,20052,d,3,0
+12,___c_ _ont_ dril_ pa_es,693,14936,p,1,0
+13,___c_ dril_ mont_ pa_es,485,11506,m,1,0
+14,b__c_ dril_ mont_ pa_es,329,9276,b,0,0
+15,b__c_ dril_ month pa_es,219,7954,h,2,4
+16,b__c_ dril_ month pages,147,6826,g,3,2
+17,bu_c_ dril_ month pages,104,6308,u,0,1
+18,bu_c_ drill month pages,93,6172,l,1,4
+19,butc_ drill month pages,88,6078,t,0,2
+20,butch drill month pages,88,6078,h,0,4

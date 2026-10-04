@@ -1,0 +1,23 @@
+# greedy letter-by-letter build (see math/greedybuild.py)
+# settings pool=custom words=4 topk=2 answers=2315
+step,opening,unsolved,ssq,placed_letter,placed_word,placed_pos
+1,_____ _____ _____ _j___,2313,17803686,j,3,1
+2,_____ _____ __t__ _j___,2306,10480790,t,2,2
+3,_____ _____ _ft__ _j___,2298,8885582,f,2,1
+4,_____ u____ _ft__ _j___,2288,6435828,u,1,0
+5,_____ u__i_ _ft__ _j___,2268,3614274,i,1,3
+6,_____ u__il _ft__ _j___,2233,2114284,l,1,4
+7,_____ u__il _fte_ _j___,2157,789298,e,2,3
+8,_____ u__il _fte_ _j__d,2073,525670,d,3,4
+9,_r___ u__il _fte_ _j__d,1944,257922,r,0,1
+10,_r__s u__il _fte_ _j__d,1745,103286,s,0,4
+11,_ra_s u__il _fte_ _j__d,1488,50330,a,0,2
+12,cra_s u__il _fte_ _j__d,1197,33252,c,0,0
+13,cra_s u__il _ften _j__d,862,21366,n,2,4
+14,craps u__il _ften _j__d,624,15584,p,0,3
+15,craps u__il _ften _jo_d,417,11710,o,3,2
+16,craps u__il _ften _jord,396,11364,r,3,3
+17,craps u__il _jord often,392,11282,o,3,0
+18,craps u__il fjord often,388,11232,f,2,0
+19,craps un_il fjord often,385,11112,n,1,1
+20,craps until fjord often,385,11112,t,1,2
