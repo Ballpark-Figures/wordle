@@ -368,3 +368,7 @@ math/data/shared/multiwordle/k9_cried-plant-wombs_t1000000_s0.csv
 math/data/shared/multiwordle/k9_dempt_t1000000_s0.csv
 math/data/shared/singletons/triple_singletons_ssq_over-custom_p2000000.csv
 math/data/shared/wordlesim/random-blind_t1000000_s0.csv
+
+# Bonus graphics (bonus/): their --stills staging dir and snapshot cache.
+edit_clips_bonus/
+bonus/**/cache/
