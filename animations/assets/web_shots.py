@@ -73,22 +73,25 @@ def _block_ads(route):
 # the PNG is still 1920 wide but the site's text column fills more of it
 ZOOM_80K = 1.5
 LIGHT_80K = {"scheme": "light", "zoom": ZOOM_80K}
+# the multi-Wordle board pages (scene 16) are zoomed the same way, so the boards
+# fill more of the small windows in the 3x2 variants grid
+ZOOM_MULTI = {"zoom": 1.25}
 
 GAMES = {
     # the itch.io page, as a browser shows it; the game is an iframe inside it.
     # (Loaded on its own, the iframe draws in the top-left of a blank white page.)
     "dordle":       ("https://zaratustra.itch.io/dordle",
-                     [("frame", "itch.zone"), ("text", "daily")]),
+                     [("frame", "itch.zone"), ("text", "daily")], ZOOM_MULTI),
     # Play is a link to #/classic, and its click is intercepted, so load the route directly
-    "quordle":      ("https://www.merriam-webster.com/games/quordle/#/classic", []),
+    "quordle":      ("https://www.merriam-webster.com/games/quordle/#/classic", [], ZOOM_MULTI),
     "octordle":     ("https://www.britannica.com/games/octordle",
-                     [("text", "Play")]),
+                     [("text", "Play")], ZOOM_MULTI),
     "sedecordle":   ("https://www.sedecordle.com/",
-                     [("text", "Daily game")]),
+                     [("text", "Daily game")], ZOOM_MULTI),
     "duotrigordle": ("https://duotrigordle.com/",
-                     [("text", "Daily Duotrigordle")]),
+                     [("text", "Daily Duotrigordle")], ZOOM_MULTI),
     "sexaginta":    ("https://sexaginta-quattuordle.pages.dev/",
-                     [("text", "daily")]),
+                     [("text", "daily")], ZOOM_MULTI),
     # the sponsor read (80,000 Hours): plain pages, no clicks, LIGHT scheme -- the
     # site as a visitor normally sees it
     "80k_doctor":   ("https://80000hours.org/articles/how-many-lives-does-a-doctor-save-part-1/",
