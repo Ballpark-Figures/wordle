@@ -20,8 +20,8 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   e great         — GREAT typed and scored; the winning bounce           (19e, VO 2)
   f split         — every tile flips back to empty as the board moves left; an
                     empty copy moves out of it to the right              (19f, VO 3)
-  g keep_yellow   — left: SALET TABES CASTE, typed and scored            (19g, VO 3)
-  h keep_grey     — right: LANCE CANSO TUNIC, typed and scored           (19h, VO 3)
+  g keep_yellow   — left: SCALE SCANT, typed and scored                  (19g, VO 3)
+  h keep_grey     — right: INLET NIGHT, typed and scored                 (19h, VO 3)
   i histogram     — pan down to 08's histogram (normal mode), its axis running on
                     to 4.22 to leave room on the right                   (19i, VO 4)
   j shift         — every word's slice slides to its hard-mode place     (19j, VO 5)
@@ -255,8 +255,8 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
     again_twice — SOLVE deleted; AGAIN twice more
     great — GREAT typed and scored
     split — board flips empty, moves left; a copy moves right
-    keep_yellow — SALET TABES CASTE
-    keep_grey — LANCE CANSO TUNIC
+    keep_yellow — SCALE SCANT
+    keep_grey — INLET NIGHT
     histogram — pan down to the normal-mode histogram
     shift — the slices slide to hard mode
     salet — SALET called out
@@ -373,20 +373,23 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
         self.board = None
 
     # g, h : an example line typed and scored on one board
-    def _play_line(self, board, line, lag_ratio=0.45):
-        """`lag_ratio` 0 flips a row's tiles all at once (19g and 19h, the user's call)."""
-        for row, (w, code) in enumerate(zip(line["words"], line["codes"])):
+    def _play_line(self, board, line, lag_ratio=0.45, n_rows=None):
+        """`lag_ratio` 0 flips a row's tiles all at once (19g and 19h, the user's call).
+        `n_rows` plays only the line's first rows (19g and 19h stop at the second
+        guess, the user's call)."""
+        rows = list(zip(line["words"], line["codes"]))[:n_rows]
+        for row, (w, code) in enumerate(rows):
             self._type(board, row, w, 0.65)
             board.reveal(self, row, code, 1.6 if lag_ratio else 0.6,
                          lag_ratio=lag_ratio)
 
     @subscene
     def keep_yellow(self):
-        self._play_line(self.left, EX["keep_yellow"], lag_ratio=0)
+        self._play_line(self.left, EX["keep_yellow"], lag_ratio=0, n_rows=2)
 
     @subscene
     def keep_grey(self):
-        self._play_line(self.right, EX["keep_grey"], lag_ratio=0)
+        self._play_line(self.right, EX["keep_grey"], lag_ratio=0, n_rows=2)
 
     # ── i-l : the histogram ───────────────────────────────────────────────────
     def _callout_row(self, word):
