@@ -25,10 +25,11 @@ Doc's own beat is in brackets):
   e timeline     — the camera pans up to scene 14's number line as it ended: 3.42 to
                    4.08, the Optimal, Random Compatible Answers and SLATE markers
                                                                    (15e, VO 4)
-  f two_words    — the PARSE CLINT marker pops out at 3.69, below the line
+  f two_words    — the PARSE CLINT marker pops out at 3.69, below the line, CLINT
+                   and its definition fading in right of the card (user's call)
                                                                    (15f, VO 5)
-  g crane_spilt  — its words flip to CRANE SPILT as it slides to 3.70, the win rate
-                   counting                                        (15g, VO 5)
+  g crane_spilt  — CLINT's definition fades out; its words flip to CRANE SPILT as it
+                   slides to 3.70, the win rate counting           (15g, VO 5)
   h three_words  — the line zooms out to fit 4.16, the DANCE HORST BLIMP marker
                    popping out there, above the line               (15h, VO 6)
   i bland_copse  — flips to BLAND COPSE RIGHT, sliding to 4.17     (15i, VO 6)
@@ -95,6 +96,9 @@ REUSE MAP — every element, the one source it comes from, and how it enters:
                         would not fit (user's call)
   marker swaps (g,i,k)  StrategyLine `replace_marker` — 14c's flip-while-sliding with
                         the win rate counting (moved there from scene 14 for this)
+  CLINT's note (f, g)   the card's own `word_line` + assets/gloss.py `gloss` under it
+                        (06d's word-then-definition), FadeIn with the pop, FadeOut
+                        at the start of g (a bounded note: the flip replaces CLINT)
   emphasis (u, v)       dim the rest to 0.2 (house rule: save_state / Restore)
   o's words             one-row boards typed in ONE play, key sound on the first only
                         (12d's), at the board's size and spacing
@@ -163,7 +167,9 @@ from assets.keys import key_cues
 from bpkfigures.style import CrispCounter
 from assets.second_view import corner_spot, row_stroke, under, group_rows
 from assets.strategy_line import (StrategyLine, GAME_DY, shrink_out,
-                                  word_stroke, whole, OPTIMAL, COMPATIBLE)
+                                  word_stroke, whole, word_line, MARKER_FS,
+                                  OPTIMAL, COMPATIBLE)
+from assets.gloss import gloss
 
 DATA = lists_data.load()
 SD = strategy_data.load()
@@ -193,6 +199,11 @@ UNCOUNTED = 1              # w-y: SALVE's one loss is not counted (user's call: 
 COUNT_DONE = LIGHT_GREEN   # w-y: the counter at 0 -- the win-rate scale's green
 COUNT_GROW = 1.4           # y: how much the counter grows as it reaches 0
 FINAL_SCALE = 1.5          # z: the four rows' growth
+CLINT = "clint"            # f: the word defined beside PARSE CLINT's card (user's call)
+CLINT_GLOSS = ["n. A hard or", "flinty rock"]   # f: its definition (user's words),
+                           #   broken by hand so no line is wider than the word
+CLINT_BUFF = 0.35          # f: between the card and CLINT
+CLINT_GLOSS_BUFF = 0.15    # f: between CLINT and its definition (06's GLOSS_BUFF)
 
 
 def _tiles(row):
@@ -266,7 +277,7 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
     to_board — SALET and a CLONE into a board's first two rows; the rest goes
     third — THIRD typed into row 3
     timeline — pan up to scene 14's line
-    two_words — PARSE CLINT at 3.69
+    two_words — PARSE CLINT at 3.69; CLINT's definition beside it
     crane_spilt — flips to CRANE SPILT at 3.70
     three_words — zoom; DANCE HORST BLIMP at 4.16
     bland_copse — flips to BLAND COPSE RIGHT at 4.17
@@ -445,15 +456,27 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
     def _zoom_to(self, mk, zoom_rt, pop_rt, lead):
         self._zoom_pop(*self._window(mk.value), mk, zoom_rt, pop_rt, lead)
 
-    # f : PARSE CLINT at 3.69, below the line
+    # f : PARSE CLINT at 3.69, below the line; CLINT and its definition fade in
+    #     to the right of the card
+    def _setup_two_words(self):
+        self.two = self._opener(TWO, DOWN)
+        word = word_line(CLINT)                         # the card's own word rows
+        defn = gloss(CLINT_GLOSS, MARKER_FS)
+        defn.next_to(word, DOWN, buff=CLINT_GLOSS_BUFF, aligned_edge=LEFT)
+        self.clint = VGroup(word, defn)
+        self.clint.next_to(self.home_label(self.two), RIGHT, buff=CLINT_BUFF)
+
     @subscene
     def two_words(self):
-        self.two = self._opener(TWO, DOWN)
-        self._pop_in(self.two, 0.4)
+        self._setup_two_words()
+        self._pop_in(self.two, 0.4, extra=[FadeIn(self.clint)])
 
-    # g : PARSE CLINT flips to CRANE SPILT, sliding to 3.70
+    # g : PARSE CLINT flips to CRANE SPILT, sliding to 3.70; CLINT's definition
+    #     fades out
     @subscene
     def crane_spilt(self):
+        self.play(FadeOut(self.clint), run_time=0.5)
+        self.clint = None
         self._swap(self.two, TWO_B, 1.2)
 
     # h : zoom out to fit DANCE HORST BLIMP at 4.16, above the line

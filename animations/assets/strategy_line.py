@@ -189,10 +189,22 @@ class StrategyLine:
         self.play(self.line.zoom(lo, hi, run_time=zoom_rt),
                   Succession(Wait(start), self.line.marker_in(m, run_time=pop_rt)))
 
-    def _pop_in(self, m, run_time):
-        """The marker's card pops out of its dot, with the pop sound."""
+    def _pop_in(self, m, run_time, extra=()):
+        """The marker's card pops out of its dot, with the pop sound; `extra`
+        animations play alongside (15f: CLINT's definition fades in)."""
         self.sfx("pop")
-        self.play(self.line.marker_in(m), run_time=run_time)
+        self.play(self.line.marker_in(m), *extra, run_time=run_time)
+
+    def home_label(self, mk):
+        """A copy of the marker's card at its full-size, popped-out place (where it
+        lands), for placing things beside it before it pops in."""
+        g = mk.grow
+        mk.grow = 1.0
+        self.line._place_marker(mk)
+        home = mk.label.copy()
+        mk.grow = g
+        self.line._place_marker(mk)
+        return home
 
     # ── the camera ───────────────────────────────────────────────────────────
     def _whoosh(self, pan_rt):
