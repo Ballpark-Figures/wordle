@@ -16,16 +16,17 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   e reveal_right  — the right word's blanks flip to E, I. BEFIT FIRST (the
                     user's call): the script has the left word at 11e       (VO 4)
   f reveal_left   — the left word's blanks flip to C, L                    (VO 4)
-  g vowel_colors  — every tile flips to black in ONE flip, letters vowel
+  g befit_gloss   — "v. To be suited to, or fit for" fades up under BEFIT  (VO 4)
+  h vowel_colors  — every tile flips to black in ONE flip, letters vowel
                     red / consonant blue                                    (VO 4)
-  h scripts       — ONE flip turns the left word into Hebrew עִבְרִית and the
+  i scripts       — ONE flip turns the left word into Hebrew עִבְרִית and the
                     right into Arabic الْعَرَبِيَّة, vowel marks red, letters
-                    blue                                                    (VO 5)
-  i script_names  — (Hebrew) and (Arabic) fade up under them               (VO 5)
-  j poof          — the vowel marks fade out, with the mids whoosh sfx (the
+                    blue; BEFIT's definition fades out in the same flip     (VO 5)
+  j script_names  — (Hebrew) and (Arabic) fade up under them               (VO 5)
+  k poof          — the vowel marks fade out, with the mids whoosh sfx (the
                     user's swap for the script's poof)                     (VO 5)
 
-THE VOWELS in h-j are the OPTIONAL marks, the ones everyday text leaves out (the
+THE VOWELS in i-k are the OPTIONAL marks, the ones everyday text leaves out (the
 user's definition): Hebrew's niqqud below the letters (hiriq, shva, hiriq — the yud
 stays a consonant), Arabic's harakat (sukun, fatha, fatha, kasra, and the shadda
 with its fatha). THE SHADDA IS NOT A VOWEL — it doubles a consonant — but every
@@ -48,6 +49,9 @@ REUSE MAP — every element and the one source it comes from:
   ring           a manim Arc in style.py ACCENT_RED; numbers crisp_text
   timer sfx      music-library `timer`, cut so its ring starts 15.044 s in
                  (catalog.md); cued at=-0.044 before the 15 s play
+  definition     assets/gloss.py `gloss` (the italic "v."), at the (Hebrew) labels'
+                 size and gap, left edge on BEFIT's; FadeIn with a small rise,
+                 as 08e's TARSE definition and this scene's labels
   word -> script assets/flip.py Flip / flip(), the whole word at once
   script words   crisp_text in a system font with the script (Inter has neither):
                  Arial Hebrew, Geeza Pro; coloured VOWEL_TILE_COLOR /
@@ -59,8 +63,8 @@ NUMBERS: the VO's "only one possible Wordle answer matches" — checked against 
 2315 answers (math/data/shared/words/mystery.txt): i.i.y matches only ICILY, b.f.t
 only BEFIT. Nothing numeric is on screen but the countdown.
 
-No other on-screen text: column 2 asks for the words, the ring and its number, and
-the (Hebrew) / (Arabic) labels.
+No other on-screen text: column 2 asks for the words, the ring and its number,
+BEFIT's definition, and the (Hebrew) / (Arabic) labels.
 """
 from pathlib import Path
 import math
@@ -73,6 +77,7 @@ from config import *
 from assets.board import WordleBoard, TileFlip, TilePop
 from assets.flip import Flip, flip
 from assets.stacks_view import WHOOSH_GAIN
+from assets.gloss import gloss
 from bpkfigures.tier_list import tile_color, VOWEL_TILE_COLOR, CONS_TILE_COLOR
 
 LEFT_WORD, RIGHT_WORD = "icily", "befit"
@@ -90,13 +95,17 @@ RING_STROKE = 12
 NUM_SIZE = 44
 TIMER_RING_AT = 15.044                # where the timer sfx's bell starts (catalog.md)
 
-# h-j: (text, font, glyph count, which glyphs are vowel marks), glyphs indexed left
+# g: BEFIT's definition (the script's words), broken by hand so no line is much
+# wider than the word
+BEFIT_GLOSS = ["v. To be suited", "to, or fit for"]
+
+# i-k: (text, font, glyph count, which glyphs are vowel marks), glyphs indexed left
 # to right as rendered — from a dump of the rendered text, see the docstring
 HEBREW = ("עִבְרִית", "Arial Hebrew", 8, {2, 4, 6})
 ARABIC = ("الْعَرَبِيَّة", "Geeza Pro", 12, {1, 3, 5, 7, 9})
 SCRIPT_SIZE = 130
 
-# j's sound: the second whoosh of Epidemic's 'Mids' (music-library catalog.md),
+# k's sound: the second whoosh of Epidemic's 'Mids' (music-library catalog.md),
 # at scene 01's whoosh level
 J_WHOOSH_SFX = "whoosh-mids"
 J_WHOOSH_PEAK = 0.20                     # s into the file where it is loudest (MEASURED)
@@ -153,6 +162,7 @@ class Scene11(WordleBoardScene):
     countdown — I_I_Y and B_F_T revealed, then the 15 s countdown
     reveal_right — E, I (BEFIT first)
     reveal_left — C, L
+    befit_gloss — BEFIT's definition under it
     vowel_colors — black tiles, vowels red, consonants blue
     scripts — the words flip into Hebrew and Arabic
     script_names — (Hebrew), (Arabic)
@@ -257,7 +267,17 @@ class Scene11(WordleBoardScene):
     def reveal_left(self):
         self.play(self._reveal(0, HIDDEN), run_time=0.8)
 
-    # g : every tile to black, vowels red, consonants blue — all ten in one flip
+    # g : BEFIT's definition fades up under it
+    def _setup_befit_gloss(self):
+        self.gloss = gloss(BEFIT_GLOSS, LABEL_SIZE) \
+            .next_to(self.words[1], DOWN, buff=LABEL_BUFF, aligned_edge=LEFT)
+
+    @subscene
+    def befit_gloss(self):
+        self._setup_befit_gloss()
+        self.play(FadeIn(self.gloss, shift=UP * 0.2), run_time=0.8)
+
+    # h : every tile to black, vowels red, consonants blue — all ten in one flip
     @subscene
     def vowel_colors(self):
         flips = [self._flip(w, i, TILE_EMPTY_FILL, stroke=TILE_FILLED_BORDER,
@@ -266,7 +286,8 @@ class Scene11(WordleBoardScene):
                  for w in range(2) for i in range(5)]
         self.play(*flips, run_time=0.6)
 
-    # h : one flip turns both words into their scripts
+    # i : one flip turns both words into their scripts; BEFIT's definition fades
+    #     out with it
     def _setup_scripts(self):
         self.scripts, self.marks = [], []
         for spec, center in ((HEBREW, LEFT_CENTER), (ARABIC, RIGHT_CENTER)):
@@ -283,10 +304,11 @@ class Scene11(WordleBoardScene):
             faces = [f for f in self.faces[w] if f is not None]
             self.remove(self.words[w], *faces)      # the flip carries them now
             olds.append(VGroup(*self.words[w].tiles[0], *faces))
-        flip(self, [Flip(olds[w], self.scripts[w]) for w in range(2)], run_time=0.8)
-        self.words = self.faces = None
+        flip(self, [Flip(olds[w], self.scripts[w]) for w in range(2)], run_time=0.8,
+             extra=[FadeOut(self.gloss)])
+        self.words = self.faces = self.gloss = None
 
-    # i : (Hebrew) and (Arabic) fade up under the words
+    # j : (Hebrew) and (Arabic) fade up under the words
     def _setup_script_names(self):
         self.names = [crisp_text(t, font_size=LABEL_SIZE)
                       .next_to(self.scripts[w], DOWN, buff=LABEL_BUFF)
@@ -297,7 +319,7 @@ class Scene11(WordleBoardScene):
         self._setup_script_names()
         self.play(*[FadeIn(n, shift=UP * 0.2) for n in self.names], run_time=0.8)
 
-    # j : the vowel marks vanish, with a whoosh (the user's swap for the script's
+    # k : the vowel marks vanish, with a whoosh (the user's swap for the script's
     #     poof) — whoosh-mids, at scene 01's whoosh level, loudest mid-fade
     @subscene
     def poof(self):
