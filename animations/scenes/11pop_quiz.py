@@ -16,12 +16,13 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   e reveal_right  — the right word's blanks flip to E, I. BEFIT FIRST (the
                     user's call): the script has the left word at 11e       (VO 4)
   f reveal_left   — the left word's blanks flip to C, L                    (VO 4)
-  g befit_gloss   — "v. To be suited to, or fit for" fades up under BEFIT  (VO 4)
+  g befit_gloss   — "v. To be suited to, or fit for" fades up, centred under
+                    BEFIT                                                   (VO 4)
   h vowel_colors  — every tile flips to black in ONE flip, letters vowel
                     red / consonant blue                                    (VO 4)
   i scripts       — ONE flip turns the left word into Hebrew עִבְרִית and the
                     right into Arabic الْعَرَبِيَّة, vowel marks red, letters
-                    blue; BEFIT's definition fades out in the same flip     (VO 5)
+                    blue; BEFIT's definition flips out, a line each, in it  (VO 5)
   j script_names  — (Hebrew) and (Arabic) fade up under them               (VO 5)
   k poof          — the vowel marks fade out, with the mids whoosh sfx (the
                     user's swap for the script's poof)                     (VO 5)
@@ -49,9 +50,10 @@ REUSE MAP — every element and the one source it comes from:
   ring           a manim Arc in style.py ACCENT_RED; numbers crisp_text
   timer sfx      music-library `timer`, cut so its ring starts 15.044 s in
                  (catalog.md); cued at=-0.044 before the 15 s play
-  definition     assets/gloss.py `gloss` (the italic "v."), at the (Hebrew) labels'
-                 size and gap, left edge on BEFIT's; FadeIn with a small rise,
-                 as 08e's TARSE definition and this scene's labels
+  definition     assets/gloss.py `gloss` (the italic "v."), each line centred under
+                 BEFIT (user's call), at the labels' gap; FadeIn with a small
+                 rise, as 08e's TARSE definition and this scene's labels; it
+                 leaves by Flip, each line flipping to nothing with BEFIT
   word -> script assets/flip.py Flip / flip(), the whole word at once
   script words   crisp_text in a system font with the script (Inter has neither):
                  Arial Hebrew, Geeza Pro; coloured VOWEL_TILE_COLOR /
@@ -98,6 +100,7 @@ TIMER_RING_AT = 15.044                # where the timer sfx's bell starts (catal
 # g: BEFIT's definition (the script's words), broken by hand so no line is much
 # wider than the word
 BEFIT_GLOSS = ["v. To be suited", "to, or fit for"]
+GLOSS_SIZE = FONT_SIZE_MD    # g: bigger than the labels (user's call)
 
 # i-k: (text, font, glyph count, which glyphs are vowel marks), glyphs indexed left
 # to right as rendered — from a dump of the rendered text, see the docstring
@@ -269,8 +272,10 @@ class Scene11(WordleBoardScene):
 
     # g : BEFIT's definition fades up under it
     def _setup_befit_gloss(self):
-        self.gloss = gloss(BEFIT_GLOSS, LABEL_SIZE) \
-            .next_to(self.words[1], DOWN, buff=LABEL_BUFF, aligned_edge=LEFT)
+        self.gloss = gloss(BEFIT_GLOSS, GLOSS_SIZE)
+        for line in self.gloss:                     # each line centred under BEFIT
+            line.set_x(self.words[1].get_x())
+        self.gloss.next_to(self.words[1], DOWN, buff=LABEL_BUFF)
 
     @subscene
     def befit_gloss(self):
@@ -286,8 +291,8 @@ class Scene11(WordleBoardScene):
                  for w in range(2) for i in range(5)]
         self.play(*flips, run_time=0.6)
 
-    # i : one flip turns both words into their scripts; BEFIT's definition fades
-    #     out with it
+    # i : one flip turns both words into their scripts; each line of BEFIT's
+    #     definition flips out with it
     def _setup_scripts(self):
         self.scripts, self.marks = [], []
         for spec, center in ((HEBREW, LEFT_CENTER), (ARABIC, RIGHT_CENTER)):
@@ -304,8 +309,10 @@ class Scene11(WordleBoardScene):
             faces = [f for f in self.faces[w] if f is not None]
             self.remove(self.words[w], *faces)      # the flip carries them now
             olds.append(VGroup(*self.words[w].tiles[0], *faces))
-        flip(self, [Flip(olds[w], self.scripts[w]) for w in range(2)], run_time=0.8,
-             extra=[FadeOut(self.gloss)])
+        outs = [Flip(line, VectorizedPoint(line.get_center())) for line in self.gloss]
+        flip(self, [Flip(olds[w], self.scripts[w]) for w in range(2)] + outs,
+             run_time=0.8)
+        self.remove(*[f.new for f in outs])
         self.words = self.faces = self.gloss = None
 
     # j : (Hebrew) and (Arabic) fade up under the words
