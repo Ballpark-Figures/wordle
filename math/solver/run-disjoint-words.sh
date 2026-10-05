@@ -1,31 +1,21 @@
 #!/bin/bash
-# Sets of K legal guesses sharing no letter, at least one an answer -- attached,
-# with live output in this terminal.
+# ONE example of the hard-mode all-grey loss, attached, with output here.
 #
-#     bash solver/run-disjoint-words.sh            # from math/, or anywhere; K = 7
-#     bash solver/run-disjoint-words.sh -k 6
+#     bash solver/run-disjoint-words.sh            # from math/, or anywhere
 #
-# K = 7 IS THE HARD-MODE ALL-GREY LOSS: six guesses and an answer, no letter in
-# common anywhere, so every reply is all grey, every guess stays hard-mode legal,
-# and the sixth grey row loses.  tools/disjoint_words.py states the question and
-# the search exactly; read it before quoting a number.  Exact and deterministic:
-# a pure function of the committed word lists.
+# Seven legal guesses sharing no letter -- one with no vowel, one per vowel
+# A E I O U Y -- at least one an answer.  Play the other six against it and every
+# reply is all grey, so every guess stays hard-mode legal and the sixth grey row
+# loses.  tools/disjoint_words.py states the construction and the visit order;
+# it stops at the FIRST set, so the result is an example, not the only one.
 #
-# Output: data/shared/disjoint/disjoint_k<K>.csv, log under data/local/disjoint/.
-# The tool refuses to overwrite a file with content -- move the old one first.
+# Output: data/shared/disjoint/hardmode_allgrey_example.csv, log under
+# data/local/disjoint/.  The tool refuses to overwrite a file with content.
 
 set -u
 
 MATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-
-K=7                       # a default a HUMAN reads, forwarded explicitly
-while [ $# -gt 0 ]; do
-    case "$1" in
-        -k|--k) K="$2"; shift 2 ;;
-        *) echo "unknown arg: $1" >&2; exit 1 ;;
-    esac
-done
-case "$K" in ''|*[!0-9]*) echo "-k must be a positive integer" >&2; exit 1 ;; esac
+[ $# -eq 0 ] || { echo "takes no arguments" >&2; exit 1; }
 
 cd "$MATH" || exit 1
 PY=../.venv/bin/python
@@ -34,7 +24,7 @@ PY=../.venv/bin/python
 OUTDIR=data/shared/disjoint
 LOC=data/local/disjoint
 mkdir -p "$OUTDIR" "$LOC"
-OUT="$OUTDIR/disjoint_k$K.csv"
+OUT="$OUTDIR/hardmode_allgrey_example.csv"
 
-echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] disjoint words k=$K" | tee -a "$LOC/disjoint_k$K.log"
-"$PY" -u tools/disjoint_words.py -k "$K" --out "$OUT" 2>&1 | tee -a "$LOC/disjoint_k$K.log"
+echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] hard-mode all-grey example" | tee -a "$LOC/example.log"
+"$PY" -u tools/disjoint_words.py --out "$OUT" 2>&1 | tee -a "$LOC/example.log"
