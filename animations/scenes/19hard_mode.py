@@ -64,6 +64,8 @@ REUSE MAP — every element, its one source, and how it enters / leaves:
                     invertible)
   tables (m-p, t, y, z)  14d's / 18's: title crisp_text WHITE FONT_SIZE_LG at
                     TITLE_BUFF, bold heads 28, cells 30, cells rising in (14's _fill)
+  table stripes (m-p)  bpkfigures.table.row_stripes (the dark-background zebra,
+                    user's call 2026-10-05), in place with the table; leave with it in q
   14 words (q)      get_typed_row in groups.grid_cells (4+4+4+2), growing out of the
                     number as it fades
   game (r)          a 10-row board, row 0 held empty; rows 1-9 flip in with TileFlip
@@ -112,6 +114,7 @@ from manim import MovingCameraScene
 
 from config import *
 from bpkfigures import tier_list as tl
+from bpkfigures.table import row_stripes
 from assets import hard_mode_data, histogram_data, game_data
 from assets import tier_data as td
 from assets import histogram_view as hv
@@ -161,6 +164,7 @@ TURNS = [str(t) for t in range(5, 11)]
 T_HEAD_Y = 2.3
 T_ROW_DY = 0.72                      # 14's
 T_COL_X = (-3.2, 0.0, 3.2)           # turns, Normal, Hard
+T_STRIPE_PAD = 0.5                   # the stripes' overhang past the outer columns
 
 # ── q-s: the 14 words and the IGHT game ──────────────────────────────────────
 WORDS_C = (-4.0, 0.0)                # the 14 words' grid centre
@@ -480,7 +484,12 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
                              for k in TURNS}
         self.hard_cells = {k: _cell(f"{DATA['table']['hard'][k]:,}", T_COL_X[2], ys[k])
                            for k in TURNS}
-        self.t_static = [self.t_title, self.t_heads, self.t_labels,
+        # zebra stripes from the turns column to the widest Hard cell
+        right = max(m.get_right()[0] for m in [*self.hard_cells.values(), self.t_heads])
+        self.t_stripes = row_stripes([ys[k] for k in TURNS],
+                                     self.t_labels.get_left()[0] - T_STRIPE_PAD,
+                                     right + T_STRIPE_PAD, T_ROW_DY)
+        self.t_static = [self.t_stripes, self.t_title, self.t_heads, self.t_labels,
                          *self.normal_cells.values()]
         for m in self.t_static:
             hv.to_view(m, VIEW, shift=DOWN * VH)

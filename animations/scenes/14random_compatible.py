@@ -52,6 +52,8 @@ REUSE MAP — every element, the one source it comes from, and how it enters:
   title (d)             crisp_text, WHITE, FONT_SIZE_LG — 13's title
   table (d)             scene 10's table: bold header at 28, cells at 30, rows 0.72
                         apart (10word_lengths.py:178-186, 409-416)
+  stripes (d)           bpkfigures.table.row_stripes (the dark-background zebra,
+                        user's call 2026-10-05), in place with the table
   table in (d)          already in place one frame below the line; the camera pans
                         down to it (13k's pan, as b)
   cells (e-i)           10's `_fill_avg`: FadeIn rising 0.3 (10word_lengths.py:437)
@@ -88,6 +90,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 from config import *
 from manim import MovingCameraScene
 from assets import random_game_data, random_compatible_data
+from bpkfigures.table import row_stripes
 from assets.strategy_line import (StrategyLine, GAME_DY, TITLE_BUFF,
                                   OPTIMAL, COMPATIBLE, word_line, rate_text)
 
@@ -109,6 +112,7 @@ SMALL_SIZE = 20                 # rows 4-5's third and fourth decimals (user's c
 SMALL_GAP = 0.02                # between the two-place part and the small digits
 TABLE_DY = -GAME_DY             # the table sits one frame below the line
 DP = {1: 2, 2: 2, 3: 2, 4: 4, 5: 4}   # the script's decimal places per row
+STRIPE_PAD = 0.5                # the stripes' overhang past the turns and the averages
 
 
 def _fmt(k):
@@ -196,10 +200,15 @@ class Scene14(StrategyLine, MovingCameraScene, WordleBoardScene):
                                      color=WHITE, weight=BOLD).move_to([AVG_X, _row_y(0), 0])
         self.table_turns = VGroup(*[crisp_text(str(k), font_size=CELL_SIZE, color=WHITE)
                                     .move_to([TURN_X, _row_y(k), 0]) for k in range(1, 6)])
-        self.add(self.table_title, self.table_head, self.table_turns)
         # the decimal point's x that centres the aligned averages on AVG_X
         block = VGroup(*[_cell(k, 0.0) for k in range(1, 6)])
         self.dot_x = AVG_X - block.get_center()[0]
+        # zebra stripes, from the turn column to the averages' (or the head's) right
+        right = max(block.get_right()[0] + self.dot_x, self.table_head.get_right()[0])
+        self.table_stripes = row_stripes([_row_y(k) for k in range(1, 6)],
+                                         self.table_turns.get_left()[0] - STRIPE_PAD,
+                                         right + STRIPE_PAD, ROW_DY)
+        self.add(self.table_stripes, self.table_title, self.table_head, self.table_turns)
 
     @subscene
     def table(self):

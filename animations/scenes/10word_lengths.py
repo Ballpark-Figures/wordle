@@ -70,6 +70,8 @@ REUSE MAP — every element and the one source it comes from:
                  for letters on a dark panel), via board.type_word's letter_color
   letter flips   assets/board.py TileFlip, with the swap_to / to_center / to_scale
                  options added for this scene (off by default)
+  stripes        bpkfigures.table.row_stripes (the dark-background zebra, user's
+                 call 2026-10-05), each rising in with its row
   definitions    assets/gloss.py gloss (italic part of speech), GLOSS_FS 28 as
                  scene 06's; FadeIn(shift=UP * 0.2) as scene 08's
                  TARSE definition, plain FadeOut
@@ -119,6 +121,7 @@ from bpkfigures.tier_list import tile_color
 from assets.background import bg_to
 from assets import word_lengths_data
 from assets.gloss import gloss
+from bpkfigures.table import row_stripes
 
 DATA = word_lengths_data.load()
 DIST = [(n, DATA["distribution"][n]) for n in sorted(DATA["distribution"], key=int)]
@@ -194,6 +197,8 @@ OPENER_X = 0.6                            # Best Opener column's LEFT edge (tile
 TABLE_TILE_SCALE = 0.6                    # opener tiles vs a full board tile
 HEADER_SIZE = 28
 CELL_SIZE = 30
+STRIPE_PAD = 0.15                         # the stripes' overhang past the table's edges
+STRIPE_Z = -2                             # behind the definitions (GLOSS_Z)
 
 
 # The openers' definitions (the user's wording), each on ONE line: under its word,
@@ -440,6 +445,16 @@ class Scene10(WordleDarkScene):
         self.table_head = VGroup(*heads)
         self.table_rows = VGroup(*[cell(str(L), CELL_SIZE).move_to([LEN_X, _row_y(L), 0])
                                    for L in LENGTHS])
+        # zebra stripes from the Word Length head to the longest opener's last tile
+        longest = get_board(rows=1, cols=max(LENGTHS)).scale(TABLE_TILE_SCALE).width
+        right = max(OPENER_X + longest, heads[2].get_right()[0]) + STRIPE_PAD
+        self.table_stripes = row_stripes([_row_y(L) for L in LENGTHS],
+                                         heads[0].get_left()[0] - STRIPE_PAD, right,
+                                         ROW_DY).set_z_index(STRIPE_Z)
+        # each row's stripe (if it has one) rises in with the row's length
+        stripe_of = dict(zip(LENGTHS[1::2], self.table_stripes))
+        self.table_row_parts = [VGroup(r, *([stripe_of[L]] if L in stripe_of else []))
+                                for L, r in zip(LENGTHS, self.table_rows)]
 
     @subscene
     def table(self):
@@ -447,8 +462,9 @@ class Scene10(WordleDarkScene):
         self.play(FadeOut(*self.mobjects), run_time=0.8)
         self.upper = self.board_wheel = self.shown = self.board = None
         self.play(FadeIn(self.table_head), run_time=0.5)
-        self.play(LaggedStart(*[FadeIn(r, shift=UP * 0.3) for r in self.table_rows],
+        self.play(LaggedStart(*[FadeIn(r, shift=UP * 0.3) for r in self.table_row_parts],
                               lag_ratio=0.12), run_time=1.2)
+        self.table_row_parts = None
 
     # ── j-v: filling in the table, one cell at a time ──────────────────────
     def _fill_avg(self, L, run_time, extra=()):
