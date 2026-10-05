@@ -1,0 +1,20 @@
+kind=topk-solve
+width=8
+k=1
+rules=2026-09-03
+objective=expected-guesses-no-cap
+ranking=ascending-sum-of-squared-bins
+win=commutative-class
+optimum=0
+rank_only=0
+opening_fixed=1
+opening=47-11=36 2*029=58
+opening_blind=1
+guesses=374246
+answers=17723
+classes=11765
+total=57731
+expected=3.257406
+opener=47-11=36 2*029=58
+rank_seconds=0.2
+solve_seconds=35.7

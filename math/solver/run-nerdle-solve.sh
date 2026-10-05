@@ -125,10 +125,12 @@ guard_output nerdle_solve.py "$OUT" || exit 1
 FLAGS="--width $WIDTH -k $K --out $OUT"
 [ -n "$TOP" ] && FLAGS="$FLAGS --top $TOP"
 [ -n "$RANKONLY" ] && FLAGS="$FLAGS --rank-only"
-[ -n "$OPENERS" ] && FLAGS="$FLAGS --openers $OPENERS"
+# The openers are passed as ONE quoted argument below, never through $FLAGS: an
+# unquoted expansion splits "A B" into two arguments, and a `*` in an equation
+# is also a glob.  Every multi-equation --opener/--openers run died on that.
 [ -n "$FROM" ] && FLAGS="$FLAGS --openers-from $FROM"
 
 # BSD date has no -Is; this form works on both macOS and Linux.
 echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] nerdle solve $STEM" | tee -a "$LOC/$STEM.log"
 
-"$PY" -u tools/nerdle_solve.py $FLAGS 2>&1 | tee -a "$LOC/$STEM.log"
+"$PY" -u tools/nerdle_solve.py $FLAGS ${OPENERS:+--openers "$OPENERS"} 2>&1 | tee -a "$LOC/$STEM.log"
