@@ -59,7 +59,7 @@ LINE_STROKE = 3.0             # line width as it would be in a 16-wide frame
 PING_SFX = "notify-app-03"    # a word emphasised / called out
 PING_GAIN = -6.0              # dB — played quieter than the library's level
 WHOOSH_SFX = "whoosh"         # under every camera move
-WHOOSH_GAIN = -8.0            # dB — played quieter than the library's level
+WHOOSH_GAIN = -14.0           # dB — played quieter than the library's level (was -8; quieter, user 2026-10-06)
 WHOOSH_PEAK = 0.5             # s into the whoosh file where it is loudest (MEASURED
                               # at import: -4.4 dB at 0.4s, -4.2 at 0.6s); a move's
                               # whoosh is placed to peak at the move's midpoint, its
