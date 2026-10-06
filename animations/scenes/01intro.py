@@ -116,6 +116,7 @@ FILL_SMOOTH = 301             # f: steps the word count is averaged over (~1.5s)
 FILL_LOOK = 60                # f: the squash looks this many steps ahead, so it
                               # flattens smoothly rather than in row-sized jerks
 WORD_SFX = "notify-text"      # f: the sound of a word landing in the histogram
+WORD_GAIN = -6.0              # dB — f's word dings, quieter than the library level (user 2026-10-06)
 NOISE_GAIN = -12.0            # dB — i's two pings, quieter still (user's call)
 # PING_SFX (h onward: a word emphasised / called out, and i's noise) and WHOOSH_SFX
 # (under every camera move: d, e, f's pan, g, j-m) come from assets/stacks_view.py
@@ -547,7 +548,7 @@ class Scene01(StacksView, MovingCameraScene, WordleDarkScene):
     @subscene
     def pan_slows(self):
         self.add(self.slows[0])
-        self._move_view(view_at(SOLO_GAP), run_time=3.0, whoosh=True)
+        self._move_view(view_at(SOLO_GAP), run_time=2.0, whoosh=True)
         self.remove(*self.great, self.labels["start"])     # both off screen now
         self.great = self.labels = None
         self.play(FadeIn(self.slows[1], shift=UP * 0.2), run_time=1.0)
@@ -587,7 +588,7 @@ class Scene01(StacksView, MovingCameraScene, WordleDarkScene):
         # a pause at START, then the first new word lands while the camera is still
         # (the plan puts it at step 0), then a beat, then the zoom begins
         self.wait(0.6)
-        self.sfx(WORD_SFX)
+        self.sfx(WORD_SFX, gain=WORD_GAIN)
         self.stacks.set_state(n=n_at[0], squash=sq_at[0], letters=let_at[0])
         self.stacks.refresh(self.camera.frame)
         self.wait(0.4)
@@ -602,7 +603,7 @@ class Scene01(StacksView, MovingCameraScene, WordleDarkScene):
         cues = self._fill_cue_times(run_time, fill_rate)
         assert cues[0] == 0.0, "the plan should land word 0 before the zoom"
         for at in cues[1:]:                  # word 0's cue already played, above
-            self.sfx(WORD_SFX, at=at)
+            self.sfx(WORD_SFX, at=at, gain=WORD_GAIN)
         self.stacks.add_updater(upd)
         self.play(t.animate.set_value(1), run_time=run_time, rate_func=fill_rate)
         self.stacks.remove_updater(upd)
