@@ -36,7 +36,7 @@ REUSE MAP — every element and the one source it comes from:
   17c combinations    tiles greens, yellows, grays, evenly spaced at the 243 grid's tile
                       gap (GRID_BUFF) all scene long; NO gap between colour blocks (the
                       user's call, overriding the script's "slight gaps")
-  17d/e sound         11j's vanish: whoosh-mids at stacks_view WHOOSH_GAIN, peaking
+  17d/e sound         11j's vanish: whoosh-mids at stacks_view VANISH_GAIN, peaking
                       mid-fade (11pop_quiz.py `poof`)
   17f pie             bpkfigures.pie_chart get_pie_chart, callout labels, fan_all
   17f/g "move up"     `_move_up`: the old screen slides up a frame as the new one rises
@@ -82,7 +82,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 
 from config import *
 from assets.colorings import level, code, trits, slot, GRID_BUFF, tile
-from assets.stacks_view import WHOOSH_GAIN, VANISH_SFX, VANISH_PEAK
+from assets.stacks_view import VANISH_SFX, VANISH_PEAK, VANISH_GAIN
 from assets.board import get_scored_row, get_typed_row
 from assets.flip import Flip, flip
 from assets import color_combos_data
@@ -328,14 +328,14 @@ class Scene17(WordleBoardScene):
     @subscene
     def drop_impossible(self):
         rt = 0.7
-        self.sfx(VANISH_SFX, at=max(0.0, rt / 2 - VANISH_PEAK), gain=WHOOSH_GAIN)
+        self.sfx(VANISH_SFX, at=max(0.0, rt / 2 - VANISH_PEAK), gain=VANISH_GAIN)
         self.play(FadeOut(self.combos.pop(IMPOSSIBLE)), run_time=rt)
 
     # e : GGGGG, the all-greens combination (the game is over), fades out
     @subscene
     def drop_win(self):
         rt = 0.7
-        self.sfx(VANISH_SFX, at=max(0.0, rt / 2 - VANISH_PEAK), gain=WHOOSH_GAIN)
+        self.sfx(VANISH_SFX, at=max(0.0, rt / 2 - VANISH_PEAK), gain=VANISH_GAIN)
         self.play(FadeOut(self.combos.pop(WIN)), run_time=rt)
 
     def _move_up(self, old, new, run_time):

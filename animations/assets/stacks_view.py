@@ -65,7 +65,9 @@ WHOOSH_PEAK = 0.5             # s into the whoosh file where it is loudest (MEAS
                               # whoosh is placed to peak at the move's midpoint, its
                               # fastest moment, since every move eases in and out
 VANISH_SFX = "whoosh-mids"    # something disappearing: 11j's vowel marks, 17d/e's
-                              # combinations, 05o's colorings; played at WHOOSH_GAIN
+                              # combinations, 05o's colorings
+VANISH_GAIN = -17.0           # dB — 3 below the camera whoosh (user 2026-10-06; it
+                              # played at WHOOSH_GAIN until then)
 VANISH_PEAK = 0.20            # s into whoosh-mids where it is loudest (MEASURED in
                               # 11pop_quiz); placed to peak at the fade's midpoint
 

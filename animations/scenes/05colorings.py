@@ -61,7 +61,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 from config import *
 from assets.board import TILE, GAP
 from assets import colorings_data
-from assets.stacks_view import WHOOSH_GAIN, VANISH_SFX, VANISH_PEAK
+from assets.stacks_view import VANISH_SFX, VANISH_PEAK, VANISH_GAIN
 from assets.colorings import (code as _code, trits as _trits, slot as _slot,
                               letters_on as _letters_on, coloring as _coloring,
                               tile_size as _tile_size, level)
@@ -264,7 +264,7 @@ class Scene05(WordleBoardScene):
     @subscene
     def vanish(self):
         rt = 0.8
-        self.sfx(VANISH_SFX, at=max(0.0, rt / 2 - VANISH_PEAK), gain=WHOOSH_GAIN)
+        self.sfx(VANISH_SFX, at=max(0.0, rt / 2 - VANISH_PEAK), gain=VANISH_GAIN)
         self.play(*[FadeOut(self.grid[_slot(c)]) for c in IMPOSSIBLE], run_time=rt)
 
     # ── j ─────────────────────────────────────────────────────────────────────

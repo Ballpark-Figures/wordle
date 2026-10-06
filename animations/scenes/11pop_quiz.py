@@ -58,7 +58,7 @@ REUSE MAP — every element and the one source it comes from:
   script words   crisp_text in a system font with the script (Inter has neither):
                  Arial Hebrew, Geeza Pro; coloured VOWEL_TILE_COLOR /
                  CONS_TILE_COLOR, the same pair tile_color uses
-  whoosh sfx     music-library `whoosh-mids`, at scene 01's WHOOSH_GAIN
+  whoosh sfx     music-library `whoosh-mids` (stacks_view VANISH_SFX), at VANISH_GAIN
                  (assets/stacks_view.py)
 
 NUMBERS: the VO's "only one possible Wordle answer matches" — checked against the
@@ -78,7 +78,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 from config import *
 from assets.board import WordleBoard, TileFlip, TilePop
 from assets.flip import Flip, flip
-from assets.stacks_view import WHOOSH_GAIN, VANISH_SFX, VANISH_PEAK
+from assets.stacks_view import VANISH_SFX, VANISH_PEAK, VANISH_GAIN
 from assets.gloss import gloss
 from bpkfigures.tier_list import tile_color, VOWEL_TILE_COLOR, CONS_TILE_COLOR
 
@@ -329,7 +329,7 @@ class Scene11(WordleBoardScene):
     @subscene
     def poof(self):
         rt = 0.7
-        self.sfx(VANISH_SFX, at=max(0.0, rt / 2 - VANISH_PEAK), gain=WHOOSH_GAIN)
+        self.sfx(VANISH_SFX, at=max(0.0, rt / 2 - VANISH_PEAK), gain=VANISH_GAIN)
         self.play(*[FadeOut(m) for m in self.marks], run_time=rt)
         for w in range(2):
             self.scripts[w].remove(*self.marks[w])
