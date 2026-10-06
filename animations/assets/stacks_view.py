@@ -219,8 +219,9 @@ class StacksView:
         seconds. `appear_gap` (seconds) brings the `appear` words in CLOSE TOGETHER
         instead of each at its own first fit: the last word to fit enters when it
         fits, and the others enter `appear_gap` apart before it, in the order they
-        fit — never before a word is on screen. None (the default) keeps each word's
-        own moment. `retarget` {word: pinned(...)} glides pinned callouts to new
+        fit — never before a word is on screen. It must be at least CALLOUT_GROW, so
+        no two callouts grow at once (the stacks draw only N_GROUPS emphasis levels
+        per frame). None (the default) keeps each word's own moment. `retarget` {word: pinned(...)} glides pinned callouts to new
         placements. `level` moves a bar-mode histogram's lit level to that array,
         every bar in step. `whoosh` plays WHOOSH_SFX with its loudest moment at the
         move's midpoint.
@@ -251,6 +252,11 @@ class StacksView:
                         1.0)
             enter[word] = min(float(np.interp(u_in, us, ts)) * run_time,
                               run_time - CALLOUT_GROW)
+        if appear_gap is not None and appear_gap < CALLOUT_GROW:
+            raise ValueError(f"appear_gap={appear_gap} is shorter than CALLOUT_GROW="
+                             f"{CALLOUT_GROW}: two callouts would grow at once, which "
+                             f"needs more emphasis levels than the stacks can draw "
+                             f"(word_stacks.N_GROUPS)")
         if appear_gap is not None and enter:
             order = sorted(enter, key=lambda w: (enter[w], list(appear).index(w)))
             last = enter[order[-1]]
