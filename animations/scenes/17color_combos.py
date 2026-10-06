@@ -82,7 +82,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 
 from config import *
 from assets.colorings import level, code, trits, slot, GRID_BUFF, tile
-from assets.stacks_view import WHOOSH_GAIN
+from assets.stacks_view import WHOOSH_GAIN, VANISH_SFX, VANISH_PEAK
 from assets.board import get_scored_row, get_typed_row
 from assets.flip import Flip, flip
 from assets import color_combos_data
@@ -107,8 +107,6 @@ IMPOSSIBLE = (4, 1, 0)     # 17d: 4 greens and a yellow can never happen
 WIN = (5, 0, 0)            # 17e: all greens — the game is over
 # 17d/e: 11j's vanish sound, copied — whoosh-mids at scene 01's whoosh level,
 # timed so its loudest point lands mid-fade
-VANISH_SFX = "whoosh-mids"
-VANISH_PEAK = 0.20         # s into the file where it is loudest (11pop_quiz.py's MEASURED)
 
 # ── 17f-z: the pie, the table, the bars ───────────────────────────────────────
 TITLE_Y = 3.85             # every title's centre

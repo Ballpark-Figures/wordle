@@ -61,6 +61,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 from config import *
 from assets.board import TILE, GAP
 from assets import colorings_data
+from assets.stacks_view import WHOOSH_GAIN, VANISH_SFX, VANISH_PEAK
 from assets.colorings import (code as _code, trits as _trits, slot as _slot,
                               letters_on as _letters_on, coloring as _coloring,
                               tile_size as _tile_size, level)
@@ -262,7 +263,9 @@ class Scene05(WordleBoardScene):
     # o : the five impossible colorings fade out, leaving five empty slots (05i)
     @subscene
     def vanish(self):
-        self.play(*[FadeOut(self.grid[_slot(c)]) for c in IMPOSSIBLE], run_time=0.8)
+        rt = 0.8
+        self.sfx(VANISH_SFX, at=max(0.0, rt / 2 - VANISH_PEAK), gain=WHOOSH_GAIN)
+        self.play(*[FadeOut(self.grid[_slot(c)]) for c in IMPOSSIBLE], run_time=rt)
 
     # ── j ─────────────────────────────────────────────────────────────────────
     def _setup_trace(self):

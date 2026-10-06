@@ -78,7 +78,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 from config import *
 from assets.board import WordleBoard, TileFlip, TilePop
 from assets.flip import Flip, flip
-from assets.stacks_view import WHOOSH_GAIN
+from assets.stacks_view import WHOOSH_GAIN, VANISH_SFX, VANISH_PEAK
 from assets.gloss import gloss
 from bpkfigures.tier_list import tile_color, VOWEL_TILE_COLOR, CONS_TILE_COLOR
 
@@ -110,8 +110,6 @@ SCRIPT_SIZE = 130
 
 # k's sound: the second whoosh of Epidemic's 'Mids' (music-library catalog.md),
 # at scene 01's whoosh level
-J_WHOOSH_SFX = "whoosh-mids"
-J_WHOOSH_PEAK = 0.20                     # s into the file where it is loudest (MEASURED)
 LABEL_SIZE = FONT_SIZE_SM
 LABEL_BUFF = 0.35
 
@@ -331,7 +329,7 @@ class Scene11(WordleBoardScene):
     @subscene
     def poof(self):
         rt = 0.7
-        self.sfx(J_WHOOSH_SFX, at=max(0.0, rt / 2 - J_WHOOSH_PEAK), gain=WHOOSH_GAIN)
+        self.sfx(VANISH_SFX, at=max(0.0, rt / 2 - VANISH_PEAK), gain=WHOOSH_GAIN)
         self.play(*[FadeOut(m) for m in self.marks], run_time=rt)
         for w in range(2):
             self.scripts[w].remove(*self.marks[w])
