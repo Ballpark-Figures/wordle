@@ -206,7 +206,7 @@ class StacksView:
     def _move_view(self, to, run_time, letters=None, dim=None, weights=None,
                    appear=(), present=(), callout_alpha=None, extra=(),
                    rate_func=smooth, whoosh=False, level=None, retarget=None,
-                   fade_time=None):
+                   fade_time=None, appear_gap=None):
         """Animate the view (and optionally letter opacity / emphasis) to `to`.
 
         `appear` words get their callout THE MOMENT THEY ARE ON SCREEN — the first
@@ -216,7 +216,11 @@ class StacksView:
         words off screen, waiting to be revealed). `callout_alpha` fades every
         callout on screen to that opacity — or, as a {word: opacity} dict, only the
         callouts it names — over the whole move, or over its first `fade_time`
-        seconds. `retarget` {word: pinned(...)} glides pinned callouts to new
+        seconds. `appear_gap` (seconds) brings the `appear` words in CLOSE TOGETHER
+        instead of each at its own first fit: the last word to fit enters when it
+        fits, and the others enter `appear_gap` apart before it, in the order they
+        fit — never before a word is on screen. None (the default) keeps each word's
+        own moment. `retarget` {word: pinned(...)} glides pinned callouts to new
         placements. `level` moves a bar-mode histogram's lit level to that array,
         every bar in step. `whoosh` plays WHOOSH_SFX with its loudest moment at the
         move's midpoint.
@@ -247,6 +251,12 @@ class StacksView:
                         1.0)
             enter[word] = min(float(np.interp(u_in, us, ts)) * run_time,
                               run_time - CALLOUT_GROW)
+        if appear_gap is not None and enter:
+            order = sorted(enter, key=lambda w: (enter[w], list(appear).index(w)))
+            last = enter[order[-1]]
+            for k, word in enumerate(order):
+                enter[word] = max(enter[word], last - (len(order) - 1 - k) * appear_gap)
+        for word in appear:
             self.sfx(PING_SFX, at=enter[word], gain=PING_GAIN)
         for word in present:
             self._callout(word)["g"] = 1.0
