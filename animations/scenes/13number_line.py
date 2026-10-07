@@ -88,9 +88,8 @@ Since 2026-10-01 the line, its markers and the game are assets/strategy_line.py
                         `pattern`, the 9 random hops per turn seeded
   pans (f, k)           the camera (MovingCameraScene, as 08) shifts one frame height;
                         the game is built GAME_DY above the line, so nothing fades
-  pan sound             01's camera-move whoosh (user's call): assets/stacks_view.py
-                        WHOOSH_SFX at WHOOSH_GAIN, placed so WHOOSH_PEAK lands at the
-                        pan's midpoint, as stacks_view.py:227 does (the zooms have none)
+  pan sound             none: screen-to-screen pans are silent (user 2026-10-07;
+                        01's camera-move whoosh was used here until then)
   the win (k)           07p's fresh_win (07dynamic_programming.py:806): the leftover
                         words go (here 12's shrink-out) AS the row does
                         `bounce_anim` at 07's `_jump` height

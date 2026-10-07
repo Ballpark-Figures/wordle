@@ -87,7 +87,7 @@ REUSE MAP — every element, the one source it comes from, and how it enters:
                         x types four rows in one play, key sound on the first (12d's)
   number line (e-k,t-v) assets/strategy_line.py `StrategyLine` — scene 14's line,
                         title, subtitle and markers, built one frame up
-  pans                  StrategyLine `_pan_up` / `_pan_down` (13's pan + whoosh)
+  pans                  StrategyLine `_pan_up` / `_pan_down` (13's pan, silent)
   new markers (f,h,j)   StrategyLine `opener_marker` (13's cards: the words, "Then
                         RCA", the win rate; several words as a `word_stack`, board-
                         tight, SLATE's size: user's calls) popping out with the pop

@@ -59,7 +59,7 @@ REUSE MAP — every element, the one source it comes from, and how it enters:
                       call: colour-coded; the midpoint is the VO's "half")
   words (e, f)        the copies themselves, moved and scaled whole onto a
                       `get_typed_row` layout, letters recoloured white (no glyph morph)
-  pans (g, o)         StrategyLine `_pan_down` (13's pan + whoosh)
+  pans (g, o)         StrategyLine `_pan_down` (13's pan, silent)
   screen title (g)    crisp_text WHITE FONT_SIZE_LG at TITLE_BUFF (13's / 14's)
   typing (h, l)       WordleBoard.type_word(appear=True) + assets/keys.py `key_cues`
                       (13's `_type`)

@@ -38,7 +38,7 @@ REUSE MAP — every element, the one source it comes from, and how it enters:
                         bpkfigures ZoomLine; the 3.42 and 4.08 markers are
                         StrategyLine `optimal_marker`/`compatible_marker`, 13's
   line in (b)           already in place one frame below the game; the camera pans
-                        down to it with 01's whoosh (`_pan_down`, 13k's pan)
+                        down to it (`_pan_down`, 13k's pan; silent)
   CHOSE marker (b)      13's marker card (`_marker`), CHOSE as a tile row like 13b's
                         SALET (`word_line`); pops out of its dot with the pop sound
                         (`_pop_in`, 13's)

@@ -4,7 +4,7 @@ hard mode's letter table. Navy background.
 
 Talking head THM precedes it, so a opens on the blank board already on screen.
 
-GEOMETRY: screens one frame apart, each move a camera pan with a whoosh (13's / 18's
+GEOMETRY: screens one frame apart, each move a SILENT camera pan (13's / 18's
 convention), so nothing fades between screens. a-h on the ordinary frame; i-m in the
 histogram's world (it is 27x wider than the frame, 08's), with the boards one frame
 ABOVE it and the turns table one frame BELOW it; at the end of m everything on screen
@@ -123,8 +123,7 @@ from assets.groups import grid_cells
 from assets.strategy_line import win_color
 from assets.keys import key_cues, backspace_cues
 from assets.word_stacks import StacksCamera, PITCH, DIM
-from assets.stacks_view import (StacksView, pinned, ASPECT, WHOOSH_SFX, WHOOSH_GAIN,
-                                WHOOSH_PEAK)
+from assets.stacks_view import StacksView, pinned, ASPECT
 
 DATA = hard_mode_data.load()
 HIST = histogram_data.load()
@@ -294,8 +293,7 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
         board.type_word(self, row, word, run_time, per_letter=key_cues(self))
 
     def _pan(self, direction, run_time):
-        """The camera moves one screen, whooshing (13's / 18's pan)."""
-        self.sfx(WHOOSH_SFX, at=max(0.0, run_time / 2 - WHOOSH_PEAK), gain=WHOOSH_GAIN)
+        """The camera moves one screen, SILENTLY (as 13's / 18's pan; user 2026-10-07)."""
         self.play(self.camera.frame.animate.shift(direction), run_time=run_time)
 
     def _clear_except(self, keep):

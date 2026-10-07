@@ -33,7 +33,6 @@ from assets.board import STROKE, GAP, TILE, WordleBoard, get_typed_row
 from assets.groups import HEADER_W, GUESS_Y, ranked_word_layout
 from assets.pigpen import PigpenWord, WORD_W     # the list-size word ranked_word_layout sizes by
 from assets.keys import key_cues
-from assets.stacks_view import WHOOSH_SFX, WHOOSH_GAIN, WHOOSH_PEAK
 
 TITLE = "Average Guesses by Strategy"
 SUBTITLE = "(Win Rate)"
@@ -195,18 +194,14 @@ class StrategyLine:
         self.play(self.line.marker_in(m), run_time=run_time)
 
     # ── the camera ───────────────────────────────────────────────────────────
-    def _whoosh(self, pan_rt):
-        """01's camera-move whoosh, loudest at the pan's midpoint."""
-        self.sfx(WHOOSH_SFX, at=max(0.0, pan_rt / 2 - WHOOSH_PEAK), gain=WHOOSH_GAIN)
-
+    # A screen-to-screen pan is SILENT (user 2026-10-07): the whoosh stays only on
+    # camera moves within one view (01/08/19's histogram and stacks zooms).
     def _pan_down(self, run_time):
-        """The camera pans down one frame (the content leaves upward), whooshing."""
-        self._whoosh(run_time)
+        """The camera pans down one frame (the content leaves upward)."""
         self.play(self.camera.frame.animate.shift(DOWN * GAME_DY), run_time=run_time)
 
     def _pan_up(self, run_time):
-        """The camera pans up one frame (the content leaves downward), whooshing."""
-        self._whoosh(run_time)
+        """The camera pans up one frame (the content leaves downward)."""
         self.play(self.camera.frame.animate.shift(UP * GAME_DY), run_time=run_time)
 
     # ── a marker's words change as it slides (14c's, then 15's) ──────────────
@@ -335,7 +330,6 @@ class StrategyLine:
                                       per_letter=lambda i, ch, at: cues(i, ch, t0 + at))
         frame.generate_target()
         frame.target.shift(UP * GAME_DY)
-        self._whoosh(pan_rt)
         self.play(MoveToTarget(frame, run_time=pan_rt),
                   Succession(Wait(t0), AnimationGroup(typing, run_time=total)))
 
