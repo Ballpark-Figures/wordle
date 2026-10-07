@@ -28,7 +28,9 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   i undo         — back: the ovals and their words fade, the rows return, the
                    typed words fade back in                              (12i, VO 3)
   j random_answers — under every SALET row its word cycles through random answers
-                   from that row's group; then everything fades           (12j, VO 4)
+                   from that row's group                                  (12j, VO 4)
+  k clear_out    — everything fades, for scene 13 (not a script beat; split
+                   from j so it can be placed on its own)
 
 REUSE MAP — every element and the one source it comes from:
   SALET / corner word   assets/pigpen.py `PigpenWord(revealed=True)` at GUESS_SCALE —
@@ -430,7 +432,7 @@ class Scene12(WordleBoardScene):
         return flips, new_words
 
     # j : under every SALET row, its word cycles through random compatible answers
-    #     from that row's group; then everything fades (scene 13 follows directly)
+    #     from that row's group
     @subscene
     def random_answers(self):
         for w, (g) in zip(self.words, self.groups):
@@ -438,5 +440,10 @@ class Scene12(WordleBoardScene):
         for t in range(CYCLE_STEPS):
             flips, self.words = self._cycle_step(t)
             flip(self, flips, 0.5)
+
+    # k : everything fades (scene 13 follows directly) — split from j so the clear
+    #     can be placed on its own in the edit (user 2026-10-07; not a script beat)
+    @subscene
+    def clear_out(self):
         self.play(*[FadeOut(m) for m in [self.guess, *self.rows, *self.words]],
                   run_time=1.0)
