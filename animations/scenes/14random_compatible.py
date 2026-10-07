@@ -188,8 +188,8 @@ class Scene14(StrategyLine, MovingCameraScene, WordleBoardScene):
         self._flip(0, 0.35, lag_ratio=0)
         self._words_in(0.8)
         self._hops(0, 0.3)
-        self._turn(1, 0.65, 0.35, 1.0, 0.3, flip_lag=0)
-        self._turn(2, 0.65, 0.35, 1.0, 0.3, flip_lag=0)
+        self._turn(1, 0.65, 0.35, 1.0, 0.3, flip_lag=0, narrow_with_flip=True)
+        self._turn(2, 0.65, 0.35, 1.0, 0.3, flip_lag=0, narrow_with_flip=True)
         self._win(3, 0.65, 0.35, 1.0, flip_lag=0)
 
     # b : pan down to the number line (3.42 .. 4.08); CHOSE's marker at 3.99

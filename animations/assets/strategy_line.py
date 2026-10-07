@@ -342,8 +342,10 @@ class StrategyLine:
         """The first turn's compatible answers fade in as a grid."""
         self.play(FadeIn(VGroup(*self.words.values())), run_time=run_time)
 
-    def _regrid(self, k, run_time):
-        """The words turn k rules out shrink away; the rest move to their cells."""
+    def _regrid(self, k, run_time, extra=()):
+        """The words turn k rules out shrink away; the rest move to their cells.
+        `extra` animations (with their OWN run_times) play in the same play — the
+        flip, for a turn that narrows as it flips."""
         keep = self.game["alive"][k]
         anims = []
         for w, (c, sc) in self._grid(keep, k).items():
@@ -353,7 +355,10 @@ class StrategyLine:
             self.wscale[w] = sc
         gone = [w for w in self.words if w not in keep]
         anims += [shrink_out(self.words[w]) for w in gone]
-        self.play(*anims, run_time=run_time)
+        if extra:
+            self.play(AnimationGroup(*anims, run_time=run_time), *extra)
+        else:
+            self.play(*anims, run_time=run_time)
         for w in gone:
             self.remove(self.words.pop(w))
             del self.wscale[w]
@@ -369,12 +374,22 @@ class StrategyLine:
             highlight(self, [self.words[w]], pulse=True, fade=hop_rt / 2, hold=hop_rt)
         self.mark = highlight(self, [self.words[seq[-1]]], persist=True, fade=hop_rt)[0]
 
-    def _turn(self, k, type_rt, flip_rt, regrid_rt, hop_rt, flip_lag=0.45):
+    def _turn(self, k, type_rt, flip_rt, regrid_rt, hop_rt, flip_lag=0.45,
+              narrow_with_flip=False):
         """A later turn: type, flip, regrid, and (unless it won) hop on. `flip_lag`
-        is the flip's lag_ratio (0 for the quick score)."""
+        is the flip's lag_ratio (0 for the quick score). `narrow_with_flip` starts
+        the regrid WITH the flip instead of after it (14a), each keeping its own
+        run_time."""
         self._type(k, type_rt)
-        self._flip(k, flip_rt, lag_ratio=flip_lag)
-        self._regrid(k, regrid_rt)
+        if narrow_with_flip:
+            row = self.rows[k]
+            flip_anim = AnimationGroup(
+                row.reveal_anim(0, self.game["codes"][k], lag_ratio=flip_lag),
+                run_time=flip_rt)
+            self._regrid(k, regrid_rt, extra=[flip_anim])
+        else:
+            self._flip(k, flip_rt, lag_ratio=flip_lag)
+            self._regrid(k, regrid_rt)
         if k + 1 < len(self.game["words"]):
             self._hops(k, hop_rt)
 
