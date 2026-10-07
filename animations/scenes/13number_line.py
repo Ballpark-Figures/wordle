@@ -211,30 +211,41 @@ class Scene13(StrategyLine, MovingCameraScene, WordleBoardScene):
     @subscene
     def dicey(self):
         self._setup_game()
-        self._pan_and_type(1.5, 0.65)
-        self._flip(0, 0.35, lag_ratio=0)          # quick score (03's), f-j (user 2026-10-07)
-        self._words_in(0.8)
+        self._pan_and_type(1.5, 0.5)
+        self._flip(0, 0.5, lag_ratio=0)          # quick score (03's), f-j (user 2026-10-07)
+        self._words_in(0.5)
         self._hops(0, 0.12)
 
     # g : GUESS's turn (BYYBB), 21 left; hops to VALUE
     @subscene
     def guess(self):
-        self._turn(1, 0.65, 0.35, 1.0, 0.12, flip_lag=0)
+        self._type(1, 0.5)
+        self._flip(1, 0.5, lag_ratio=0)
+        self._narrow(1, 0.5)
+        self._hops(1, 0.12)
 
     # h : VALUE's turn (BBYYG), 5 left; hops to FLUTE
     @subscene
     def value(self):
-        self._turn(2, 0.65, 0.35, 1.0, 0.12, flip_lag=0)
+        self._type(2, 0.5)
+        self._flip(2, 0.5, lag_ratio=0)
+        self._narrow(2, 0.5)
+        self._hops(2, 0.12)
 
     # i : FLUTE's turn (GGGBG), 2 left; hops to FLUKE
     @subscene
     def flute(self):
-        self._turn(3, 0.65, 0.35, 1.0, 0.12, flip_lag=0)
+        self._type(3, 0.5)
+        self._flip(3, 0.5, lag_ratio=0)
+        self._narrow(3, 0.5)
+        self._hops(3, 0.12)
 
     # j : FLUKE's turn (GGGGG); both words left vanish as the row does the win bounce
     @subscene
     def fluke(self):
-        self._win(4, 0.65, 0.35, 1.0, flip_lag=0)
+        self._type(4, 0.5)
+        self._flip(4, 0.5, lag_ratio=0)
+        self._win_bounce(4, 1.0)
 
     # k : the camera pans back down to the number line; the game leaves upward
     @subscene

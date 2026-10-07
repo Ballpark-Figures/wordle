@@ -33,7 +33,7 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
 REUSE MAP — every element, the one source it comes from, and how it enters:
   the game (a)          assets/strategy_line.py `StrategyLine` — scene 13's game,
                         moved there unchanged: typed rows `_type`, flips `_flip`,
-                        the grid `_words_in`/`_regrid`, the highlight `_hops` (a
+                        the grid `_words_in`/`_narrow`, the highlight `_hops` (a
                         single hop, the next guess), the win `_win`
   CHOSE in (a)          typed as it appears (13's `_type`); the scene opens on it
   number line (b)       StrategyLine `_build_line` (13's title, subtitle and line),
@@ -186,16 +186,18 @@ class Scene14(StrategyLine, MovingCameraScene, WordleBoardScene):
         self.first_row = self.rest_rows = None
         # quick score (03's, as 13f-j): all five tiles at once (user 2026-10-07)
         # the compatible words fade in DURING CHOSE's flip (user 2026-10-07)
-        first_flip = AnimationGroup(
-            self.rows[0].reveal_anim(0, self.game["codes"][0], lag_ratio=0), run_time=0.35)
-        self._words_in(0.8, extra=[first_flip])
-        # no highlight steps: each next word lights up in the grid as it is typed
-        # (user 2026-10-07)
-        self._turn(1, 0.65, 0.35, 1.0, 0.3, flip_lag=0, narrow_with_flip=True,
-                   highlight_typing=True)
-        self._turn(2, 0.65, 0.35, 1.0, 0.3, flip_lag=0, narrow_with_flip=True,
-                   highlight_typing=True)
-        self._win(3, 0.65, 0.35, 1.0, flip_lag=0, highlight_typing=True)
+        self._flip_and_words_in(0, flip_run_time=0.35, words_run_time=0.8, lag_ratio=0)
+        # VIDEO: no separate highlight step — it lights up in the grid as it is typed;
+        # the words narrow during its flip (user 2026-10-07)
+        self._type(1, 0.65, highlight_word=True)
+        self._flip_and_narrow(1, flip_run_time=0.35, narrow_run_time=1.0, lag_ratio=0)
+        # NOVEL, the same
+        self._type(2, 0.65, highlight_word=True)
+        self._flip_and_narrow(2, flip_run_time=0.35, narrow_run_time=1.0, lag_ratio=0)
+        # WOVEN: typed, flipped all green, the win bounce
+        self._type(3, 0.65, highlight_word=True)
+        self._flip(3, 0.35, lag_ratio=0)
+        self._win_bounce(3, 1.0)
 
     # b : pan down to the number line (3.42 .. 4.08); CHOSE's marker at 3.99
     def _setup_chose_line(self):

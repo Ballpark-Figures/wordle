@@ -357,7 +357,7 @@ class StrategyLine:
         else:
             self.play(fade, run_time=run_time)
 
-    def _regrid(self, k, run_time, extra=()):
+    def _narrow(self, k, run_time, extra=()):
         """The words turn k rules out shrink away; the rest move to their cells.
         `extra` animations (with their OWN run_times) play in the same play — the
         flip, for a turn that narrows as it flips."""
@@ -389,32 +389,27 @@ class StrategyLine:
             highlight(self, [self.words[w]], pulse=True, fade=hop_rt / 2, hold=hop_rt)
         self.mark = highlight(self, [self.words[seq[-1]]], persist=True, fade=hop_rt)[0]
 
-    def _turn(self, k, type_rt, flip_rt, regrid_rt, hop_rt, flip_lag=0.45,
-              narrow_with_flip=False, highlight_typing=False):
-        """A later turn: type, flip, regrid, and (unless it won) hop on. `flip_lag`
-        is the flip's lag_ratio (0 for the quick score). `narrow_with_flip` starts
-        the regrid WITH the flip instead of after it (14a), each keeping its own
-        run_time. `highlight_typing` lights the word in the grid as it is typed and
-        skips the hops (14a)."""
-        self._type(k, type_rt, highlight_word=highlight_typing)
-        if narrow_with_flip:
-            row = self.rows[k]
-            flip_anim = AnimationGroup(
-                row.reveal_anim(0, self.game["codes"][k], lag_ratio=flip_lag),
-                run_time=flip_rt)
-            self._regrid(k, regrid_rt, extra=[flip_anim])
-        else:
-            self._flip(k, flip_rt, lag_ratio=flip_lag)
-            self._regrid(k, regrid_rt)
-        if k + 1 < len(self.game["words"]) and not highlight_typing:
-            self._hops(k, hop_rt)
+    # A turn is NOT one helper call. Each phase below is ONE play with its run_time
+    # passed at the call site, so a scene's turn reads as a timeline of labelled
+    # steps (type, flip, narrow, hops) — a bundled _turn(k, 0.65, 0.35, 1.0, 0.3)
+    # hid which number was which (user 2026-10-07; see bpkfigures/CLAUDE.md).
+    def _flip_and_narrow(self, k, *, flip_run_time, narrow_run_time, lag_ratio=0.45):
+        """Turn k's flip and the narrowing START together (14a), each its own length."""
+        flip_anim = AnimationGroup(
+            self.rows[k].reveal_anim(0, self.game["codes"][k], lag_ratio=lag_ratio),
+            run_time=flip_run_time)
+        self._narrow(k, narrow_run_time, extra=[flip_anim])
 
-    def _win(self, k, type_rt, flip_rt, run_time, flip_lag=0.45, highlight_typing=False):
-        """The last word typed and flipped all green; the words left vanish as the
-        row does the win bounce (07p's fresh_win). `flip_lag`, `highlight_typing`
-        as in _turn."""
-        self._type(k, type_rt, highlight_word=highlight_typing)
-        self._flip(k, flip_rt, lag_ratio=flip_lag)
+    def _flip_and_words_in(self, k, *, flip_run_time, words_run_time, lag_ratio=0.45):
+        """Turn k's flip and the compatible words fading in START together (14a)."""
+        flip_anim = AnimationGroup(
+            self.rows[k].reveal_anim(0, self.game["codes"][k], lag_ratio=lag_ratio),
+            run_time=flip_run_time)
+        self._words_in(words_run_time, extra=[flip_anim])
+
+    def _win_bounce(self, k, run_time):
+        """The words left vanish as turn k's (all-green) row does the win bounce
+        (07p's fresh_win)."""
         row = self.rows[k]
         jump = BOUNCE_H * row.tiles[0][0].height / TILE
         self.play(*[shrink_out(m) for m in self.words.values()],
