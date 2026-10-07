@@ -20,10 +20,10 @@ BEAT MAP — one subscene per Script.md beat, plus c (see the NB below):
   f tarse_gloss    — "n. A" and a blurred word under TARSE                    (08e, VO 2)
   g slate          — as SALET in b, all at once: SLATE's slice lights up and
                      SLATE (as large as SALET) grows out of its line          (08f, VO 3)
-  h label_axis     — SLATE (and its slice's highlight) and all of TARSE fade;
-                     then tick labels and "Average Guesses" fade in           (08g, VO 4)
-  i within_01      — the lit level rises to the words within 0.01 of SALET;
-                     "3.42 guesses" and SALET's definition fade                 (08h, VO 5)
+  h label_axis     — SLATE (and its slice's highlight), all of TARSE, and SALET's
+                     definition and "3.42 guesses" fade; then tick labels and
+                     "Average Guesses" fade in                                (08g, VO 4)
+  i within_01      — the lit level rises to the words within 0.01 of SALET    (08h, VO 5)
   j within_1       — zoom out to cover 0.1 guesses, the level rising to the
                      1480 within 0.1; SALET's callout moves and shrinks       (08i, VO 5)
   k within_2       — zoom all the way out, the level rising to the 6908
@@ -466,9 +466,11 @@ class Scene08(StacksView, MovingCameraScene, WordleBoardScene):
         self.xlabel_h = self.xlabel.height
         self._place_overlay()
         self.add(*[m for _, mark, lab, _ in self.ticks for m in (mark, lab)], self.xlabel)
-        self.fading = [self.stub, self.t_line, self.tarse, self.gloss]
+        self.fading = [self.stub, self.t_line, self.tarse, self.gloss,
+                       self.salet_gloss, self.label]          # SALET's two labels too
 
-    # h : the axis labels fade in; SLATE (its slice too) and all of TARSE fade out
+    # h : the axis labels fade in; SLATE (its slice too), all of TARSE, and SALET's
+    #     definition and "3.42 guesses" fade out
     @subscene
     def label_axis(self):
         self._setup_label_axis()
@@ -478,18 +480,15 @@ class Scene08(StacksView, MovingCameraScene, WordleBoardScene):
         self._drop_callouts(["slate"])
         self.remove(*self.fading)
         self.fading = self.stub = self.t_line = self.tarse = self.gloss = self.blur = None
+        self.salet_gloss = self.label = None
         self._move_view(VIEW_LEFT, run_time=1.0,
                         extra=[self.tick_alpha.animate.set_value(1.0)])
 
-    # i : the level rises to the words within 0.01 of SALET; "3.42 guesses" and SALET's
-    #     definition fade
+    # i : the level rises to the words within 0.01 of SALET
     @subscene
     def within_01(self):
         self._move_view(VIEW_LEFT, run_time=1.0,
-                        level=_counts(DATA["within"]["0.01"]),
-                        extra=[FadeOut(self.label), FadeOut(self.salet_gloss)])
-        self.remove(self.label, self.salet_gloss)
-        self.salet_gloss = None
+                        level=_counts(DATA["within"]["0.01"]))
         self.label = None
 
     # j : zoom out to cover 0.1 guesses, the level rising to the 1480 within 0.1;
