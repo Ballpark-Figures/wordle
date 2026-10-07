@@ -12,7 +12,7 @@ BEAT MAP — one subscene per Script.md beat, plus c (see the NB below):
   a show_histogram — the bars grow up from the axis, the title fades in      (08a, VO 1)
   b salet          — zoom in on the left; then at once everything but SALET's
                      slice dims and SALET (large) grows out of its line       (08b, VO 1)
-  c salet_gloss    — "n. A medieval helmet" under SALET, just above the axis
+  c salet_gloss    — "n. A helmet" under SALET, just above the axis
                      (not in the script: user 2026-10-07)                     (VO 1)
   d salet_label    — "3.42 guesses" just below the axis, under the definition (08c, VO 1)
   e tarse          — all at once: a little faded bar grows down below the axis
@@ -214,7 +214,7 @@ def _diagonal(words):
 # are placed for VIEW_LEFT, with SALET gliding to SALET_TENTH / SALET_FULL as i and j
 # zoom out; the rest are placed for VIEW_FULL, their lines to the slice's centre.
 CALLOUTS = {
-    "salet": pinned(0.36, 0.72, "right", w=BIG_W),    # raised from 0.60 for c's 2-line definition
+    "salet": pinned(0.36, 0.60, "right", w=BIG_W),
     "slate": pinned(0.36, 0.77, "right", w=BIG_W),
     "qajaq": pinned(0.88, 0.30, "bottom", "center"),
     **_diagonal(["trace", "roate", "arise", "raise"]),        # n
@@ -384,9 +384,9 @@ class Scene08(StacksView, MovingCameraScene, WordleBoardScene):
         self._move_view(VIEW_LEFT, run_time=0.8, dim=1.0, weights={"salet": 1},
                         appear=["salet"])
 
-    # c : "n. A medieval helmet" under SALET, just above the axis (user 2026-10-07)
+    # c : "n. A helmet" under SALET, just above the axis (user 2026-10-07)
     def _setup_salet_gloss(self):
-        self.salet_gloss = gloss(["n. A medieval", "helmet"], LABEL_FS)  # the shared style, 2 lines
+        self.salet_gloss = gloss(["n. A helmet"], LABEL_FS)  # the shared style (user 2026-10-07)
         # RIGHT-aligned with SALET's row: it is wider than the row, and centred it ran
         # into the callout line, which leaves the row's right edge going down-right
         row = self._callout_of("salet")["row"]
