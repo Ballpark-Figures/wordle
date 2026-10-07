@@ -302,8 +302,8 @@ class Scene10(WordleDarkScene):
     def distribution(self):
         self._setup_chart()
         c = self.chart
-        self.salet_tiles.type_word(self, 0, DATA["opener"], 0.65,
-                                   per_letter=key_cues(self), appear=True)
+        # typed SILENTLY: no keystroke sounds in 10a (user 2026-10-07)
+        self.salet_tiles.type_word(self, 0, DATA["opener"], 0.65, appear=True)
         self.play(FadeIn(c.title), FadeIn(c.labels), run_time=0.8)
         grow_bars(self, c.bars, 1.5, lag=0.08, edge=LEFT)
         self.play(FadeIn(c.values), run_time=0.6)
