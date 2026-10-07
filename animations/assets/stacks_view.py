@@ -268,8 +268,14 @@ class StacksView:
             last = enter[order[-1]]
             for k, word in enumerate(order):
                 enter[word] = max(enter[word], last - (len(order) - 1 - k) * appear_gap)
-        for word in appear:
-            self.sfx(PING_SFX, at=enter[word], gain=PING_GAIN)
+        # ONE ping per moment: callouts entering together (08o/p's four words, all on
+        # screen from the first frame) share a ping rather than stacking four copies
+        # into one ping four times as loud (user 2026-10-07)
+        last = None
+        for at in sorted(enter[w] for w in appear):
+            if last is None or at - last > 1 / 60:           # more than a frame apart
+                self.sfx(PING_SFX, at=at, gain=PING_GAIN)
+                last = at
         for word in present:
             self._callout(word)["g"] = 1.0
         a0 = {c["word"]: c["a"] for c in self.callouts or []}
