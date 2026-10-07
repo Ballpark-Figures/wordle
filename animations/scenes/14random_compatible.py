@@ -6,7 +6,9 @@ directly, and i ends with everything faded out (user's call, 2026-10-01).
 
 BEAT MAP — one subscene per Script.md beat, letters matching:
 
-  a chose_game  — scene 13's game again, from CHOSE (the "word of our choice"; the
+  a chose_game  — the scene OPENS on a blank board, its top row where CHOSE goes; the
+                  rest of the board fades as CHOSE is typed (user 2026-10-07); then
+                  scene 13's game again, from CHOSE (the "word of our choice"; the
                   script's CHOICE has six letters), against WOVEN: CHOSE typed and
                   flipped BBYBY, its 66 compatible answers in, and each next word
                   selected straight away (no random hops, per the script): VIDEO
@@ -90,6 +92,9 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 from config import *
 from manim import MovingCameraScene
 from assets import random_game_data, random_compatible_data
+from assets.board import WordleBoard, GAP, TILE
+from assets.pigpen import PigpenWord
+from assets.keys import key_cues
 from bpkfigures.table import row_stripes
 from assets.strategy_line import (StrategyLine, GAME_DY, TITLE_BUFF,
                                   OPTIMAL, COMPATIBLE, word_line, rate_text)
@@ -155,12 +160,30 @@ class Scene14(StrategyLine, MovingCameraScene, WordleBoardScene):
     def setup_scene(self):
         self.game = random_game_data.load("14")
         self.camera.frame.move_to([0, GAME_DY, 0])     # the game's frame
+        # on screen from frame 0 (user 2026-10-07): a full blank board whose top row
+        # IS the game's first row, where CHOSE is typed; the five below it fade out
+        # as CHOSE types (a). Built as the first row + a 5-row block, so the game's
+        # later rows still stack under CHOSE exactly as StrategyLine stacks them.
+        self.word_w = PigpenWord("salet", revealed=True).width
+        self.rows = []
+        self.first_row = self._new_row()
+        self.rest_rows = WordleBoard(rows=5, cols=5)
+        self.rest_rows.scale(self.first_row.width / self.rest_rows.width)
+        self.rest_rows.next_to(self.first_row, DOWN,
+                               buff=self.first_row.tiles[0][0].height * GAP / TILE)
+        self.add(self.first_row, self.rest_rows)
 
     # a : the DICEY game again from CHOSE, each next word selected straight away
     @subscene
     def chose_game(self):
         self._setup_game()
-        self._type(0, 0.65)
+        self.rows = [self.first_row]          # the blank board's top row
+        # CHOSE types into it while the rest of the board fades over the typing
+        typing, total = self.first_row.type_anim(self, 0, self.game["words"][0], 0.65,
+                                                 per_letter=key_cues(self))
+        self.play(typing, FadeOut(self.rest_rows), run_time=total)
+        self.remove(self.rest_rows)
+        self.first_row = self.rest_rows = None
         self._flip(0, 1.6)
         self._words_in(0.8)
         self._hops(0, 0.3)
