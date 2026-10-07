@@ -212,7 +212,7 @@ class Scene13(StrategyLine, MovingCameraScene, WordleBoardScene):
     def dicey(self):
         self._setup_game()
         self._pan_and_type(1.5, 0.65)
-        self._flip(0, 0.35, lag_ratio=0)          # quick score (03's), f-h (user 2026-10-07)
+        self._flip(0, 0.35, lag_ratio=0)          # quick score (03's), f-j (user 2026-10-07)
         self._words_in(0.8)
         self._hops(0, 0.12)
 
@@ -229,12 +229,12 @@ class Scene13(StrategyLine, MovingCameraScene, WordleBoardScene):
     # i : FLUTE's turn (GGGBG), 2 left; hops to FLUKE
     @subscene
     def flute(self):
-        self._turn(3, 0.65, 1.6, 1.0, 0.12)
+        self._turn(3, 0.65, 0.35, 1.0, 0.12, flip_lag=0)
 
     # j : FLUKE's turn (GGGGG); both words left vanish as the row does the win bounce
     @subscene
     def fluke(self):
-        self._win(4, 0.65, 1.6, 1.0)
+        self._win(4, 0.65, 0.35, 1.0, flip_lag=0)
 
     # k : the camera pans back down to the number line; the game leaves upward
     @subscene

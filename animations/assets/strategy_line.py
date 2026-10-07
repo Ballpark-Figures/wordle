@@ -378,11 +378,11 @@ class StrategyLine:
         if k + 1 < len(self.game["words"]):
             self._hops(k, hop_rt)
 
-    def _win(self, k, type_rt, flip_rt, run_time):
+    def _win(self, k, type_rt, flip_rt, run_time, flip_lag=0.45):
         """The last word typed and flipped all green; the words left vanish as the
-        row does the win bounce (07p's fresh_win)."""
+        row does the win bounce (07p's fresh_win). `flip_lag` as in _turn."""
         self._type(k, type_rt)
-        self._flip(k, flip_rt)
+        self._flip(k, flip_rt, lag_ratio=flip_lag)
         row = self.rows[k]
         jump = BOUNCE_H * row.tiles[0][0].height / TILE
         self.play(*[shrink_out(m) for m in self.words.values()],

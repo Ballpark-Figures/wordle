@@ -42,7 +42,8 @@ MATH = os.path.join(HERE, "..", "..", "math")
 GAMES = {
     "13": {"words": ["dicey", "guess", "value", "flute", "fluke"], "answer": "fluke",
            "codes": ["BBBYB", "BYYBB", "BBYYG", "GGGBG", "GGGGG"],
-           "alive": [332, 21, 5, 2, 1], "hops": 10, "seed": 13},
+           "alive": [332, 21, 5, 2, 1], "hops": 6, "seed": 13},   # 5 random + the
+                                                         # next guess (was 10; user 2026-10-07)
     "14": {"words": ["chose", "video", "novel", "woven"], "answer": "woven",
            "codes": ["BBYBY", "YBBGY", "YGGGB", "GGGGG"],
            "alive": [66, 5, 1, 1], "hops": 1, "seed": 14},
@@ -69,13 +70,18 @@ def _build(g):
     rng = random.Random(g["seed"])
     hops = []
     for nxt, pool in zip(words[1:], alive):
-        seq = []
-        while len(seq) < g["hops"] - 1:
-            w = rng.choice(pool)
-            if not seq or w != seq[-1]:
-                seq.append(w)
-        if seq and seq[-1] == nxt:          # the landing must be a move too
-            seq[-1] = rng.choice([w for w in pool if w != nxt])
+        # hops-1 random words, never the same twice in a row, and the LAST of them
+        # not the next guess either (the landing must be a move too). With a tiny
+        # pool (FLUKE/FLUME) patching the last word could repeat the one before it
+        # -- it did, 2026-10-07 -- so a sequence that cannot end legally is redrawn.
+        while True:
+            seq = []
+            while len(seq) < g["hops"] - 1:
+                w = rng.choice(pool)
+                if not seq or w != seq[-1]:
+                    seq.append(w)
+            if not seq or seq[-1] != nxt:
+                break
         hops.append(seq + [nxt])
     return {"words": words, "answer": answer, "codes": codes, "alive": alive,
             "hops": hops}
