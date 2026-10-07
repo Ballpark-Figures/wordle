@@ -212,19 +212,19 @@ class Scene13(StrategyLine, MovingCameraScene, WordleBoardScene):
     def dicey(self):
         self._setup_game()
         self._pan_and_type(1.5, 0.65)
-        self._flip(0, 1.6)
+        self._flip(0, 0.35, lag_ratio=0)          # quick score (03's), f-h (user 2026-10-07)
         self._words_in(0.8)
         self._hops(0, 0.12)
 
     # g : GUESS's turn (BYYBB), 21 left; hops to VALUE
     @subscene
     def guess(self):
-        self._turn(1, 0.65, 1.6, 1.0, 0.12)
+        self._turn(1, 0.65, 0.35, 1.0, 0.12, flip_lag=0)
 
     # h : VALUE's turn (BBYYG), 5 left; hops to FLUTE
     @subscene
     def value(self):
-        self._turn(2, 0.65, 1.6, 1.0, 0.12)
+        self._turn(2, 0.65, 0.35, 1.0, 0.12, flip_lag=0)
 
     # i : FLUTE's turn (GGGBG), 2 left; hops to FLUKE
     @subscene

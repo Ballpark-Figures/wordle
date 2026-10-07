@@ -333,8 +333,10 @@ class StrategyLine:
         self.play(MoveToTarget(frame, run_time=pan_rt),
                   Succession(Wait(t0), AnimationGroup(typing, run_time=total)))
 
-    def _flip(self, k, run_time):
-        self.rows[k].reveal(self, 0, self.game["codes"][k], run_time)
+    def _flip(self, k, run_time, lag_ratio=0.45):
+        """Turn k's row scored. `lag_ratio=0` is the QUICK SCORE, all five tiles at
+        once (03's); the default is the board's own left-to-right reveal."""
+        self.rows[k].reveal(self, 0, self.game["codes"][k], run_time, lag_ratio=lag_ratio)
 
     def _words_in(self, run_time):
         """The first turn's compatible answers fade in as a grid."""
@@ -367,10 +369,11 @@ class StrategyLine:
             highlight(self, [self.words[w]], pulse=True, fade=hop_rt / 2, hold=hop_rt)
         self.mark = highlight(self, [self.words[seq[-1]]], persist=True, fade=hop_rt)[0]
 
-    def _turn(self, k, type_rt, flip_rt, regrid_rt, hop_rt):
-        """A later turn: type, flip, regrid, and (unless it won) hop on."""
+    def _turn(self, k, type_rt, flip_rt, regrid_rt, hop_rt, flip_lag=0.45):
+        """A later turn: type, flip, regrid, and (unless it won) hop on. `flip_lag`
+        is the flip's lag_ratio (0 for the quick score)."""
         self._type(k, type_rt)
-        self._flip(k, flip_rt)
+        self._flip(k, flip_rt, lag_ratio=flip_lag)
         self._regrid(k, regrid_rt)
         if k + 1 < len(self.game["words"]):
             self._hops(k, hop_rt)
