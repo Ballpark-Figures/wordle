@@ -387,10 +387,8 @@ class Scene08(StacksView, MovingCameraScene, WordleBoardScene):
     # c : "n. A helmet" under SALET, just above the axis (user 2026-10-07)
     def _setup_salet_gloss(self):
         self.salet_gloss = gloss(["n. A helmet"], LABEL_FS)  # the shared style (user 2026-10-07)
-        # RIGHT-aligned with SALET's row: it is wider than the row, and centred it ran
-        # into the callout line, which leaves the row's right edge going down-right
-        row = self._callout_of("salet")["row"]
-        self.salet_gloss.next_to(row, DOWN, buff=LABEL_BUFF, aligned_edge=RIGHT)
+        # centred under SALET, as TARSE's definition is under TARSE
+        self.salet_gloss.next_to(self._callout_of("salet")["row"], DOWN, buff=LABEL_BUFF)
 
     @subscene
     def salet_gloss(self):
@@ -402,9 +400,9 @@ class Scene08(StacksView, MovingCameraScene, WordleBoardScene):
     def _setup_salet_label(self):
         self.label = crisp_text(f"{DATA['labels'][IDX['salet']]} guesses", color=WHITE,
                                 font_size=LABEL_FS)
-        # right-aligned with the definition above it, clear of the callout lines
-        self.label.move_to([0, 0, 0], aligned_edge=UP).shift(DOWN * LABEL_BUFF)
-        self.label.shift(RIGHT * (self.salet_gloss.get_right()[0] - self.label.get_right()[0]))
+        # centred under the definition above it
+        self.label.move_to([self.salet_gloss.get_center()[0], 0, 0], aligned_edge=UP)
+        self.label.shift(DOWN * LABEL_BUFF)
 
     @subscene
     def salet_label(self):
