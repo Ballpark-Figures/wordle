@@ -184,12 +184,13 @@ class Scene14(StrategyLine, MovingCameraScene, WordleBoardScene):
         self.play(typing, FadeOut(self.rest_rows), run_time=total)
         self.remove(self.rest_rows)
         self.first_row = self.rest_rows = None
-        self._flip(0, 1.6)
+        # quick score (03's, as 13f-j): all five tiles at once (user 2026-10-07)
+        self._flip(0, 0.35, lag_ratio=0)
         self._words_in(0.8)
         self._hops(0, 0.3)
-        self._turn(1, 0.65, 1.6, 1.0, 0.3)
-        self._turn(2, 0.65, 1.6, 1.0, 0.3)
-        self._win(3, 0.65, 1.6, 1.0)
+        self._turn(1, 0.65, 0.35, 1.0, 0.3, flip_lag=0)
+        self._turn(2, 0.65, 0.35, 1.0, 0.3, flip_lag=0)
+        self._win(3, 0.65, 0.35, 1.0, flip_lag=0)
 
     # b : pan down to the number line (3.42 .. 4.08); CHOSE's marker at 3.99
     def _setup_chose_line(self):
