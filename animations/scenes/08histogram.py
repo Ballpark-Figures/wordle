@@ -214,7 +214,7 @@ def _diagonal(words):
 # are placed for VIEW_LEFT, with SALET gliding to SALET_TENTH / SALET_FULL as i and j
 # zoom out; the rest are placed for VIEW_FULL, their lines to the slice's centre.
 CALLOUTS = {
-    "salet": pinned(0.36, 0.60, "right", w=BIG_W),
+    "salet": pinned(0.36, 0.72, "right", w=BIG_W),    # raised from 0.60 for c's 2-line definition
     "slate": pinned(0.36, 0.77, "right", w=BIG_W),
     "qajaq": pinned(0.88, 0.30, "bottom", "center"),
     **_diagonal(["trace", "roate", "arise", "raise"]),        # n
@@ -386,7 +386,7 @@ class Scene08(StacksView, MovingCameraScene, WordleBoardScene):
 
     # c : "n. A medieval helmet" under SALET, just above the axis (user 2026-10-07)
     def _setup_salet_gloss(self):
-        self.salet_gloss = gloss(["n. A medieval helmet"], LABEL_FS)[0]   # the shared style
+        self.salet_gloss = gloss(["n. A medieval", "helmet"], LABEL_FS)  # the shared style, 2 lines
         # RIGHT-aligned with SALET's row: it is wider than the row, and centred it ran
         # into the callout line, which leaves the row's right edge going down-right
         row = self._callout_of("salet")["row"]
