@@ -470,13 +470,19 @@ class Scene10(WordleDarkScene):
     def _fill_avg(self, L, run_time, extra=()):
         """Length L's average guesses fades into its cell. A STUB total (None, see
         word_lengths_data) leaves the cell empty rather than showing a number."""
-        t = TABLE[L]
-        if t["total"] is None:
+        cell = self._avg_cell(L)
+        if cell is None:
             return
-        cell = crisp_text(_avg(t["total"], t["answers"]), font_size=CELL_SIZE,
-                          color=WHITE).move_to([AVG_X, _row_y(L), 0])
         # rising in, as the table's rows do in i
         self.play(FadeIn(cell, shift=UP * 0.3), *extra, run_time=run_time)
+
+    def _avg_cell(self, L):
+        """Length L's average as a cell, unplayed; None for a STUB total."""
+        t = TABLE[L]
+        if t["total"] is None:
+            return None
+        return crisp_text(_avg(t["total"], t["answers"]), font_size=CELL_SIZE,
+                          color=WHITE).move_to([AVG_X, _row_y(L), 0])
 
     def _type_flipping_gloss_out(self, board, row, word, run_time, sound=True, **kwargs):
         """`board.type_word`, with the definition on screen (if any) fading out
@@ -509,6 +515,13 @@ class Scene10(WordleDarkScene):
     def _gloss_in(self, L, run_time):
         """Length L's opener's definition fades up into place, one line, under the word (to its
         right for RAS)."""
+        d = self._make_gloss(L)
+        self.definition = d
+        # rising in, as scene 08's TARSE definition does
+        self.play(FadeIn(d, shift=UP * 0.2), run_time=run_time)
+
+    def _make_gloss(self, L):
+        """Length L's opener's definition, placed against self.opener_row, unplayed."""
         word = TABLE[L]["opener"]
         d = gloss([DEFINITIONS[word]], GLOSS_FS)
         if word in BESIDE:
@@ -517,14 +530,44 @@ class Scene10(WordleDarkScene):
             # centred in the row below, flush left with the word
             d.move_to([0, _row_y(L) - ROW_DY, 0]).align_to(self.opener_row, LEFT)
         d.set_z_index(GLOSS_Z)
-        self.definition = d
-        # rising in, as scene 08's TARSE definition does
-        self.play(FadeIn(d, shift=UP * 0.2), run_time=run_time)
+        return d
 
     def _fill_both(self, L, avg_run_time, opener_run_time, sound=True):
         """A whole row, as every row filled in one beat is: average, then opener."""
         self._fill_avg(L, avg_run_time)
         self._fill_opener(L, opener_run_time, sound=sound)
+
+    def _fill_together(self, L, avg_run_time, opener_run_time, gloss_run_time=None,
+                       sound=True):
+        """A whole row AT ONCE (user 2026-10-07, 10o-q): the average, the opener's
+        typing and, with `gloss_run_time`, its definition all START together, each
+        keeping its own run_time. The definition already on screen fades out during
+        the first letter's pop, as _type_flipping_gloss_out does."""
+        anims = []
+        cell = self._avg_cell(L)
+        if cell is not None:
+            anims.append(FadeIn(cell, shift=UP * 0.3, run_time=avg_run_time))
+        row = get_board(rows=1, cols=L).scale(TABLE_TILE_SCALE)
+        row.move_to([0, _row_y(L), 0]).align_to(np.array([OPENER_X, 0, 0]), LEFT)
+        word = TABLE[L]["opener"]
+        typing, total = row.type_anim(self, 0, word, opener_run_time,
+                                      per_letter=key_cues(self) if sound else None,
+                                      appear=True, letter_color=tile_color)
+        typing.run_time = total
+        anims.append(typing)
+        old = self.definition
+        if old is not None:
+            n = len(word)
+            anims.append(FadeOut(old, run_time=total * n / (2 * n - 1)))
+        self.opener_row = row
+        new = None
+        if gloss_run_time is not None:
+            new = self._make_gloss(L)
+            anims.append(FadeIn(new, shift=UP * 0.2, run_time=gloss_run_time))
+        self.play(*anims)                 # no play-level run_time: each keeps its own
+        if old is not None:
+            self.remove(old)
+        self.definition = new
 
     def _setup_corner(self, L):
         """An empty board for length L's all-grey path, at the TABLE's tile size,
@@ -576,19 +619,18 @@ class Scene10(WordleDarkScene):
     # o : both for 8
     @subscene
     def both_8(self):
-        self._fill_both(8, 0.5, 1.04, sound=False)    # silent: o-q (user 2026-10-07)
-        self._gloss_in(8, 0.6)
+        # o-q: number, silent typing and definition together (user 2026-10-07)
+        self._fill_together(8, 0.5, 1.04, 0.6, sound=False)
 
     # p : both for 9
     @subscene
     def both_9(self):
-        self._fill_both(9, 0.5, 1.17, sound=False)
-        self._gloss_in(9, 0.6)
+        self._fill_together(9, 0.5, 1.17, 0.6, sound=False)
 
     # q : both for 10
     @subscene
     def both_10(self):
-        self._fill_both(10, 0.5, 1.3, sound=False)
+        self._fill_together(10, 0.5, 1.3, sound=False)
 
     # r : both for 11
     @subscene
