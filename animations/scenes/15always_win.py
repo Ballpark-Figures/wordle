@@ -10,7 +10,7 @@ camera pans (13's convention) and nothing fades.
 
 BEAT MAP — one subscene per Script.md beat, with departures (user's calls): 15a is
 SPLIT into a and b (2026-10-07), 15n and 15o are MERGED (2026-10-01), and three beats
-not in the Doc are ADDED (h, i, z: 2026-10-07). So RENDERED letters do not match the
+not in the Doc are ADDED (g, h, z: 2026-10-07). So RENDERED letters do not match the
 Doc's; the Doc's own beat is in brackets, and an added beat says (added):
 
   a second_words — SALET in the top-left corner and its 148 groups as coloured rows
@@ -27,12 +27,12 @@ Doc's; the Doc's own beat is in brackets, and an added beat says (added):
   f timeline     — the camera pans up to scene 14's number line as it ended: 3.42 to
                    4.08, the Optimal, Random Compatible Answers and SLATE markers
                                                                    (15e, VO 4)
-  g two_words    — the PARSE CLINT marker pops out at 3.69, below the line; then
+  g emph_slate   — SLATE's box emphasised: every other marker dims (user's call)
+                                                                   (added)
+  h de_emph_slate — everything comes back                          (added)
+  i two_words    — the PARSE CLINT marker pops out at 3.69, below the line; then
                    CLINT and its definition fade in right of the card (user's call)
                                                                    (15f, VO 5)
-  h emph_slate   — SLATE's box emphasised: every other marker and CLINT's note
-                   dim (user's call)                               (added)
-  i de_emph_slate — everything comes back                          (added)
   j crane_spilt  — its words flip to CRANE SPILT as it slides to 3.70, the win rate
                    counting, CLINT's definition fading out         (15g, VO 5)
   k three_words  — the line zooms out to fit 4.16, the DANCE HORST BLIMP marker
@@ -95,7 +95,7 @@ REUSE MAP — every element, the one source it comes from, and how it enters:
   number line (f-n,w-z) assets/strategy_line.py `StrategyLine` — scene 14's line,
                         title, subtitle and markers, built one frame up
   pans                  StrategyLine `_pan_up` / `_pan_down` (13's pan, silent)
-  new markers (g,k,m)   StrategyLine `opener_marker` (13's cards: the words, "Then
+  new markers (i,k,m)   StrategyLine `opener_marker` (13's cards: the words, "Then
                         RCA", the win rate; several words as a `word_stack`, board-
                         tight, SLATE's size: user's calls) popping out with the pop
                         sound (`_pop_in`; with a zoom, `_zoom_pop` as 13c/e)
@@ -106,9 +106,9 @@ REUSE MAP — every element, the one source it comes from, and how it enters:
   marker swaps (j,l,n)  StrategyLine `replace_marker` — 14c's flip-while-sliding with
                         the win rate counting (moved there from scene 14 for this)
   CLINT / HORST notes   the card's own `word_line` + assets/gloss.py `gloss` under it
-  (g-l)                 (06d's word-then-definition); FadeIn after the pop, FadeOut
+  (i-l)                 (06d's word-then-definition); FadeIn after the pop, FadeOut
                         during the next beat's flip (the flip replaces the word)
-  emphasis (h,i,x-z)    dim the rest to 0.2 (house rule: save_state / Restore)
+  emphasis (g,h,x-z)    dim the rest to 0.2 (house rule: save_state / Restore)
   o's words             one-row boards typed in ONE play, key sound on the first only
                         (12d's), at the board's size and spacing
   q's words             one-row boards typed in ONE play (12d's), at the size
@@ -289,9 +289,9 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
     to_board — SALET and a CLONE into a board's first two rows; the rest goes
     third — THIRD typed into row 3
     timeline — pan up to scene 14's line
-    two_words — PARSE CLINT at 3.69; CLINT's definition beside it
     emph_slate — SLATE's box emphasised
     de_emph_slate — back to normal
+    two_words — PARSE CLINT at 3.69; CLINT's definition beside it
     crane_spilt — flips to CRANE SPILT at 3.70
     three_words — zoom; DANCE HORST BLIMP at 4.16; HORST's definition beside it
     bland_copse — flips to BLAND COPSE RIGHT at 4.17
@@ -494,7 +494,21 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
         """Beside the marker's card, where it has landed."""
         note.next_to(mk.label, note.side, buff=NOTE_BUFF)
 
-    # g : PARSE CLINT at 3.69, below the line; once it has popped out, CLINT and
+    # g : emph SLATE's box: every other marker dims (user 2026-10-07)
+    @subscene
+    def emph_slate(self):
+        self.slate_rest = [m for m in self.line.markers if m is not self.slate]
+        for m in self.slate_rest:
+            m.save_state()
+        self.play(*[m.animate.set_opacity(0.2) for m in self.slate_rest], run_time=0.6)
+
+    # h : de-emph: everything comes back
+    @subscene
+    def de_emph_slate(self):
+        self.play(*[Restore(m) for m in self.slate_rest], run_time=0.6)
+        self.slate_rest = None
+
+    # i : PARSE CLINT at 3.69, below the line; once it has popped out, CLINT and
     #     its definition fade in to the right of the card
     def _setup_two_words(self):
         self.two = self._opener(TWO, DOWN)
@@ -506,21 +520,6 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
         self._pop_in(self.two, 0.4)
         self._place_note(self.clint, self.two)          # the card's landed place
         self.play(FadeIn(self.clint), run_time=0.5)
-
-    # h : emph SLATE's box: everything else on the line dims (user 2026-10-07)
-    @subscene
-    def emph_slate(self):
-        self.slate_rest = [m for m in self.line.markers if m is not self.slate]
-        self.slate_rest.append(self.clint)
-        for m in self.slate_rest:
-            m.save_state()
-        self.play(*[m.animate.set_opacity(0.2) for m in self.slate_rest], run_time=0.6)
-
-    # i : de-emph: everything comes back
-    @subscene
-    def de_emph_slate(self):
-        self.play(*[Restore(m) for m in self.slate_rest], run_time=0.6)
-        self.slate_rest = None
 
     # j : PARSE CLINT flips to CRANE SPILT, sliding to 3.70, CLINT's definition
     #     fading out as it goes
