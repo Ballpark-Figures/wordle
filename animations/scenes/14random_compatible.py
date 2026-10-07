@@ -189,10 +189,13 @@ class Scene14(StrategyLine, MovingCameraScene, WordleBoardScene):
         first_flip = AnimationGroup(
             self.rows[0].reveal_anim(0, self.game["codes"][0], lag_ratio=0), run_time=0.35)
         self._words_in(0.8, extra=[first_flip])
-        self._hops(0, 0.3)
-        self._turn(1, 0.65, 0.35, 1.0, 0.3, flip_lag=0, narrow_with_flip=True)
-        self._turn(2, 0.65, 0.35, 1.0, 0.3, flip_lag=0, narrow_with_flip=True)
-        self._win(3, 0.65, 0.35, 1.0, flip_lag=0)
+        # no highlight steps: each next word lights up in the grid as it is typed
+        # (user 2026-10-07)
+        self._turn(1, 0.65, 0.35, 1.0, 0.3, flip_lag=0, narrow_with_flip=True,
+                   highlight_typing=True)
+        self._turn(2, 0.65, 0.35, 1.0, 0.3, flip_lag=0, narrow_with_flip=True,
+                   highlight_typing=True)
+        self._win(3, 0.65, 0.35, 1.0, flip_lag=0, highlight_typing=True)
 
     # b : pan down to the number line (3.42 .. 4.08); CHOSE's marker at 3.99
     def _setup_chose_line(self):

@@ -26,7 +26,7 @@ import math
 
 from config import *
 from bpkfigures.number_line import ZoomLine
-from bpkfigures.highlight import highlight
+from bpkfigures.highlight import highlight, overlay_rect
 from bpkfigures.style import CrispCounter
 from assets.flip import Flip, flip, row_parts
 from assets.board import STROKE, GAP, TILE, WordleBoard, get_typed_row
@@ -303,16 +303,25 @@ class StrategyLine:
             self.words[w], self.wscale[w] = m, sc
         self.mark = None
 
-    def _type(self, k, run_time):
+    def _type(self, k, run_time, highlight_word=False):
         """Turn k's word typed on a new row, its tiles appearing as typed (the
-        previous hop's highlight fades first)."""
+        previous hop's highlight fades first). `highlight_word` instead lights the
+        word's copy in the grid DURING the typing — up as it starts, gone as it
+        ends (14a: no separate highlight step)."""
         if self.mark is not None:
             self.play(FadeOut(self.mark), run_time=0.2)
             self.mark = None
         row = self._new_row()
         self.rows.append(row)
-        row.type_word(self, 0, self.game["words"][k], run_time,
-                      per_letter=key_cues(self), appear=True)
+        word = self.game["words"][k]
+        if not highlight_word or word not in self.words:
+            row.type_word(self, 0, word, run_time, per_letter=key_cues(self), appear=True)
+            return
+        typing, total = row.type_anim(self, 0, word, run_time,
+                                      per_letter=key_cues(self), appear=True)
+        rect = overlay_rect(self.words[word])        # highlight()'s gold overlay
+        self.play(typing, FadeIn(rect, rate_func=there_and_back), run_time=total)
+        self.remove(rect)
 
     def _pan_and_type(self, pan_rt, type_rt):
         """The camera pans up one frame to the game, and the first word starts
@@ -381,12 +390,13 @@ class StrategyLine:
         self.mark = highlight(self, [self.words[seq[-1]]], persist=True, fade=hop_rt)[0]
 
     def _turn(self, k, type_rt, flip_rt, regrid_rt, hop_rt, flip_lag=0.45,
-              narrow_with_flip=False):
+              narrow_with_flip=False, highlight_typing=False):
         """A later turn: type, flip, regrid, and (unless it won) hop on. `flip_lag`
         is the flip's lag_ratio (0 for the quick score). `narrow_with_flip` starts
         the regrid WITH the flip instead of after it (14a), each keeping its own
-        run_time."""
-        self._type(k, type_rt)
+        run_time. `highlight_typing` lights the word in the grid as it is typed and
+        skips the hops (14a)."""
+        self._type(k, type_rt, highlight_word=highlight_typing)
         if narrow_with_flip:
             row = self.rows[k]
             flip_anim = AnimationGroup(
@@ -396,13 +406,14 @@ class StrategyLine:
         else:
             self._flip(k, flip_rt, lag_ratio=flip_lag)
             self._regrid(k, regrid_rt)
-        if k + 1 < len(self.game["words"]):
+        if k + 1 < len(self.game["words"]) and not highlight_typing:
             self._hops(k, hop_rt)
 
-    def _win(self, k, type_rt, flip_rt, run_time, flip_lag=0.45):
+    def _win(self, k, type_rt, flip_rt, run_time, flip_lag=0.45, highlight_typing=False):
         """The last word typed and flipped all green; the words left vanish as the
-        row does the win bounce (07p's fresh_win). `flip_lag` as in _turn."""
-        self._type(k, type_rt)
+        row does the win bounce (07p's fresh_win). `flip_lag`, `highlight_typing`
+        as in _turn."""
+        self._type(k, type_rt, highlight_word=highlight_typing)
         self._flip(k, flip_rt, lag_ratio=flip_lag)
         row = self.rows[k]
         jump = BOUNCE_H * row.tiles[0][0].height / TILE
