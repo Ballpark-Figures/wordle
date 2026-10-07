@@ -8,8 +8,8 @@ BEAT MAP (one subscene per Script.md beat)
                     community poll page slides in from the RIGHT (VO 2: "…I posted
                     this poll 3 days before the Hangman video came out.")
   c hangman_clip  — a swipe BACK: the poll page slides off to the RIGHT as the watch
-                    page slides in from the LEFT, then 10 s of the Hangman video
-                    from 13:30 plays in its player (VO 3)
+                    page slides in from the LEFT, its player already on the clip's
+                    first frame, then 15 s of the Hangman video from 13:30 plays (VO 3)
   d hangman_tiers — the watch page fades out; the Hangman tier list fades in with the
                     title "Hangman Tier List" at the top (VO 3)
   e wordle_tiers  — hangman list + title slide LEFT; a copy MORPHS into the Wordle
@@ -17,8 +17,9 @@ BEAT MAP (one subscene per Script.md beat)
                     arrow drawn AFTER — the hangman scene-17 comparison style (VO 4)
   f emph_i        — on BOTH lists every tile but I dims (hangman 17's letter
                     spotlight)                                               (VO 5)
-  g emph_s        — the spotlight moves to S                                 (VO 5)
-  h emph_lh       — the spotlight moves to L and H                           (VO 5)
+  g emph_s        — the spotlight moves to S; "*The ranking for S goes down"
+                    (ranking bold) fades in at the bottom                   (VO 5)
+  h emph_lh       — the spotlight moves to L and H; the footnote fades      (VO 5)
   i histogram     — the camera jumps (invisibly) to 08's histogram view; the navy
                     background fades in, the Hangman list, the titles and the arrow
                     fade out, the Wordle list shrinks into the top-RIGHT corner, its
@@ -108,7 +109,7 @@ import numpy as np
 from manim import MovingCameraScene
 
 from config import *
-from bpkfigures.youtube_card import youtube_watch, youtube_poll, play_clip
+from bpkfigures.youtube_card import youtube_watch, youtube_poll, play_clip, show_clip_frame
 from bpkfigures import tier_list as tl
 from bpkfigures.bar_graph import grow_bars, shrink_bars
 from assets.youtube_data import get as yt_get
@@ -193,15 +194,17 @@ class Scene09(MovingCameraScene, WordleScene):
         self.remove(self.video_page)              # kept off-frame: c swipes it back
 
     # c : swipe back — the poll page slides off RIGHT as the watch page slides in from
-    #     LEFT; then the Hangman video plays from 13:30 for 10 s in its player
+    #     LEFT, its player already on the clip's first frame (not the thumbnail);
+    #     then the Hangman video plays from 13:30 for 15 s (user 2026-10-07)
     @subscene
     def hangman_clip(self):
+        show_clip_frame(self.video_page, HANGMAN_FILE, "13:30")
         self.add(self.video_page)
         self.play(self.video_page.animate.shift(RIGHT * config.frame_width),
                   self.poll_page.animate.shift(RIGHT * config.frame_width), run_time=1.0)
         self.remove(self.poll_page)
         self.poll_page = None
-        self.play(play_clip(self.video_page, HANGMAN_FILE, "13:30"), run_time=10.0)
+        self.play(play_clip(self.video_page, HANGMAN_FILE, "13:30"), run_time=15.0)
 
     # d : the watch page leaves; the Hangman tier list + its title fade in
     def _setup_hangman_tiers(self):
@@ -235,25 +238,36 @@ class Scene09(MovingCameraScene, WordleScene):
         self.play(GrowArrow(self.arrow), run_time=0.5)
 
     # f-h : spotlight letters on both lists (every other tile dims)
-    def _spotlight(self, letters, run_time):
+    def _spotlight(self, letters, run_time, extra=()):
         self.play(*tl.emphasize_letters([(self.hang, td.HANGMAN_LETTERS),
                                          (self.wordle, td.WORDLE_LETTERS)], letters),
-                  run_time=run_time)
+                  *extra, run_time=run_time)
 
     # f : spotlight I
     @subscene
     def emph_i(self):
         self._spotlight("I", 0.6)
 
-    # g : spotlight S
+    # g : spotlight S, with a footnote at the bottom (user 2026-10-07)
+    def _setup_emph_s(self):
+        # the shared footnote (16's FORTH note), in the tier lists' black, centred
+        # in the space under the lists
+        self.s_note = footnote("The ranking for S goes down", color=TITLE_COLOR,
+                               t2w={"ranking": BOLD})
+        bottom = min(self.hang.get_bottom()[1], self.wordle.get_bottom()[1])
+        self.s_note.move_to([0, (bottom - config.frame_y_radius) / 2, 0])
+
     @subscene
     def emph_s(self):
-        self._spotlight("S", 0.6)
+        self._setup_emph_s()
+        self._spotlight("S", 0.6, extra=[FadeIn(self.s_note)])
 
-    # h : spotlight L and H
+    # h : spotlight L and H; S's footnote goes with the spotlight
     @subscene
     def emph_lh(self):
-        self._spotlight("LH", 0.6)
+        self._spotlight("LH", 0.6, extra=[FadeOut(self.s_note)])
+        self.remove(self.s_note)
+        self.s_note = None
 
     # ── histogram helpers ─────────────────────────────────────────────────────
     def _list_at(self, letters, names, scale, *, ur=None, center=(0, LIST_Y),

@@ -419,10 +419,7 @@ class Scene16(WordleBoardScene):
         self.star = crisp_text("*", font_size=36, color=WHITE)
         self.star.scale_to_fit_height(row.height * 0.45)
         self.star.next_to(row, RIGHT, buff=0.06).align_to(row, UP)
-        body = crisp_text("Yes, I know how to spell FOURTH", font_size=24, color=WHITE)
-        star = crisp_text("*", font_size=24, color=WHITE).next_to(body, LEFT, buff=0.04)
-        star.set_y(body.get_top()[1])          # raised, as hangman 18's footnote
-        foot = VGroup(star, body).scale_to_fit_width(FOOT_W)
+        foot = footnote("Yes, I know how to spell FOURTH").scale_to_fit_width(FOOT_W)
         bottom = min(bb.get_bottom()[1] for bb in self.boards)
         foot.move_to([0, (bottom - config.frame_y_radius) / 2, 0])
         self.foot = foot
