@@ -478,11 +478,13 @@ class Scene10(WordleDarkScene):
         # rising in, as the table's rows do in i
         self.play(FadeIn(cell, shift=UP * 0.3), *extra, run_time=run_time)
 
-    def _type_flipping_gloss_out(self, board, row, word, run_time, **kwargs):
+    def _type_flipping_gloss_out(self, board, row, word, run_time, sound=True, **kwargs):
         """`board.type_word`, with the definition on screen (if any) fading out
-        during the FIRST letter's pop, in the same play."""
+        during the FIRST letter's pop, in the same play. `sound=False` types it
+        silently."""
         anim, total = board.type_anim(self, row, word, run_time,
-                                      per_letter=key_cues(self), appear=True, **kwargs)
+                                      per_letter=key_cues(self) if sound else None,
+                                      appear=True, **kwargs)
         if self.definition is None:
             self.play(anim, run_time=total)
             return
@@ -494,12 +496,12 @@ class Scene10(WordleDarkScene):
         self.remove(self.definition)
         self.definition = None
 
-    def _fill_opener(self, L, run_time):
+    def _fill_opener(self, L, run_time, sound=True):
         """Length L's best opener typed into its row as tiles (they appear as their
-        letters land), with the keystroke sounds. Returns the row."""
+        letters land), with the keystroke sounds unless `sound=False`. Returns the row."""
         row = get_board(rows=1, cols=L).scale(TABLE_TILE_SCALE)
         row.move_to([0, _row_y(L), 0]).align_to(np.array([OPENER_X, 0, 0]), LEFT)
-        self._type_flipping_gloss_out(row, 0, TABLE[L]["opener"], run_time,
+        self._type_flipping_gloss_out(row, 0, TABLE[L]["opener"], run_time, sound=sound,
                                       letter_color=tile_color)
         self.opener_row = row
         return row
@@ -519,10 +521,10 @@ class Scene10(WordleDarkScene):
         # rising in, as scene 08's TARSE definition does
         self.play(FadeIn(d, shift=UP * 0.2), run_time=run_time)
 
-    def _fill_both(self, L, avg_run_time, opener_run_time):
+    def _fill_both(self, L, avg_run_time, opener_run_time, sound=True):
         """A whole row, as every row filled in one beat is: average, then opener."""
         self._fill_avg(L, avg_run_time)
-        self._fill_opener(L, opener_run_time)
+        self._fill_opener(L, opener_run_time, sound=sound)
 
     def _setup_corner(self, L):
         """An empty board for length L's all-grey path, at the TABLE's tile size,
@@ -574,19 +576,19 @@ class Scene10(WordleDarkScene):
     # o : both for 8
     @subscene
     def both_8(self):
-        self._fill_both(8, 0.5, 1.04)
+        self._fill_both(8, 0.5, 1.04, sound=False)    # silent: o-q (user 2026-10-07)
         self._gloss_in(8, 0.6)
 
     # p : both for 9
     @subscene
     def both_9(self):
-        self._fill_both(9, 0.5, 1.17)
+        self._fill_both(9, 0.5, 1.17, sound=False)
         self._gloss_in(9, 0.6)
 
     # q : both for 10
     @subscene
     def both_10(self):
-        self._fill_both(10, 0.5, 1.3)
+        self._fill_both(10, 0.5, 1.3, sound=False)
 
     # r : both for 11
     @subscene
