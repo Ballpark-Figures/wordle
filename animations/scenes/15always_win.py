@@ -10,7 +10,8 @@ camera pans (13's convention) and nothing fades.
 
 BEAT MAP — one subscene per Script.md beat, with two departures (user's calls): 15a
 is SPLIT into a and b (2026-10-07), and 15n and 15o are MERGED (2026-10-01). So from
-b to n each RENDERED letter is one AHEAD of the Doc's, and from o on they agree again
+b to n each RENDERED letter is one AHEAD of the Doc's, from o to w they agree, and an
+added de-emph beat (x, 2026-10-07) puts them one ahead again from y
 (the Doc's own beat is in brackets):
 
   a second_words — SALET in the top-left corner and its 148 groups as coloured rows
@@ -59,14 +60,16 @@ b to n each RENDERED letter is one AHEAD of the Doc's, and from o on they agree 
   v two_up       — every marker but the 2-word one dims            (15v, VO 13)
   w four_up      — the 2-word marker dims, the 3- and 4-word ones return (user's
                    call: the VO now says "a 3- or 4-word opener") (15w, VO 13)
-  x empty_board  — the camera pans down to an empty board          (15x, VO 14)
-  y climb_start  — trial 68's starting words typed: QUERY NINNY BALER MASSE
+  x de_emph      — every dimmed marker comes back to full (user's call)
+                                                                   (added)
+  y empty_board  — the camera pans down to an empty board          (15x, VO 14)
+  z climb_start  — trial 68's starting words typed: QUERY NINNY BALER MASSE
                                                                    (15y, VO 14)
-  z climb        — each of its nine accepted moves flips the rows it changes, ending
+  za climb       — each of its nine accepted moves flips the rows it changes, ending
                    on LEDGE PAWNS ROCKY THUMB; the counter counts down beside it, the
                    last count growing and turning green as it reaches 0
                                                                    (15z, VO 14)
-  za finale      — the two empty rows drop off the bottom; the four words grow,
+  zb finale      — the two empty rows drop off the bottom; the four words grow,
                    centred                                         (15za, VO 15)
 
 REUSE MAP — every element, the one source it comes from, and how it enters:
@@ -81,7 +84,7 @@ REUSE MAP — every element, the one source it comes from, and how it enters:
                         ONE play, key sound on the first only (12efficient_strats.py
                         second_words); words from strategy_data (the optimal trees)
   every word flip       assets/flip.py `Flip` by `row_parts` (12e's word flips)
-  boards (d, m-za)      assets/board.py at the origin, unscaled — 02's and 04's board;
+  boards (d, m-zb)      assets/board.py at the origin, unscaled — 02's and 04's board;
                         from l on, six one-row boards stacked at the board's spacing,
                         so each row can be typed, flipped and moved on its own
   rows leaving (d)      06b's shrink-out (strategy_line `shrink_out`)
@@ -103,7 +106,7 @@ REUSE MAP — every element, the one source it comes from, and how it enters:
   CLINT / HORST notes   the card's own `word_line` + assets/gloss.py `gloss` under it
   (g-j)                 (06d's word-then-definition); FadeIn after the pop, FadeOut
                         during the next beat's flip (the flip replaces the word)
-  emphasis (v, w)       dim the rest to 0.2 (house rule: save_state / Restore)
+  emphasis (v, w, x)    dim the rest to 0.2 (house rule: save_state / Restore)
   o's words             one-row boards typed in ONE play, key sound on the first only
                         (12d's), at the board's size and spacing
   q's words             one-row boards typed in ONE play (12d's), at the size
@@ -111,7 +114,7 @@ REUSE MAP — every element, the one source it comes from, and how it enters:
                         `ranked_word_layout` (07's groups, filling the region), its
                         rows of groups then re-spread by `_close_columns`
   words in / out        plain FadeIn / FadeOut; s slides them off to the right
-  finale (za)           the rows move and scale as one (no source: the script's own)
+  finale (zb)           the rows move and scale as one (no source: the script's own)
   colours               BOARD_NAVY via WordleBoardScene; win rates by `win_color`
 
 EVERY NUMBER is sourced (assets/always_win_data.py -> its cache; provenance there):
@@ -301,6 +304,7 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
     back_to_line — pan up to the line
     two_up — dim all but the 2-word marker
     four_up — the 4-word marker instead
+    de_emph — every dimmed marker back to full
     empty_board — pan down to an empty board
     climb_start — QUERY NINNY BALER MASSE typed
     climb — the nine moves, to LEDGE PAWNS ROCKY THUMB
@@ -358,13 +362,13 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
         self._setup_clone()
         cc = self.corner_clone
         anims, total, gone = [], 0.0, []
-        a, total = cc.type_anim(self, 0, CLONE, 0.65, per_letter=key_cues(self),
+        a, total = cc.type_anim(self, 0, CLONE, 1.5, per_letter=key_cues(self),
                                 appear=True, stroke=row_stroke(cc.width))
         anims.append(a)
         n = len(CLONE)
         for b in self.words:
             olds = list(b.letters[0])
-            a, _ = b.type_anim(self, 0, CLONE, 0.65, stroke=row_stroke(b.width))
+            a, _ = b.type_anim(self, 0, CLONE, 1.5, stroke=row_stroke(b.width))
             anims += [a, LaggedStart(*[FadeOut(l, rate_func=_at_once) for l in olds],
                                      lag_ratio=1 / n)]
             gone.append((b, olds))
@@ -674,12 +678,18 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
         self.play(self.two.animate.set_opacity(0.2), Restore(self.three),
                   Restore(self.four), run_time=0.6)
 
-    # x : the camera pans down to the empty board
+    # x : de-emph: every dimmed marker comes back (user 2026-10-07)
+    @subscene
+    def de_emph(self):
+        self.play(*[Restore(m) for m in self.line.markers
+                    if m is not self.three and m is not self.four], run_time=0.6)
+
+    # y : the camera pans down to the empty board
     @subscene
     def empty_board(self):
         self._pan_down(1.5)
 
-    # y : trial 68's starting words, typed at once; the unsolved counter beside
+    # z : trial 68's starting words, typed at once; the unsolved counter beside
     #     the board fades in with them
     def _setup_climb_start(self):
         cx = self._right_mid()
@@ -706,7 +716,7 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
         self.play(*anims, FadeIn(self.count_label), FadeIn(self.counter.mob),
                   run_time=total)
 
-    # z : each accepted move flips the rows it changes while the counter counts
+    # za : each accepted move flips the rows it changes while the counter counts
     #     down to its unsolved words, ending on LEDGE PAWNS ROCKY THUMB at 0, green
     @subscene
     def climb(self):
@@ -727,7 +737,7 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
             if k < len(moves) - 1:
                 self.wait(0.6)                 # each number holds before the next move
 
-    # za : the counter fades and the two empty rows drop off the bottom; the four
+    # zb : the counter fades and the two empty rows drop off the bottom; the four
     #      words grow, centred
     @subscene
     def finale(self):
