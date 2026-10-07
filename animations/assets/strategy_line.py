@@ -338,9 +338,15 @@ class StrategyLine:
         once (03's); the default is the board's own left-to-right reveal."""
         self.rows[k].reveal(self, 0, self.game["codes"][k], run_time, lag_ratio=lag_ratio)
 
-    def _words_in(self, run_time):
-        """The first turn's compatible answers fade in as a grid."""
-        self.play(FadeIn(VGroup(*self.words.values())), run_time=run_time)
+    def _words_in(self, run_time, extra=()):
+        """The first turn's compatible answers fade in as a grid. `extra` animations
+        (with their OWN run_times) play in the same play — the first flip, for a
+        game whose words fade in as it flips (14a)."""
+        fade = FadeIn(VGroup(*self.words.values()))
+        if extra:
+            self.play(AnimationGroup(fade, run_time=run_time), *extra)
+        else:
+            self.play(fade, run_time=run_time)
 
     def _regrid(self, k, run_time, extra=()):
         """The words turn k rules out shrink away; the rest move to their cells.
