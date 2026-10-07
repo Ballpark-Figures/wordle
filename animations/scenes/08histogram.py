@@ -7,39 +7,45 @@ word, with no gaps, so a single word — SALET at the bottom of the left bar —
 highlighted by dimming the rest, and a set of words (always the bottom of each bar,
 since each bar is sorted) as a lit LEVEL that rises and falls continuously.
 
-BEAT MAP — one subscene per Script.md beat, letters matching:
+BEAT MAP — one subscene per Script.md beat, plus c (see the NB below):
 
   a show_histogram — the bars grow up from the axis, the title fades in      (08a, VO 1)
   b salet          — zoom in on the left; then at once everything but SALET's
                      slice dims and SALET (large) grows out of its line       (08b, VO 1)
-  c salet_label    — "3.42 guesses" under SALET                              (08c, VO 1)
-  d tarse          — all at once: a little faded bar grows down below the axis
+  c salet_gloss    — "n. A medieval helmet" under SALET, just above the axis
+                     (not in the script: user 2026-10-07)                     (VO 1)
+  d salet_label    — "3.42 guesses" just below the axis, under the definition (08c, VO 1)
+  e tarse          — all at once: a little faded bar grows down below the axis
                      under SALET's, and TARSE pops out of a line from it      (08d, VO 2)
-  e tarse_gloss    — "n. A" and a blurred word under TARSE                    (08e, VO 2)
-  f slate          — as SALET in b, all at once: SLATE's slice lights up and
+  f tarse_gloss    — "n. A" and a blurred word under TARSE                    (08e, VO 2)
+  g slate          — as SALET in b, all at once: SLATE's slice lights up and
                      SLATE (as large as SALET) grows out of its line          (08f, VO 3)
-  g label_axis     — SLATE (and its slice's highlight) and all of TARSE fade;
+  h label_axis     — SLATE (and its slice's highlight) and all of TARSE fade;
                      then tick labels and "Average Guesses" fade in           (08g, VO 4)
-  h within_01      — the lit level rises to the words within 0.01 of SALET;
-                     "3.42 guesses" fades                                     (08h, VO 5)
-  i within_1       — zoom out to cover 0.1 guesses, the level rising to the
+  i within_01      — the lit level rises to the words within 0.01 of SALET;
+                     "3.42 guesses" and SALET's definition fade                 (08h, VO 5)
+  j within_1       — zoom out to cover 0.1 guesses, the level rising to the
                      1480 within 0.1; SALET's callout moves and shrinks       (08i, VO 5)
-  j within_2       — zoom all the way out, the level rising to the 6908
+  k within_2       — zoom all the way out, the level rising to the 6908
                      within 0.2; SALET still called out                       (08j, VO 5)
-  k top_1000       — the level falls to the top 1000; SALET fades             (08k, VO 6)
-  l unhighlight    — the level rises to the top of every bar                  (08l, VO 6)
-  m qajaq          — QAJAQ with its line                                      (08m, VO 7)
-  n popular        — QAJAQ fades; TRACE straight up over its bar, then ROATE,
+  l top_1000       — the level falls to the top 1000; SALET fades             (08k, VO 6)
+  m unhighlight    — the level rises to the top of every bar                  (08l, VO 6)
+  n qajaq          — QAJAQ with its line                                      (08m, VO 7)
+  o popular        — QAJAQ fades; TRACE straight up over its bar, then ROATE,
                      ARISE, RAISE stepping diagonally down from it            (08n, VO 8)
-  o nyt            — all four fade quickly; CRANE straight up, then STARE,
+  p nyt            — all four fade quickly; CRANE straight up, then STARE,
                      TRAIN, IRATE stepping diagonally down                    (08o, VO 8)
-  p adieu          — the others fade quickly; ADIEU with its line            (08p, VO 9)
-  q audio          — AUDIO with its line                                      (08q, VO 9)
-  r stats_all      — vertical lines at the average and the median of all
+  q adieu          — the others fade quickly; ADIEU with its line            (08p, VO 9)
+  r audio          — AUDIO with its line                                      (08q, VO 9)
+  s stats_all      — vertical lines at the average and the median of all
                      openers, labelled                                        (08r, VO 10)
-  s stats_answers  — the lines and their labels MOVE to the answer words'
+  t stats_answers  — the lines and their labels MOVE to the answer words'
                      figures; "Answer" fades in above each label, riding
                      along with it                                           (08s, VO 11)
+
+  NB from c on the LETTERS run one ahead of the script's: c (SALET's definition) has
+  no script beat, so the script's c is subscene d, d is e, and so on to s, which is t.
+
 
 REUSE MAP — every element and the one source it comes from:
   the bars          assets/word_stacks.py WordStacks in BAR MODE + StacksCamera — 01's
@@ -378,18 +384,30 @@ class Scene08(StacksView, MovingCameraScene, WordleBoardScene):
         self._move_view(VIEW_LEFT, run_time=0.8, dim=1.0, weights={"salet": 1},
                         appear=["salet"])
 
-    # c : "3.42 guesses" under SALET
+    # c : "n. A medieval helmet" under SALET, just above the axis (user 2026-10-07)
+    def _setup_salet_gloss(self):
+        self.salet_gloss = gloss(["n. A medieval helmet"], LABEL_FS)[0]   # the shared style
+        self.salet_gloss.next_to(self._callout_of("salet")["row"], DOWN, buff=LABEL_BUFF)
+
+    @subscene
+    def salet_gloss(self):
+        self._setup_salet_gloss()
+        self.play(FadeIn(self.salet_gloss, shift=UP * 0.2), run_time=1.0)
+
+    # d : "3.42 guesses" just BELOW the axis, under SALET's definition (user
+    #     2026-10-07: the definition took its old place above the axis)
     def _setup_salet_label(self):
         self.label = crisp_text(f"{DATA['labels'][IDX['salet']]} guesses", color=WHITE,
                                 font_size=LABEL_FS)
-        self.label.next_to(self._callout_of("salet")["row"], DOWN, buff=LABEL_BUFF)
+        self.label.move_to([self.salet_gloss.get_center()[0], 0, 0], aligned_edge=UP)
+        self.label.shift(DOWN * LABEL_BUFF)
 
     @subscene
     def salet_label(self):
         self._setup_salet_label()
         self.play(FadeIn(self.label, shift=UP * 0.2), run_time=1.0)
 
-    # d : a little faded bar below the axis, under SALET's; TARSE pops out of a line
+    # e : a little faded bar below the axis, under SALET's; TARSE pops out of a line
     #     from it, the way the callouts do
     def _setup_tarse(self):
         h = LEFT_SQUASH * STEP                             # one slice
@@ -415,7 +433,7 @@ class Scene08(StacksView, MovingCameraScene, WordleBoardScene):
                   Create(self.t_line), GrowFromPoint(self.tarse, self.t_anchor),
                   run_time=0.5)
 
-    # e : "n. A" and a blurred word under TARSE, formatted as "3.42 guesses"
+    # f : "n. A" and a blurred word under TARSE, formatted as "3.42 guesses"
     def _setup_tarse_gloss(self):
         line = gloss(["n. A penis"], LABEL_FS)[0]      # the shared definition style
         hidden = VGroup(*line.submobjects[-5:])          # "penis", never shown
@@ -431,7 +449,7 @@ class Scene08(StacksView, MovingCameraScene, WordleBoardScene):
         self._setup_tarse_gloss()
         self.play(FadeIn(self.gloss, shift=UP * 0.2), run_time=1.0)
 
-    # f : SLATE's slice lights up; SLATE grows out of its line — SALET's two steps
+    # g : SLATE's slice lights up; SLATE grows out of its line — SALET's two steps
     @subscene
     def slate(self):
         self._move_view(VIEW_LEFT, run_time=0.8, weights={"slate": 1},
@@ -448,7 +466,7 @@ class Scene08(StacksView, MovingCameraScene, WordleBoardScene):
         self.add(*[m for _, mark, lab, _ in self.ticks for m in (mark, lab)], self.xlabel)
         self.fading = [self.stub, self.t_line, self.tarse, self.gloss]
 
-    # g : the axis labels fade in; SLATE (its slice too) and all of TARSE fade out
+    # h : the axis labels fade in; SLATE (its slice too) and all of TARSE fade out
     @subscene
     def label_axis(self):
         self._setup_label_axis()
@@ -461,16 +479,18 @@ class Scene08(StacksView, MovingCameraScene, WordleBoardScene):
         self._move_view(VIEW_LEFT, run_time=1.0,
                         extra=[self.tick_alpha.animate.set_value(1.0)])
 
-    # h : the level rises to the words within 0.01 of SALET; "3.42 guesses" fades
+    # i : the level rises to the words within 0.01 of SALET; "3.42 guesses" and SALET's
+    #     definition fade
     @subscene
     def within_01(self):
         self._move_view(VIEW_LEFT, run_time=1.0,
                         level=_counts(DATA["within"]["0.01"]),
-                        extra=[FadeOut(self.label)])
-        self.remove(self.label)
+                        extra=[FadeOut(self.label), FadeOut(self.salet_gloss)])
+        self.remove(self.label, self.salet_gloss)
+        self.salet_gloss = None
         self.label = None
 
-    # i : zoom out to cover 0.1 guesses, the level rising to the 1480 within 0.1;
+    # j : zoom out to cover 0.1 guesses, the level rising to the 1480 within 0.1;
     #     SALET follows, smaller
     @subscene
     def within_1(self):
@@ -478,21 +498,21 @@ class Scene08(StacksView, MovingCameraScene, WordleBoardScene):
                         level=_counts(DATA["within"]["0.1"]),
                         retarget={"salet": SALET_TENTH})
 
-    # j : zoom all the way out, the level rising to the 6908 within 0.2; SALET follows
+    # k : zoom all the way out, the level rising to the 6908 within 0.2; SALET follows
     @subscene
     def within_2(self):
         self._move_view(VIEW_FULL, run_time=3.0, whoosh=True,
                         level=_counts(DATA["within"]["0.2"]),
                         retarget={"salet": SALET_FULL})
 
-    # k : the level falls to the top 1000; SALET fades
+    # l : the level falls to the top 1000; SALET fades
     @subscene
     def top_1000(self):
         self._move_view(VIEW_FULL, run_time=1.5, level=_counts(DATA["top"]),
                         callout_alpha={"salet": 0.0})
         self._drop_callouts(["salet"])
 
-    # l : the level rises to the top of every bar; then the dimming is switched off,
+    # m : the level rises to the top of every bar; then the dimming is switched off,
     #     which changes nothing on screen
     @subscene
     def unhighlight(self):
@@ -501,12 +521,12 @@ class Scene08(StacksView, MovingCameraScene, WordleBoardScene):
                               weights={w: 0 for w in self.stacks.emphasised()})
         self.stacks.refresh(self.camera.frame)
 
-    # m : QAJAQ with its line
+    # n : QAJAQ with its line
     @subscene
     def qajaq(self):
         self._move_view(VIEW_FULL, run_time=0.8, appear=["qajaq"])
 
-    # n : QAJAQ fades; TRACE, ROATE, ARISE, RAISE with their lines
+    # o : QAJAQ fades; TRACE, ROATE, ARISE, RAISE with their lines
     @subscene
     def popular(self):
         self._move_view(VIEW_FULL, run_time=0.8, callout_alpha={"qajaq": 0.0},
@@ -514,7 +534,7 @@ class Scene08(StacksView, MovingCameraScene, WordleBoardScene):
                         appear=["trace", "roate", "arise", "raise"])
         self._drop_callouts(["qajaq"])
 
-    # o : all four fade as STARE, CRANE, TRAIN, IRATE come in
+    # p : all four fade as STARE, CRANE, TRAIN, IRATE come in
     @subscene
     def nyt(self):
         gone = ["trace", "roate", "arise", "raise"]
@@ -523,7 +543,7 @@ class Scene08(StacksView, MovingCameraScene, WordleBoardScene):
                         appear=["crane", "stare", "train", "irate"])
         self._drop_callouts(gone)
 
-    # p : those fade as ADIEU comes in
+    # q : those fade as ADIEU comes in
     @subscene
     def adieu(self):
         gone = ["stare", "crane", "train", "irate"]
@@ -531,7 +551,7 @@ class Scene08(StacksView, MovingCameraScene, WordleBoardScene):
                         fade_time=CALLOUT_GROW, appear=["adieu"])
         self._drop_callouts(gone)
 
-    # q : AUDIO with its line
+    # r : AUDIO with its line
     @subscene
     def audio(self):
         self._move_view(VIEW_FULL, run_time=0.8, appear=["audio"])
@@ -555,7 +575,7 @@ class Scene08(StacksView, MovingCameraScene, WordleBoardScene):
             out.append((line, lab, side, color))
         return out
 
-    # r : average and median of all openers
+    # s : average and median of all openers
     def _setup_stats_all(self):
         self.stats = self._stat_lines("all")
 
@@ -565,7 +585,7 @@ class Scene08(StacksView, MovingCameraScene, WordleBoardScene):
         self.play(*[Create(l) for l, _, _, _ in self.stats], run_time=1.0)
         self.play(*[FadeIn(t) for _, t, _, _ in self.stats], run_time=0.6)
 
-    # s : the lines and their labels move to the answer words' figures; "Answer"
+    # t : the lines and their labels move to the answer words' figures; "Answer"
     #     fades in above each label, aligned on the side toward its line
     def _setup_stats_answers(self):
         k = VIEW_FULL[2] / FRAME_W
