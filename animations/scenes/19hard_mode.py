@@ -583,14 +583,15 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
                 g.letters[r][c] = letter
                 g.add(letter)
                 row.append(TileFlip(t, letter, TILE_STATE[k], appear=True))
-            self.flips.append(LaggedStart(*row, lag_ratio=0.2))
+            self.flips.append(AnimationGroup(*row))   # a row's tiles together
         self.game = g
 
     @subscene
     def ight_game(self):
         self._setup_ight_game()
         self.add(self.game)
-        self.play(LaggedStart(*self.flips, lag_ratio=0.15), run_time=3.0)
+        # row by row, top down (user, 2026-10-08; was a diagonal sweep); 16n's row lag
+        self.play(LaggedStart(*self.flips, lag_ratio=0.35), run_time=3.0)
         self.flips = None
 
     # s : AUGHT travels up from the word grid into the game's top row; scored
