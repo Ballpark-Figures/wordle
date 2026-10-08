@@ -39,11 +39,18 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   t families      — pan down to the families table (Max Guesses / Family / # Words)
                                                                          (19t, VO 8)
   u trace_up      — TRACE on the right                                   (19u, VO 8)
-  v emph_er       — everything dims but E and R, in the words with BOTH  (19v, VO 8)
-  w emph_atc      — instead, A T C in .ATCH and in TRACE                 (19w, VO 8)
-  x unemph        — everything back                                      (19x, VO 8)
-  y fast          — pan right to "Top Fast Openers"                      (19y, VO 9)
-  z letters       — pan down to hard mode's letter table and tier list   (19z, VO 10)
+  v emph_ight     — everything dims but .IGHT (user's added beats v-y)   (--,  VO 8)
+  w emph_ound     — instead, .OUND                                       (--,  VO 8)
+  x emph_er_words — instead, every family ending in ER                   (--,  VO 8)
+  y de_emph_families — everything back                                   (--,  VO 8)
+  z emph_er       — everything dims but E and R, in the words with BOTH  (19v, VO 8)
+  za emph_atc     — instead, A T C in .ATCH and in TRACE                 (19w, VO 8)
+  zb unemph       — everything back                                      (19x, VO 8)
+  zc fast         — pan right to "Top Fast Openers"                      (19y, VO 9)
+  zd letters      — pan down to hard mode's letter table, EMPTY, and the
+                    tier list                                            (19z, VO 10)
+  ze letters_turn1 — turn 1's percentages fill in (user's split)         (19z, VO 10)
+  zf letters_turn2 — turn 2's percentages fill in                        (19z, VO 10)
 
 REUSE MAP — every element, its one source, and how it enters / leaves:
   board, typing, scoring, bounce   assets/board.py get_board / type_word (+ keys.py
@@ -660,6 +667,23 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
         anims += [m.animate.set_opacity(1.0 if keep is None else DIM) for m in self.f_text]
         self.play(*anims, run_time=run_time)
 
+    # v-y : the families the VO names, each emphasised in turn (user, 2026-10-08)
+    @subscene
+    def emph_ight(self):
+        self._emph(lambda fam, ch: fam == ".ight", 0.8)
+
+    @subscene
+    def emph_ound(self):
+        self._emph(lambda fam, ch: fam == ".ound", 0.8)
+
+    @subscene
+    def emph_er_words(self):
+        self._emph(lambda fam, ch: fam.endswith("er"), 0.8)
+
+    @subscene
+    def de_emph_families(self):
+        self._emph(None, 0.8)
+
     @subscene
     def emph_er(self):
         self._emph(lambda fam, ch: ch in "er" and "e" in fam and "r" in fam, 0.8)
@@ -672,7 +696,7 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
     def unemph(self):
         self._emph(None, 0.8)
 
-    # y : pan right to the fast openers
+    # zc : pan right to the fast openers
     def _setup_fast(self):
         c = (Z_DX, F_DY)
         self.z_title = _title("Top Fast Openers", c)
@@ -688,8 +712,9 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
         self.f_rows = self.trace_row = self.f_pieces = self.t_pieces = None
         self.f_text = None
 
-    # z : pan down to hard mode's letter table (18's), the hard tier list on the
-    #      right — both only once their data exist (see the docstring)
+    # zd : pan down to hard mode's letter table (18's), EMPTY, the hard tier list on
+    #     the right — both only once their data exist (see the docstring); the
+    #     percentages fill in by column in ze and zf (user, 2026-10-08)
     def _setup_letters(self):
         c = np.array([Z_DX, ZA_DY, 0.0])
         title = crisp_text("Appearances in First ___ Guesses", font_size=FONT_SIZE_LG,
@@ -701,6 +726,7 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
         heads = VGroup(*[_cell(h, c[0] + x, c[1] + HEAD_Y, bold=True)
                          for h, x in zip(("1", "2"), COL_X)])
         self.za = VGroup(title, sub, heads)
+        self.z_cols = [[], []]          # turn 1's and turn 2's cells, filled in za/zb
         tiers, cov = td.WORDLE_HARD_LETTERS, DATA["coverage"]
         if tiers is not None and cov is not None:
             box_stroke = STROKE * tl.BOX_FILL_FRAC * tl.LETTER_PITCH * LIST_SCALE / TILE
@@ -719,8 +745,8 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
                 for col in (0, 1):
                     pct = 100 * cov["counts"][ch.lower()][col] / cov["paths"]
                     share = cov["counts"][ch.lower()][col] / cov["paths"]
-                    self.za.add(_cell(f"{pct:.2f}%", c[0] + COL_X[col], y)
-                                .set_color(win_color(share, mid=TABLE_MID)))
+                    self.z_cols[col].append(_cell(f"{pct:.2f}%", c[0] + COL_X[col], y)
+                                            .set_color(win_color(share, mid=TABLE_MID)))
         self.add(self.za)
 
     @subscene
@@ -729,3 +755,18 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
         self._pan(DOWN * FRAME_H, 1.5)
         self._clear_except([self.za])
         self.z_title = self.z_words = None
+
+    # ze : turn 1's column fills in
+    @subscene
+    def letters_turn1(self):
+        if self.z_cols[0]:              # empty until the hard coverage data exist
+            self._fill(self.z_cols[0], 1.0)
+        self.za.add(*self.z_cols[0])
+
+    # zf : turn 2's column fills in
+    @subscene
+    def letters_turn2(self):
+        if self.z_cols[1]:
+            self._fill(self.z_cols[1], 1.0)
+        self.za.add(*self.z_cols[1])
+        self.z_cols = None
