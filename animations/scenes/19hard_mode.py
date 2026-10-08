@@ -500,7 +500,7 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
         # the FRAME, so it rode the camera down (fixed 19m). Let go, they are plain
         # mobjects at their place in the world and leave with the histogram.
         self.callouts = []
-        self._move_view(LOWER, run_time=1.5, whoosh=True)
+        self._move_view(LOWER, run_time=1.5)   # silent: a move to another screen (user, 2026-10-08)
         # the seam back: everything on screen to the ordinary frame, invisibly
         self._clear_except(self.t_static)
         for m in self.t_static:
