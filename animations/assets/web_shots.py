@@ -94,6 +94,7 @@ GAMES = {
                      [("text", "daily")], ZOOM_MULTI),
     # the sponsor read (80,000 Hours): plain pages, no clicks, LIGHT scheme -- the
     # site as a visitor normally sees it
+    "80k_home":     ("https://80000hours.org/", [], LIGHT_80K),   # scene 21's opening page
     "80k_doctor":   ("https://80000hours.org/articles/how-many-lives-does-a-doctor-save-part-1/",
                      [], LIGHT_80K),
     "80k_problems": ("https://80000hours.org/career-guide/world-problems/", [], LIGHT_80K),

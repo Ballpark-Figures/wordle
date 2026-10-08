@@ -23,6 +23,8 @@ ASPECT = 9 / 16
 
 # screenshot -> (address, tab title)
 PAGES = {
+    "80k_home":     ("80000hours.org",
+                     "80,000 Hours: How to make a difference with your career"),
     "80k_doctor":   ("80000hours.org/articles/how-many-lives-does-a-doctor-save-part-1",
                      "How many lives does a doctor save? (Part 1)"),
     "80k_problems": ("80000hours.org/career-guide/world-problems",
