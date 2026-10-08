@@ -98,6 +98,7 @@ GAMES = {
     "80k_doctor":   ("https://80000hours.org/articles/how-many-lives-does-a-doctor-save-part-1/",
                      [], LIGHT_80K),
     "80k_problems": ("https://80000hours.org/career-guide/world-problems/", [], LIGHT_80K),
+    "80k_podcast":  ("https://80000hours.org/podcast/", [], LIGHT_80K),   # scene 21c
     "80k_elie":     ("https://80000hours.org/podcast/episodes/elie-hassenfeld-givewell-critiques-and-lessons/",
                      [], LIGHT_80K),
     "80k_oster":    ("https://80000hours.org/podcast/episodes/emily-oster-pregnancy-parenting-careers/",

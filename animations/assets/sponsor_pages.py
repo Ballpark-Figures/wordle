@@ -1,4 +1,4 @@
-"""The 80,000 Hours pages shown in the sponsor read's browser window (scenes 21-23).
+"""The 80,000 Hours pages shown in the sponsor read's browser window (scenes 21 and 23).
 
 One place for every page's screenshot, address and tab title, and for the window
 they sit in, so the scenes cannot drift apart.
@@ -29,6 +29,8 @@ PAGES = {
                      "How many lives does a doctor save? (Part 1)"),
     "80k_problems": ("80000hours.org/career-guide/world-problems",
                      "How we rank the world’s most pressing problems (and why)"),
+    "80k_podcast":  ("80000hours.org/podcast",
+                     "The 80,000 Hours Podcast"),
     "80k_elie":     ("80000hours.org/podcast/episodes/elie-hassenfeld-givewell-critiques-and-lessons",
                      "#153 – Elie Hassenfeld on two big-picture critiques of GiveWell’s approach"),
     "80k_oster":    ("80000hours.org/podcast/episodes/emily-oster-pregnancy-parenting-careers",
