@@ -9,7 +9,7 @@ BEAT MAP (one subscene per Script.md beat)
                     this poll 3 days before the Hangman video came out.")
   c hangman_clip  — a swipe BACK: the poll page slides off to the RIGHT as the watch
                     page slides in from the LEFT, its player already on the clip's
-                    first frame, then 15 s of the Hangman video from 13:30 plays (VO 3)
+                    first frame, then 15 s of the Hangman video from 2:18 plays (VO 3)
   d hangman_tiers — the watch page fades out; the Hangman tier list fades in with the
                     title "Hangman Tier List" at the top (VO 3)
   e wordle_tiers  — hangman list + title slide LEFT; a copy MORPHS into the Wordle
@@ -195,16 +195,16 @@ class Scene09(MovingCameraScene, WordleScene):
 
     # c : swipe back — the poll page slides off RIGHT as the watch page slides in from
     #     LEFT, its player already on the clip's first frame (not the thumbnail);
-    #     then the Hangman video plays from 13:30 for 15 s (user 2026-10-07)
+    #     then the Hangman video plays from 2:18 for 15 s (user 2026-10-07)
     @subscene
     def hangman_clip(self):
-        show_clip_frame(self.video_page, HANGMAN_FILE, "13:30")
+        show_clip_frame(self.video_page, HANGMAN_FILE, "2:18")
         self.add(self.video_page)
         self.play(self.video_page.animate.shift(RIGHT * config.frame_width),
                   self.poll_page.animate.shift(RIGHT * config.frame_width), run_time=1.0)
         self.remove(self.poll_page)
         self.poll_page = None
-        self.play(play_clip(self.video_page, HANGMAN_FILE, "13:30"), run_time=15.0)
+        self.play(play_clip(self.video_page, HANGMAN_FILE, "2:18"), run_time=15.0)
 
     # d : the watch page leaves; the Hangman tier list + its title fade in
     def _setup_hangman_tiers(self):
