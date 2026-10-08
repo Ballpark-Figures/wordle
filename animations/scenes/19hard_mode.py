@@ -423,7 +423,7 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
     @subscene
     def histogram(self):
         self._setup_histogram()
-        self._move_view(VIEW, run_time=1.5, whoosh=True)
+        self._move_view(VIEW, run_time=1.5)   # silent: a move to another screen (user, 2026-10-08)
         self._clear_except([self.stacks, self.chrome])
         self.left = self.right = None
 
