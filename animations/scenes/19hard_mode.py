@@ -38,11 +38,11 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   s aught         — AUGHT moves to the top of the game and is scored     (19s, VO 7)
   t families      — pan down to the families table (Max Guesses / Family / # Words)
                                                                          (19t, VO 8)
-  u trace_up      — TRACE on the right                                   (19u, VO 8)
-  v emph_ight     — everything dims but .IGHT (user's added beats v-y)   (--,  VO 8)
-  w emph_ound     — instead, .OUND                                       (--,  VO 8)
-  x emph_er_words — instead, every family ending in ER                   (--,  VO 8)
-  y de_emph_families — everything back                                   (--,  VO 8)
+  u emph_ight     — everything dims but .IGHT (user's added beats u-x)   (--,  VO 8)
+  v emph_ound     — instead, .OUND                                       (--,  VO 8)
+  w emph_er_words — instead, every family ending in ER                   (--,  VO 8)
+  x de_emph_families — everything back                                   (--,  VO 8)
+  y trace_up      — TRACE on the right                                   (19u, VO 8)
   z emph_er       — everything dims but E and R, in the words with BOTH  (19v, VO 8)
   za emph_atc     — instead, A T C in .ATCH and in TRACE                 (19w, VO 8)
   zb unemph       — everything back                                      (19x, VO 8)
@@ -645,29 +645,8 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
         self._clear_except([self.f_rows])
         self.ten_words = self.game = None
 
-    @subscene
-    def trace_up(self):
-        # centred between the # Words numbers' right edge and the frame's
-        right = max(m.get_right()[0] for m in self.f_text[2::2])
-        x = (right + self.camera.frame.get_right()[0]) / 2
-        self.trace_row = _typed("trace", TRACE_W, (x, F_DY + TRACE_C[1]))
-        self.t_pieces = [(ch, VGroup(self.trace_row.tiles[0][i],
-                                     self.trace_row.letters[0][i]))
-                         for i, ch in enumerate("trace")]
-        self.play(FadeIn(self.trace_row, shift=UP * RISE), run_time=0.6)
-
-    def _emph(self, keep, run_time):
-        """Every piece to full or dimmed; `keep(family, letter)` says which stay
-        full (family is "trace" for TRACE's tiles); None restores everything."""
-        anims = []
-        pieces = self.f_pieces + [("trace", ch, p) for ch, p in self.t_pieces]
-        for fam, ch, p in pieces:
-            on = keep is None or (ch is not None and keep(fam, ch))
-            anims.append(p.animate.set_opacity(1.0 if on else DIM))
-        anims += [m.animate.set_opacity(1.0 if keep is None else DIM) for m in self.f_text]
-        self.play(*anims, run_time=run_time)
-
-    # v-y : the families the VO names, each emphasised in turn (user, 2026-10-08)
+    # u-x : the families the VO names, each emphasised in turn, before TRACE is up
+    #       (user, 2026-10-08)
     @subscene
     def emph_ight(self):
         self._emph(lambda fam, ch: fam == ".ight", 0.8)
@@ -683,6 +662,29 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
     @subscene
     def de_emph_families(self):
         self._emph(None, 0.8)
+
+    @subscene
+    def trace_up(self):
+        # centred between the # Words numbers' right edge and the frame's
+        right = max(m.get_right()[0] for m in self.f_text[2::2])
+        x = (right + self.camera.frame.get_right()[0]) / 2
+        self.trace_row = _typed("trace", TRACE_W, (x, F_DY + TRACE_C[1]))
+        self.t_pieces = [(ch, VGroup(self.trace_row.tiles[0][i],
+                                     self.trace_row.letters[0][i]))
+                         for i, ch in enumerate("trace")]
+        self.play(FadeIn(self.trace_row, shift=UP * RISE), run_time=0.6)
+
+    def _emph(self, keep, run_time):
+        """Every piece to full or dimmed; `keep(family, letter)` says which stay
+        full (family is "trace" for TRACE's tiles); None restores everything."""
+        anims = []
+        trace = getattr(self, "t_pieces", None) or []     # TRACE is up from y on
+        pieces = self.f_pieces + [("trace", ch, p) for ch, p in trace]
+        for fam, ch, p in pieces:
+            on = keep is None or (ch is not None and keep(fam, ch))
+            anims.append(p.animate.set_opacity(1.0 if on else DIM))
+        anims += [m.animate.set_opacity(1.0 if keep is None else DIM) for m in self.f_text]
+        self.play(*anims, run_time=run_time)
 
     @subscene
     def emph_er(self):
