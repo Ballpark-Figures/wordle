@@ -4735,6 +4735,13 @@ a correction to one is invisible to the rest.
 
 ## Style
 - Uses `bpkfigures` style + the local `config.py` for colors/fonts.
+- **A camera move WHOOSHES only when it moves around content ALREADY ON SCREEN** —
+  panning along 01's stacks of words, zooming in and out of 08's histogram. **A move
+  that brings a DIFFERENT screen into view is SILENT**, whatever code drives it: a pan
+  up to a number line, down to a board, across to a histogram or a table. Judge by
+  what the viewer sees arrive, never by the helper: 19i and 19m use the same
+  `_move_view` as 01 and 08, and kept their whoosh for that reason until the user
+  pointed out both bring on new screens (2026-10-08).
 - **EVERY grid of words — a group's members, under a guess or on their own — goes
   through `animations/assets/groups.py` `grid_cells(n)`**: scene 04's rule, ceil(sqrt(n))
   columns, filled row by row, a short last row centred (6 words = 3+3, 14 = 4+4+4+2).
