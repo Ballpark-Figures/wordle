@@ -332,14 +332,14 @@ class Scene19(StacksView, MovingCameraScene, WordleBoardScene):
         for row in (1, 2):
             g = RULES["guesses"][row]
             self._type(self.board, row, g["word"], 0.65)
-            self.board.reveal(self, row, g["code"], 1.6)
+            self.board.reveal(self, row, g["code"], 0.5, lag_ratio=0)   # quick score (13f's)
 
     # e : GREAT typed and scored; the winning row jumps
     @subscene
     def great(self):
         g = RULES["guesses"][3]
         self._type(self.board, 3, g["word"], 0.65)
-        self.board.reveal(self, 3, g["code"], 1.6)
+        self.board.reveal(self, 3, g["code"], 0.5, lag_ratio=0)   # quick score (13f's)
         self.board.bounce(self, 3, 1.0)
 
     # f : every tile flips back to empty as the board moves left; an empty copy
