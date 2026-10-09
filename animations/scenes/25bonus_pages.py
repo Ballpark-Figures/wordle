@@ -18,15 +18,15 @@ REUSE MAP
   page-to-page move scene 20's `swipe` (scene 09's swipe, inside the window),
                     `BrowserWindow.swipe_to`
   typing            browser.py `fade_to` between real page states, as 24's clicks
-  pages             assets/web_media: sea_of_greens.png is the user's Safari
-                    screenshot cropped to the page; wordle_in_one.png and ceart_0..5
-                    are assets/web_shots.py recipes (`wordle_in_one`, `ceart`)
+  pages             assets/web_media: sea_of_greens.png and wordle_in_one_puzzle.png
+                    are the user's own (logged-in) Safari screenshots, cropped to the
+                    page; ceart_0..5 are the assets/web_shots.py `ceart` recipe
   addresses/titles  the pages' own: the badge page's URL as the screenshot shows
                     it, each tab title read from the live page
 
-OPEN: Wordle in One is subscriber-only, so the logged-out capture is its paywall
-("Unlock weekly bonus puzzles"). Replace web_media/wordle_in_one.png with a
-logged-in screenshot (cropped to the page, 1920x1080) before this ships.
+Wordle in One is subscriber-only, so it cannot be captured logged out (that gets
+a paywall); its image is the user's screenshot, under a NEW filename -- manim's
+animation cache cannot tell two images apart by their pixels (youtube_card.py).
 """
 from pathlib import Path
 import sys
@@ -42,7 +42,7 @@ WIN_W = 13.2                                     # as scene 24's window
 # (screenshot, address, the page's own tab title)
 BADGE = ("sea_of_greens", "nytimes.com/games/wordle/2026-07-10",
          "Friday, July 10, 2026 Wordle puzzle — The New York Times")
-IN_ONE = ("wordle_in_one", "nytimes.com/games/bonus/wordle-in-one/standard/2026-10-07-8",
+IN_ONE = ("wordle_in_one_puzzle", "nytimes.com/games/bonus/wordle-in-one/standard/2026-10-07-8",
           "Wednesday, October 7, 2026 Wordle in 1 — Bonus Puzzles — The New York Times")
 WORDLE = ("ceart_0", "nytimes.com/games/wordle/index.html",
           "Wordle — The New York Times")         # as scene 24's

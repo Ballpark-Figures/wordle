@@ -109,10 +109,6 @@ GAMES = {
     # the WHOLE page, since scene 23 scrolls down it
     "80k_guide":    ("https://80000hours.org/gettheguide/?utm_source=youtube&utm_campaign=2026-80KMAR-ballpark&utm_medium=sponsorship",
                      [], {**LIGHT_80K, "full_page": True}),
-    # scene 25 (over THM): NYT's Wordle in One bonus puzzle, as the user linked it,
-    # dark and zoomed like the Wordle page below
-    "wordle_in_one": ("https://www.nytimes.com/games/bonus/wordle-in-one/standard/2026-10-07-8",
-                      [], {"zoom": ZOOM_80K}),
     # scene 25: an empty Wordle board, then CEART typed one letter at a time (a shot
     # after each key, so the typing is the real page's own states). Same opening
     # steps and ad-slot hiding as the "wordle" recipe below.
