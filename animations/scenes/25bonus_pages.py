@@ -18,7 +18,8 @@ REUSE MAP
   browser window    bpkfigures/browser.py `browser_window`, sized as scene 24's
   page-to-page move scene 20's `swipe` (scene 09's swipe, inside the window),
                     `BrowserWindow.swipe_to`
-  typing            browser.py `fade_to` between real page states, as 24's clicks
+  typing            browser.py `fade_to` between real page states, as 24's clicks;
+                    key sounds: assets/keys.py `key_cues` (02's), one per letter
   pages             assets/web_media: sea_of_greens.png and wordle_in_one_puzzle.png
                     are the user's own (logged-in) Safari screenshots, cropped to the
                     page; ceart_0..5 are the assets/web_shots.py `ceart` recipe
@@ -37,6 +38,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 
 from config import *
 from bpkfigures.browser import browser_window
+from assets.keys import key_cues
 
 MEDIA = Path(__file__).resolve().parent.parent / "assets" / "web_media"
 WIN_W = 13.2                                     # as scene 24's window
@@ -82,5 +84,7 @@ class Scene25(WordleBoardScene):           # navy, as scene 24
     # d : CEART typed, one letter at a time -- each a real state of the page
     @subscene
     def ceart(self):
-        for k in range(1, 6):                    # lockstep: five identical keystrokes
+        key = key_cues(self)                     # each letter's own key sound (02's)
+        for k, ch in enumerate("ceart", start=1):    # lockstep: five identical keystrokes
+            key(k - 1, ch, 0)                    # the sound lands as its letter appears
             self.play(self.win.fade_to(_shot(f"ceart_{k}")), run_time=0.12)
