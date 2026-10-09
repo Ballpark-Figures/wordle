@@ -74,6 +74,7 @@ REUSE MAP — every element and the one source it comes from:
   background     assets/background.py bg_to (promoted from scene 01's _bg_to)
   table letters  bpkfigures.tier_list.tile_color (hangman's vowel/consonant colours
                  for letters on a dark panel), via board.type_word's letter_color
+  h-l letters    tile_color too: vowel red / consonant blue (user 2026-10-09)
   letter flips   assets/board.py TileFlip, with the swap_to / to_center / to_scale
                  options added for this scene (off by default)
   stripes        bpkfigures.table.row_stripes (the dark-background zebra, user's
@@ -394,8 +395,9 @@ class Scene10(WordleDarkScene):
             self.new_d[(r, i)] = self._new_letter(r, i, ch, grown[r].tiles[0][i])
 
     def _new_letter(self, r, i, ch, tile):
-        """A letter for tile (r, i), built on `tile`'s pose, hidden until its flip."""
-        letter = self.upper[r]._letter(ch, tile)
+        """A letter for tile (r, i), built on `tile`'s pose, hidden until its flip;
+        vowel red / consonant blue (tile_color, as the table's openers and 11h)."""
+        letter = self.upper[r]._letter(ch, tile, color=tile_color(ch))
         letter.set_opacity(0).set_z_index(BOARD_Z + 1)
         self.upper[r].add(letter)
         self.add(letter)
