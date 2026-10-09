@@ -3,15 +3,16 @@
 Wordle in One minigame"). Not in Script.md's column 2: the user's ask (2026-10-09).
 Navy background (WordleBoardScene), as scene 24.
 
-Opens on the Sea of Greens badge in a browser window, on from frame 0, swipes to
-Wordle in One, swipes to an empty Wordle board, and CEART is typed into it. Ends
-with the window on screen.
+Opens on an empty Wordle board in a browser window, on from frame 0 (user's call,
+2026-10-09), swipes to the Sea of Greens badge, to Wordle in One, back to the empty
+board, and CEART is typed into it. Ends with the window on screen.
 
 BEAT MAP
-  a wordle_in_one — the badge page slides left inside the window, Wordle in One in
+  a sea_of_greens — the empty board slides left inside the window, the badge in
                     from the right; address and tab title cross-fade
-  b wordle        — the same to an empty Wordle board
-  c ceart         — C, E, A, R, T appear one at a time (the page's own states)
+  b wordle_in_one — the same to Wordle in One
+  c wordle        — the same to the empty Wordle board
+  d ceart         — C, E, A, R, T appear one at a time (the page's own states)
 
 REUSE MAP
   browser window    bpkfigures/browser.py `browser_window`, sized as scene 24's
@@ -54,7 +55,7 @@ def _shot(name):
 
 class Scene25(WordleBoardScene):           # navy, as scene 24
     def setup_scene(self):
-        name, url, title = BADGE
+        name, url, title = WORDLE
         self.win = browser_window(url, title, image=_shot(name), width=WIN_W,
                                   aspect=9 / 16)               # on from frame 0
         self.add(self.win)
@@ -63,17 +64,22 @@ class Scene25(WordleBoardScene):           # navy, as scene 24
         name, url, title = page
         self.play(self.win.swipe_to(_shot(name), url, title), run_time=run_time)
 
-    # a : the badge swipes to Wordle in One
+    # a : the empty board swipes to the Sea of Greens badge
+    @subscene
+    def sea_of_greens(self):
+        self._swipe(BADGE, 1.0)
+
+    # b : the badge swipes to Wordle in One
     @subscene
     def wordle_in_one(self):
         self._swipe(IN_ONE, 1.0)
 
-    # b : Wordle in One swipes to an empty Wordle board
+    # c : Wordle in One swipes back to the empty Wordle board
     @subscene
     def wordle(self):
         self._swipe(WORDLE, 1.0)
 
-    # c : CEART typed, one letter at a time -- each a real state of the page
+    # d : CEART typed, one letter at a time -- each a real state of the page
     @subscene
     def ceart(self):
         for k in range(1, 6):                    # lockstep: five identical keystrokes
