@@ -657,23 +657,23 @@ class Scene10(WordleDarkScene):
     # s : both for 8
     @subscene
     def both_8(self):
-        # o-r: number, silent typing and definition together (user 2026-10-07)
-        self._fill_together(8, 0.5, 1.04, 0.6, sound=False)
+        # o-r: number, typing and definition together (user 2026-10-07); typing sounds back in (user 2026-10-09)
+        self._fill_together(8, 0.5, 1.04, 0.6)
 
     # t : both for 9
     @subscene
     def both_9(self):
-        self._fill_together(9, 0.5, 1.17, 0.6, sound=False)
+        self._fill_together(9, 0.5, 1.17, 0.6)
 
     # u : both for 10
     @subscene
     def both_10(self):
-        self._fill_together(10, 0.5, 1.3, sound=False)
+        self._fill_together(10, 0.5, 1.3)
 
     # v : both for 11
     @subscene
     def both_11(self):
-        self._fill_together(11, 0.5, 1.43, 0.6, sound=False)   # as o-q (user 2026-10-07)
+        self._fill_together(11, 0.5, 1.43, 0.6)   # as o-q (user 2026-10-07)
 
     # w : length 4's average
     @subscene
