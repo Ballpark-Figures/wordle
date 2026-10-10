@@ -16,6 +16,7 @@ BEAT MAP
                 axis and arrow (user's call),
                 the video's own tile borders; lines white (b's black, swapped) / gold /
                 yellow / orange
+  j, k        — a and f with gaps between the bars, at 08's proportion
 
 REUSE MAP
   background    WordleScene (BG_COLOR, the channel's light blue)
@@ -44,6 +45,7 @@ from config import *
 from bpkfigures.histogram import get_histogram
 from assets import histogram_data
 from assets.board import get_scored_row
+from assets.word_stacks import WORD_W, PITCH
 
 from wordle import pattern
 
@@ -60,6 +62,7 @@ LINE_STROKE = 5                  # thicker than 08's LINE_STROKE (3), rounded en
 LINE_COLOR = WHITE               # a's line colour; b-e try others (user comparing)
 TILE_BORDER = BLACK              # thin black border around every tile (user's call)
 TILE_BORDER_W = 2.0
+GAP_RATIO = WORD_W / PITCH       # j, k: 08's bars, a word wide on a word + gap pitch
 QAJAQ_UNDER = "audio"            # QAJAQ sits directly below this row ...
 QAJAQ_FRAC = 0.5                 # ... this far from it down to the x-axis
 # the two schemes: (background, bars, axis + arrow, tile border)
@@ -127,7 +130,17 @@ class Thumbnails(WordleScene):
     def dark_orange(self):
         self._histogram(ACCENT_ORANGE, DARK)
 
-    def _histogram(self, line_color, scheme=LIGHT):
+    # j : a with gaps between the bars
+    @thumbnail
+    def gaps_light(self):
+        self._histogram(LINE_COLOR, gaps=True)
+
+    # k : f with gaps between the bars
+    @thumbnail
+    def gaps_dark(self):
+        self._histogram(WHITE, DARK, gaps=True)
+
+    def _histogram(self, line_color, scheme=LIGHT, gaps=False):
         bg, ink, axis_color, border = scheme
         self.camera.background_color = bg
         counts = Counter(DATA["bins"])
@@ -135,18 +148,20 @@ class Thumbnails(WordleScene):
         plot = get_histogram(None, counts=counts, min_val=lo, max_val=hi,
                              width=HIST_W, height=HIST_H, center=HIST_CENTER,
                              bar_color=ink, ink_color=axis_color,
-                             bar_ratio=1.0, x_tick_step=10 ** 6)
-        # one merged outline over the bars' own corners, so there is no seam between
-        # neighbouring bars at any resolution (separate rectangles antialias a seam)
-        pts = []
-        for bar in sorted(plot.bars, key=lambda b: b.get_left()[0]):
-            pts += [[bar.get_left()[0], bar.get_top()[1], 0],
-                    [bar.get_right()[0], bar.get_top()[1], 0]]
+                             bar_ratio=GAP_RATIO if gaps else 1.0,
+                             x_tick_step=10 ** 6)
         base_y = plot.bars[0].get_bottom()[1]
-        pts = [[pts[0][0], base_y, 0]] + pts + [[pts[-1][0], base_y, 0]]
-        skyline = Polygon(*pts, fill_color=ink, fill_opacity=1, stroke_width=0)
-        plot.remove(plot.bars)
-        plot.add(skyline)
+        if not gaps:
+            # one merged outline over the bars' own corners, so there is no seam between
+            # neighbouring bars at any resolution (separate rectangles antialias a seam)
+            pts = []
+            for bar in sorted(plot.bars, key=lambda b: b.get_left()[0]):
+                pts += [[bar.get_left()[0], bar.get_top()[1], 0],
+                        [bar.get_right()[0], bar.get_top()[1], 0]]
+            pts = [[pts[0][0], base_y, 0]] + pts + [[pts[-1][0], base_y, 0]]
+            skyline = Polygon(*pts, fill_color=ink, fill_opacity=1, stroke_width=0)
+            plot.remove(plot.bars)
+            plot.add(skyline)
         g = plot.hist_geom
         bar_w = g["width"] / g["n"]
         left = plot.x_axis.get_left()[0]
