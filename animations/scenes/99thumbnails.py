@@ -53,7 +53,7 @@ ANSWER = "video"                 # every word on the thumbnail is scored against
 
 HIST_W, HIST_H = 14.4, 4.4       # the histogram's plot area
 HIST_CENTER = DOWN * 0.55
-ROW_SCALE = 0.62                 # tile rows, relative to a board row (4.9 wide)
+ROW_SCALE = 0.80                 # tile rows, relative to a board row (4.9 wide)
 TOP_Y = 3.55                     # word rows at the top of the frame
 ARROW_Y = -3.75                  # GREAT <-> WORST
 LINE_STROKE = 5                  # thicker than 08's LINE_STROKE (3), rounded ends
