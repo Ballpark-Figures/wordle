@@ -20,7 +20,7 @@ REUSE MAP
   word rows     assets/board.py get_scored_row; codes from math/wordle.py pattern
                 against VIDEO (SALET's code is its own, its letters shown as ?)
   marker lines  08's pinned callouts (assets/stacks_view.py pinned, 08's CALLOUTS):
-                white, LINE_STROKE, into the word's own SLICE of its bar --
+                white, thicker than 08 (LINE_STROKE), into the word's own SLICE of its bar --
                 ADIEU/AUDIO from the row's left side to the slice centre at the
                 exact value, SALET from the row's bottom to its slice's top edge
   tile borders  thin black (user's call)
@@ -40,7 +40,7 @@ from config import *
 from bpkfigures.histogram import get_histogram
 from assets import histogram_data
 from assets.board import get_scored_row
-from assets.stacks_view import LINE_STROKE
+
 from wordle import pattern
 
 DATA = histogram_data.load()
@@ -52,6 +52,7 @@ HIST_CENTER = DOWN * 0.55
 ROW_SCALE = 0.62                 # tile rows, relative to a board row (4.9 wide)
 TOP_Y = 3.55                     # word rows at the top of the frame
 ARROW_Y = -3.75                  # GREAT <-> WORST
+LINE_STROKE = 8                  # 2.7x 08's LINE_STROKE (3), for thumbnail size
 LINE_COLOR = WHITE               # a's line colour; b-e try others (user comparing)
 TILE_BORDER = BLACK              # thin black border around every tile (user's call)
 TILE_BORDER_W = 2.0
