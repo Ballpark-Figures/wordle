@@ -16,7 +16,7 @@ BEAT MAP
                 axis and arrow (user's call),
                 the video's own tile borders; lines white (b's black, swapped) / gold /
                 yellow / orange
-  j, k        — a and f with gaps between the bars, at 08's proportion
+  j, k        — a and g with gaps between the bars, at 08's proportion
 
 REUSE MAP
   background    WordleScene (BG_COLOR, the channel's light blue)
@@ -135,10 +135,10 @@ class Thumbnails(WordleScene):
     def gaps_light(self):
         self._histogram(LINE_COLOR, gaps=True)
 
-    # k : f with gaps between the bars
+    # k : g (navy, gold lines) with gaps between the bars
     @thumbnail
     def gaps_dark(self):
-        self._histogram(WHITE, DARK, gaps=True)
+        self._histogram(ACCENT_GOLD, DARK, gaps=True)
 
     def _histogram(self, line_color, scheme=LIGHT, gaps=False):
         bg, ink, axis_color, border = scheme
