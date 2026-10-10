@@ -51,7 +51,7 @@ HIST_CENTER = DOWN * 0.55
 ROW_SCALE = 0.62                 # tile rows, relative to a board row (4.9 wide)
 TOP_Y = 3.55                     # word rows at the top of the frame
 ARROW_Y = -3.75                  # GREAT <-> WORST
-LINE_COLOR = WHITE               # 08's callout lines are white (stacks_view)
+LINE_COLOR = WHITE
 TILE_BORDER = BLACK              # thin black border around every tile (user's call)
 TILE_BORDER_W = 2.0
 
@@ -122,10 +122,11 @@ class Thumbnails(WordleScene):
             return VGroup(line, row)
 
         # 08's specs: SALET_FULL is pinned(..., "bottom") to its slice's top edge;
-        # ADIEU and AUDIO are pinned(..., "left", "center", x=exact value)
+        # ADIEU and AUDIO to their slice centres at the exact value, as 08, but every
+        # line leaves the bottom of the middle letter (user's call)
         salet = marked("salet", -4.9, "bottom", "edge", False, shown="?????")
-        adieu = marked("adieu", 0.3, "left", "center", True)
-        audio = marked("audio", 5.0, "left", "center", True)
+        adieu = marked("adieu", 0.3, "bottom", "center", True)
+        audio = marked("audio", 5.0, "bottom", "center", True)
 
         great = _row("great")
         worst = _row("worst")
