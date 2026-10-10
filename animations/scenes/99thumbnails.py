@@ -67,7 +67,17 @@ class Thumbnails(WordleScene):
                              width=HIST_W, height=HIST_H, center=HIST_CENTER,
                              bar_color=BOARD_NAVY, ink_color=BOARD_NAVY,
                              bar_ratio=1.0, x_tick_step=10 ** 6)
-        plot.bars.set_stroke(BOARD_NAVY, width=1)   # hides antialias seams between bars
+        # one merged outline over the bars' own corners, so there is no seam between
+        # neighbouring bars at any resolution (separate rectangles antialias a seam)
+        pts = []
+        for bar in sorted(plot.bars, key=lambda b: b.get_left()[0]):
+            pts += [[bar.get_left()[0], bar.get_top()[1], 0],
+                    [bar.get_right()[0], bar.get_top()[1], 0]]
+        base_y = plot.bars[0].get_bottom()[1]
+        pts = [[pts[0][0], base_y, 0]] + pts + [[pts[-1][0], base_y, 0]]
+        skyline = Polygon(*pts, fill_color=BOARD_NAVY, fill_opacity=1, stroke_width=0)
+        plot.remove(plot.bars)
+        plot.add(skyline)
         g = plot.hist_geom
         bar_w = g["width"] / g["n"]
         left = plot.x_axis.get_left()[0]
@@ -79,13 +89,16 @@ class Thumbnails(WordleScene):
             return left + (v - lo) * bar_w
 
         def bar_top(word):
-            b = DATA["bins"][DATA["words"].index(word)]
-            return base + counts[b] / g["max_mag"] * g["height"]
+            # the top of the bar the line lands in, read off the drawn bar itself
+            x = x_of(word)
+            bar = next(b for b in plot.bars
+                       if b.get_left()[0] <= x <= b.get_right()[0])
+            return bar.get_top()[1]
 
         def marked(word, row_x, shown=None):
             row = _row(word, shown).move_to([row_x, TOP_Y, 0])
             x = x_of(word)
-            line = Line(row.get_bottom() + DOWN * 0.12, [x, bar_top(word) + 0.08, 0],
+            line = Line(row.get_bottom() + DOWN * 0.12, [x, bar_top(word) - 0.02, 0],
                         color=BOARD_NAVY, stroke_width=LINE_STROKE)
             return VGroup(row, line)
 
