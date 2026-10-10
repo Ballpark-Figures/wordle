@@ -8,9 +8,13 @@ One `@thumbnail` per thumbnail, each a static composition from a clean frame.
 BEAT MAP
   a histogram — light blue; scene 08's normal-mode histogram in navy with no gaps;
                 ADIEU and AUDIO at the top with lines to their values, SALET as
-                ????? with a line to its value; GREAT <-> WORST along the bottom.
+                ????? with a line to its value; QAJAQ directly below AUDIO,
+                halfway down to the axis; GREAT <-> WORST along the bottom.
                 Every word is a tile row scored against VIDEO. White lines.
   b-e         — a with black / gold / yellow / orange lines, for comparison
+  f-i         — the same, INVERTED: navy background, light blue bars and arrow,
+                white tile borders; lines white (b's black, swapped) / gold /
+                yellow / orange
 
 REUSE MAP
   background    WordleScene (BG_COLOR, the channel's light blue)
@@ -22,8 +26,8 @@ REUSE MAP
   marker lines  from the bottom of the middle letter to the TOP of the word's bar
                 (user's call), rounded ends, LINE_STROKE 5; ADIEU/AUDIO at their
                 exact value as in 08, SALET at its bar's centre
-  tile borders  thin black (user's call)
-  arrow         manim DoubleArrow, navy
+  tile borders  thin black (user's call); white in the inverted f-i
+  arrow         manim DoubleArrow, navy (light blue in f-i)
 """
 from pathlib import Path
 from collections import Counter
@@ -55,13 +59,18 @@ LINE_STROKE = 5                  # thicker than 08's LINE_STROKE (3), rounded en
 LINE_COLOR = WHITE               # a's line colour; b-e try others (user comparing)
 TILE_BORDER = BLACK              # thin black border around every tile (user's call)
 TILE_BORDER_W = 2.0
+QAJAQ_UNDER = "audio"            # QAJAQ sits directly below this row ...
+QAJAQ_FRAC = 0.5                 # ... this far from it down to the x-axis
+# the two schemes: (background, bars + arrow, tile border)
+LIGHT = (BG_COLOR, BOARD_NAVY, BLACK)
+DARK = (BOARD_NAVY, BG_COLOR, WHITE)     # inverted, black swapped for white (user)
 
 
-def _row(word, shown=None):
+def _row(word, border, shown=None):
     """`word`'s row scored against ANSWER, with `shown` letters on the tiles."""
     row = get_scored_row(shown or word, pattern(word, ANSWER)).scale(ROW_SCALE)
     for t in row.tiles[0]:
-        t.set_stroke(TILE_BORDER, width=TILE_BORDER_W)
+        t.set_stroke(border, width=TILE_BORDER_W)
     return row
 
 
@@ -95,12 +104,34 @@ class Thumbnails(WordleScene):
     def histogram_orange(self):
         self._histogram(ACCENT_ORANGE)
 
-    def _histogram(self, line_color):
+    # f : inverted, white lines
+    @thumbnail
+    def dark_white(self):
+        self._histogram(WHITE, DARK)
+
+    # g : inverted, gold lines
+    @thumbnail
+    def dark_gold(self):
+        self._histogram(ACCENT_GOLD, DARK)
+
+    # h : inverted, yellow lines
+    @thumbnail
+    def dark_yellow(self):
+        self._histogram(LIGHT_YELLOW, DARK)
+
+    # i : inverted, orange lines
+    @thumbnail
+    def dark_orange(self):
+        self._histogram(ACCENT_ORANGE, DARK)
+
+    def _histogram(self, line_color, scheme=LIGHT):
+        bg, ink, border = scheme
+        self.camera.background_color = bg
         counts = Counter(DATA["bins"])
         lo, hi = min(counts), max(counts)
         plot = get_histogram(None, counts=counts, min_val=lo, max_val=hi,
                              width=HIST_W, height=HIST_H, center=HIST_CENTER,
-                             bar_color=BOARD_NAVY, ink_color=BOARD_NAVY,
+                             bar_color=ink, ink_color=ink,
                              bar_ratio=1.0, x_tick_step=10 ** 6)
         # one merged outline over the bars' own corners, so there is no seam between
         # neighbouring bars at any resolution (separate rectangles antialias a seam)
@@ -110,7 +141,7 @@ class Thumbnails(WordleScene):
                     [bar.get_right()[0], bar.get_top()[1], 0]]
         base_y = plot.bars[0].get_bottom()[1]
         pts = [[pts[0][0], base_y, 0]] + pts + [[pts[-1][0], base_y, 0]]
-        skyline = Polygon(*pts, fill_color=BOARD_NAVY, fill_opacity=1, stroke_width=0)
+        skyline = Polygon(*pts, fill_color=ink, fill_opacity=1, stroke_width=0)
         plot.remove(plot.bars)
         plot.add(skyline)
         g = plot.hist_geom
@@ -129,10 +160,10 @@ class Thumbnails(WordleScene):
             bar = next(r for r in plot.bars if r.get_left()[0] <= x <= r.get_right()[0])
             return bar.get_top()[1]
 
-        def marked(word, row_x, exact, shown=None):
+        def marked(word, row_x, exact, shown=None, row_y=TOP_Y):
             # from the bottom of the middle letter to the top of the word's bar --
             # at its exact value (ADIEU, AUDIO, as 08) or the bar's centre (SALET)
-            row = _row(word, shown).move_to([row_x, TOP_Y, 0])
+            row = _row(word, border, shown).move_to([row_x, row_y, 0])
             b = DATA["bins"][DATA["words"].index(word)]
             x = x_of(word) if exact else left + (b - lo + 0.5) * bar_w
             line = Line(row.get_bottom(), [x, bar_top(word), 0], color=line_color,
@@ -143,13 +174,16 @@ class Thumbnails(WordleScene):
         salet = marked("salet", -4.9, False, shown="?????")
         adieu = marked("adieu", 0.3, True)
         audio = marked("audio", 5.0, True)
+        under = audio[1]
+        qajaq = marked("qajaq", under.get_x(), True,
+                       row_y=under.get_y() + QAJAQ_FRAC * (base_y - under.get_y()))
 
-        great = _row("great")
-        worst = _row("worst")
+        great = _row("great", border)
+        worst = _row("worst", border)
         great.move_to([-8 + 0.35 + great.width / 2, ARROW_Y, 0])
         worst.move_to([8 - 0.35 - worst.width / 2, ARROW_Y, 0])
         arrow = DoubleArrow(great.get_right() + RIGHT * 0.2, worst.get_left() + LEFT * 0.2,
-                            buff=0, color=BOARD_NAVY, stroke_width=8,
+                            buff=0, color=ink, stroke_width=8,
                             tip_length=0.35, max_tip_length_to_length_ratio=1)
 
-        self.add(plot, salet, adieu, audio, great, worst, arrow)
+        self.add(plot, salet, adieu, audio, qajaq, great, worst, arrow)
