@@ -13,6 +13,7 @@ Every number shown is READ from the pipeline's committed files, never typed in.
 
 BEAT MAP (one line per graphic, in order):
   smoke_table — plumbing test: top 5 openers from opener_totals.csv
+  today_board — channel post: NEWER WORDY VIDEO HOURS AFTER scored against TODAY, TODAY unscored
 """
 import csv
 from pathlib import Path
@@ -22,6 +23,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from config import *
 
+MATH = Path(__file__).resolve().parents[2] / "math"
 DATA = Path(__file__).resolve().parents[2] / "math" / "data" / "shared"
 
 
@@ -39,3 +41,18 @@ class Bonus(WordleScene):
             ["Opener", "Total guesses", "Average"],
             [[r["word"].upper(), f"{int(r['total']):,}", r["expected"]] for r in rows],
             title="Best openers"))
+
+    # b : channel post — five guesses scored against TODAY, then TODAY typed, unscored
+    @still
+    def today_board(self):
+        sys.path.insert(0, str(MATH))
+        from wordle import pattern
+        from assets.board import GAP, get_scored_row, get_typed_row
+
+        self.camera.background_color = BOARD_NAVY
+        answer = "today"
+        guesses = ["newer", "wordy", "video", "hours", "after"]
+        rows = [get_scored_row(g, pattern(g, answer)) for g in guesses]
+        rows.append(get_typed_row(answer))
+        board = VGroup(*rows).arrange(DOWN, buff=GAP).scale(1.2).move_to(ORIGIN)
+        self.add(board)
