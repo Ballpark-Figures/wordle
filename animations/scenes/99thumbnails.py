@@ -9,7 +9,8 @@ BEAT MAP
   a histogram — light blue; scene 08's normal-mode histogram in navy with no gaps;
                 ADIEU and AUDIO at the top with lines to their values, SALET as
                 ????? with a line to its value; GREAT <-> WORST along the bottom.
-                Every word is a tile row scored against VIDEO.
+                Every word is a tile row scored against VIDEO. White lines.
+  b-e         — a with black / gold / yellow / orange lines, for comparison
 
 REUSE MAP
   background    WordleScene (BG_COLOR, the channel's light blue)
@@ -51,7 +52,7 @@ HIST_CENTER = DOWN * 0.55
 ROW_SCALE = 0.62                 # tile rows, relative to a board row (4.9 wide)
 TOP_Y = 3.55                     # word rows at the top of the frame
 ARROW_Y = -3.75                  # GREAT <-> WORST
-LINE_COLOR = WHITE
+LINE_COLOR = WHITE               # a's line colour; b-e try others (user comparing)
 TILE_BORDER = BLACK              # thin black border around every tile (user's call)
 TILE_BORDER_W = 2.0
 
@@ -72,6 +73,29 @@ class Thumbnails(WordleScene):
     # a : the histogram, ADIEU / AUDIO / ?????, GREAT <-> WORST
     @thumbnail
     def histogram(self):
+        self._histogram(LINE_COLOR)
+
+    # b : a with black lines
+    @thumbnail
+    def histogram_black(self):
+        self._histogram(BLACK)
+
+    # c : a with gold lines
+    @thumbnail
+    def histogram_gold(self):
+        self._histogram(ACCENT_GOLD)
+
+    # d : a with yellow lines
+    @thumbnail
+    def histogram_yellow(self):
+        self._histogram(LIGHT_YELLOW)
+
+    # e : a with orange lines
+    @thumbnail
+    def histogram_orange(self):
+        self._histogram(ACCENT_ORANGE)
+
+    def _histogram(self, line_color):
         counts = Counter(DATA["bins"])
         lo, hi = min(counts), max(counts)
         plot = get_histogram(None, counts=counts, min_val=lo, max_val=hi,
@@ -118,7 +142,7 @@ class Thumbnails(WordleScene):
             if exact:
                 end[0] = x_of(word)
             start = {"left": row.get_left(), "bottom": row.get_bottom()}[attach]
-            line = Line(start, end, color=LINE_COLOR, stroke_width=LINE_STROKE)
+            line = Line(start, end, color=line_color, stroke_width=LINE_STROKE)
             return VGroup(line, row)
 
         # 08's specs: SALET_FULL is pinned(..., "bottom") to its slice's top edge;
