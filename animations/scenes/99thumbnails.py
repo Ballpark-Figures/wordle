@@ -13,7 +13,7 @@ BEAT MAP
                 Every word is a tile row scored against VIDEO. White lines.
   b-e         — a with black / gold / yellow / orange lines, for comparison
   f-i         — the same, INVERTED: navy background, light blue bars and arrow,
-                white tile borders; lines white (b's black, swapped) / gold /
+                the video's own tile borders; lines white (b's black, swapped) / gold /
                 yellow / orange
 
 REUSE MAP
@@ -26,7 +26,7 @@ REUSE MAP
   marker lines  from the bottom of the middle letter to the TOP of the word's bar
                 (user's call), rounded ends, LINE_STROKE 5; ADIEU/AUDIO at their
                 exact value as in 08, SALET at its bar's centre
-  tile borders  thin black (user's call); white in the inverted f-i
+  tile borders  thin black (user's call); the video's own (get_scored_row) in f-i
   arrow         manim DoubleArrow, navy (light blue in f-i)
 """
 from pathlib import Path
@@ -63,14 +63,16 @@ QAJAQ_UNDER = "audio"            # QAJAQ sits directly below this row ...
 QAJAQ_FRAC = 0.5                 # ... this far from it down to the x-axis
 # the two schemes: (background, bars + arrow, tile border)
 LIGHT = (BG_COLOR, BOARD_NAVY, BLACK)
-DARK = (BOARD_NAVY, BG_COLOR, WHITE)     # inverted, black swapped for white (user)
+DARK = (BOARD_NAVY, BG_COLOR, None)      # inverted; border None = the video's own
+                                         # (get_scored_row: the tile's own colour)
 
 
 def _row(word, border, shown=None):
     """`word`'s row scored against ANSWER, with `shown` letters on the tiles."""
     row = get_scored_row(shown or word, pattern(word, ANSWER)).scale(ROW_SCALE)
-    for t in row.tiles[0]:
-        t.set_stroke(border, width=TILE_BORDER_W)
+    if border is not None:
+        for t in row.tiles[0]:
+            t.set_stroke(border, width=TILE_BORDER_W)
     return row
 
 
