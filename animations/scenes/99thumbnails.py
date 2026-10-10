@@ -12,7 +12,8 @@ BEAT MAP
                 halfway down to the axis; GREAT <-> WORST along the bottom.
                 Every word is a tile row scored against VIDEO. White lines.
   b-e         — a with black / gold / yellow / orange lines, for comparison
-  f-i         — the same, INVERTED: navy background, light blue bars and arrow,
+  f-i         — the same, INVERTED: navy background, light blue bars, white
+                axis and arrow (user's call),
                 the video's own tile borders; lines white (b's black, swapped) / gold /
                 yellow / orange
 
@@ -27,7 +28,7 @@ REUSE MAP
                 (user's call), rounded ends, LINE_STROKE 5; ADIEU/AUDIO at their
                 exact value as in 08, SALET at its bar's centre
   tile borders  thin black (user's call); the video's own (get_scored_row) in f-i
-  arrow         manim DoubleArrow, navy (light blue in f-i)
+  arrow         manim DoubleArrow, navy (white in f-i, with the axis)
 """
 from pathlib import Path
 from collections import Counter
@@ -61,9 +62,9 @@ TILE_BORDER = BLACK              # thin black border around every tile (user's c
 TILE_BORDER_W = 2.0
 QAJAQ_UNDER = "audio"            # QAJAQ sits directly below this row ...
 QAJAQ_FRAC = 0.5                 # ... this far from it down to the x-axis
-# the two schemes: (background, bars + arrow, tile border)
-LIGHT = (BG_COLOR, BOARD_NAVY, BLACK)
-DARK = (BOARD_NAVY, BG_COLOR, None)      # inverted; border None = the video's own
+# the two schemes: (background, bars, axis + arrow, tile border)
+LIGHT = (BG_COLOR, BOARD_NAVY, BOARD_NAVY, BLACK)
+DARK = (BOARD_NAVY, BG_COLOR, WHITE, None)     # inverted; border None = the video's own
                                          # (get_scored_row: the tile's own colour)
 
 
@@ -127,13 +128,13 @@ class Thumbnails(WordleScene):
         self._histogram(ACCENT_ORANGE, DARK)
 
     def _histogram(self, line_color, scheme=LIGHT):
-        bg, ink, border = scheme
+        bg, ink, axis_color, border = scheme
         self.camera.background_color = bg
         counts = Counter(DATA["bins"])
         lo, hi = min(counts), max(counts)
         plot = get_histogram(None, counts=counts, min_val=lo, max_val=hi,
                              width=HIST_W, height=HIST_H, center=HIST_CENTER,
-                             bar_color=ink, ink_color=ink,
+                             bar_color=ink, ink_color=axis_color,
                              bar_ratio=1.0, x_tick_step=10 ** 6)
         # one merged outline over the bars' own corners, so there is no seam between
         # neighbouring bars at any resolution (separate rectangles antialias a seam)
@@ -185,7 +186,7 @@ class Thumbnails(WordleScene):
         great.move_to([-8 + 0.35 + great.width / 2, ARROW_Y, 0])
         worst.move_to([8 - 0.35 - worst.width / 2, ARROW_Y, 0])
         arrow = DoubleArrow(great.get_right() + RIGHT * 0.2, worst.get_left() + LEFT * 0.2,
-                            buff=0, color=ink, stroke_width=8,
+                            buff=0, color=axis_color, stroke_width=8,
                             tip_length=0.35, max_tip_length_to_length_ratio=1)
 
         self.add(plot, salet, adieu, audio, qajaq, great, worst, arrow)
