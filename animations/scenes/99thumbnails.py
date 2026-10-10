@@ -18,8 +18,11 @@ REUSE MAP
                 histogram_cache.json (the committed optturns sweep, 08's bins)
   word rows     assets/board.py get_scored_row; codes from math/wordle.py pattern
                 against VIDEO (SALET's code is its own, its letters shown as ?)
-  marker lines  08's callouts: a line from the word to the word's EXACT value
-                (total / 2315), here stopping at the top of its bar, in navy
+  marker lines  08's pinned callouts (assets/stacks_view.py pinned, 08's CALLOUTS):
+                white, LINE_STROKE, into the word's own SLICE of its bar --
+                ADIEU/AUDIO from the row's left side to the slice centre at the
+                exact value, SALET from the row's bottom to its slice's top edge
+  tile borders  thin black (user's call)
   arrow         manim DoubleArrow, navy
 """
 from pathlib import Path
@@ -30,10 +33,13 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent / "math"))
 
+import numpy as np
+
 from config import *
 from bpkfigures.histogram import get_histogram
 from assets import histogram_data
 from assets.board import get_scored_row
+from assets.stacks_view import LINE_STROKE
 from wordle import pattern
 
 DATA = histogram_data.load()
@@ -45,12 +51,17 @@ HIST_CENTER = DOWN * 0.55
 ROW_SCALE = 0.62                 # tile rows, relative to a board row (4.9 wide)
 TOP_Y = 3.55                     # word rows at the top of the frame
 ARROW_Y = -3.75                  # GREAT <-> WORST
-LINE_STROKE = 5
+LINE_COLOR = WHITE               # 08's callout lines are white (stacks_view)
+TILE_BORDER = BLACK              # thin black border around every tile (user's call)
+TILE_BORDER_W = 2.0
 
 
 def _row(word, shown=None):
     """`word`'s row scored against ANSWER, with `shown` letters on the tiles."""
-    return get_scored_row(shown or word, pattern(word, ANSWER)).scale(ROW_SCALE)
+    row = get_scored_row(shown or word, pattern(word, ANSWER)).scale(ROW_SCALE)
+    for t in row.tiles[0]:
+        t.set_stroke(TILE_BORDER, width=TILE_BORDER_W)
+    return row
 
 
 class Thumbnails(WordleScene):
@@ -81,30 +92,40 @@ class Thumbnails(WordleScene):
         g = plot.hist_geom
         bar_w = g["width"] / g["n"]
         left = plot.x_axis.get_left()[0]
-        base = plot.x_axis.get_center()[1]
 
         def x_of(word):
             # exact value on the bin scale: bin b spans [b, b+1) hundredths
             v = DATA["totals"][DATA["words"].index(word)] / N_ANSWERS * 100
             return left + (v - lo) * bar_w
 
-        def bar_top(word):
-            # the top of the bar the line lands in, read off the drawn bar itself
-            x = x_of(word)
-            bar = next(b for b in plot.bars
-                       if b.get_left()[0] <= x <= b.get_right()[0])
-            return bar.get_top()[1]
+        def slice_box(word):
+            # 08's slice: each bar is a stack of its words, best at the bottom, so
+            # `word` is row DATA["rows"] of its bin's bar, one count tall
+            i = DATA["words"].index(word)
+            b, r = DATA["bins"][i], DATA["rows"][i]
+            h = g["height"] / g["max_mag"]
+            x0 = left + (b - lo) * bar_w
+            return x0, base_y + r * h, x0 + bar_w, base_y + (r + 1) * h
 
-        def marked(word, row_x, shown=None):
+        def marked(word, row_x, attach, anchor, exact, shown=None):
+            # 08's pinned callout (assets/stacks_view.py `pinned`): the line runs
+            # from the row's `attach` side to the slice's centre ("center") or the
+            # side facing the row ("edge"), moved sideways to the exact value
             row = _row(word, shown).move_to([row_x, TOP_Y, 0])
-            x = x_of(word)
-            line = Line(row.get_bottom() + DOWN * 0.12, [x, bar_top(word) - 0.02, 0],
-                        color=BOARD_NAVY, stroke_width=LINE_STROKE)
-            return VGroup(row, line)
+            x0, y0, x1, y1 = slice_box(word)
+            ax, ay = {"center": (0, 0), "edge": (0, 1)}[anchor]
+            end = np.array([(x0 + x1) / 2, (y0 + y1) / 2 + ay * (y1 - y0) / 2, 0])
+            if exact:
+                end[0] = x_of(word)
+            start = {"left": row.get_left(), "bottom": row.get_bottom()}[attach]
+            line = Line(start, end, color=LINE_COLOR, stroke_width=LINE_STROKE)
+            return VGroup(line, row)
 
-        salet = marked("salet", -4.9, shown="?????")
-        adieu = marked("adieu", 0.3)
-        audio = marked("audio", 5.0)
+        # 08's specs: SALET_FULL is pinned(..., "bottom") to its slice's top edge;
+        # ADIEU and AUDIO are pinned(..., "left", "center", x=exact value)
+        salet = marked("salet", -4.9, "bottom", "edge", False, shown="?????")
+        adieu = marked("adieu", 0.3, "left", "center", True)
+        audio = marked("audio", 5.0, "left", "center", True)
 
         great = _row("great")
         worst = _row("worst")
