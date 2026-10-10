@@ -19,10 +19,9 @@ REUSE MAP
                 histogram_cache.json (the committed optturns sweep, 08's bins)
   word rows     assets/board.py get_scored_row; codes from math/wordle.py pattern
                 against VIDEO (SALET's code is its own, its letters shown as ?)
-  marker lines  08's pinned callouts (assets/stacks_view.py pinned, 08's CALLOUTS):
-                white, thicker than 08 (LINE_STROKE), into the word's own SLICE of its bar --
-                ADIEU/AUDIO from the row's left side to the slice centre at the
-                exact value, SALET from the row's bottom to its slice's top edge
+  marker lines  from the bottom of the middle letter to the TOP of the word's bar
+                (user's call), rounded ends, LINE_STROKE 5; ADIEU/AUDIO at their
+                exact value as in 08, SALET at its bar's centre
   tile borders  thin black (user's call)
   arrow         manim DoubleArrow, navy
 """
@@ -52,7 +51,7 @@ HIST_CENTER = DOWN * 0.55
 ROW_SCALE = 0.62                 # tile rows, relative to a board row (4.9 wide)
 TOP_Y = 3.55                     # word rows at the top of the frame
 ARROW_Y = -3.75                  # GREAT <-> WORST
-LINE_STROKE = 8                  # 2.7x 08's LINE_STROKE (3), for thumbnail size
+LINE_STROKE = 5                  # thicker than 08's LINE_STROKE (3), rounded ends
 LINE_COLOR = WHITE               # a's line colour; b-e try others (user comparing)
 TILE_BORDER = BLACK              # thin black border around every tile (user's call)
 TILE_BORDER_W = 2.0
@@ -123,35 +122,27 @@ class Thumbnails(WordleScene):
             v = DATA["totals"][DATA["words"].index(word)] / N_ANSWERS * 100
             return left + (v - lo) * bar_w
 
-        def slice_box(word):
-            # 08's slice: each bar is a stack of its words, best at the bottom, so
-            # `word` is row DATA["rows"] of its bin's bar, one count tall
-            i = DATA["words"].index(word)
-            b, r = DATA["bins"][i], DATA["rows"][i]
-            h = g["height"] / g["max_mag"]
-            x0 = left + (b - lo) * bar_w
-            return x0, base_y + r * h, x0 + bar_w, base_y + (r + 1) * h
+        def bar_top(word):
+            # the top of the bar holding `word`, read off the drawn bar itself
+            b = DATA["bins"][DATA["words"].index(word)]
+            x = left + (b - lo + 0.5) * bar_w
+            bar = next(r for r in plot.bars if r.get_left()[0] <= x <= r.get_right()[0])
+            return bar.get_top()[1]
 
-        def marked(word, row_x, attach, anchor, exact, shown=None):
-            # 08's pinned callout (assets/stacks_view.py `pinned`): the line runs
-            # from the row's `attach` side to the slice's centre ("center") or the
-            # side facing the row ("edge"), moved sideways to the exact value
+        def marked(word, row_x, exact, shown=None):
+            # from the bottom of the middle letter to the top of the word's bar --
+            # at its exact value (ADIEU, AUDIO, as 08) or the bar's centre (SALET)
             row = _row(word, shown).move_to([row_x, TOP_Y, 0])
-            x0, y0, x1, y1 = slice_box(word)
-            ax, ay = {"center": (0, 0), "edge": (0, 1)}[anchor]
-            end = np.array([(x0 + x1) / 2, (y0 + y1) / 2 + ay * (y1 - y0) / 2, 0])
-            if exact:
-                end[0] = x_of(word)
-            start = {"left": row.get_left(), "bottom": row.get_bottom()}[attach]
-            line = Line(start, end, color=line_color, stroke_width=LINE_STROKE)
+            b = DATA["bins"][DATA["words"].index(word)]
+            x = x_of(word) if exact else left + (b - lo + 0.5) * bar_w
+            line = Line(row.get_bottom(), [x, bar_top(word), 0], color=line_color,
+                        stroke_width=LINE_STROKE)
+            line.set_cap_style(CapStyleType.ROUND)
             return VGroup(line, row)
 
-        # 08's specs: SALET_FULL is pinned(..., "bottom") to its slice's top edge;
-        # ADIEU and AUDIO to their slice centres at the exact value, as 08, but every
-        # line leaves the bottom of the middle letter (user's call)
-        salet = marked("salet", -4.9, "bottom", "edge", False, shown="?????")
-        adieu = marked("adieu", 0.3, "bottom", "center", True)
-        audio = marked("audio", 5.0, "bottom", "center", True)
+        salet = marked("salet", -4.9, False, shown="?????")
+        adieu = marked("adieu", 0.3, True)
+        audio = marked("audio", 5.0, True)
 
         great = _row("great")
         worst = _row("worst")
