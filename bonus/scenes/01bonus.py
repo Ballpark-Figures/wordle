@@ -58,7 +58,7 @@ until built, so every letter is fixed from the start):
   zq  letroso_table — top 10 Letroso first guesses by average options left
   zr  foximax — title card "Foximax"
   zs  foximax_page — Foximax in a browser window
-  zt  foximax_histogram — horizontal-bar histogram of word counts from the Foximax analysis  [NOT BUILT]
+  zt  foximax_histogram — words per game over 1,000,000 simulated Foximax games, horizontal bars
   zu  nerdle — title card "Nerdle"
   zv  nerdle_page — Nerdle's classic game in a browser window
   zw  nerdle_symbols — table: symbols with % of equations containing them  [NOT BUILT]
@@ -189,6 +189,12 @@ ABS_HEAD_GAP = 0.45    # zn: "Options Left" above the board's top
 # zq: fingerprint fa3d3ea0526042a0 == the current lists (checked 2026-10-11)
 LETROSO_RANK = DATA / "letroso" / "root_rank_lengths.csv.gz"
 LETROSO_TOP = 10
+FOXIMAX_CSV = DATA / "foximax" / "t1000000_s0.csv"     # the largest run (seed 0)
+FOXIMAX_GAMES = 1_000_000
+FOX_LEN = 7.0          # zt: the axis the bars stand on (vertical here)
+FOX_H = 9.0            # zt: the longest bar
+FOX_TITLE_DROP = 0.4   # zt: the chart sits this far below centre, room for the title
+FOX_TITLE_GAP = 0.5    # zt: get_histogram's title gap
 BOARD_SIDE_X = 4.0     # scene 15's: how far left the board moves for a column of words beside it
 
 
@@ -798,10 +804,34 @@ class Bonus(WordleBoardScene):
     def foximax_page(self):
         self._browser(*PAGE_FOXIMAX)
 
-    # zt : NOT BUILT — horizontal-bar histogram of word counts from the Foximax analysis
+    # zt : Foximax, the largest simulation (1,000,000 games): how many games end
+    #      with each number of words, horizontal bars in 08's light blue
     @still
     def foximax_histogram(self):
-        self._not_built('horizontal-bar histogram of word counts from the Foximax analysis')
+        from bpkfigures.histogram import get_histogram
+        counts = {}
+        for line in open(FOXIMAX_CSV):
+            m = re.match(r"#\s+(\d+) words\s+(\d+)\s+[\d.]+%", line)
+            if m:
+                counts[int(m.group(1))] = int(m.group(2))
+        total = sum(counts.values())
+        assert total == FOXIMAX_GAMES, total
+        labels = {}
+        for k, c in counts.items():
+            pct = 100 * c / total
+            labels[k] = f"{pct:.1f}%" if pct >= 1 else f"{pct:.2g}%"
+        plot = get_histogram(None, counts=counts, is_vertical=True, width=FOX_LEN, height=FOX_H,
+                             bar_color=BG_COLOR, ink_color=WHITE, bar_labels=labels,
+                             bar_label_color=WHITE, x_tick_step=1,
+                             title="FoxiMax: Words per Game")
+        # horizontal mode centres the title on the axis (here the left edge): put
+        # the chart in the middle and the title over the whole frame
+        title = plot.title_text
+        body = VGroup(*[m for m in plot if m is not title])
+        body.move_to(ORIGIN).shift(DOWN * FOX_TITLE_DROP)
+        title.move_to([0, body.get_top()[1] + FOX_TITLE_GAP, 0], aligned_edge=DOWN)
+        fit_to_frame(plot, buff=0.4)
+        self.add(plot)
 
     # zu : title card
     @still
