@@ -27,18 +27,19 @@ alone:
 
 The scenes placed each column by hand, so the one thing NOT from a scene is
 COL_GAP, the space between neighbouring columns' widest entries: an automatic
-layout needs some value. The block of header + rows is centred in the space under
-the title (or in the frame, without one). Cells are shown as given, so formatting
+layout needs some value. The block of header + rows is centred in the space between
+the title and an optional one-line `note` at the bottom (a footnote, e.g. what a *
+means), and only the BLOCK shrinks to fit, so the title and note keep their places. Cells are shown as given, so formatting
 is the caller's and the numbers are SOURCED.
 
-Role handles: `.title` (None without one), `.header`, `.rows`, `.cells[r][c]`,
+Role handles: `.title` / `.note` (None without one), `.header`, `.rows`, `.cells[r][c]`,
 `.stripes`.
 """
 import re
 
 from manim import *
 
-from bpkfigures.style import FONT_SIZE_LG, crisp_text, fit_to_frame, place_on_baseline
+from bpkfigures.style import FONT_SIZE_LG, crisp_text, place_on_baseline
 from bpkfigures.table import row_stripes
 
 TITLE_BUFF = 0.6        # 13's / 14's / 18's / 19's screen titles
@@ -50,6 +51,8 @@ STRIPE_PAD = 0.5        # 14's / 19's overhang past the outer columns
 COL_GAP = 1.0           # NOT from a scene (they placed columns by hand)
 TITLE_GAP = 0.15        # 14's, between a two-line title's lines
 BLOCK_GAP = 0.6         # title bottom to the header, at least
+NOTE_SIZE = 24          # a footnote under the table (no main-video precedent)
+NOTE_GAP = 0.4          # the table's bottom to the note's top, at least
 
 _DECIMAL = re.compile(r"^[+\-−]?[\d,]*\.\d+%?$")
 
@@ -66,7 +69,7 @@ def _sit(mob, s, x, y, size):
     return place_on_baseline(mob, (x, y - cap / 2), string=s or " ")
 
 
-def navy_table(headers, rows, *, title=None, fit_buff=0.4):
+def navy_table(headers, rows, *, title=None, note=None, fit_buff=0.4):
     headers = [str(h) for h in headers]
     rows = [[str(v) for v in r] for r in rows]
     ncol = len(headers)
@@ -126,24 +129,30 @@ def navy_table(headers, rows, *, title=None, fit_buff=0.4):
     block = VGroup(stripes, header, *body)
 
     out = VGroup()
-    title_mob = None
-    top = config.frame_y_radius
+    title_mob = note_mob = None
+    top = config.frame_y_radius - fit_buff
+    bottom = -config.frame_y_radius + fit_buff
     if title is not None:
         lines = [title] if isinstance(title, str) else list(title)
         title_mob = VGroup(*[crisp_text(t, font_size=FONT_SIZE_LG, color=WHITE)
                              for t in lines]).arrange(DOWN, buff=TITLE_GAP)
         title_mob.to_edge(UP, buff=TITLE_BUFF)
         top = title_mob.get_bottom()[1] - BLOCK_GAP
-    bottom = -config.frame_y_radius + TITLE_BUFF
+    if note is not None:
+        note_mob = crisp_text(note, font_size=NOTE_SIZE, color=WHITE)
+        note_mob.to_edge(DOWN, buff=TITLE_BUFF)
+        bottom = note_mob.get_top()[1] + NOTE_GAP
+    # the TABLE alone shrinks to fit between the title and the note (never grows),
+    # so the title keeps its place at the top and the note at the bottom
+    max_w = config.frame_width - 2 * fit_buff
+    f = min(1.0, max_w / block.width, (top - bottom) / block.height)
+    block.scale(f)
     block.move_to([0, (top + bottom) / 2, 0])
-    if block.get_top()[1] > top:                 # never under the title
-        block.shift(DOWN * (block.get_top()[1] - top))
     out.add(block)
-    if title_mob is not None:
-        out.add(title_mob)
-    if fit_buff is not None:
-        fit_to_frame(out, buff=fit_buff)
+    for m in (title_mob, note_mob):
+        if m is not None:
+            out.add(m)
 
-    out.title, out.header, out.rows, out.cells, out.stripes = (
-        title_mob, header, body, cells, stripes)
+    out.title, out.note, out.header, out.rows, out.cells, out.stripes = (
+        title_mob, note_mob, header, body, cells, stripes)
     return out

@@ -234,6 +234,34 @@ def _build():
     return out
 
 
+ANSWER_FIELDS = {1: ["mystery"],
+                 2: ["pair_singletons_answers_top100000_top10000"],
+                 3: ["triple_singletons_answers_exhaustive_top10000"]}
+
+
+def best_opener(k, fields):
+    """The greedy winner at THIS k among `fields`' races, by the chart's rule: the
+    settled races compete on race mean (a race is settled when one opening is left or
+    its leader has RACE_MIN_GAMES), and with none settled the best unsettled leader
+    stands in. Its average misses come from its fixed-opener run at k when that has
+    finished (more games), else from the race. `unfinished` is True when the chosen
+    race still has more than one opening live. None if no race at k. For the bonus
+    video's opener tables; the chart itself is built by _build."""
+    settled, unsettled = [], []
+    for field in fields:
+        r = _race("greedy", k, field)
+        if r is not None:
+            (settled if r[4] == 1 or r[3] >= RACE_MIN_GAMES else unsettled).append(r)
+    pool = settled or unsettled
+    if not pool:
+        return None
+    r = min(pool, key=lambda r: r[1])
+    got = _sim(k, r[0], T_GREEDY, "")
+    mean = got[0] if got is not None else r[1]
+    return {"opening": r[0], "misses": round(mean - k, 4),
+            "source": "run" if got is not None else "race", "unfinished": r[4] > 1}
+
+
 def load():
     with open(CACHE) as f:
         return json.load(f)

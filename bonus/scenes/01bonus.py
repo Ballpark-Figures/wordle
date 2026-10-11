@@ -26,8 +26,8 @@ until built, so every letter is fixed from the start):
   k   ledge_pawns — LEDGE PAWNS ROCKY THUMB scored as FALSE/SALLE/SALVE all score it, the three words beside it (scene 15r's layout)
   l   pokecheese — browser: Pokecheese video, with '*I couldn't actually find his citation' at the bottom  [NOT BUILT]
   m   multiwordle — title card "Multiwordle"
-  n   multi_openers — table: best 1/2/3-word openers per number of wordles  [NOT BUILT]
-  o   multi_openers_answers — table: best 1/2/3-word openers per number of wordles, answers only  [NOT BUILT]
+  n   multi_openers — table: best 1/2/3-word opener + average misses per k, best of every race (scene 16's chart rule)
+  o   multi_openers_answers — the same, answers-only races
   p   more_color_groups — title card "More Color Groups"
   q   casework_tree — tree: the better-than-SLANT-PRICE casework strategy, SLANT PRICE tree style, with its expected guesses  [NOT BUILT]
   r   hard_mode — title card "Hard Mode"
@@ -233,15 +233,37 @@ class Bonus(WordleBoardScene):
     def multiwordle(self):
         self._title_card('Multiwordle')
 
-    # n : NOT BUILT — table: best 1/2/3-word openers per number of wordles
+    # n : table — the best 1/2/3-word opener and its average misses at each k, every race
     @still
     def multi_openers(self):
-        self._not_built('table: best 1/2/3-word openers per number of wordles')
+        from assets import multi_plot_data as mp
+        self._opener_table(mp.FIELDS, "Best Multiwordle Openers")
 
-    # o : NOT BUILT — table: best 1/2/3-word openers per number of wordles, answers only
+    def _opener_table(self, fields, title):
+        """Scene 16's chart rule (multi_plot_data.best_opener) at every k where the
+        1-, 2- and 3-word lines were all raced: each cell the winning opener and its
+        average misses, an unfinished race's leader marked *."""
+        from assets import multi_plot_data as mp
+        rows, marked = [], False
+        for k in mp.POWERS:
+            best = [mp.best_opener(k, fields[n]) for n in (1, 2, 3)]
+            if not all(best):
+                continue
+            row = [str(k)]
+            for b in best:
+                marked |= b["unfinished"]
+                row += [b["opening"].upper() + ("*" if b["unfinished"] else ""),
+                        f"{b['misses']:.2f}"]
+            rows.append(row)
+        self.add(navy_table(["Wordles", "1 Word", "Misses", "2 Words", "Misses",
+                             "3 Words", "Misses"], rows, title=title,
+                            note="*race still running: the leader so far" if marked else None))
+
+    # o : table — the same, every opener drawn from the 2315 answers
     @still
     def multi_openers_answers(self):
-        self._not_built('table: best 1/2/3-word openers per number of wordles, answers only')
+        from assets import multi_plot_data as mp
+        self._opener_table(mp.ANSWER_FIELDS, "Best Multiwordle Openers (Answers Only)")
 
     # p : title card
     @still
