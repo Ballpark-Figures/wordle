@@ -38,7 +38,7 @@ until built, so every letter is fixed from the start):
   w   greens_uncapped — the uncapped strategy's all-grey path and longest path, two columns
   x   wordle_in_one — title card "Wordle in One"
   y   wordle_in_one_page — Wordle in One in a browser window (scene 25b's)
-  z   in_one_table — table: Wordle in One games by colour combo, with a total, in 17's combo style without bars  [NOT BUILT]
+  z   in_one_table — Wordle in One games per colour combination (answers-only guesses) + total, scene 17's combo table, no bars
   za  hard_to_guess — title card "Hard-to-Guess Words"
   zb  adversarial — adversarial search results, hangman-table style in Wordle colours  [NOT BUILT]
   zc  changing_word_lists — title card "Changing Word Lists"
@@ -135,7 +135,23 @@ TREE_GAP = 0.4         # q: the grid's clearance under TRINE and above the avera
 GREENS_D6_TREE = DATA / "greens" / "trees_d6_k13000" / "booby.txt.gz"
 GREENS_UNCAPPED_TREE = DATA / "greens" / "trees_uncapped" / "booby.txt.gz"
 PATH_COL_GAP = 1.5     # w: between the two path columns
+IN_ONE_CSV = DATA / "singletons" / "wordle_in_one_breakdown.csv"   # guesses = the 2315 answers
+# z: scene 17's table of combinations, its values
+CC_TITLE_Y = 3.85      # 17's TITLE_Y
+CC_TOP_ROW_Y = 3.1     # 17's TOP_ROW_Y
+CC_ROW_TILE = 0.25     # 17's ROW_TILE
+CC_ROW_PITCH = 0.34    # 17's ROW_PITCH
+CC_GROUP_GAP = 0.16    # 17's GROUP_GAP, between gray-count groups
+CC_VAL_GAP = 0.6       # 17's VAL_GAP
+CC_BOTTOM = 0.3        # z: the total row's clearance above the frame's bottom
 BOARD_SIDE_X = 4.0     # scene 15's: how far left the board moves for a column of words beside it
+
+
+def _on_row(mob, text, x, y, size):
+    """Sit a label on its row by its text BASELINE, the row's visual middle (half the
+    cap height above the baseline) at y, so "2,106" and "465" share one line."""
+    cap = crisp_text("H", font_size=size).height
+    return place_on_baseline(mob, (x, y - cap / 2), string=text)
 
 
 def _tree_lines(path):
@@ -434,10 +450,51 @@ class Bonus(WordleBoardScene):
     def wordle_in_one_page(self):
         self._browser(*PAGE_IN_ONE)
 
-    # z : NOT BUILT — table: Wordle in One games by colour combo, with a total, in 17's combo style without bars
+    # z : Wordle in One games by colour combination (answers-only guesses), scene 17's
+    #     table of combinations without its bars, a total at the bottom
     @still
     def in_one_table(self):
-        self._not_built("table: Wordle in One games by colour combo, with a total, in 17's combo style without bars")
+        from assets import color_combos_data
+        from assets.colorings import GRID_BUFF, tile
+
+        def combo(g, y, b):                       # 17's `_combo`: no gap between colours
+            t = VGroup(*[tile(k, CC_ROW_TILE) for k in [2] * g + [1] * y + [0] * b])
+            return t.arrange(RIGHT, buff=CC_ROW_TILE * GRID_BUFF)
+
+        with open(IN_ONE_CSV) as f:
+            games = {(int(r["greens"]), int(r["yellows"]), int(r["grays"])): int(r["games_nowin"])
+                     for r in csv.DictReader(l for l in f if not l.startswith("#"))}
+        order = [tuple(int(ch) for ch in k) for k in color_combos_data.load()["rows"]]
+        # every combination with a game is a row (17's 19 leave out 4G1Y, impossible,
+        # and the all-green win, which is no puzzle)
+        assert {c for c, n in games.items() if n} <= set(order), games
+        title = crisp_text("Wordle in One Games", color=WHITE, font_size=FONT_SIZE_LG)
+        title.move_to([0, CC_TITLE_Y, 0])
+        combo_w = combo(5, 0, 0).width
+        col_w = crisp_text(f"{sum(games.values()):,}", font_size=FONT_SIZE_SM, weight=BOLD).width
+        left = -(combo_w + CC_VAL_GAP + col_w) / 2                  # 17's `_table_xs`
+        cx = left + combo_w + CC_VAL_GAP + col_w / 2
+        block = VGroup()
+        y = 0.0
+        for i, c in enumerate(order):
+            if i and c[2] != order[i - 1][2]:
+                y -= CC_GROUP_GAP                                   # 17's group gap
+            row = combo(*c)
+            row.shift([left - row.get_left()[0], y - row.get_y(), 0])
+            val = crisp_text(f"{games[c]:,}", color=WHITE, font_size=FONT_SIZE_SM)
+            block.add(row, _on_row(val, f"{games[c]:,}", cx, y, FONT_SIZE_SM))
+            y -= CC_ROW_PITCH
+        y -= CC_GROUP_GAP
+        label = crisp_text("Total", color=WHITE, font_size=FONT_SIZE_SM, weight=BOLD)
+        _on_row(label, "Total", left + combo_w / 2, y, FONT_SIZE_SM)
+        total = crisp_text(f"{sum(games.values()):,}", color=WHITE, font_size=FONT_SIZE_SM,
+                           weight=BOLD)
+        _on_row(total, f"{sum(games.values()):,}", cx, y, FONT_SIZE_SM)
+        block.add(label, total)
+        top, bottom = CC_TOP_ROW_Y + CC_ROW_TILE / 2, -config.frame_y_radius + CC_BOTTOM
+        block.scale(min(1.0, (top - bottom) / block.height), about_point=[0, block.get_top()[1], 0])
+        block.shift(UP * (top - block.get_top()[1]))
+        self.add(title, block)
 
     # za : title card
     @still
