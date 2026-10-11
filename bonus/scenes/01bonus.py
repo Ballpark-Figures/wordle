@@ -61,7 +61,7 @@ until built, so every letter is fixed from the start):
   zt  foximax_histogram — words per game over 1,000,000 simulated Foximax games, horizontal bars
   zu  nerdle — title card "Nerdle"
   zv  nerdle_page — Nerdle's classic game in a browser window
-  zw  nerdle_symbols — table: symbols with % of equations containing them  [NOT BUILT]
+  zw  nerdle_symbols — each symbol's share of the 17,723 answer equations containing it
   zx  nerdle_openers — 48-32=16, and below it the pair 47-11=36 and 2*029=58  [NOT BUILT]
   zy  bad_wordle — title card "Bad Wordle"
   zz  rasmussen — browser: Ellie Rasmussen's 'You should play Wordle wrong' video  [NOT BUILT]
@@ -843,10 +843,22 @@ class Bonus(WordleBoardScene):
     def nerdle_page(self):
         self._browser(*PAGE_NERDLE)
 
-    # zw : NOT BUILT — table: symbols with % of equations containing them
+    # zw : each Nerdle symbol and the share of answer equations containing it
+    #      (tools/nerdle_symbols.py's count, over the 17,723 answers)
     @still
     def nerdle_symbols(self):
-        self._not_built('table: symbols with % of equations containing them')
+        sys.path.insert(0, str(MATH))
+        sys.path.insert(0, str(MATH / "tools"))
+        from nerdle_symbols import counts, load_set
+        words = load_set("answers", 8)
+        _, has, _ = counts(words, 8)
+        n = len(words)
+        order = sorted(has, key=lambda c: (-has[c], c))
+        self.add(navy_table(
+            ["Symbol", "Equations Containing It"],
+            [[c, f"{100 * has[c] / n:.1f}%"] for c in order],
+            title="Nerdle Symbols",
+            note=f"Share of the {n:,} possible answers"))
 
     # zx : NOT BUILT — 48-32=16, and below it the pair 47-11=36 and 2*029=58
     @still

@@ -72,13 +72,9 @@ def load_set(which, width):
     return out
 
 
-def main(argv):
-    which, width = parse_args(argv)
-    words = load_set(which, width)
-    n = len(words)
-    if not n:
-        raise SystemExit("the %s set is empty at width %d" % (which, width))
-
+def counts(words, width=WIDTH):
+    """(occurrences, equations containing, per-position counts) for each symbol --
+    the three counts the report prints (the bonus video's symbol table reads it)."""
     occ = {c: 0 for c in SYMBOLS}
     has = {c: 0 for c in SYMBOLS}
     pos = {c: [0] * width for c in SYMBOLS}
@@ -88,6 +84,17 @@ def main(argv):
             pos[c][i] += 1
         for c in set(w):
             has[c] += 1
+    return occ, has, pos
+
+
+def main(argv):
+    which, width = parse_args(argv)
+    words = load_set(which, width)
+    n = len(words)
+    if not n:
+        raise SystemExit("the %s set is empty at width %d" % (which, width))
+
+    occ, has, pos = counts(words, width)
 
     print("nerdle symbol frequencies: set=%s width=%d, %d equations"
           % (which, width, n))
