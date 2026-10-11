@@ -14,6 +14,17 @@ Every number shown is READ from the pipeline's committed files, never typed in.
 BEAT MAP (one line per graphic, in order):
   smoke_table — plumbing test: top 5 openers from opener_totals.csv
   today_board — channel post: NEWER WORDY VIDEO HOURS AFTER scored against TODAY, TODAY unscored
+  title_mockup — title-card mockup
+
+EVERY bonus still is on BOARD_NAVY (user's call, 2026-10-10: the main video is
+almost all navy), hence the WordleBoardScene base.
+
+REUSE MAP
+  title card -> yahtzee/animations/scenes/00transitions.py `_card`: crisp_text BOLD,
+                built at TITLE_BASE_FS and scaled by TITLE_SCALE (so it never wraps),
+                centred. WHITE, not yahtzee's black, because it sits on navy: the
+                main video's titles on navy are white (08histogram.py's heading).
+                Static (@still), so no entrance.
 """
 import csv
 from pathlib import Path
@@ -26,8 +37,12 @@ from config import *
 MATH = Path(__file__).resolve().parents[2] / "math"
 DATA = Path(__file__).resolve().parents[2] / "math" / "data" / "shared"
 
+# title cards: yahtzee 00transitions' values, carried over verbatim
+TITLE_BASE_FS = 20     # built at this (under the crisp_text wrap threshold)...
+TITLE_SCALE = 3.0      # ...then scaled to its final size
 
-class Bonus(WordleScene):
+
+class Bonus(WordleBoardScene):
     def setup_scene(self):
         pass
 
@@ -56,3 +71,13 @@ class Bonus(WordleScene):
         rows.append(get_typed_row(answer))
         board = VGroup(*rows).arrange(DOWN, buff=GAP).scale(1.2).move_to(ORIGIN)
         self.add(board)
+
+    def _title_card(self, name):
+        """A title card: yahtzee 00transitions' `_card`, in white on the navy."""
+        return crisp_text(name, font_size=TITLE_BASE_FS, color=WHITE,
+                          weight="BOLD").scale(TITLE_SCALE).move_to(ORIGIN)
+
+    # c : title-card mockup
+    @still
+    def title_mockup(self):
+        self.add(self._title_card("Antiwordle"))
