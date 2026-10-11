@@ -69,17 +69,27 @@ def _sit(mob, s, x, y, size):
     return place_on_baseline(mob, (x, y - cap / 2), string=s or " ")
 
 
-def navy_table(headers, rows, *, title=None, note=None, fit_buff=0.4):
+def navy_table(headers, rows, *, title=None, note=None, fit_buff=0.4, region=None):
+    """`region=(x0, x1)` confines the table, its title and note to that strip of the
+    frame (centred in it, fitted to its width), so two tables can sit side by side;
+    the whole frame without one. A cell may be a Mobject (a tile row) instead of
+    text: it is centred on its column and its row's y, and never decimal-aligned."""
+    mobs = {(i, c): v for i, r in enumerate(rows) for c, v in enumerate(r)
+            if isinstance(v, Mobject)}
     headers = [str(h) for h in headers]
-    rows = [[str(v) for v in r] for r in rows]
+    rows = [["" if (i, c) in mobs else str(v) for c, v in enumerate(r)]
+            for i, r in enumerate(rows)]
     ncol = len(headers)
     for i, r in enumerate(rows):
         if len(r) != ncol:
             raise ValueError(f"row {i} has {len(r)} cells, want {ncol}: {r}")
 
     head = [_text(h, HEADER_SIZE, weight=BOLD) for h in headers]
-    cells = [[_text(v, CELL_SIZE) for v in r] for r in rows]
-    decimal = [bool(rows) and all(_DECIMAL.match(r[c]) for r in rows if r[c].strip())
+    cells = [[mobs.get((i, c)) or _text(v, CELL_SIZE) for c, v in enumerate(r)]
+             for i, r in enumerate(rows)]
+    is_mob = [any((i, c) in mobs for i in range(len(rows))) for c in range(ncol)]
+    decimal = [not is_mob[c] and bool(rows)
+               and all(_DECIMAL.match(r[c]) for r in rows if r[c].strip())
                and any(r[c].strip() for r in rows) for c in range(ncol)]
 
     def point_x(mob, s):
@@ -119,7 +129,10 @@ def navy_table(headers, rows, *, title=None, note=None, fit_buff=0.4):
                 cells[r][c].shift(RIGHT * (dot - point_x(cells[r][c], rows[r][c])))
         else:
             for r in range(len(rows)):
-                _sit(cells[r][c], rows[r][c], xs[c], row_ys[r], CELL_SIZE)
+                if (r, c) in mobs:
+                    cells[r][c].move_to([xs[c], row_ys[r], 0])
+                else:
+                    _sit(cells[r][c], rows[r][c], xs[c], row_ys[r], CELL_SIZE)
 
     header = VGroup(*head)
     body = [VGroup(*row) for row in cells]
@@ -144,10 +157,17 @@ def navy_table(headers, rows, *, title=None, note=None, fit_buff=0.4):
         bottom = note_mob.get_top()[1] + NOTE_GAP
     # the TABLE alone shrinks to fit between the title and the note (never grows),
     # so the title keeps its place at the top and the note at the bottom
-    max_w = config.frame_width - 2 * fit_buff
+    x0, x1 = region if region is not None else (-config.frame_x_radius, config.frame_x_radius)
+    cx = (x0 + x1) / 2
+    max_w = (x1 - x0) - 2 * fit_buff
+    for m in (title_mob, note_mob):
+        if m is not None:
+            if m.width > max_w:                  # a title / note wider than its strip
+                m.scale(max_w / m.width, about_edge=UP if m is title_mob else DOWN)
+            m.set_x(cx)
     f = min(1.0, max_w / block.width, (top - bottom) / block.height)
     block.scale(f)
-    block.move_to([0, (top + bottom) / 2, 0])
+    block.move_to([cx, (top + bottom) / 2, 0])
     out.add(block)
     for m in (title_mob, note_mob):
         if m is not None:

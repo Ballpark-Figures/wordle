@@ -40,7 +40,7 @@ until built, so every letter is fixed from the start):
   y   wordle_in_one_page — Wordle in One in a browser window (scene 25b's)
   z   in_one_table — Wordle in One games per colour combination (answers-only guesses) + total, scene 17's combo table, no bars
   za  hard_to_guess — title card "Hard-to-Guess Words"
-  zb  adversarial — adversarial search results, hangman-table style in Wordle colours  [NOT BUILT]
+  zb  adversarial — the adversarial search's top letter patterns and words, hangman's two tables in the Wordle look
   zc  changing_word_lists — title card "Changing Word Lists"
   zd  list_grid — 3x3 grid of best openers and averages, exact vs k marked, one cell Impossible  [NOT BUILT]
   ze  lingo — title card "Lingo"
@@ -144,6 +144,7 @@ CC_ROW_PITCH = 0.34    # 17's ROW_PITCH
 CC_GROUP_GAP = 0.16    # 17's GROUP_GAP, between gray-count groups
 CC_VAL_GAP = 0.6       # 17's VAL_GAP
 CC_BOTTOM = 0.3        # z: the total row's clearance above the frame's bottom
+TABLE_TILE_H = 0.5     # a tile row inside a table (row pitch 0.72)
 BOARD_SIDE_X = 4.0     # scene 15's: how far left the board moves for a column of words beside it
 
 
@@ -152,6 +153,25 @@ def _on_row(mob, text, x, y, size):
     cap height above the baseline) at y, so "2,106" and "465" share one line."""
     cap = crisp_text("H", font_size=size).height
     return place_on_baseline(mob, (x, y - cap / 2), string=text)
+
+
+def _tile_word(s):
+    """A word or a letter pattern ("F__FF") as one typed board row, `_` an untouched
+    tile, at TABLE_TILE_H tall: get_typed_row's look."""
+    from assets.board import TILE_FILLED_BORDER, STROKE, WordleBoard
+    row = WordleBoard(rows=1, cols=len(s))
+    for i, ch in enumerate(s.lower()):
+        if ch != "_":
+            tile = row.tiles[0][i]
+            tile.set_stroke(TILE_FILLED_BORDER, STROKE)
+            letter = row._letter(ch, tile)
+            row.letters[0][i] = letter
+            row.add(letter)
+    from assets.strategy_tree import stroke
+    row.scale(TABLE_TILE_H / row.height)
+    for t in row.tiles[0]:                          # 12's rule: borders thin with the tiles
+        t.set_stroke(width=stroke(row))
+    return row
 
 
 def _tree_lines(path):
@@ -501,10 +521,29 @@ class Bonus(WordleBoardScene):
     def hard_to_guess(self):
         self._title_card('Hard-to-Guess Words')
 
-    # zb : NOT BUILT — adversarial search results, hangman-table style in Wordle colours
+    # zb : the adversarial search's result as hangman's two tables (Common Letter
+    #      Patterns, Common Words), in the Wordle look: navy tables, tile rows
     @still
     def adversarial(self):
-        self._not_built('adversarial search results, hangman-table style in Wordle colours')
+        import math
+        from assets import adversarial_data
+        d = adversarial_data.load()
+
+        def sig2(x):                                     # hangman's `_sig2`
+            dp = 1 - math.floor(math.log10(abs(x)))
+            return f"{x:.{max(dp, 0)}f}"
+
+        pats = navy_table(["Pattern", "Multiplier"],
+                          [[_tile_word(p["pattern"]), f"{p['multiplier']:.1f}"]   # hangman's `_mult`
+                           for p in d["patterns"]],
+                          title="Common Letter Patterns", region=(-config.frame_x_radius, 0))
+        words = navy_table(["Word", "Frequency"],
+                           [[_tile_word(w["word"]), sig2(w["pct"]) + "%"] for w in d["words"]],
+                           title="Common Words", region=(0, config.frame_x_radius))
+        h = min(pats.title.height, words.title.height)   # side by side: one title size
+        for t in (pats.title, words.title):
+            t.scale(h / t.height, about_edge=UP)
+        self.add(pats, words)
 
     # zc : title card
     @still
