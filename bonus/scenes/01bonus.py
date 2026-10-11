@@ -48,7 +48,7 @@ until built, so every letter is fixed from the start):
   zg  lingo_table — Lingo 5-letter (answers only, 5 guesses): best opener per starting letter, two halves
   zh  lingo6_table — Lingo 6-letter (answers only, 5 guesses): best opener per starting letter, two halves
   zi  other_languages — title card "Other Languages"
-  zj  languages_table — table: best opener and average per language  [NOT BUILT]
+  zj  languages_table — best opener + average per language (answers only, k = 30)
   zk  mastermind_rules — title card "Mastermind Rules"
   zl  absurdle — title card "Absurdle"
   zm  absurdle_page — Absurdle in a browser window
@@ -176,6 +176,11 @@ PAGE_ABSURDLE = ("absurdle", "qntm.org/files/absurdle/absurdle.html", "Absurdle 
 PAGE_LETROSO = ("letroso", "letroso.com/en", "Letroso")
 PAGE_FOXIMAX = ("foximax", "foximax.com", "FoxiMax")
 PAGE_NERDLE = ("nerdle", "nerdlegame.com", "Nerdle - daily number puzzles, brain-teasers & math games")
+LANG_CSV = DATA / "langans" / "topk30_len5_ascii.csv"   # widest finished k (k50: header only)
+LANG_NAMES = {"ca": "Catalan", "cs": "Czech", "de": "German", "en": "English",
+              "es": "Spanish", "fi": "Finnish", "fr": "French", "it": "Italian",
+              "nb": "Norwegian", "nl": "Dutch", "pl": "Polish", "pt": "Portuguese",
+              "sv": "Swedish"}
 BOARD_SIDE_X = 4.0     # scene 15's: how far left the board moves for a column of words beside it
 
 
@@ -689,10 +694,17 @@ class Bonus(WordleBoardScene):
     def other_languages(self):
         self._title_card('Other Languages')
 
-    # zj : NOT BUILT — table: best opener and average per language
+    # zj : each language's best opener and average guesses, answers only (the
+    #      widest finished beam, k = 30, so an upper bound -- the note says so)
     @still
     def languages_table(self):
-        self._not_built('table: best opener and average per language')
+        rows = [r for r in csv.DictReader(open(LANG_CSV))]
+        self.add(navy_table(
+            ["Language", "Best Opener", "Average"],
+            [[LANG_NAMES[r["lang"]], r["opener"].upper(), f"{float(r['expected_guesses']):.2f}"]
+             for r in sorted(rows, key=lambda r: LANG_NAMES[r["lang"]])],
+            title="Best Openers by Language",
+            note="Answers only; best of the top 30 openers (k = 30), accents removed"))
 
     # zk : title card
     @still
