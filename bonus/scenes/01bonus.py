@@ -33,11 +33,11 @@ until built, so every letter is fixed from the start):
   r   hard_mode — title card "Hard Mode"
   s   part2 — title card "Part 2: Variants"
   t   sea_of_greens — title card "Sea of Greens"
-  u   sea_of_greens_page — browser: the Sea of Greens page from the main video  [NOT BUILT]
+  u   sea_of_greens_page — the Sea of Greens badge page in a browser window (scene 25a's)
   v   greens_all_grey — the all-grey path of the main Sea of Greens strategy  [NOT BUILT]
   w   greens_uncapped — the all-grey path and the longest path of the uncapped Sea of Greens strategy  [NOT BUILT]
   x   wordle_in_one — title card "Wordle in One"
-  y   wordle_in_one_page — browser: Wordle in One from the main video  [NOT BUILT]
+  y   wordle_in_one_page — Wordle in One in a browser window (scene 25b's)
   z   in_one_table — table: Wordle in One games by colour combo, with a total, in 17's combo style without bars  [NOT BUILT]
   za  hard_to_guess — title card "Hard-to-Guess Words"
   zb  adversarial — adversarial search results, hangman-table style in Wordle colours  [NOT BUILT]
@@ -110,6 +110,14 @@ TITLE_BASE_FS = 20     # built at this (under the crisp_text wrap threshold)...
 TITLE_SCALE = 3.0      # ...then scaled to its final size
 
 CHAIN_MARGIN = 0.4     # scene 03's COLUMN_MARGIN: space above and below the 16-row column
+WEB_MEDIA = Path(__file__).resolve().parents[2] / "animations" / "assets" / "web_media"
+WIN_W = 13.2           # scene 24/25's browser window width
+# (screenshot, address, the page's own tab title) -- scene 25's BADGE and IN_ONE
+PAGE_BADGE = ("sea_of_greens", "nytimes.com/games/wordle/2026-07-10",
+              "Friday, July 10, 2026 Wordle puzzle — The New York Times")
+PAGE_IN_ONE = ("wordle_in_one_puzzle",
+               "nytimes.com/games/bonus/wordle-in-one/standard/2026-10-07-8",
+               "Wednesday, October 7, 2026 Wordle in 1 — Bonus Puzzles — The New York Times")
 BOARD_SIDE_X = 4.0     # scene 15's: how far left the board moves for a column of words beside it
 
 
@@ -121,6 +129,13 @@ class Bonus(WordleBoardScene):
         """A title card: yahtzee 00transitions' `_card`, in white on the navy."""
         self.add(crisp_text(name, font_size=TITLE_BASE_FS, color=WHITE,
                             weight="BOLD").scale(TITLE_SCALE).move_to(ORIGIN))
+
+    def _browser(self, image, url, title):
+        """A page in a browser window, as scene 25 builds it: its width and aspect,
+        a screenshot from animations/assets/web_media/."""
+        from bpkfigures.browser import browser_window
+        self.add(browser_window(url, title, image=str(WEB_MEDIA / f"{image}.png"),
+                                width=WIN_W, aspect=9 / 16))
 
     def _not_built(self, what):
         raise NotImplementedError(f"bonus still not built yet: {what}")
@@ -253,10 +268,10 @@ class Bonus(WordleBoardScene):
     def sea_of_greens(self):
         self._title_card('Sea of Greens')
 
-    # u : NOT BUILT — browser: the Sea of Greens page from the main video
+    # u : the Sea of Greens badge page in a browser window, as scene 25a shows it
     @still
     def sea_of_greens_page(self):
-        self._not_built('browser: the Sea of Greens page from the main video')
+        self._browser(*PAGE_BADGE)
 
     # v : NOT BUILT — the all-grey path of the main Sea of Greens strategy
     @still
@@ -273,10 +288,10 @@ class Bonus(WordleBoardScene):
     def wordle_in_one(self):
         self._title_card('Wordle in One')
 
-    # y : NOT BUILT — browser: Wordle in One from the main video
+    # y : Wordle in One in a browser window, as scene 25b shows it
     @still
     def wordle_in_one_page(self):
-        self._not_built('browser: Wordle in One from the main video')
+        self._browser(*PAGE_IN_ONE)
 
     # z : NOT BUILT — table: Wordle in One games by colour combo, with a total, in 17's combo style without bars
     @still
