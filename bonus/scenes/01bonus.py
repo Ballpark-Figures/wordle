@@ -44,23 +44,23 @@ until built, so every letter is fixed from the start):
   zc  changing_word_lists — title card "Changing Word Lists"
   zd  list_grid — 3x3 grid, guess list x answer list: best opener, average, exact or k, one cell Impossible
   ze  lingo — title card "Lingo"
-  zf  lingo_page — browser: the Lingo Wikipedia page  [NOT BUILT]
+  zf  lingo_page — the Lingo (American game show) Wikipedia page in a browser window
   zg  lingo_table — table: best opener and average per starting letter, Lingo  [NOT BUILT]
   zh  lingo6_table — table: the same for 6-letter Lingo  [NOT BUILT]
   zi  other_languages — title card "Other Languages"
   zj  languages_table — table: best opener and average per language  [NOT BUILT]
   zk  mastermind_rules — title card "Mastermind Rules"
   zl  absurdle — title card "Absurdle"
-  zm  absurdle_page — browser: Absurdle  [NOT BUILT]
+  zm  absurdle_page — Absurdle in a browser window
   zn  absurdle_sequence — a winning 4-word Absurdle sequence with the options left at each step  [NOT BUILT]
   zo  letroso — title card "Letroso"
-  zp  letroso_page — browser: Letroso  [NOT BUILT]
+  zp  letroso_page — Letroso's home page in a browser window
   zq  letroso_table — table: top Letroso starters by average remaining options  [NOT BUILT]
   zr  foximax — title card "Foximax"
-  zs  foximax_page — browser: Foximax  [NOT BUILT]
+  zs  foximax_page — Foximax in a browser window
   zt  foximax_histogram — horizontal-bar histogram of word counts from the Foximax analysis  [NOT BUILT]
   zu  nerdle — title card "Nerdle"
-  zv  nerdle_page — browser: Nerdle  [NOT BUILT]
+  zv  nerdle_page — Nerdle's classic game in a browser window
   zw  nerdle_symbols — table: symbols with % of equations containing them  [NOT BUILT]
   zx  nerdle_openers — 48-32=16, and below it the pair 47-11=36 and 2*029=58  [NOT BUILT]
   zy  bad_wordle — title card "Bad Wordle"
@@ -170,6 +170,12 @@ GRID_HEAD_GAP = 0.35   # zd: the column heads above the top row
 GRID_LABEL_GAP = 0.3   # zd: the row labels left of the first column
 GRID_AXIS_GAP = 0.35   # zd: "Answer List" / "Guess List" beyond the heads / labels
 STRIPE_OVERHANG = 0.5  # 14's / 19's STRIPE_PAD
+# the live pages, captured by web_shots.py; addresses and tab titles read off them
+PAGE_LINGO = ("lingo_wiki", "en.wikipedia.org/wiki/Lingo_(American_game_show)", "Lingo (American game show) - Wikipedia")
+PAGE_ABSURDLE = ("absurdle", "qntm.org/files/absurdle/absurdle.html", "Absurdle @ Things Of Interest")
+PAGE_LETROSO = ("letroso", "letroso.com/en", "Letroso")
+PAGE_FOXIMAX = ("foximax", "foximax.com", "FoxiMax")
+PAGE_NERDLE = ("nerdle", "nerdlegame.com", "Nerdle - daily number puzzles, brain-teasers & math games")
 BOARD_SIDE_X = 4.0     # scene 15's: how far left the board moves for a column of words beside it
 
 
@@ -623,10 +629,10 @@ class Bonus(WordleBoardScene):
     def lingo(self):
         self._title_card('Lingo')
 
-    # zf : NOT BUILT — browser: the Lingo Wikipedia page
+    # zf : the Lingo (American game show) Wikipedia page in a browser window (assets/web_shots.py recipe)
     @still
     def lingo_page(self):
-        self._not_built('browser: the Lingo Wikipedia page')
+        self._browser(*PAGE_LINGO)
 
     # zg : NOT BUILT — table: best opener and average per starting letter, Lingo
     @still
@@ -658,10 +664,10 @@ class Bonus(WordleBoardScene):
     def absurdle(self):
         self._title_card('Absurdle')
 
-    # zm : NOT BUILT — browser: Absurdle
+    # zm : Absurdle in a browser window (assets/web_shots.py recipe)
     @still
     def absurdle_page(self):
-        self._not_built('browser: Absurdle')
+        self._browser(*PAGE_ABSURDLE)
 
     # zn : NOT BUILT — a winning 4-word Absurdle sequence with the options left at each step
     @still
@@ -673,10 +679,10 @@ class Bonus(WordleBoardScene):
     def letroso(self):
         self._title_card('Letroso')
 
-    # zp : NOT BUILT — browser: Letroso
+    # zp : Letroso's home page in a browser window (assets/web_shots.py recipe)
     @still
     def letroso_page(self):
-        self._not_built('browser: Letroso')
+        self._browser(*PAGE_LETROSO)
 
     # zq : NOT BUILT — table: top Letroso starters by average remaining options
     @still
@@ -688,10 +694,10 @@ class Bonus(WordleBoardScene):
     def foximax(self):
         self._title_card('Foximax')
 
-    # zs : NOT BUILT — browser: Foximax
+    # zs : Foximax in a browser window (assets/web_shots.py recipe)
     @still
     def foximax_page(self):
-        self._not_built('browser: Foximax')
+        self._browser(*PAGE_FOXIMAX)
 
     # zt : NOT BUILT — horizontal-bar histogram of word counts from the Foximax analysis
     @still
@@ -703,10 +709,10 @@ class Bonus(WordleBoardScene):
     def nerdle(self):
         self._title_card('Nerdle')
 
-    # zv : NOT BUILT — browser: Nerdle
+    # zv : Nerdle's classic game in a browser window (assets/web_shots.py recipe)
     @still
     def nerdle_page(self):
-        self._not_built('browser: Nerdle')
+        self._browser(*PAGE_NERDLE)
 
     # zw : NOT BUILT — table: symbols with % of equations containing them
     @still

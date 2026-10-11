@@ -136,6 +136,19 @@ GAMES = {
                       ("click", '[aria-label="Hard Mode"][role="switch"]'),
                       ("shot", "hard")],
                      {"zoom": ZOOM_80K}),
+    # the bonus video's variants, each as its site first shows it (light where the
+    # site has no dark mode; Wikipedia in its normal light scheme)
+    "lingo_wiki":   ("https://en.wikipedia.org/wiki/Lingo_(American_game_show)",
+                     [("hide", "#siteNotice")], LIGHT_80K),   # a campaign banner, hidden
+    "absurdle":     ("https://qntm.org/files/absurdle/absurdle.html", [], {"zoom": ZOOM_80K}),
+    # its home page (the daily game's card): the game page itself did not load in
+    # the headless browser (2026-10-11), with or without its how-to-play closed
+    "letroso":      ("https://letroso.com/en", [], {"zoom": ZOOM_80K}),
+    "foximax":      ("https://foximax.com/", [("text", "Close")], {"zoom": ZOOM_80K}),
+    "nerdle":       ("https://www.nerdlegame.com/", [("text", "play 8-digit classic"),
+                                                     ("text", "play now"),
+                                                     ("hide", ".triangle-new")],
+                     {"zoom": ZOOM_80K}),                     # the game, its hint bubble hidden
 }
 
 
@@ -197,6 +210,8 @@ def _run(game, url, steps, browser, full_page=False, view=VIEW, scheme="dark", z
             shots.append(path)
         for path in shots:
             print(f"  ok   {game:13s} {path.relative_to(OUT.parent.parent)}")
+        # the address and tab title a browser mock shows, read off the live page
+        print(f"       {'':13s} url {page.url}   title {page.title()!r}")
         return True
     except Exception as e:
         print(f"  FAIL {game:13s} {type(e).__name__}: {str(e).splitlines()[0]}")
