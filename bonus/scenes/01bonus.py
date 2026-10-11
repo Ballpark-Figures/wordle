@@ -34,8 +34,8 @@ until built, so every letter is fixed from the start):
   s   part2 — title card "Part 2: Variants"
   t   sea_of_greens — title card "Sea of Greens"
   u   sea_of_greens_page — the Sea of Greens badge page in a browser window (scene 25a's)
-  v   greens_all_grey — the all-grey path of the main Sea of Greens strategy  [NOT BUILT]
-  w   greens_uncapped — the all-grey path and the longest path of the uncapped Sea of Greens strategy  [NOT BUILT]
+  v   greens_all_grey — the may-lose 6-guess, full-width strategy's all-grey path (BOOBY), as a board
+  w   greens_uncapped — the uncapped strategy's all-grey path and longest path, two columns
   x   wordle_in_one — title card "Wordle in One"
   y   wordle_in_one_page — Wordle in One in a browser window (scene 25b's)
   z   in_one_table — table: Wordle in One games by colour combo, with a total, in 17's combo style without bars  [NOT BUILT]
@@ -132,7 +132,29 @@ TREE_COL_GAP = 0.45
 TREE_ROW_GAP = 0.45
 TREE_TOP = 0.45        # q: TRINE / the average from the frame's top / bottom
 TREE_GAP = 0.4         # q: the grid's clearance under TRINE and above the average
+GREENS_D6_TREE = DATA / "greens" / "trees_d6_k13000" / "booby.txt.gz"
+GREENS_UNCAPPED_TREE = DATA / "greens" / "trees_uncapped" / "booby.txt.gz"
+PATH_COL_GAP = 1.5     # w: between the two path columns
 BOARD_SIDE_X = 4.0     # scene 15's: how far left the board moves for a column of words beside it
+
+
+def _tree_lines(path):
+    import gzip
+    with gzip.open(path, "rt") as f:
+        return [l.strip() for l in f if l.strip()]
+
+
+def _all_grey_line(path):
+    """The tree line with the longest run of all-grey replies from the start (the
+    all-grey path: grey, grey, ... then whatever the line does next)."""
+    def run(l):
+        n = 0
+        for p in l.split()[3::2]:
+            if p != "bbbbb":
+                break
+            n += 1
+        return n
+    return max(_tree_lines(path), key=run)
 
 
 class Bonus(WordleBoardScene):
@@ -367,15 +389,40 @@ class Bonus(WordleBoardScene):
     def sea_of_greens_page(self):
         self._browser(*PAGE_BADGE)
 
-    # v : NOT BUILT — the all-grey path of the main Sea of Greens strategy
+    # v : the main Sea of Greens strategy's all-grey path (may-lose, 6 guesses, full
+    #     width: BOOBY, tied with BOOZY on 1176 badges, the one whose tree was kept)
     @still
     def greens_all_grey(self):
-        self._not_built('the all-grey path of the main Sea of Greens strategy')
+        from assets.board import GAP
+        line = _all_grey_line(GREENS_D6_TREE)
+        board = VGroup(*self._path_rows(line)).arrange(DOWN, buff=GAP).move_to(ORIGIN)
+        self.add(board)
 
-    # w : NOT BUILT — the all-grey path and the longest path of the uncapped Sea of Greens strategy
+    def _path_rows(self, line):
+        """A greens tree line -> its scored rows, the last (the answer) all green."""
+        from assets.board import get_scored_row
+        t = line.split()
+        words, pats = t[2::2], t[3::2]
+        code = lambda p: sum({"b": 0, "y": 1, "g": 2}[c] * 3 ** (4 - i) for i, c in enumerate(p))
+        assert words[-1] == t[0] and len(words) == int(t[1]) == len(pats) + 1, line
+        return [get_scored_row(w, code(p)) for w, p in zip(words, pats)] + \
+               [get_scored_row(words[-1], 242)]
+
+    # w : the uncapped Sea of Greens strategy (BOOBY): its all-grey path (19 guesses)
+    #     beside its longest path (22; four answers tie, PARRY the first in the tree)
     @still
     def greens_uncapped(self):
-        self._not_built('the all-grey path and the longest path of the uncapped Sea of Greens strategy')
+        from assets.board import GAP
+        lines = [l for l in _tree_lines(GREENS_UNCAPPED_TREE)]
+        longest = max(lines, key=lambda l: int(l.split()[1]))   # first of the ties
+        cols = [VGroup(*self._path_rows(l)).arrange(DOWN, buff=GAP)
+                for l in (_all_grey_line(GREENS_UNCAPPED_TREE), longest)]
+        h = config.frame_height - 2 * CHAIN_MARGIN          # 03's finished column
+        s = h / max(c.height for c in cols)
+        for c in cols:
+            c.scale(s)
+        VGroup(*cols).arrange(RIGHT, buff=PATH_COL_GAP, aligned_edge=UP).move_to(ORIGIN)
+        self.add(*cols)
 
     # x : title card
     @still
