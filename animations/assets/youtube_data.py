@@ -25,7 +25,8 @@ CACHE = Path(__file__).resolve().parent / "youtube_cache.json"
 _ANALYTICS = Path(__file__).resolve().parents[3] / "analytics"
 
 # tracked videos to cache: short scene key -> YouTube video id
-VIDEOS = {"hangman": "ApdLgfgfh5o"}   # Ballpark Figures — "I Tried to Solve Hangman"
+VIDEOS = {"hangman": "ApdLgfgfh5o",   # Ballpark Figures — "I Tried to Solve Hangman"
+          "rasmussen": "zoh5eLOjwHA"}  # Ellie Rasmussen — "You should play Wordle wrong" (bonus)
 OWN_CHANNEL = {"hangman"}           # keys whose channel is ours (use bpk_logo.png)
 
 
@@ -56,9 +57,10 @@ def _fmt_age(published):
     return "today"
 
 
-def build():
+def build(keys=None):
     """Query the analytics DB for each tracked video and write the cache. Needs DB
-    access (run with the analytics venv). Returns the written data."""
+    access (run with the analytics venv). `keys` limits the refresh to those
+    entries, every other cached entry kept as it was. Returns the written data."""
     if str(_ANALYTICS) not in sys.path:
         sys.path.insert(0, str(_ANALYTICS))
     import os
@@ -68,8 +70,10 @@ def build():
     conn = db.connect(os.environ["DATABASE_URL"])
     cur = conn.cursor()
     media = Path(__file__).resolve().parent / "youtube_media"
-    out = {}
+    out = json.loads(CACHE.read_text()) if keys and CACHE.exists() else {}
     for key, vid in VIDEOS.items():
+        if keys and key not in keys:
+            continue
         cur.execute(
             """
             select v.title, v.published_at, v.duration_seconds, c.title,
@@ -128,7 +132,7 @@ def get(key):
 
 
 if __name__ == "__main__":
-    data = build()
+    data = build(sys.argv[1:] or None)
     print(f"wrote {CACHE.name}: {len(data)} video(s)")
     for key, v in data.items():
         print(f"  {key}: {v['title']!r} | {v['channel']} | {v['meta']} | {v['duration']}")

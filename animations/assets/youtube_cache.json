@@ -13,5 +13,20 @@
   },
   "thumbnail": "youtube_media/hangman_thumb.png",
   "avatar": "youtube_media/bpk_logo.png"
+ },
+ "rasmussen": {
+  "video_id": "zoh5eLOjwHA",
+  "title": "You should play Wordle wrong",
+  "channel": "Ellie Rasmussen",
+  "duration": "16:14",
+  "meta": "189K views \u00b7 1 year ago",
+  "source": {
+   "view_count": 189445,
+   "published_at": "2025-08-29T00:02:46+00:00",
+   "duration_seconds": 974,
+   "sampled_at": "2026-10-11T04:55:08.666165+00:00"
+  },
+  "thumbnail": "youtube_media/rasmussen_thumb.png",
+  "avatar": "youtube_media/rasmussen_avatar.png"
  }
 }

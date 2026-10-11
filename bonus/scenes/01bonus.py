@@ -64,7 +64,7 @@ until built, so every letter is fixed from the start):
   zw  nerdle_symbols — each symbol's share of the 17,723 answer equations containing it
   zx  nerdle_openers — 48-32=16 above the pair 47-11=36, 2*029=58, typed tile rows
   zy  bad_wordle — title card "Bad Wordle"
-  zz  rasmussen — browser: Ellie Rasmussen's 'You should play Wordle wrong' video  [NOT BUILT]
+  zz  rasmussen — Ellie Rasmussen's video on YouTube's dark watch page (scene 09a's)
   zza vowelless — every legal guess with no AEIOUY, typed rows
   zzb eight_words — the 8-word no-shared-letter solution, typed rows (EXEEM or EXEME)
   zzc vowelless_triples — the 10 triples of the vowel-less words, letters shared within a triple in red
@@ -207,6 +207,7 @@ BW_OR_GAP = 0.35       # zzc: "or" between EXEEM and EXEME
 BW_TRI_H = 0.55        # zzd: a row in a triple
 BW_TRI_GAP = 0.08      # zzd: between a triple's rows
 BW_GRID_GAP = 0.6      # zzd: between triples
+FOOTNOTE_FS = 24       # a one-line footnote under a still (navy_table's NOTE_SIZE)
 BOARD_SIDE_X = 4.0     # scene 15's: how far left the board moves for a column of words beside it
 
 
@@ -327,6 +328,18 @@ class Bonus(WordleBoardScene):
         bottom = -config.frame_y_radius + 0.4
         pair.shift(UP * ((top + bottom) / 2 - pair.get_center()[1]))
         self.add(title, a, b)
+
+    def _youtube(self, key, note=None):
+        """A video on YouTube's dark watch page, as scene 09a builds it: title, channel,
+        views and age from assets/youtube_data's committed cache (the analytics DB);
+        thumbnail and avatar from assets/youtube_media."""
+        from bpkfigures.youtube_card import youtube_watch
+        from assets.youtube_data import get as yt_get
+        page = youtube_watch(**yt_get(key), dark=True)
+        self.add(page)
+        if note:
+            t = crisp_text(note, font_size=FOOTNOTE_FS, color=WHITE)
+            self.add(t.to_edge(DOWN, buff=0.3))
 
     def _not_built(self, what):
         raise NotImplementedError(f"bonus still not built yet: {what}")
@@ -909,10 +922,11 @@ class Bonus(WordleBoardScene):
     def bad_wordle(self):
         self._title_card('Bad Wordle')
 
-    # zz : NOT BUILT — browser: Ellie Rasmussen's 'You should play Wordle wrong' video
+    # zz : Ellie Rasmussen's "You should play Wordle wrong" on YouTube's dark watch
+    #      page, as scene 09a shows the Hangman video (stats: assets/youtube_data)
     @still
     def rasmussen(self):
-        self._not_built("browser: Ellie Rasmussen's 'You should play Wordle wrong' video")
+        self._youtube("rasmussen")
 
     # zza : every legal guess with no A, E, I, O, U or Y (tools/disjoint_words.py's rule),
     #       a column of typed rows
