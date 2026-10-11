@@ -42,7 +42,7 @@ until built, so every letter is fixed from the start):
   za  hard_to_guess — title card "Hard-to-Guess Words"
   zb  adversarial — the adversarial search's top letter patterns and words, hangman's two tables in the Wordle look
   zc  changing_word_lists — title card "Changing Word Lists"
-  zd  list_grid — 3x3 grid of best openers and averages, exact vs k marked, one cell Impossible  [NOT BUILT]
+  zd  list_grid — 3x3 grid, guess list x answer list: best opener, average, exact or k, one cell Impossible
   ze  lingo — title card "Lingo"
   zf  lingo_page — browser: the Lingo Wikipedia page  [NOT BUILT]
   zg  lingo_table — table: best opener and average per starting letter, Lingo  [NOT BUILT]
@@ -145,6 +145,31 @@ CC_GROUP_GAP = 0.16    # 17's GROUP_GAP, between gray-count groups
 CC_VAL_GAP = 0.6       # 17's VAL_GAP
 CC_BOTTOM = 0.3        # z: the total row's clearance above the frame's bottom
 TABLE_TILE_H = 0.5     # a tile row inside a table (row pitch 0.72)
+# zd: (guess list, answer list) -> (file, how it was found); 0 Answers, 1 Guesses,
+# 2 All Letter Combos. The widest beam with a result in each cell; None = Impossible
+# (no run: answer words as guesses cannot reach every string).
+GRID_CELLS = {
+    (0, 0): ("ansturns/opener_totals.csv", "Exact"),
+    (1, 0): ("optturns/opener_totals.csv", "Exact"),
+    (2, 0): ("strguess/opener_totals_mystery_d6_k100.csv", "k = 100"),
+    (0, 1): ("ansall/optimal_d7_k100.csv", "k = 100"),
+    (1, 1): ("allwords/opener_totals_k1.csv", "k = 1"),
+    (2, 1): ("strguess/opener_totals_guess_d7_k20.csv", "k = 20"),
+    (0, 2): None,
+    (1, 2): ("strturns/opener_totals_d9-30_k1_cls.csv", "k = 1"),
+    (2, 2): ("strsts/opener_totals_d30_k1_sn512.csv", "k = 1"),
+}
+HEADER_SIZE = 28       # the video's table heads (scene 10's)
+GRID_VAL_FS = 30       # zd: a cell's average (scene 10's CELL_SIZE)
+GRID_NOTE_FS = 22      # zd: "Exact" / "k = 100" under it (no precedent)
+GRID_COL_W = 3.6       # zd: column pitch
+GRID_ROW_H = 2.0       # zd: row pitch (a cell: tiles, average, note)
+GRID_X, GRID_Y = 1.6, -0.4   # zd: the middle cell's centre
+GRID_INNER = 0.12      # zd: between a cell's three lines
+GRID_HEAD_GAP = 0.35   # zd: the column heads above the top row
+GRID_LABEL_GAP = 0.3   # zd: the row labels left of the first column
+GRID_AXIS_GAP = 0.35   # zd: "Answer List" / "Guess List" beyond the heads / labels
+STRIPE_OVERHANG = 0.5  # 14's / 19's STRIPE_PAD
 BOARD_SIDE_X = 4.0     # scene 15's: how far left the board moves for a column of words beside it
 
 
@@ -550,10 +575,48 @@ class Bonus(WordleBoardScene):
     def changing_word_lists(self):
         self._title_card('Changing Word Lists')
 
-    # zd : NOT BUILT — 3x3 grid of best openers and averages, exact vs k marked, one cell Impossible
+    # zd : the 3 x 3 grid -- guess list (rows) x answer list (columns), each of the
+    #      2315 answers, the 12972 legal words, all 26^5 letter strings -- with each
+    #      cell's best opener, its average guesses, and whether it is exact or a beam
     @still
     def list_grid(self):
-        self._not_built('3x3 grid of best openers and averages, exact vs k marked, one cell Impossible')
+        from bpkfigures.table import row_stripes
+        names = ["Answers", "Guesses", "All Letter Combos"]
+        cells = {}
+        for (g, a), spec in GRID_CELLS.items():
+            if spec is None:
+                cells[g, a] = VGroup(crisp_text("Impossible", font_size=GRID_VAL_FS, color=WHITE))
+                continue
+            path, how = spec
+            rows = [r for r in csv.DictReader(l for l in open(DATA / path) if not l.startswith("#"))
+                    if r["expected"] and r.get("unsolved", "0") in ("", "0")]
+            best = min(rows, key=lambda r: float(r["expected"]))
+            cells[g, a] = VGroup(_tile_word(best["word"]),
+                                 crisp_text(f"{float(best['expected']):.2f}", font_size=GRID_VAL_FS,
+                                            color=WHITE),
+                                 crisp_text(how, font_size=GRID_NOTE_FS, color=WHITE)
+                                 ).arrange(DOWN, buff=GRID_INNER)
+        xs = [(c - 1) * GRID_COL_W + GRID_X for c in range(3)]
+        ys = [(1 - r) * GRID_ROW_H + GRID_Y for r in range(3)]
+        for (g, a), m in cells.items():
+            m.move_to([xs[a], ys[g], 0])
+        heads = VGroup(*[crisp_text(n, font_size=HEADER_SIZE, color=WHITE, weight=BOLD)
+                         .move_to([xs[c], ys[0] + GRID_ROW_H / 2 + GRID_HEAD_GAP, 0])
+                         for c, n in enumerate(names)])
+        labels = VGroup(*[crisp_text(n, font_size=HEADER_SIZE, color=WHITE, weight=BOLD)
+                          for n in names])
+        for r, lab in enumerate(labels):
+            lab.move_to([0, ys[r], 0]).align_to([xs[0] - GRID_COL_W / 2 - GRID_LABEL_GAP, 0, 0], RIGHT)
+        left = labels.get_left()[0] - STRIPE_OVERHANG
+        right = xs[2] + GRID_COL_W / 2
+        stripes = row_stripes(ys, left, right, GRID_ROW_H)
+        across = crisp_text("Answer List", font_size=FONT_SIZE_MD, color=WHITE)
+        across.next_to(heads, UP, buff=GRID_AXIS_GAP)
+        down = crisp_text("Guess List", font_size=FONT_SIZE_MD, color=WHITE).rotate(PI / 2)
+        down.next_to(labels, LEFT, buff=GRID_AXIS_GAP)
+        grid = VGroup(stripes, heads, labels, across, down, *cells.values())
+        fit_to_frame(grid.move_to(ORIGIN), buff=0.35)
+        self.add(grid)
 
     # ze : title card
     @still
