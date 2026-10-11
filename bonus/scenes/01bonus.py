@@ -55,7 +55,7 @@ until built, so every letter is fixed from the start):
   zn  absurdle_sequence — the 4-guess Absurdle win as a board, options left beside each row
   zo  letroso — title card "Letroso"
   zp  letroso_page — Letroso's home page in a browser window
-  zq  letroso_table — table: top Letroso starters by average remaining options  [NOT BUILT]
+  zq  letroso_table — top 10 Letroso first guesses by average options left
   zr  foximax — title card "Foximax"
   zs  foximax_page — Foximax in a browser window
   zt  foximax_histogram — horizontal-bar histogram of word counts from the Foximax analysis  [NOT BUILT]
@@ -186,6 +186,9 @@ ABSURDLE_TXT = DATA / "absurdle" / "one_shortest_solution.txt"
 ABS_COUNT_FS = 48      # zn: the options-left numbers beside the board's rows
 ABS_COUNT_GAP = 1.0    # zn: board to the numbers
 ABS_HEAD_GAP = 0.45    # zn: "Options Left" above the board's top
+# zq: fingerprint fa3d3ea0526042a0 == the current lists (checked 2026-10-11)
+LETROSO_RANK = DATA / "letroso" / "root_rank_lengths.csv.gz"
+LETROSO_TOP = 10
 BOARD_SIDE_X = 4.0     # scene 15's: how far left the board moves for a column of words beside it
 
 
@@ -768,10 +771,22 @@ class Bonus(WordleBoardScene):
     def letroso_page(self):
         self._browser(*PAGE_LETROSO)
 
-    # zq : NOT BUILT — table: top Letroso starters by average remaining options
+    # zq : Letroso's top 10 first guesses by the average number of answers still
+    #      possible after them (the cached root ranking; each answer length weighted
+    #      equally -- the note says so)
     @still
     def letroso_table(self):
-        self._not_built('table: top Letroso starters by average remaining options')
+        import gzip
+        with gzip.open(LETROSO_RANK, "rt") as f:
+            head = [l for l in f if l.startswith("#")]
+        with gzip.open(LETROSO_RANK, "rt") as f:
+            rows = list(csv.DictReader(l for l in f if not l.startswith("#")))[:LETROSO_TOP]
+        assert any("prior=lengths" in l for l in head), head
+        self.add(navy_table(
+            ["Rank", "First Guess", "Options Left"],
+            [[r["rank"], r["guess"].upper(), f"{float(r['score']):.1f}"] for r in rows],
+            title="Best Letroso Starters",
+            note="Average answers still possible after the first guess (every word length equally likely)"))
 
     # zr : title card
     @still
