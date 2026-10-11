@@ -11,10 +11,66 @@ copy already on the timeline. The main video's edit_clips/ and bins are untouche
 
 Every number shown is READ from the pipeline's committed files, never typed in.
 
-BEAT MAP (one line per graphic, in order):
-  smoke_table — plumbing test: top 5 openers from opener_totals.csv
-  today_board — channel post: NEWER WORDY VIDEO HOURS AFTER scored against TODAY, TODAY unscored
-  title_mockup — title-card mockup
+BEAT MAP (one line per graphic, in the video's order; [NOT BUILT] slots raise
+until built, so every letter is fixed from the start):
+  a   part1 — title card "Part 1: Wordle"
+  b   antiwordle — title card "Antiwordle"
+  c   antiwordle_table — table of the 16 words from the antiwordle sequence  [NOT BUILT]
+  d   color_groups — title card "Color Groups"
+  e   optimal_strategy — title card "The Optimal Strategy"
+  f   word_list_changes — title card "Word List Changes"
+  g   alphabet_tier_list — title card "Alphabet Tier List"
+  h   vowels — title card "Vowels"
+  i   speedrunning — title card "Speedrunning"
+  j   multi_word_openers — title card "Multi-Word Openers"
+  k   ledge_pawns — LEDGE PAWNS ROCKY THUMB scored for FALSE/SALLE/SALVE, left; the three words on the right in scene 06's RUPEE/PURER style  [NOT BUILT]
+  l   pokecheese — browser: Pokecheese video, with '*I couldn't actually find his citation' at the bottom  [NOT BUILT]
+  m   multiwordle — title card "Multiwordle"
+  n   multi_openers — table: best 1/2/3-word openers per number of wordles  [NOT BUILT]
+  o   multi_openers_answers — table: best 1/2/3-word openers per number of wordles, answers only  [NOT BUILT]
+  p   more_color_groups — title card "More Color Groups"
+  q   casework_tree — tree: the better-than-SLANT-PRICE casework strategy, SLANT PRICE tree style, with its expected guesses  [NOT BUILT]
+  r   hard_mode — title card "Hard Mode"
+  s   part2 — title card "Part 2: Variants"
+  t   sea_of_greens — title card "Sea of Greens"
+  u   sea_of_greens_page — browser: the Sea of Greens page from the main video  [NOT BUILT]
+  v   greens_all_grey — the all-grey path of the main Sea of Greens strategy  [NOT BUILT]
+  w   greens_uncapped — the all-grey path and the longest path of the uncapped Sea of Greens strategy  [NOT BUILT]
+  x   wordle_in_one — title card "Wordle in One"
+  y   wordle_in_one_page — browser: Wordle in One from the main video  [NOT BUILT]
+  z   in_one_table — table: Wordle in One games by colour combo, with a total, in 17's combo style without bars  [NOT BUILT]
+  za  hard_to_guess — title card "Hard-to-Guess Words"
+  zb  adversarial — adversarial search results, hangman-table style in Wordle colours  [NOT BUILT]
+  zc  changing_word_lists — title card "Changing Word Lists"
+  zd  list_grid — 3x3 grid of best openers and averages, exact vs k marked, one cell Impossible  [NOT BUILT]
+  ze  lingo — title card "Lingo"
+  zf  lingo_page — browser: the Lingo Wikipedia page  [NOT BUILT]
+  zg  lingo_table — table: best opener and average per starting letter, Lingo  [NOT BUILT]
+  zh  lingo6_table — table: the same for 6-letter Lingo  [NOT BUILT]
+  zi  other_languages — title card "Other Languages"
+  zj  languages_table — table: best opener and average per language  [NOT BUILT]
+  zk  mastermind_rules — title card "Mastermind Rules"
+  zl  absurdle — title card "Absurdle"
+  zm  absurdle_page — browser: Absurdle  [NOT BUILT]
+  zn  absurdle_sequence — a winning 4-word Absurdle sequence with the options left at each step  [NOT BUILT]
+  zo  letroso — title card "Letroso"
+  zp  letroso_page — browser: Letroso  [NOT BUILT]
+  zq  letroso_table — table: top Letroso starters by average remaining options  [NOT BUILT]
+  zr  foximax — title card "Foximax"
+  zs  foximax_page — browser: Foximax  [NOT BUILT]
+  zt  foximax_histogram — horizontal-bar histogram of word counts from the Foximax analysis  [NOT BUILT]
+  zu  nerdle — title card "Nerdle"
+  zv  nerdle_page — browser: Nerdle  [NOT BUILT]
+  zw  nerdle_symbols — table: symbols with % of equations containing them  [NOT BUILT]
+  zx  nerdle_openers — 48-32=16, and below it the pair 47-11=36 and 2*029=58  [NOT BUILT]
+  zy  bad_wordle — title card "Bad Wordle"
+  zz  rasmussen — browser: Ellie Rasmussen's 'You should play Wordle wrong' video  [NOT BUILT]
+  zza vowelless — list of every word with no A, E, I, O, U or Y  [NOT BUILT]
+  zzb eight_words — our 8-word solution with no letters in common  [NOT BUILT]
+  zzc vowelless_triples — all 10 triples of the 5 vowel-less words, shared letters in red  [NOT BUILT]
+  zzd answers_from_combos — title card "Answers from Color Combos"
+  zze conclusion — title card "Conclusion"
+  zzf today_board — channel post, not in the video: NEWER WORDY VIDEO HOURS AFTER scored against TODAY, TODAY unscored
 
 EVERY bonus still is on BOARD_NAVY (user's call, 2026-10-10: the main video is
 almost all navy), hence the WordleBoardScene base.
@@ -56,18 +112,300 @@ class Bonus(WordleBoardScene):
     def setup_scene(self):
         pass
 
-    # a : plumbing test — top 5 openers by total guesses
-    @still
-    def smoke_table(self):
-        with open(DATA / "optturns" / "opener_totals.csv") as f:
-            rows = sorted((r for r in csv.DictReader(f) if r["total"]),
-                          key=lambda r: (int(r["total"]), r["word"]))[:5]
-        self.add(navy_table(
-            ["Opener", "Total Guesses", "Average"],
-            [[r["word"].upper(), f"{int(r['total']):,}", r["expected"]] for r in rows],
-            title="Best Openers"))
+    def _title_card(self, name):
+        """A title card: yahtzee 00transitions' `_card`, in white on the navy."""
+        self.add(crisp_text(name, font_size=TITLE_BASE_FS, color=WHITE,
+                            weight="BOLD").scale(TITLE_SCALE).move_to(ORIGIN))
 
-    # b : channel post — five guesses scored against TODAY, then TODAY typed, unscored
+    def _not_built(self, what):
+        raise NotImplementedError(f"bonus still not built yet: {what}")
+
+    # a : title card
+    @still
+    def part1(self):
+        self._title_card('Part 1: Wordle')
+
+    # b : title card
+    @still
+    def antiwordle(self):
+        self._title_card('Antiwordle')
+
+    # c : NOT BUILT — table of the 16 words from the antiwordle sequence
+    @still
+    def antiwordle_table(self):
+        self._not_built('table of the 16 words from the antiwordle sequence')
+
+    # d : title card
+    @still
+    def color_groups(self):
+        self._title_card('Color Groups')
+
+    # e : title card
+    @still
+    def optimal_strategy(self):
+        self._title_card('The Optimal Strategy')
+
+    # f : title card
+    @still
+    def word_list_changes(self):
+        self._title_card('Word List Changes')
+
+    # g : title card
+    @still
+    def alphabet_tier_list(self):
+        self._title_card('Alphabet Tier List')
+
+    # h : title card
+    @still
+    def vowels(self):
+        self._title_card('Vowels')
+
+    # i : title card
+    @still
+    def speedrunning(self):
+        self._title_card('Speedrunning')
+
+    # j : title card
+    @still
+    def multi_word_openers(self):
+        self._title_card('Multi-Word Openers')
+
+    # k : NOT BUILT — LEDGE PAWNS ROCKY THUMB scored for FALSE/SALLE/SALVE, left; the three words on the right in scene 06's RUPEE/PURER style
+    @still
+    def ledge_pawns(self):
+        self._not_built("LEDGE PAWNS ROCKY THUMB scored for FALSE/SALLE/SALVE, left; the three words on the right in scene 06's RUPEE/PURER style")
+
+    # l : NOT BUILT — browser: Pokecheese video, with '*I couldn't actually find his citation' at the bottom
+    @still
+    def pokecheese(self):
+        self._not_built("browser: Pokecheese video, with '*I couldn't actually find his citation' at the bottom")
+
+    # m : title card
+    @still
+    def multiwordle(self):
+        self._title_card('Multiwordle')
+
+    # n : NOT BUILT — table: best 1/2/3-word openers per number of wordles
+    @still
+    def multi_openers(self):
+        self._not_built('table: best 1/2/3-word openers per number of wordles')
+
+    # o : NOT BUILT — table: best 1/2/3-word openers per number of wordles, answers only
+    @still
+    def multi_openers_answers(self):
+        self._not_built('table: best 1/2/3-word openers per number of wordles, answers only')
+
+    # p : title card
+    @still
+    def more_color_groups(self):
+        self._title_card('More Color Groups')
+
+    # q : NOT BUILT — tree: the better-than-SLANT-PRICE casework strategy, SLANT PRICE tree style, with its expected guesses
+    @still
+    def casework_tree(self):
+        self._not_built('tree: the better-than-SLANT-PRICE casework strategy, SLANT PRICE tree style, with its expected guesses')
+
+    # r : title card
+    @still
+    def hard_mode(self):
+        self._title_card('Hard Mode')
+
+    # s : title card
+    @still
+    def part2(self):
+        self._title_card('Part 2: Variants')
+
+    # t : title card
+    @still
+    def sea_of_greens(self):
+        self._title_card('Sea of Greens')
+
+    # u : NOT BUILT — browser: the Sea of Greens page from the main video
+    @still
+    def sea_of_greens_page(self):
+        self._not_built('browser: the Sea of Greens page from the main video')
+
+    # v : NOT BUILT — the all-grey path of the main Sea of Greens strategy
+    @still
+    def greens_all_grey(self):
+        self._not_built('the all-grey path of the main Sea of Greens strategy')
+
+    # w : NOT BUILT — the all-grey path and the longest path of the uncapped Sea of Greens strategy
+    @still
+    def greens_uncapped(self):
+        self._not_built('the all-grey path and the longest path of the uncapped Sea of Greens strategy')
+
+    # x : title card
+    @still
+    def wordle_in_one(self):
+        self._title_card('Wordle in One')
+
+    # y : NOT BUILT — browser: Wordle in One from the main video
+    @still
+    def wordle_in_one_page(self):
+        self._not_built('browser: Wordle in One from the main video')
+
+    # z : NOT BUILT — table: Wordle in One games by colour combo, with a total, in 17's combo style without bars
+    @still
+    def in_one_table(self):
+        self._not_built("table: Wordle in One games by colour combo, with a total, in 17's combo style without bars")
+
+    # za : title card
+    @still
+    def hard_to_guess(self):
+        self._title_card('Hard-to-Guess Words')
+
+    # zb : NOT BUILT — adversarial search results, hangman-table style in Wordle colours
+    @still
+    def adversarial(self):
+        self._not_built('adversarial search results, hangman-table style in Wordle colours')
+
+    # zc : title card
+    @still
+    def changing_word_lists(self):
+        self._title_card('Changing Word Lists')
+
+    # zd : NOT BUILT — 3x3 grid of best openers and averages, exact vs k marked, one cell Impossible
+    @still
+    def list_grid(self):
+        self._not_built('3x3 grid of best openers and averages, exact vs k marked, one cell Impossible')
+
+    # ze : title card
+    @still
+    def lingo(self):
+        self._title_card('Lingo')
+
+    # zf : NOT BUILT — browser: the Lingo Wikipedia page
+    @still
+    def lingo_page(self):
+        self._not_built('browser: the Lingo Wikipedia page')
+
+    # zg : NOT BUILT — table: best opener and average per starting letter, Lingo
+    @still
+    def lingo_table(self):
+        self._not_built('table: best opener and average per starting letter, Lingo')
+
+    # zh : NOT BUILT — table: the same for 6-letter Lingo
+    @still
+    def lingo6_table(self):
+        self._not_built('table: the same for 6-letter Lingo')
+
+    # zi : title card
+    @still
+    def other_languages(self):
+        self._title_card('Other Languages')
+
+    # zj : NOT BUILT — table: best opener and average per language
+    @still
+    def languages_table(self):
+        self._not_built('table: best opener and average per language')
+
+    # zk : title card
+    @still
+    def mastermind_rules(self):
+        self._title_card('Mastermind Rules')
+
+    # zl : title card
+    @still
+    def absurdle(self):
+        self._title_card('Absurdle')
+
+    # zm : NOT BUILT — browser: Absurdle
+    @still
+    def absurdle_page(self):
+        self._not_built('browser: Absurdle')
+
+    # zn : NOT BUILT — a winning 4-word Absurdle sequence with the options left at each step
+    @still
+    def absurdle_sequence(self):
+        self._not_built('a winning 4-word Absurdle sequence with the options left at each step')
+
+    # zo : title card
+    @still
+    def letroso(self):
+        self._title_card('Letroso')
+
+    # zp : NOT BUILT — browser: Letroso
+    @still
+    def letroso_page(self):
+        self._not_built('browser: Letroso')
+
+    # zq : NOT BUILT — table: top Letroso starters by average remaining options
+    @still
+    def letroso_table(self):
+        self._not_built('table: top Letroso starters by average remaining options')
+
+    # zr : title card
+    @still
+    def foximax(self):
+        self._title_card('Foximax')
+
+    # zs : NOT BUILT — browser: Foximax
+    @still
+    def foximax_page(self):
+        self._not_built('browser: Foximax')
+
+    # zt : NOT BUILT — horizontal-bar histogram of word counts from the Foximax analysis
+    @still
+    def foximax_histogram(self):
+        self._not_built('horizontal-bar histogram of word counts from the Foximax analysis')
+
+    # zu : title card
+    @still
+    def nerdle(self):
+        self._title_card('Nerdle')
+
+    # zv : NOT BUILT — browser: Nerdle
+    @still
+    def nerdle_page(self):
+        self._not_built('browser: Nerdle')
+
+    # zw : NOT BUILT — table: symbols with % of equations containing them
+    @still
+    def nerdle_symbols(self):
+        self._not_built('table: symbols with % of equations containing them')
+
+    # zx : NOT BUILT — 48-32=16, and below it the pair 47-11=36 and 2*029=58
+    @still
+    def nerdle_openers(self):
+        self._not_built('48-32=16, and below it the pair 47-11=36 and 2*029=58')
+
+    # zy : title card
+    @still
+    def bad_wordle(self):
+        self._title_card('Bad Wordle')
+
+    # zz : NOT BUILT — browser: Ellie Rasmussen's 'You should play Wordle wrong' video
+    @still
+    def rasmussen(self):
+        self._not_built("browser: Ellie Rasmussen's 'You should play Wordle wrong' video")
+
+    # zza : NOT BUILT — list of every word with no A, E, I, O, U or Y
+    @still
+    def vowelless(self):
+        self._not_built('list of every word with no A, E, I, O, U or Y')
+
+    # zzb : NOT BUILT — our 8-word solution with no letters in common
+    @still
+    def eight_words(self):
+        self._not_built('our 8-word solution with no letters in common')
+
+    # zzc : NOT BUILT — all 10 triples of the 5 vowel-less words, shared letters in red
+    @still
+    def vowelless_triples(self):
+        self._not_built('all 10 triples of the 5 vowel-less words, shared letters in red')
+
+    # zzd : title card
+    @still
+    def answers_from_combos(self):
+        self._title_card('Answers from Color Combos')
+
+    # zze : title card
+    @still
+    def conclusion(self):
+        self._title_card('Conclusion')
+
+    # zzf : channel post (not in the video) — five guesses scored against TODAY, then TODAY typed, unscored
     @still
     def today_board(self):
         sys.path.insert(0, str(MATH))
@@ -81,13 +419,3 @@ class Bonus(WordleBoardScene):
         rows.append(get_typed_row(answer))
         board = VGroup(*rows).arrange(DOWN, buff=GAP).scale(1.2).move_to(ORIGIN)
         self.add(board)
-
-    def _title_card(self, name):
-        """A title card: yahtzee 00transitions' `_card`, in white on the navy."""
-        return crisp_text(name, font_size=TITLE_BASE_FS, color=WHITE,
-                          weight="BOLD").scale(TITLE_SCALE).move_to(ORIGIN)
-
-    # c : title-card mockup
-    @still
-    def title_mockup(self):
-        self.add(self._title_card("Antiwordle"))
