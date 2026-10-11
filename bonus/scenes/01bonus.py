@@ -23,7 +23,7 @@ until built, so every letter is fixed from the start):
   h   vowels — title card "Vowels"
   i   speedrunning — title card "Speedrunning"
   j   multi_word_openers — title card "Multi-Word Openers"
-  k   ledge_pawns — LEDGE PAWNS ROCKY THUMB scored for FALSE/SALLE/SALVE, left; the three words on the right in scene 06's RUPEE/PURER style  [NOT BUILT]
+  k   ledge_pawns — LEDGE PAWNS ROCKY THUMB scored as FALSE/SALLE/SALVE all score it, the three words beside it (scene 15r's layout)
   l   pokecheese — browser: Pokecheese video, with '*I couldn't actually find his citation' at the bottom  [NOT BUILT]
   m   multiwordle — title card "Multiwordle"
   n   multi_openers — table: best 1/2/3-word openers per number of wordles  [NOT BUILT]
@@ -110,6 +110,7 @@ TITLE_BASE_FS = 20     # built at this (under the crisp_text wrap threshold)...
 TITLE_SCALE = 3.0      # ...then scaled to its final size
 
 CHAIN_MARGIN = 0.4     # scene 03's COLUMN_MARGIN: space above and below the 16-row column
+BOARD_SIDE_X = 4.0     # scene 15's: how far left the board moves for a column of words beside it
 
 
 class Bonus(WordleBoardScene):
@@ -182,10 +183,30 @@ class Bonus(WordleBoardScene):
     def multi_word_openers(self):
         self._title_card('Multi-Word Openers')
 
-    # k : NOT BUILT — LEDGE PAWNS ROCKY THUMB scored for FALSE/SALLE/SALVE, left; the three words on the right in scene 06's RUPEE/PURER style
+    # k : LEDGE PAWNS ROCKY THUMB scored in the colouring FALSE, SALLE and SALVE all
+    #     give, on the left; the three words typed on the right — scene 15r's layout
     @still
     def ledge_pawns(self):
-        self._not_built("LEDGE PAWNS ROCKY THUMB scored for FALSE/SALLE/SALVE, left; the three words on the right in scene 06's RUPEE/PURER style")
+        sys.path.insert(0, str(MATH))
+        from wordle import pattern
+        from assets.board import GAP, WordleBoard, get_scored_row, get_typed_row
+
+        opener = ["ledge", "pawns", "rocky", "thumb"]   # scene 15's finished climb
+        bucket = ["false", "salle", "salve"]            # its one unsolved bucket (15's NB)
+        codes = [pattern(g, bucket[0]) for g in opener]
+        for w in bucket[1:]:                            # the point of the still: one colouring
+            assert [pattern(g, w) for g in opener] == codes, w
+        # 15's board: six one-row boards at the board's spacing, the unused rows
+        # empty, moved BOARD_SIDE_X to the left (15q)
+        rows = [get_scored_row(g, c) for g, c in zip(opener, codes)]
+        rows += [WordleBoard(rows=1, cols=5) for _ in range(6 - len(rows))]
+        board = VGroup(*rows).arrange(DOWN, buff=GAP).move_to(ORIGIN)
+        board.shift(LEFT * BOARD_SIDE_X)
+        # 15r: the words typed at the board's size and spacing, centred between the
+        # board and the frame's right edge
+        words = VGroup(*[get_typed_row(w) for w in bucket]).arrange(DOWN, buff=GAP)
+        words.move_to(RIGHT * (board.get_right()[0] + config.frame_x_radius) / 2)
+        self.add(board, words)
 
     # l : NOT BUILT — browser: Pokecheese video, with '*I couldn't actually find his citation' at the bottom
     @still
