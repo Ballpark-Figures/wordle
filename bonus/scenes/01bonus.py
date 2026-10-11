@@ -65,9 +65,9 @@ until built, so every letter is fixed from the start):
   zx  nerdle_openers — 48-32=16 above the pair 47-11=36, 2*029=58, typed tile rows
   zy  bad_wordle — title card "Bad Wordle"
   zz  rasmussen — browser: Ellie Rasmussen's 'You should play Wordle wrong' video  [NOT BUILT]
-  zza vowelless — list of every word with no A, E, I, O, U or Y  [NOT BUILT]
-  zzb eight_words — our 8-word solution with no letters in common  [NOT BUILT]
-  zzc vowelless_triples — all 10 triples of the 5 vowel-less words, shared letters in red  [NOT BUILT]
+  zza vowelless — every legal guess with no AEIOUY, typed rows
+  zzb eight_words — the 8-word no-shared-letter solution, typed rows (EXEEM or EXEME)
+  zzc vowelless_triples — the 10 triples of the vowel-less words, letters shared within a triple in red
   zzd answers_from_combos — title card "Answers from Color Combos"
   zze conclusion — title card "Conclusion"
   zzf today_board — channel post, not in the video: NEWER WORDY VIDEO HOURS AFTER scored against TODAY, TODAY unscored
@@ -200,6 +200,13 @@ NERDLE_PAIRS = DATA / "nerdle" / "pairs_w8_n30000_incumbents.csv"
 NERDLE_TILE_H = 1.1    # zx: a row's height (the board's tile is ~1.0)
 NERDLE_ROW_GAP = 0.12  # zx: between the pair's rows (the board's GAP-ish)
 NERDLE_BLOCK_GAP = 1.0 # zx: the single opener to the pair
+EIGHT_CSV = DATA / "disjoint" / "disjoint_full_k8.csv"
+BW_TILE_H = 0.8        # zzb/zzc: a typed row's height
+BW_ROW_GAP = 0.12      # zzb/zzc: between rows (the board's spacing, roughly)
+BW_OR_GAP = 0.35       # zzc: "or" between EXEEM and EXEME
+BW_TRI_H = 0.55        # zzd: a row in a triple
+BW_TRI_GAP = 0.08      # zzd: between a triple's rows
+BW_GRID_GAP = 0.6      # zzd: between triples
 BOARD_SIDE_X = 4.0     # scene 15's: how far left the board moves for a column of words beside it
 
 
@@ -210,7 +217,7 @@ def _on_row(mob, text, x, y, size):
     return place_on_baseline(mob, (x, y - cap / 2), string=text)
 
 
-def _tile_word(s, height=None):
+def _tile_word(s, height=None, colors=None):
     """A word or a letter pattern ("F__FF") as one typed board row, `_` an untouched
     tile, at TABLE_TILE_H tall: get_typed_row's look."""
     from assets.board import TILE_FILLED_BORDER, STROKE, WordleBoard
@@ -220,7 +227,7 @@ def _tile_word(s, height=None):
             tile = row.tiles[0][i]
             tile.set_stroke(TILE_FILLED_BORDER, STROKE)
             if ch.isalnum():
-                letter = row._letter(ch, tile)
+                letter = row._letter(ch, tile, color=(colors or {}).get(i, TILE_TEXT))
             else:
                 # a symbol (- = * /) at the scale a capital letter gets, centred: the
                 # board's fit-to-height would blow a short glyph like "-" up to fill it
@@ -235,6 +242,17 @@ def _tile_word(s, height=None):
     for t in row.tiles[0]:                          # 12's rule: borders thin with the tiles
         t.set_stroke(width=stroke(row))
     return row
+
+
+def _vowelless():
+    """Every legal guess with no A, E, I, O, U or Y, by tools/disjoint_words.py's own
+    `vowels_in` -- the five its docstring names."""
+    sys.path.insert(0, str(MATH / "tools"))
+    from disjoint_words import vowels_in
+    guesses = [w.strip() for w in open(DATA / "words" / "guess.txt") if w.strip()]
+    words = sorted(w for w in guesses if not vowels_in(w))
+    assert words == ["crwth", "cwtch", "grrls", "grrrl", "phpht"], words
+    return words
 
 
 def _tree_lines(path):
@@ -896,20 +914,57 @@ class Bonus(WordleBoardScene):
     def rasmussen(self):
         self._not_built("browser: Ellie Rasmussen's 'You should play Wordle wrong' video")
 
-    # zza : NOT BUILT — list of every word with no A, E, I, O, U or Y
+    # zza : every legal guess with no A, E, I, O, U or Y (tools/disjoint_words.py's rule),
+    #       a column of typed rows
     @still
     def vowelless(self):
-        self._not_built('list of every word with no A, E, I, O, U or Y')
+        words = _vowelless()
+        col = VGroup(*[_tile_word(w, BW_TILE_H) for w in words]).arrange(DOWN, buff=BW_ROW_GAP)
+        self.add(col.move_to(ORIGIN))
 
-    # zzb : NOT BUILT — our 8-word solution with no letters in common
+    # zzb : the 8-word bad-Wordle solution (8 legal guesses, no letter in common, an
+    #       answer among them): disjoint_full_k8.csv's one set; slot 6 is EXEEM or EXEME
     @still
     def eight_words(self):
-        self._not_built('our 8-word solution with no letters in common')
+        slots = [r for r in csv.DictReader(l for l in open(EIGHT_CSV) if not l.startswith("#"))]
+        assert len({r["set"] for r in slots}) == 1 and len(slots) == 8, slots
+        rows = VGroup()
+        for r in slots:
+            alts = r["words"].split("|")
+            row = _tile_word(alts[0], BW_TILE_H)
+            if len(alts) > 1:                     # the same letters, either word
+                extra = VGroup()
+                for w in alts[1:]:
+                    extra.add(crisp_text("or", font_size=FONT_SIZE_MD, color=WHITE),
+                              _tile_word(w, BW_TILE_H))
+                row = VGroup(row, *extra).arrange(RIGHT, buff=BW_OR_GAP)
+            rows.add(row)
+        rows.arrange(DOWN, buff=BW_ROW_GAP, aligned_edge=LEFT)   # first words in one column
+        rows.move_to(ORIGIN)
+        rows.shift(LEFT * rows[0].get_center()[0])   # the column centred; "or EXEME" hangs right
+        self.add(rows)
 
-    # zzc : NOT BUILT — all 10 triples of the 5 vowel-less words, shared letters in red
+    # zzc : all 10 triples of the 5 vowel-less words, 04's grid; a letter in more
+    #       than one word of its triple is red
     @still
     def vowelless_triples(self):
-        self._not_built('all 10 triples of the 5 vowel-less words, shared letters in red')
+        from itertools import combinations
+        from assets.groups import grid_cells
+        words = _vowelless()
+        groups = []
+        for tri in combinations(words, 3):
+            col = VGroup()
+            for w in tri:
+                others = set("".join(x for x in tri if x != w))
+                col.add(_tile_word(w, BW_TRI_H, {i: LIGHT_RED for i, c in enumerate(w) if c in others}))
+            groups.append(col.arrange(DOWN, buff=BW_TRI_GAP))
+        assert len(groups) == 10
+        w, h = groups[0].width, groups[0].height
+        for g, (cx, cy) in zip(groups, grid_cells(len(groups))):
+            g.move_to([cx * (w + BW_GRID_GAP), cy * (h + BW_GRID_GAP), 0])
+        grid = VGroup(*groups)
+        fit_to_frame(grid.move_to(ORIGIN), buff=0.4)
+        self.add(grid)
 
     # zzd : title card
     @still
