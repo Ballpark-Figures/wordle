@@ -69,10 +69,12 @@ def _sit(mob, s, x, y, size):
     return place_on_baseline(mob, (x, y - cap / 2), string=s or " ")
 
 
-def navy_table(headers, rows, *, title=None, note=None, fit_buff=0.4, region=None):
+def navy_table(headers, rows, *, title=None, note=None, fit_buff=0.4, region=None,
+               top=None):
     """`region=(x0, x1)` confines the table, its title and note to that strip of the
     frame (centred in it, fitted to its width), so two tables can sit side by side;
-    the whole frame without one. A cell may be a Mobject (a tile row) instead of
+    the whole frame without one. `top` caps the table's top edge (below a title the
+    caller placed, e.g. one title over two halves). A cell may be a Mobject (a tile row) instead of
     text: it is centred on its column and its row's y, and never decimal-aligned."""
     mobs = {(i, c): v for i, r in enumerate(rows) for c, v in enumerate(r)
             if isinstance(v, Mobject)}
@@ -101,10 +103,11 @@ def navy_table(headers, rows, *, title=None, note=None, fit_buff=0.4, region=Non
     widths = []
     for c in range(ncol):
         if decimal[c]:
+            filled = [r for r in range(len(rows)) if rows[r][c].strip()]
             lefts = [point_x(cells[r][c], rows[r][c]) - cells[r][c].get_left()[0]
-                     for r in range(len(rows))]
+                     for r in filled]
             rights = [cells[r][c].get_right()[0] - point_x(cells[r][c], rows[r][c])
-                      for r in range(len(rows))]
+                      for r in filled]
             body_w = max(lefts) + max(rights)
         else:
             body_w = max((row[c].width for row in cells), default=0)
@@ -119,14 +122,16 @@ def navy_table(headers, rows, *, title=None, note=None, fit_buff=0.4, region=Non
     for c in range(ncol):
         _sit(head[c], headers[c], xs[c], 0, HEADER_SIZE)
         if decimal[c]:
+            filled = [r for r in range(len(rows)) if rows[r][c].strip()]
             lefts = [point_x(cells[r][c], rows[r][c]) - cells[r][c].get_left()[0]
-                     for r in range(len(rows))]
+                     for r in filled]
             rights = [cells[r][c].get_right()[0] - point_x(cells[r][c], rows[r][c])
-                      for r in range(len(rows))]
+                      for r in filled]
             dot = xs[c] - (max(lefts) + max(rights)) / 2 + max(lefts)
             for r in range(len(rows)):
-                _sit(cells[r][c], rows[r][c], 0, row_ys[r], CELL_SIZE)
-                cells[r][c].shift(RIGHT * (dot - point_x(cells[r][c], rows[r][c])))
+                _sit(cells[r][c], rows[r][c], 0 if r in filled else xs[c], row_ys[r], CELL_SIZE)
+                if r in filled:               # a blank cell has no point to align
+                    cells[r][c].shift(RIGHT * (dot - point_x(cells[r][c], rows[r][c])))
         else:
             for r in range(len(rows)):
                 if (r, c) in mobs:
@@ -143,7 +148,7 @@ def navy_table(headers, rows, *, title=None, note=None, fit_buff=0.4, region=Non
 
     out = VGroup()
     title_mob = note_mob = None
-    top = config.frame_y_radius - fit_buff
+    top = config.frame_y_radius - fit_buff if top is None else top
     bottom = -config.frame_y_radius + fit_buff
     if title is not None:
         lines = [title] if isinstance(title, str) else list(title)

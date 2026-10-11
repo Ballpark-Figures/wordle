@@ -45,8 +45,8 @@ until built, so every letter is fixed from the start):
   zd  list_grid — 3x3 grid, guess list x answer list: best opener, average, exact or k, one cell Impossible
   ze  lingo — title card "Lingo"
   zf  lingo_page — the Lingo (American game show) Wikipedia page in a browser window
-  zg  lingo_table — table: best opener and average per starting letter, Lingo  [NOT BUILT]
-  zh  lingo6_table — table: the same for 6-letter Lingo  [NOT BUILT]
+  zg  lingo_table — Lingo 5-letter (answers only, 5 guesses): best opener per starting letter, two halves
+  zh  lingo6_table — Lingo 6-letter (answers only, 5 guesses): best opener per starting letter, two halves
   zi  other_languages — title card "Other Languages"
   zj  languages_table — table: best opener and average per language  [NOT BUILT]
   zk  mastermind_rules — title card "Mastermind Rules"
@@ -239,6 +239,44 @@ class Bonus(WordleBoardScene):
         from bpkfigures.browser import browser_window
         self.add(browser_window(url, title, image=str(WEB_MEDIA / f"{image}.png"),
                                 width=WIN_W, aspect=9 / 16))
+
+    def _lingo_table(self, length):
+        """One title over two navy tables (A-M, N-Z): each letter's best opener(s) by
+        total guesses (ties all listed, as tools/lingo_report.py does) and the
+        average; a letter whose every opener is INFEASIBLE says so."""
+        rows = []
+        for letter in "abcdefghijklmnopqrstuvwxyz":
+            f = DATA / "lingo" / f"len{length}_d5_ans" / f"{letter}_totals.csv"
+            if not f.exists():
+                continue                      # no answer word starts with it
+            got = [r for r in csv.DictReader(l for l in open(f) if not l.startswith("#"))]
+            ok = [r for r in got if r["total"]]
+            if not ok:
+                rows.append([letter.upper(), "none within 5", ""])
+                continue
+            best = min(int(r["total"]) for r in ok)
+            tied = [r for r in ok if int(r["total"]) == best]
+            rows.append([letter.upper(), ", ".join(r["word"].upper() for r in tied),
+                         f"{float(tied[0]['expected']):.2f}"])
+        title = crisp_text(f"Lingo: {length}-Letter Answers", font_size=FONT_SIZE_LG, color=WHITE)
+        title.to_edge(UP, buff=0.6)
+        half = (len(rows) + 1) // 2
+        top = title.get_bottom()[1] - 0.6
+        heads = ["Letter", "Best Opener", "Average"]
+        r = config.frame_x_radius
+        a = navy_table(heads, rows[:half], region=(-r, 0), top=top)
+        b = navy_table(heads, rows[half:], region=(0, r), top=top)
+        # both halves at the smaller of their two fits (same text size), tops aligned
+        sa, sb = a.header.height, b.header.height
+        if sa > sb:
+            a[0].scale(sb / sa, about_edge=UP)
+        elif sb > sa:
+            b[0].scale(sa / sb, about_edge=UP)
+        b[0].align_to(a[0], UP)
+        pair = VGroup(a[0], b[0])                # re-centred in the space under the title
+        bottom = -config.frame_y_radius + 0.4
+        pair.shift(UP * ((top + bottom) / 2 - pair.get_center()[1]))
+        self.add(title, a, b)
 
     def _not_built(self, what):
         raise NotImplementedError(f"bonus still not built yet: {what}")
@@ -634,15 +672,17 @@ class Bonus(WordleBoardScene):
     def lingo_page(self):
         self._browser(*PAGE_LINGO)
 
-    # zg : NOT BUILT — table: best opener and average per starting letter, Lingo
+    # zg : Lingo, 5-letter answers only, 5 guesses: each starting letter's best
+    #      opener(s) (exact ties all shown) and average guesses
     @still
     def lingo_table(self):
-        self._not_built('table: best opener and average per starting letter, Lingo')
+        self._lingo_table(5)
 
-    # zh : NOT BUILT — table: the same for 6-letter Lingo
+    # zh : Lingo, 6-letter answers only, 5 guesses: each starting letter's best
+    #      opener(s) (exact ties all shown) and average guesses
     @still
     def lingo6_table(self):
-        self._not_built('table: the same for 6-letter Lingo')
+        self._lingo_table(6)
 
     # zi : title card
     @still
