@@ -15,7 +15,7 @@ BEAT MAP (one line per graphic, in the video's order; [NOT BUILT] slots raise
 until built, so every letter is fixed from the start):
   a   part1 — title card "Part 1: Wordle"
   b   antiwordle — title card "Antiwordle"
-  c   antiwordle_table — table of the 16 words from the antiwordle sequence  [NOT BUILT]
+  c   antiwordle_chain — the 16-word antiwordle chain (scene 03's) as one giant scored board
   d   color_groups — title card "Color Groups"
   e   optimal_strategy — title card "The Optimal Strategy"
   f   word_list_changes — title card "Word List Changes"
@@ -90,6 +90,8 @@ add a line here; every later still of the kind follows the line.
                 TITLE_SCALE (so it never wraps), centred. WHITE, not yahtzee's
                 black, because it sits on navy: the main video's titles on navy
                 are white (08histogram.py's heading).
+  board      -> animations/assets/board.py `get_scored_row` rows, as scene 03 and
+                today_board; a long chain sized as scene 03a's finished column.
 """
 import csv
 from pathlib import Path
@@ -106,6 +108,8 @@ DATA = Path(__file__).resolve().parents[2] / "math" / "data" / "shared"
 # title cards: yahtzee 00transitions' values, carried over verbatim
 TITLE_BASE_FS = 20     # built at this (under the crisp_text wrap threshold)...
 TITLE_SCALE = 3.0      # ...then scaled to its final size
+
+CHAIN_MARGIN = 0.4     # scene 03's COLUMN_MARGIN: space above and below the 16-row column
 
 
 class Bonus(WordleBoardScene):
@@ -130,10 +134,18 @@ class Bonus(WordleBoardScene):
     def antiwordle(self):
         self._title_card('Antiwordle')
 
-    # c : NOT BUILT — table of the 16 words from the antiwordle sequence
+    # c : the 16-word antiwordle chain as one giant board — scene 03a's end state
     @still
-    def antiwordle_table(self):
-        self._not_built('table of the 16 words from the antiwordle sequence')
+    def antiwordle_chain(self):
+        from assets import game_data
+        from assets.board import GAP, get_scored_row
+
+        game = game_data.load("antiwordle")       # scene 03's chain, same cache
+        rows = VGroup(*[get_scored_row(g["word"], g["code"]) for g in game["guesses"]])
+        rows.arrange(DOWN, buff=GAP)
+        # 03's finished column: the full frame height less CHAIN_MARGIN top and bottom
+        rows.scale_to_fit_height(config.frame_height - 2 * CHAIN_MARGIN).move_to(ORIGIN)
+        self.add(rows)
 
     # d : title card
     @still
