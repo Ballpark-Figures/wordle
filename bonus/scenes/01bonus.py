@@ -62,7 +62,7 @@ until built, so every letter is fixed from the start):
   zu  nerdle — title card "Nerdle"
   zv  nerdle_page — Nerdle's classic game in a browser window
   zw  nerdle_symbols — each symbol's share of the 17,723 answer equations containing it
-  zx  nerdle_openers — 48-32=16, and below it the pair 47-11=36 and 2*029=58  [NOT BUILT]
+  zx  nerdle_openers — 48-32=16 above the pair 47-11=36, 2*029=58, typed tile rows
   zy  bad_wordle — title card "Bad Wordle"
   zz  rasmussen — browser: Ellie Rasmussen's 'You should play Wordle wrong' video  [NOT BUILT]
   zza vowelless — list of every word with no A, E, I, O, U or Y  [NOT BUILT]
@@ -195,6 +195,11 @@ FOX_LEN = 7.0          # zt: the axis the bars stand on (vertical here)
 FOX_H = 9.0            # zt: the longest bar
 FOX_TITLE_DROP = 0.4   # zt: the chart sits this far below centre, room for the title
 FOX_TITLE_GAP = 0.5    # zt: get_histogram's title gap
+NERDLE_SOLVE = DATA / "nerdle" / "solve_w8_k1.csv"
+NERDLE_PAIRS = DATA / "nerdle" / "pairs_w8_n30000_incumbents.csv"
+NERDLE_TILE_H = 1.1    # zx: a row's height (the board's tile is ~1.0)
+NERDLE_ROW_GAP = 0.12  # zx: between the pair's rows (the board's GAP-ish)
+NERDLE_BLOCK_GAP = 1.0 # zx: the single opener to the pair
 BOARD_SIDE_X = 4.0     # scene 15's: how far left the board moves for a column of words beside it
 
 
@@ -205,7 +210,7 @@ def _on_row(mob, text, x, y, size):
     return place_on_baseline(mob, (x, y - cap / 2), string=text)
 
 
-def _tile_word(s):
+def _tile_word(s, height=None):
     """A word or a letter pattern ("F__FF") as one typed board row, `_` an untouched
     tile, at TABLE_TILE_H tall: get_typed_row's look."""
     from assets.board import TILE_FILLED_BORDER, STROKE, WordleBoard
@@ -214,11 +219,19 @@ def _tile_word(s):
         if ch != "_":
             tile = row.tiles[0][i]
             tile.set_stroke(TILE_FILLED_BORDER, STROKE)
-            letter = row._letter(ch, tile)
+            if ch.isalnum():
+                letter = row._letter(ch, tile)
+            else:
+                # a symbol (- = * /) at the scale a capital letter gets, centred: the
+                # board's fit-to-height would blow a short glyph like "-" up to fill it
+                from assets.board import LETTER_FRAC
+                ref = crisp_text("H", weight=BOLD)
+                letter = crisp_text(ch, color=TILE_TEXT, weight=BOLD)
+                letter.scale(tile.height * LETTER_FRAC / ref.height).move_to(tile.get_center())
             row.letters[0][i] = letter
             row.add(letter)
     from assets.strategy_tree import stroke
-    row.scale(TABLE_TILE_H / row.height)
+    row.scale((height or TABLE_TILE_H) / row.height)
     for t in row.tiles[0]:                          # 12's rule: borders thin with the tiles
         t.set_stroke(width=stroke(row))
     return row
@@ -860,10 +873,18 @@ class Bonus(WordleBoardScene):
             title="Nerdle Symbols",
             note=f"Share of the {n:,} possible answers"))
 
-    # zx : NOT BUILT — 48-32=16, and below it the pair 47-11=36 and 2*029=58
+    # zx : Nerdle's single best opener (48-32=16, the k=1 solve) and, below it,
+    #      the best pair found (47-11=36, 2*029=58), as typed tile rows
     @still
     def nerdle_openers(self):
-        self._not_built('48-32=16, and below it the pair 47-11=36 and 2*029=58')
+        one = next(csv.DictReader(l for l in open(NERDLE_SOLVE) if not l.startswith("#")))["opener"]
+        last = list(csv.DictReader(open(NERDLE_PAIRS)))[-1]          # the final incumbent
+        assert (one, last["first"], last["second"]) == ("48-32=16", "47-11=36", "2*029=58")
+        top = _tile_word(one, NERDLE_TILE_H)
+        pair = VGroup(_tile_word(last["first"], NERDLE_TILE_H),
+                      _tile_word(last["second"], NERDLE_TILE_H)).arrange(DOWN, buff=NERDLE_ROW_GAP)
+        VGroup(top, pair).arrange(DOWN, buff=NERDLE_BLOCK_GAP).move_to(ORIGIN)
+        self.add(top, pair)
 
     # zy : title card
     @still
