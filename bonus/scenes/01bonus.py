@@ -29,7 +29,7 @@ until built, so every letter is fixed from the start):
   n   multi_openers — table: best 1/2/3-word opener + average misses per k, best of every race (scene 16's chart rule)
   o   multi_openers_answers — the same, answers-only races
   p   more_color_groups — title card "More Color Groups"
-  q   casework_tree — tree: the better-than-SLANT-PRICE casework strategy, SLANT PRICE tree style, with its expected guesses  [NOT BUILT]
+  q   casework_tree — TRINE (3.606637, the best casework result): its 17 reply cases in scene 18's tree pieces  [DRAFT, not staged]
   r   hard_mode — title card "Hard Mode"
   s   part2 — title card "Part 2: Variants"
   t   sea_of_greens — title card "Sea of Greens"
@@ -118,6 +118,20 @@ PAGE_BADGE = ("sea_of_greens", "nytimes.com/games/wordle/2026-07-10",
 PAGE_IN_ONE = ("wordle_in_one_puzzle",
                "nytimes.com/games/bonus/wordle-in-one/standard/2026-10-07-8",
                "Wednesday, October 7, 2026 Wordle in 1 — Bonus Puzzles — The New York Times")
+TRINE_CSV = DATA / "secondexact" / ("exact_e3_nz01.e3_nz02.e3_nz03.e3_nz04.e3_nz12."
+    "e3_nz13.e3_nz14.e3_nz23.e3_nz24.e3_nz34.e4_nz0.e4_nz1.e4_nz2.e4_nz3.e4_nz4.e5_k200_3group2dec.csv")
+TREE_COLS = 6          # q: cases per row of the grid
+TREE_ROW_W = 1.9       # q: a pattern / word row's width
+TREE_OPENER_W = 3.2    # q: TRINE's row at the top (18's SLANT is row_width() ~ 3.3)
+TREE_LINK = 0.3        # q: pattern row to second word (18's RCA_LINK 0.35, tighter)
+TREE_LINK3 = 0.45      # q: second word to third word, room for the label
+TREE_LABEL_FS = 18     # q: "1 matched" on a third-word branch (no precedent)
+TREE_LABEL_BUFF = 0.1  # q: the label's gap right of the branch line
+TREE_CARD_FS = 22      # q: the decline case's RCA card text (18's MARKER_FS 30)
+TREE_COL_GAP = 0.45
+TREE_ROW_GAP = 0.45
+TREE_TOP = 0.45        # q: TRINE / the average from the frame's top / bottom
+TREE_GAP = 0.4         # q: the grid's clearance under TRINE and above the average
 BOARD_SIDE_X = 4.0     # scene 15's: how far left the board moves for a column of words beside it
 
 
@@ -270,10 +284,68 @@ class Bonus(WordleBoardScene):
     def more_color_groups(self):
         self._title_card('More Color Groups')
 
-    # q : NOT BUILT — tree: the better-than-SLANT-PRICE casework strategy, SLANT PRICE tree style, with its expected guesses
+    # q : the best casework strategy on disk, TRINE (3.606637), as a grid of its 17
+    #     reply cases in scene 18's tree pieces, with its average guesses
     @still
     def casework_tree(self):
-        self._not_built('tree: the better-than-SLANT-PRICE casework strategy, SLANT PRICE tree style, with its expected guesses')
+        from assets.branch import branch_line, mid_tile
+        from assets import strategy_tree as st
+
+        rows = [r for r in csv.DictReader(l for l in open(TRINE_CSV) if not l.startswith("#"))
+                if r["opener"] == "trine"]
+        second = {r["fires"]: r["second"] for r in rows if r["cut"] != "third"}
+        third = {}
+        for r in rows:
+            if r["cut"] == "third":
+                case, m = r["fires"].split("|m")
+                third[case] = (int(m), r["second"])
+        mean = float(rows[0]["expected"])
+        # the cases in reading order: declined (<= 2 greys: 18's "ccc.." row), then 5
+        # greys, then 4 and 3 greys by which tiles came back coloured
+        order = ["decline", "e5"] + sorted((c for c in second if c.startswith("e4")),
+                                           key=lambda c: c) \
+            + sorted((c for c in second if c.startswith("e3")), key=lambda c: c)
+        assert len(order) == 17 and set(order[1:]) == set(second), order
+
+        def kinds(case):
+            if case == "decline":
+                return "ccc.."
+            nz = case.split("_nz")[1] if "_nz" in case else ""
+            return "".join("c" if str(i) in nz else "g" for i in range(5))
+
+        w = TREE_ROW_W
+        cells = []
+        for case in order:
+            pat = st.pattern_row(kinds(case), w)
+            parts = [pat]
+            if case == "decline":
+                card = st.rca_card(pat.get_bottom() + DOWN * TREE_LINK, font_size=TREE_CARD_FS)
+                parts += [branch_line(mid_tile(pat), card.get_center()), card]
+            else:
+                wd = st.word_row(second[case], w).next_to(pat, DOWN, buff=TREE_LINK)
+                parts += [branch_line(mid_tile(pat), mid_tile(wd)), wd]
+                if case in third:
+                    m, word3 = third[case]
+                    t3 = st.word_row(word3, w).next_to(wd, DOWN, buff=TREE_LINK3)
+                    lab = crisp_text(f"{m} matched", font_size=TREE_LABEL_FS, color=WHITE)
+                    mid = (wd.get_bottom() + t3.get_top()) / 2
+                    lab.next_to([mid_tile(wd)[0], mid[1], 0], RIGHT, buff=TREE_LABEL_BUFF)
+                    parts += [branch_line(mid_tile(wd), mid_tile(t3)), t3, lab]
+            cells.append(VGroup(*parts))
+        grid = VGroup()
+        for start in range(0, len(cells), TREE_COLS):
+            line = VGroup(*cells[start:start + TREE_COLS])
+            line.arrange(RIGHT, buff=TREE_COL_GAP, aligned_edge=UP)
+            grid.add(line)
+        grid.arrange(DOWN, buff=TREE_ROW_GAP)
+        opener = st.word_row("trine", TREE_OPENER_W).to_edge(UP, buff=TREE_TOP)
+        avg = crisp_text(f"Average Guesses: {mean:.2f}", font_size=FONT_SIZE_MD, color=WHITE)
+        avg.to_edge(DOWN, buff=TREE_TOP)
+        top, bottom = opener.get_bottom()[1] - TREE_GAP, avg.get_top()[1] + TREE_GAP
+        grid.scale(min(1.0, (top - bottom) / grid.height,
+                       (config.frame_width - 0.6) / grid.width))
+        grid.move_to([0, (top + bottom) / 2, 0])
+        self.add(opener, grid, avg)
 
     # r : title card
     @still
