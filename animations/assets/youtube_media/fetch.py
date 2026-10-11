@@ -25,7 +25,8 @@ OUT = Path(__file__).resolve().parent
 _ENV = Path(__file__).resolve().parents[4] / "analytics" / ".env"
 CHANNELS = {"bpk": "@BPKFigures"}   # key -> channel handle
 VIDEOS = {"hangman": "ApdLgfgfh5o",   # key -> video id (Ballpark Figures, "I Tried to Solve Hangman")
-          "rasmussen": "zoh5eLOjwHA"}  # Ellie Rasmussen, "You should play Wordle wrong" (bonus video)
+          "rasmussen": "zoh5eLOjwHA",  # Ellie Rasmussen, "You should play Wordle wrong" (bonus video)
+          "pokecheese": "dCUvQ7HIDmA"}  # Pokecheese, the "Broken" Wordle strategy video (bonus video)
 
 
 def _api_key():

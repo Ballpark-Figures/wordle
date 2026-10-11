@@ -26,7 +26,8 @@ _ANALYTICS = Path(__file__).resolve().parents[3] / "analytics"
 
 # tracked videos to cache: short scene key -> YouTube video id
 VIDEOS = {"hangman": "ApdLgfgfh5o",   # Ballpark Figures — "I Tried to Solve Hangman"
-          "rasmussen": "zoh5eLOjwHA"}  # Ellie Rasmussen — "You should play Wordle wrong" (bonus)
+          "rasmussen": "zoh5eLOjwHA",  # Ellie Rasmussen — "You should play Wordle wrong" (bonus)
+          "pokecheese": "dCUvQ7HIDmA"}  # Pokecheese — the "Broken" Wordle strategy video (bonus)
 OWN_CHANNEL = {"hangman"}           # keys whose channel is ours (use bpk_logo.png)
 
 

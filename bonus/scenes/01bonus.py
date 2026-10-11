@@ -24,12 +24,12 @@ until built, so every letter is fixed from the start):
   i   speedrunning — title card "Speedrunning"
   j   multi_word_openers — title card "Multi-Word Openers"
   k   ledge_pawns — LEDGE PAWNS ROCKY THUMB scored as FALSE/SALLE/SALVE all score it, the three words beside it (scene 15r's layout)
-  l   pokecheese — browser: Pokecheese video, with '*I couldn't actually find his citation' at the bottom  [NOT BUILT]
+  l   pokecheese — Pokecheese's video on YouTube's dark watch page + the citation footnote
   m   multiwordle — title card "Multiwordle"
   n   multi_openers — table: best 1/2/3-word opener + average misses per k, best of every race (scene 16's chart rule)
   o   multi_openers_answers — the same, answers-only races
   p   more_color_groups — title card "More Color Groups"
-  q   casework_tree — TRINE (3.606637, the best casework result): its 17 reply cases in scene 18's tree pieces  [DRAFT, not staged]
+  q   casework_tree — TRINE (3.606637, the best casework result): its 17 reply cases in scene 18's tree pieces
   r   hard_mode — title card "Hard Mode"
   s   part2 — title card "Part 2: Variants"
   t   sea_of_greens — title card "Sea of Greens"
@@ -208,6 +208,7 @@ BW_TRI_H = 0.55        # zzd: a row in a triple
 BW_TRI_GAP = 0.08      # zzd: between a triple's rows
 BW_GRID_GAP = 0.6      # zzd: between triples
 FOOTNOTE_FS = 24       # a one-line footnote under a still (navy_table's NOTE_SIZE)
+FOOTNOTE_GAP = 0.3     # the clearance above it
 BOARD_SIDE_X = 4.0     # scene 15's: how far left the board moves for a column of words beside it
 
 
@@ -338,8 +339,18 @@ class Bonus(WordleBoardScene):
         page = youtube_watch(**yt_get(key), dark=True)
         self.add(page)
         if note:
-            t = crisp_text(note, font_size=FOOTNOTE_FS, color=WHITE)
-            self.add(t.to_edge(DOWN, buff=0.3))
+            # the page shrinks (about its top) to leave the note its own strip below
+            t = crisp_text(note, font_size=FOOTNOTE_FS, color=WHITE).to_edge(DOWN, buff=0.3)
+            room = t.get_top()[1] + FOOTNOTE_GAP
+            # the page's full-frame background stays; only what sits on it shrinks
+            bg = [m for m in page if isinstance(m, Rectangle)
+                  and abs(m.width - config.frame_width) < 1e-6]
+            content = Group(*[m for m in page if m not in bg])
+            if content.get_bottom()[1] < room:
+                top = config.frame_y_radius
+                content.scale((top - room) / (top - content.get_bottom()[1]),
+                              about_point=[0, top, 0])
+            self.add(t)
 
     def _not_built(self, what):
         raise NotImplementedError(f"bonus still not built yet: {what}")
@@ -427,10 +438,11 @@ class Bonus(WordleBoardScene):
         words.move_to(RIGHT * (board.get_right()[0] + config.frame_x_radius) / 2)
         self.add(board, words)
 
-    # l : NOT BUILT — browser: Pokecheese video, with '*I couldn't actually find his citation' at the bottom
+    # l : Pokecheese's "Broken" Wordle strategy video on YouTube's dark watch page
+    #      (scene 09a's), the user's footnote at the bottom
     @still
     def pokecheese(self):
-        self._not_built("browser: Pokecheese video, with '*I couldn't actually find his citation' at the bottom")
+        self._youtube("pokecheese", note="*I couldn't actually find his citation")
 
     # m : title card
     @still
