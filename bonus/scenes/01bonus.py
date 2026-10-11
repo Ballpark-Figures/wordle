@@ -52,7 +52,7 @@ until built, so every letter is fixed from the start):
   zk  mastermind_rules — title card "Mastermind Rules"
   zl  absurdle — title card "Absurdle"
   zm  absurdle_page — Absurdle in a browser window
-  zn  absurdle_sequence — a winning 4-word Absurdle sequence with the options left at each step  [NOT BUILT]
+  zn  absurdle_sequence — the 4-guess Absurdle win as a board, options left beside each row
   zo  letroso — title card "Letroso"
   zp  letroso_page — Letroso's home page in a browser window
   zq  letroso_table — table: top Letroso starters by average remaining options  [NOT BUILT]
@@ -94,6 +94,7 @@ add a line here; every later still of the kind follows the line.
                 today_board; a long chain sized as scene 03a's finished column.
 """
 import csv
+import re
 from pathlib import Path
 import sys
 
@@ -181,6 +182,10 @@ LANG_NAMES = {"ca": "Catalan", "cs": "Czech", "de": "German", "en": "English",
               "es": "Spanish", "fi": "Finnish", "fr": "French", "it": "Italian",
               "nb": "Norwegian", "nl": "Dutch", "pl": "Polish", "pt": "Portuguese",
               "sv": "Swedish"}
+ABSURDLE_TXT = DATA / "absurdle" / "one_shortest_solution.txt"
+ABS_COUNT_FS = 48      # zn: the options-left numbers beside the board's rows
+ABS_COUNT_GAP = 1.0    # zn: board to the numbers
+ABS_HEAD_GAP = 0.45    # zn: "Options Left" above the board's top
 BOARD_SIDE_X = 4.0     # scene 15's: how far left the board moves for a column of words beside it
 
 
@@ -721,10 +726,37 @@ class Bonus(WordleBoardScene):
     def absurdle_page(self):
         self._browser(*PAGE_ABSURDLE)
 
-    # zn : NOT BUILT — a winning 4-word Absurdle sequence with the options left at each step
+    # zn : the committed 4-guess Absurdle win (AESIR YAULD TENCH WHOOP) as a board,
+    #      the candidates left after each guess beside its row
     @still
     def absurdle_sequence(self):
-        self._not_built('a winning 4-word Absurdle sequence with the options left at each step')
+        sys.path.insert(0, str(MATH))
+        from wordle import pattern
+        from assets.board import GAP, get_scored_row
+        steps = []
+        for line in open(ABSURDLE_TXT):
+            t = line.split()
+            if len(t) >= 2 and re.fullmatch(r"[a-z]{5}", t[0]) and re.fullmatch(r"[.yG]{5}", t[1]):
+                steps.append((t[0], t[1], t[2] if t[2] != "WIN" else None))
+        answer = steps[-1][0]
+        rows = []
+        for word, pat, left in steps:
+            code = sum({".": 0, "y": 1, "G": 2}[c] * 3 ** (4 - i) for i, c in enumerate(pat))
+            assert code == pattern(word, answer), (word, pat)   # the file's replies, re-derived
+            rows.append(get_scored_row(word, code))
+        board = VGroup(*rows).arrange(DOWN, buff=GAP)
+        counts = VGroup()
+        for row, (_, _, left) in zip(rows, steps):
+            if left is not None:
+                n = crisp_text(f"{int(left):,}", font_size=ABS_COUNT_FS, color=WHITE)
+                counts.add(_on_row(n, f"{int(left):,}", 0, row.get_y(), ABS_COUNT_FS))
+        head = crisp_text("Options Left", font_size=HEADER_SIZE, color=WHITE, weight=BOLD)
+        cx = board.get_right()[0] + ABS_COUNT_GAP + max(head.width, counts.width) / 2
+        for n in counts:                                 # each stays on its row; x only
+            n.set_x(cx)
+        head.move_to([cx, board.get_top()[1] + ABS_HEAD_GAP, 0])
+        VGroup(board, counts, head).move_to(ORIGIN)
+        self.add(board, counts, head)
 
     # zo : title card
     @still
