@@ -1,0 +1,15 @@
+# wrongle objective=lose depth=8 topk=50 root=sweep guesses=12972 answers=2315
+opener,status,value,bound,per_answer,secs
+jeeze,solved,1336,2311,0.577106,1137.206
+qajaq,solved,1489,2311,0.643197,1961.851
+yukky,solved,1389,2311,0.600000,949.076
+huzzy,solved,1300,2310,0.561555,480.509
+kudzu,solved,1198,2310,0.517495,802.354
+yummy,solved,1330,2310,0.574514,684.626
+muzzy,solved,1249,2309,0.539525,326.161
+whizz,solved,1285,2309,0.555076,616.181
+fuzzy,solved,1298,2308,0.560691,553.559
+jujus,solved,1263,2308,0.545572,962.798
+kibbi,solved,1314,2308,0.567603,939.316
+pzazz,solved,1306,2308,0.564147,868.661
+zoppo,solved,1324,2308,0.571922,909.959
