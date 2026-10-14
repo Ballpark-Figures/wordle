@@ -1,0 +1,4 @@
+# wrongle objective=lose depth=13 topk=2 root=sweep guesses=12972 answers=2315
+opener,status,value,bound,per_answer,secs
+qajaq,solved,21,2310,0.009071,11.275
+immix,solved,10,2293,0.004320,15.904
