@@ -4667,6 +4667,15 @@ still be a POSSIBLE ANSWER — consistent with every clue so far?". Run it with
   the answer-holding test, and treating every word as an answer, both caught).
   **A strictly larger play pool, so its number is never tabled beside the plain
   one.** Cost on the full lists UNMEASURED -- `--greedy` first.
+  - **A WITNESS BELOW THE MAXIMUM MAY END WITH SEVERAL WORDS ALIVE**, and the
+    rebuild then names the lowest-index ANSWER among them. Only a line of the
+    PROVEN maximum (exact mode, or the ladder's last line once the next bar fails)
+    must end on one word, and only those are checked for it. The check used to be
+    unconditional and killed the first full `--plays guess` ladder at bar 14
+    (2026-10-14) — a latent bug in plain mode too, where short witnesses just
+    happened to end on singletons. Gated by `--target` below the maximum in both
+    modes, with coverage asserting some witness really ended with company;
+    mutation-tested (naming `mem[0]` regardless of answer-hood is caught).
 - Data under `math/data/shared/eldrow/eldrowmax.<pool>.csv`, one row per run with
   every knob as a column; log under `math/data/local/eldrow/`.
 - **The rest of the antiwordle family (`antistall`, `antiexpect`, `antiwordle.py`,

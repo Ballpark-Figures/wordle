@@ -800,7 +800,7 @@ static int move_is_live(const uint16_t *mem, int n, int gp) {
  * reach the remaining budget -- and the full scan is still there underneath for
  * when an entry has been evicted. A hint can therefore only ever make this
  * FASTER; it cannot make the line wrong. */
-static void walk_line(Ctx *c, int need, int hint, char *out, size_t outsz) {
+static int walk_line(Ctx *c, int need, int hint, char *out, size_t outsz) {
     uint16_t mem[MAXP];
     int n = ROOTN;
     for (int i = 0; i < NP; i++) mem[i] = (uint16_t)i;
@@ -866,17 +866,33 @@ static void walk_line(Ctx *c, int need, int hint, char *out, size_t outsz) {
                                  "%s%s", used ? " " : "", PWORD[g]);
         left--;
     }
-    if (n != 1) {
-        fprintf(stderr, "internal: a longest line ended with %d words alive, not 1 --\n"
-                        "  it could have been extended, so it was not longest\n", n);
-        exit(1);
-    }
-    if (!ISA[mem[0]]) {
-        fprintf(stderr, "internal: the line ends on %s, which is not an answer\n", PWORD[mem[0]]);
+    /* THE LINE ENDS BY NAMING AN ANSWER STILL ALIVE -- and more than one word may
+     * be.  A line of exactly `need` words is a witness for "at least need", so when
+     * the true maximum is longer it can legitimately stop with several words
+     * alive (it could have gone on).  Only a line of the PROVEN maximum must end
+     * on a single word -- with two alive, playing the non-answer one extends it --
+     * and the callers that know the length is the maximum check that, on the
+     * count returned here.  This assertion used to sit here unconditionally and
+     * killed the first --answers ladder at bar 14 (2026-10-14).  Every state
+     * reached holds an answer, so the scan below always finds one; the lowest
+     * index is named, which without --answers is mem[0] exactly as before. */
+    int name = -1;
+    for (int k = 0; k < n; k++) if (ISA[mem[k]]) { name = mem[k]; break; }
+    if (name < 0) {
+        fprintf(stderr, "internal: a line ended on a state holding no answer\n");
         exit(1);
     }
     snprintf(out + used, used < outsz ? outsz - used : 0,
-             "%s%s", used ? " " : "", PWORD[mem[0]]);
+             "%s%s", used ? " " : "", PWORD[name]);
+    return n;
+}
+
+/* A line claimed to be the LONGEST must end on a single word; see walk_line. */
+static void require_singleton(int alive, int len) {
+    if (alive == 1) return;
+    fprintf(stderr, "internal: a longest line (%d words) ended with %d words alive, not 1 --\n"
+                    "  it could have been extended, so it was not longest\n", len, alive);
+    exit(1);
 }
 
 /* ------------------------------------------------------------------ output
@@ -1174,11 +1190,12 @@ int main(int argc, char **argv) {
             /* No hint: `value` memoises under an UNBUDGETED key, so the walk's
              * budgeted lookups miss and it scans. That is affordable because
              * --exact is the small-pool oracle; the ladder is the scaling path. */
-            walk_line(c, v, -1, line, sizeof line);
+            require_singleton(walk_line(c, v, -1, line, sizeof line), v);
         }
     } else {
         int incumbent = greedy > floor_at ? greedy : floor_at;
         int verified = greedy;               /* the longest length we hold a LINE for */
+        int last_alive = 1;                  /* greedy plays to a singleton */
         if (floor_at > greedy)
             printf("starting from --floor %d rather than the greedy %d\n", floor_at, greedy);
         for (;;) {
@@ -1206,7 +1223,7 @@ int main(int argc, char **argv) {
              * defect as writing the row only at the end, one level in. */
             write_row(&row, "reached", incumbent, "");
             double tw = wall_time();
-            walk_line(c, incumbent, witness, line, sizeof line);
+            last_alive = walk_line(c, incumbent, witness, line, sizeof line);
             verified = incumbent;
             printf("        NEW LONGEST: %d words (line rebuilt in %.1fs)\n"
                    "        %s\n", incumbent, wall_time() - tw, line);
@@ -1222,9 +1239,14 @@ int main(int argc, char **argv) {
         if (incumbent > verified) {
             printf("verifying the --floor %d by producing its line ...\n", incumbent);
             fflush(stdout);
-            walk_line(c, incumbent, -1, line, sizeof line);
+            last_alive = walk_line(c, incumbent, -1, line, sizeof line);
         }
         length = incumbent;
+        /* The ladder failed at incumbent + 1, so the line in hand IS longest --
+         * unless it was abandoned by --max-nodes, where nothing is proved. */
+        int blown_here = 0;
+        for (int t = 0; t < nthreads; t++) blown_here |= ctxs[t]->budget_blown;
+        if (!blown_here) require_singleton(last_alive, length);
     }
 
     long long nodes = 0;
