@@ -21,7 +21,9 @@
 # and the ladder moves on to the next K.
 #
 # --stop-on-repeat ends the ladder as soon as two CONSECUTIVE K in the list give
-# the same best value (answers lost). Off by default. Only a COMPLETE cell counts:
+# the same best value (answers lost). Off by default. Two 0s in a row do NOT
+# count: at a high depth a narrow beam can lose nothing while a wider one still
+# finds losses (depth 14: 0 at K=1, 4 at K=2). Only a COMPLETE cell counts:
 # its CSV must hold every opener the root beam examines, min(K, 12972) rows. The
 # exit status cannot say so -- run-wrongle.sh pipes the solver into tee, so a
 # crashed solver still "succeeds" -- hence the row count. An incomplete cell
@@ -83,7 +85,7 @@ for K in "${KS[@]}"; do
         break
     fi
     echo "--- depth $DEPTH K=$K complete: best $BEST lost"
-    if [ -n "$PREV" ] && [ "$BEST" = "$PREV" ]; then
+    if [ -n "$PREV" ] && [ "$BEST" = "$PREV" ] && [ "$BEST" != 0 ]; then
         echo "--- depth $DEPTH: K=$PREVK and K=$K both give $BEST -- stopping (repeat)"
         break
     fi
