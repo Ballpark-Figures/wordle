@@ -116,12 +116,17 @@ if [ $# -eq 0 ]; then
   # per-guess delta table nor either of antistall's two bounds survives the change
   # -- it shares the loader, the table and the arena and none of the search.
   gcc $BASE $OMP -o eldrowmax eldrowmax.c
+  # eldrowmaxg is the SAME source with room for the full 12972-word pool, for
+  # `--answers` runs (any legal word may be played, only the last must be an
+  # answer). The limits size per-thread arenas, so the 2315-word build keeps its
+  # small ones.
+  gcc $BASE $OMP -DMAXP=13000 -DCANDPOOL='(1<<23)' -DDEDUP_BITS=22 -o eldrowmaxg eldrowmax.c
   # wrongle is the REVERSE game: every guess consistent with the clues (over the
   # 12972), and the strategy tries NOT to find the answer -- most answers lost
   # within a cap, or most guesses in expectation.  eldrowmax's set machinery under
   # greens' count-over-answers, so its own file like both of them.
   gcc $BASE $OMP -o wrongle wrongle.c
-  echo "built ./optturns, ./hardturns, ./mmturns, ./ultraturns, ./pairsplit, ./secondword, ./secondexact, ./strturns, ./strguess, ./greens, ./antistall, ./antiexpect, ./eldrowmax and ./wrongle  (5 letters)"
+  echo "built ./optturns, ./hardturns, ./mmturns, ./ultraturns, ./pairsplit, ./secondword, ./secondexact, ./strturns, ./strguess, ./greens, ./antistall, ./antiexpect, ./eldrowmax, ./eldrowmaxg and ./wrongle  (5 letters)"
   exit 0
 fi
 

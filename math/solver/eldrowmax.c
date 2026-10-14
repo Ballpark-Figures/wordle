@@ -62,6 +62,24 @@
  * list (that is where its feedback comes from).  A different pool is a different
  * quantity, so it is recorded in every row.
  *
+ * --answers: ONLY THE LAST WORD MUST BE AN ANSWER (added 2026-10-14, user's call).
+ * With --answers, the pool (--words) is what may be PLAYED and --answers names the
+ * words the run may END on, a subset of it.  Every play must still be consistent
+ * with every clue, and since the clues are taken against the final answer, a
+ * branch is followable only while it still HOLDS an answer -- that is the one
+ * change to the search (expand and the greedy skip answer-less children).  The
+ * state is still the legal set: whether it holds an answer is a function of it.
+ * Everything else carries over unchanged: value(S) <= |S| still holds (every move
+ * drops the word played), naming is always possible because every state reached
+ * holds an answer, and a longest line still ends on a single word -- with two or
+ * more legal and an answer among them, playing any other word keeps the answer's
+ * branch alive and lengthens the run.  The reference is eldrow.longest_run.
+ *   Feedback then comes from the SQUARE matrix (`build_patterns.py --full`), since
+ * a played word may not be in the answer list.  The full 12972-word pool needs the
+ * bigger compile-time limits, so build.sh makes a second binary, `eldrowmaxg`.
+ * Without --answers nothing changes: every pool word is an answer and every
+ * non-empty child holds one.
+ *
  * WORD LISTS ARE OURS.  The 2315/12972 Wordle lists the rest of this video runs
  * on, which are not the NYT's current ones; a chain length here is a fact about
  * OUR lists.
@@ -96,6 +114,9 @@
 #ifndef MAXP
 #define MAXP       2400
 #endif
+#ifndef DEDUP_BITS
+#define DEDUP_BITS 15
+#endif
 
 #define BSW  ((MAXP + 63) / 64)          /* uint64 words spanning the whole pool */
 
@@ -118,6 +139,15 @@ typedef uint8_t pat_t;
 static int      NP;                      /* pool size: candidates == guesses */
 static char   (*PWORD)[WBUF];            /* the pool's words */
 static pat_t   *APAT;                    /* NP * NP: APAT[g * NP + w] */
+static uint8_t *ISA;                     /* ISA[w]: may the run END on w */
+static int      SUBANS = 0;              /* --answers given: not every word is one */
+
+/* Does a run of `sort` hold an answer?  Always yes without --answers. */
+static inline int run_has_answer(const uint16_t *m, int n) {
+    if (!SUBANS) return n > 0;
+    for (int k = 0; k < n; k++) if (ISA[m[k]]) return 1;
+    return 0;
+}
 
 static int      PRUNE = 1;               /* --no-prune drops the size bound */
 static long long MAXNODES = 0;           /* --max-nodes, 0 = unlimited */
@@ -306,7 +336,6 @@ static char PHASE[128] = "starting";
  * Slots are STAMPED with a per-node counter rather than cleared.  Clearing would
  * mean a 256 KB memset at every node -- larger than the work the node itself does,
  * and it would quietly have become the whole runtime. */
-#define DEDUP_BITS 15
 #define DEDUP_SIZE (1 << DEDUP_BITS)
 
 static void ctx_free(Ctx *c) {
@@ -440,6 +469,7 @@ static int expand(Ctx *c, int depth, Cand *cand, int room) {
                 if (lo == hi || p == ALL_GREEN) continue;   /* see the header: the
                        all-green bucket is "you just played the answer", worth the
                        best = 1 the search starts from and never more */
+                if (!run_has_answer(c->sort + lo, hi - lo)) continue;  /* --answers */
                 uint64_t ch0, ch1;
                 build_child(c->sort + lo, hi - lo, c->scratch,
                             c->swidx, &c->snwid, &ch0, &ch1);
@@ -621,7 +651,9 @@ static int greedy_len(Ctx *c, char *out, size_t outsz) {
                 for (int p = 0; p < NPAT; p++) {
                     if (p == ALL_GREEN) continue;
                     int sz = c->start[p + 1] - c->start[p];
-                    if (sz > bestn) { bestn = sz; bestgp = g * NPAT + p; }
+                    if (sz > bestn && run_has_answer(c->sort + c->start[p], sz)) {
+                        bestn = sz; bestgp = g * NPAT + p;
+                    }
                 }
             }
         }
@@ -797,7 +829,10 @@ static void walk_line(Ctx *c, int need, int hint, char *out, size_t outsz) {
         if (hinted >= 0 && move_is_live(mem, n, hinted)) {
             uint64_t ch0, ch1;
             int nC = descend(c, 0, hinted, &ch0, &ch1);
-            if (nC > 0 && can_reach(c, 1, nC, ch0, ch1, left - 1)) picked = hinted;
+            int lo = c->start[hinted % NPAT];
+            if (nC > 0 && hinted % NPAT != ALL_GREEN
+                && run_has_answer(c->sort + lo, nC)
+                && can_reach(c, 1, nC, ch0, ch1, left - 1)) picked = hinted;
         }
 
         /* 2. The scan, for a hint that was evicted or did not verify. */
@@ -834,6 +869,10 @@ static void walk_line(Ctx *c, int need, int hint, char *out, size_t outsz) {
     if (n != 1) {
         fprintf(stderr, "internal: a longest line ended with %d words alive, not 1 --\n"
                         "  it could have been extended, so it was not longest\n", n);
+        exit(1);
+    }
+    if (!ISA[mem[0]]) {
+        fprintf(stderr, "internal: the line ends on %s, which is not an answer\n", PWORD[mem[0]]);
         exit(1);
     }
     snprintf(out + used, used < outsz ? outsz - used : 0,
@@ -874,6 +913,8 @@ static void usage(void) {
         "  --out FILE       CSV to append one row per run to\n"
         "  --no-out         print only, save NOTHING -- must be explicit\n"
         "  --words PATH     the pool: candidates AND guesses (default mystery.txt)\n"
+        "  --answers PATH   only the LAST word must be in this list; the pool is what\n"
+        "                   may be played (needs patterns_full.npy)\n"
         "  --exact          compute the value outright instead of the decision\n"
         "                   ladder -- the same number, the slower way, kept as an\n"
         "                   oracle for the ladder\n"
@@ -894,7 +935,7 @@ int main(int argc, char **argv) {
      * on a pipe means a long run shows NOTHING in its log until it ends. */
     setvbuf(stdout, NULL, _IOLBF, 0);
 
-    const char *outpath = NULL, *datadir = "data", *poolpath = NULL;
+    const char *outpath = NULL, *datadir = "data", *poolpath = NULL, *anspath = NULL;
     int no_out = 0, ttbits = 26, exact = 0, target = 0, floor_at = 0, greedy_only = 0;
     int nthreads = 1;
 
@@ -902,6 +943,7 @@ int main(int argc, char **argv) {
         if      (!strcmp(argv[i], "--out") && i + 1 < argc)        outpath = argv[++i];
         else if (!strcmp(argv[i], "--no-out"))                     no_out = 1;
         else if (!strcmp(argv[i], "--words") && i + 1 < argc)      poolpath = argv[++i];
+        else if (!strcmp(argv[i], "--answers") && i + 1 < argc)    anspath = argv[++i];
         else if (!strcmp(argv[i], "--exact"))                      exact = 1;
         else if (!strcmp(argv[i], "--target") && i + 1 < argc)     target = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--floor") && i + 1 < argc)      floor_at = atoi(argv[++i]);
@@ -946,12 +988,28 @@ int main(int argc, char **argv) {
     int ng = load_words(path, gword, 16384);
     snprintf(path, sizeof path, "%s/shared/words/mystery.txt", datadir);
     int na = load_words(path, aword, 16384);
-    snprintf(path, sizeof path, "%s/local/patterns/patterns.npy", datadir);
+    /* With --answers a played word need not be an answer, so its feedback comes
+     * from the SQUARE guess x guess matrix and the "column" list is the guess list.
+     * Without it, the original 12972 x 2315 matrix, exactly as before. */
     int r, cc;
-    pat_t *pat = load_npy(path, &r, &cc);
-    if (r != ng || cc != na) {
-        fprintf(stderr, "pattern matrix is %dx%d but the lists are %dx%d\n", r, cc, ng, na);
-        return 1;
+    pat_t *pat;
+    if (anspath) {
+        snprintf(path, sizeof path, "%s/local/patterns/patterns_full.npy", datadir);
+        pat = load_npy(path, &r, &cc);
+        if (r != ng || cc != ng) {
+            fprintf(stderr, "patterns_full.npy is %dx%d but the guess list is %d --\n"
+                            "  python3 build_patterns.py --full\n", r, cc, ng);
+            return 1;
+        }
+        memcpy(aword, gword, (size_t)ng * sizeof(*aword));
+        na = ng;
+    } else {
+        snprintf(path, sizeof path, "%s/local/patterns/patterns.npy", datadir);
+        pat = load_npy(path, &r, &cc);
+        if (r != ng || cc != na) {
+            fprintf(stderr, "pattern matrix is %dx%d but the lists are %dx%d\n", r, cc, ng, na);
+            return 1;
+        }
     }
 
     PWORD = malloc(sizeof(*PWORD) * MAXP);
@@ -992,6 +1050,30 @@ int main(int argc, char **argv) {
             return 1;
         }
     free(pat); free(gword); free(aword); free(prow); free(pcol);
+
+    /* Which pool words the run may END on.  Without --answers, all of them. */
+    ISA = malloc((size_t)NP);
+    memset(ISA, anspath ? 0 : 1, (size_t)NP);
+    if (anspath) {
+        SUBANS = 1;
+        char (*ans)[WBUF] = malloc(sizeof(*ans) * 16384);
+        int nans = load_words(anspath, ans, 16384);
+        int found = 0;
+        for (int i = 0; i < nans; i++) {
+            int k = -1;
+            for (int j = 0; j < NP; j++) if (!strcmp(PWORD[j], ans[i])) { k = j; break; }
+            if (k < 0) {
+                fprintf(stderr, "answer %s is not in the pool -- it could never be played\n", ans[i]);
+                return 1;
+            }
+            if (!ISA[k]) found++;
+            ISA[k] = 1;
+        }
+        free(ans);
+        if (!found) { fprintf(stderr, "--answers is empty\n"); return 1; }
+        fprintf(stderr, "only the LAST word must be an answer: %d answers in a %d-word pool\n",
+                found, NP);
+    }
 
 #ifdef _OPENMP
     nthreads = omp_get_max_threads();
@@ -1040,7 +1122,10 @@ int main(int argc, char **argv) {
         if (fresh) fprintf(out,
             "pool,words,mode,status,length,greedy,nodes,threads,secs,line\n");
     }
-    Row row = { out, poolpath ? poolpath : "mystery.txt",
+    char poollabel[1100];
+    snprintf(poollabel, sizeof poollabel, "%s%s%s", poolpath ? poolpath : "mystery.txt",
+             anspath ? "|answers=" : "", anspath ? anspath : "");
+    Row row = { out, poollabel,
                 greedy_only ? "greedy" : target ? "target"
                             : exact ? "exact" : "ladder",
                 ctxs, nthreads, t_start, 0 };

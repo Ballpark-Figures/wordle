@@ -45,6 +45,7 @@ math/solver/antistall
 math/solver/antiexpect
 math/solver/cover
 math/solver/eldrowmax
+math/solver/eldrowmaxg
 math/solver/wrongle
 math/solver/greens
 math/solver/strguess

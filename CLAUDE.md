@@ -4655,6 +4655,18 @@ still be a POSSIBLE ANSWER — consistent with every clue so far?". Run it with
     pools, and a pool where it is exercises none of the search; on random seeds the
     tally came up empty as often as not. So the gate keeps drawing until greedy is
     STRICTLY short of the answer, and failing to find one is itself a finding.
+- **`--plays guess`: ONLY THE LAST WORD MUST BE AN ANSWER** (added 2026-10-14,
+  user's call). Every play must still be consistent with every clue, but may be any
+  of the 12972; the run must END on one of the 2315. The binary flag is `--answers
+  PATH` (the pool stays `--words`); without it nothing changes. The one search
+  change: a branch is followable only while it still holds an answer. It needs the
+  SQUARE matrix and runs the `eldrowmaxg` build (same source, `MAXP 13000`, bigger
+  candidate arena and dedup table -- per-thread memory is far larger than the
+  2315 build's). Reference `eldrow.longest_run` (recomputes legal sets from the
+  strings); gated in `checkeldrowmax.py` on both builds, mutation-tested (dropping
+  the answer-holding test, and treating every word as an answer, both caught).
+  **A strictly larger play pool, so its number is never tabled beside the plain
+  one.** Cost on the full lists UNMEASURED -- `--greedy` first.
 - Data under `math/data/shared/eldrow/eldrowmax.<pool>.csv`, one row per run with
   every knob as a column; log under `math/data/local/eldrow/`.
 - **The rest of the antiwordle family (`antistall`, `antiexpect`, `antiwordle.py`,

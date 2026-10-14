@@ -7,6 +7,9 @@
 #     bash solver/run-eldrowmax.sh --floor 18            # skip re-deriving a known one
 #     bash solver/run-eldrowmax.sh --exact               # the same number, the slow way
 #     bash solver/run-eldrowmax.sh --words <list>.txt    # a different pool
+#     bash solver/run-eldrowmax.sh --plays guess         # any legal word may be
+#                                                        # played; only the LAST
+#                                                        # must be an answer
 #     bash solver/run-eldrowmax.sh --dry-run             # resolve and stop
 #
 # --dry-run STOPS AFTER RESOLUTION -- which pool, which output file -- and before
@@ -36,6 +39,13 @@
 # a word that could genuinely have been the answer. Every pool word must be in the
 # pattern matrix's lists. A different pool is a different quantity and lands in its
 # own CSV.
+#
+# --plays guess IS A DIFFERENT QUESTION (added 2026-10-14): every word played must
+# still be consistent with every clue, but may be any of the 12972 legal words;
+# only the FINAL word must be one of the 2315 answers. It runs the eldrowmaxg build
+# (room for 12972 words) with --words guess.txt --answers mystery.txt, needs the
+# square matrix (`python3 build_patterns.py --full`), and writes its own CSV. Its
+# number is never comparable with the plain one -- a strictly larger play pool.
 #
 # NO DEPTH CAP AND NO BEAM: the game has no cap and a restricted search would not
 # be the maximum. The only bound is that a chain cannot outlast its candidate set.
@@ -78,18 +88,36 @@ cd "$MATH" || exit 1
 ARGS=("$@")
 TAG=""
 DRY=0
+PLAYS=""
 PASS=()
 i=0
 while [ $i -lt ${#ARGS[@]} ]; do
     case "${ARGS[$i]}" in
         --words)   TAG=".$(basename "${ARGS[$((i + 1))]}" .txt)"
                    PASS+=("${ARGS[$i]}") ;;
+        --plays)   case "${ARGS[$((i + 1))]}" in
+                       guess) PLAYS=guess ;;
+                       *) echo "--plays takes 'guess'" >&2; exit 2 ;;
+                   esac
+                   i=$((i + 1)) ;;
         --dry-run) DRY=1 ;;
         *)         PASS+=("${ARGS[$i]}") ;;
     esac
     i=$((i + 1))
 done
 [ -n "$TAG" ] || TAG=".mystery"
+BIN=./solver/eldrowmax
+if [ "$PLAYS" = guess ]; then
+    [ -z "${TAG#.mystery}" ] || { echo "--plays guess sets the pool itself; drop --words" >&2; exit 2; }
+    TAG=".plays-guess"
+    BIN=./solver/eldrowmaxg
+    PASS+=(--words data/shared/words/guess.txt --answers data/shared/words/mystery.txt)
+    [ -x "$BIN" ] || { echo "no $BIN -- run 'sh build.sh' in solver/" >&2; exit 1; }
+    [ -f data/local/patterns/patterns_full.npy ] || {
+        echo "no data/local/patterns/patterns_full.npy -- run 'python3 build_patterns.py --full'" >&2
+        exit 1
+    }
+fi
 
 OUTDIR=data/shared/eldrow
 LOC=data/local/eldrow
@@ -100,13 +128,13 @@ if [ "$DRY" = 1 ]; then
     echo "  pool:   ${TAG#.}"
     echo "  out:    $MATH/$OUT"
     echo "  log:    $MATH/$LOG"
-    echo "  binary: ./solver/eldrowmax --out $OUT ${PASS[@]+${PASS[@]}}"
+    echo "  binary: $BIN --out $OUT ${PASS[@]+${PASS[@]}}"
     exit 0
 fi
 
 mkdir -p "$OUTDIR" "$LOC"
 
-guard_output eldrowmax "$OUT" || exit 1
+guard_output "$(basename "$BIN")" "$OUT" || exit 1
 
 # `date -Is` is GNU-only and prints NOTHING on macOS, which is how another wrapper
 # here ended up logging an empty timestamp.
@@ -116,4 +144,4 @@ echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] eldrowmax longest consistent chain -> $OU
 # `${PASS[@]+...}` is not decoration: under `set -u`, bash 3.2 -- which is what
 # macOS ships -- treats a bare "${PASS[@]}" on an EMPTY array as an unbound
 # variable and aborts, so the no-argument form documented above would die here.
-./solver/eldrowmax --out "$OUT" ${PASS[@]+"${PASS[@]}"} 2>&1 | tee -a "$LOG"
+"$BIN" --out "$OUT" ${PASS[@]+"${PASS[@]}"} 2>&1 | tee -a "$LOG"
