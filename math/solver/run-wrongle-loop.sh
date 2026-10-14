@@ -19,22 +19,33 @@
 #
 # A run that fails or is refused (the output guard, a missing binary) is reported
 # and the ladder moves on to the next K.
+#
+# --stop-on-repeat ends the ladder as soon as two CONSECUTIVE K in the list give
+# the same best value (answers lost). Off by default. Only a COMPLETE cell counts:
+# its CSV must hold every opener the root beam examines, min(K, 12972) rows. The
+# exit status cannot say so -- run-wrongle.sh pipes the solver into tee, so a
+# crashed solver still "succeeds" -- hence the row count. An incomplete cell
+# stops the ladder rather than feed a partial value to the comparison.
 
 set -u
 
 MATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$MATH" || exit 1
 
+NG=12972
 DEPTH=""
+STOP=0
+DRY=0
 PASS=()
 KS=()
 while [ $# -gt 0 ]; do
     case "$1" in
-        --depth)   DEPTH="$2"; shift ;;
-        --threads) PASS+=(--threads "$2"); shift ;;
-        --dry-run) PASS+=(--dry-run) ;;
-        -*)        echo "unknown flag $1" >&2; exit 2 ;;
-        *)         KS+=("$1") ;;
+        --depth)          DEPTH="$2"; shift ;;
+        --threads)        PASS+=(--threads "$2"); shift ;;
+        --dry-run)        PASS+=(--dry-run); DRY=1 ;;
+        --stop-on-repeat) STOP=1 ;;
+        -*)               echo "unknown flag $1" >&2; exit 2 ;;
+        *)                KS+=("$1") ;;
     esac
     shift
 done
@@ -42,13 +53,42 @@ done
 [ -n "$DEPTH" ] || { echo "--depth is required" >&2; exit 2; }
 [ ${#KS[@]} -gt 0 ] || { echo "give the K values to run, e.g. 1 2 3 5 10" >&2; exit 2; }
 
-echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] wrongle ladder: depth $DEPTH, K = ${KS[*]}"
+# "rows best" for one cell's CSV: data rows, and the largest solved value.
+cell_summary() {
+    awk -F, 'NR > 2 { n++; if ($2 == "solved" && ($3 + 0 > b || b == "")) b = $3 + 0 }
+             END { printf "%d %s\n", n, (b == "" ? "-" : b) }' "$1"
+}
+
+echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] wrongle ladder: depth $DEPTH, K = ${KS[*]}" \
+     "$([ "$STOP" = 1 ] && echo '(stop on repeat)')"
+PREV=""
+PREVK=""
 for K in "${KS[@]}"; do
     echo
     echo "=== depth $DEPTH, K=$K ==="
     bash solver/run-wrongle.sh --objective lose --depth "$DEPTH" -k "$K" \
         ${PASS[@]+"${PASS[@]}"} \
         || echo "!!! depth $DEPTH K=$K exited with status $? -- moving on"
+
+    [ "$STOP" = 1 ] && [ "$DRY" = 0 ] || continue
+    CSV="data/shared/wrongle/lose_d${DEPTH}_k${K}.csv"
+    WANT=$(( K < NG ? K : NG ))
+    if [ ! -f "$CSV" ]; then
+        echo "!!! depth $DEPTH K=$K wrote no CSV -- stopping this ladder"
+        break
+    fi
+    read -r ROWS BEST <<< "$(cell_summary "$CSV")"
+    if [ "$ROWS" -lt "$WANT" ]; then
+        echo "!!! depth $DEPTH K=$K is INCOMPLETE ($ROWS of $WANT openers) -- stopping this ladder"
+        break
+    fi
+    echo "--- depth $DEPTH K=$K complete: best $BEST lost"
+    if [ -n "$PREV" ] && [ "$BEST" = "$PREV" ]; then
+        echo "--- depth $DEPTH: K=$PREVK and K=$K both give $BEST -- stopping (repeat)"
+        break
+    fi
+    PREV="$BEST"
+    PREVK="$K"
 done
 echo
 echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] wrongle ladder: depth $DEPTH done"
