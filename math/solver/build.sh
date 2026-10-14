@@ -116,7 +116,12 @@ if [ $# -eq 0 ]; then
   # per-guess delta table nor either of antistall's two bounds survives the change
   # -- it shares the loader, the table and the arena and none of the search.
   gcc $BASE $OMP -o eldrowmax eldrowmax.c
-  echo "built ./optturns, ./hardturns, ./mmturns, ./ultraturns, ./pairsplit, ./secondword, ./secondexact, ./strturns, ./strguess, ./greens, ./antistall, ./antiexpect and ./eldrowmax  (5 letters)"
+  # wrongle is the REVERSE game: every guess consistent with the clues (over the
+  # 12972), and the strategy tries NOT to find the answer -- most answers lost
+  # within a cap, or most guesses in expectation.  eldrowmax's set machinery under
+  # greens' count-over-answers, so its own file like both of them.
+  gcc $BASE $OMP -o wrongle wrongle.c
+  echo "built ./optturns, ./hardturns, ./mmturns, ./ultraturns, ./pairsplit, ./secondword, ./secondexact, ./strturns, ./strguess, ./greens, ./antistall, ./antiexpect, ./eldrowmax and ./wrongle  (5 letters)"
   exit 0
 fi
 

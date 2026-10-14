@@ -4661,6 +4661,46 @@ still be a POSSIBLE ANSWER — consistent with every clue so far?". Run it with
   `eldrow.py`) has NO section here** — the source headers and the wrapper comments
   are the documentation. Worth writing up when one of them is next touched.
 
+## `wrongle` — compatible guesses only, trying NOT to find the answer
+`math/wrongle.py` states the rule and both value functions and IS the source of
+truth; `solver/wrongle.c` is the solver. Run it with **`bash solver/run-wrongle.sh
+[--objective lose|expect] [--depth D] [-k K] [--opener W]`** (from `math/`),
+attached, tee'd log, `--dry-run`. Built 2026-10-14 (user's spec).
+- **Wrongle is a real App Store game** ("more is more": every guess must follow
+  the feedback so far, Wrongler Trophy at 6+ guesses). The OBJECTIVES here are the
+  user's, and the word lists are ours, not Wrongle's.
+- **LEGALITY = ultraturns', NOT eldrowmax's** (user's call): any of the 12972 legal
+  words that is CONSISTENT with every clue so far, so guess-only words are playable.
+  Answer uniform over the 2315. **The state is the legal set L** (one more clue just
+  filters it); answers still possible = L restricted to the answers. Needs the
+  SQUARE matrix (`build_patterns.py --full`).
+- **TWO OBJECTIVES, two quantities, never in one table** (nor beside an
+  optturns-family total, which minimise). **The binary has NO default objective**;
+  the wrapper defaults to `lose`, depth 6, and forwards both explicitly.
+  - `lose --depth D`: maximise answers NOT found within D guesses. D is the
+    objective (6 = lose the Wordle, 5 = reach the trophy); each D its own file.
+  - `expect`: maximise expected guesses, UNCAPPED, reported as the integer total
+    over the 2315. Refuses `--depth`.
+- **`|L| <= d` means 0 lost, exactly** (each guess removes the word played and
+  never the answer). Child bounds: lose `|A_p|` (0 when `|L_p| <= d`), expect
+  `|A_p| * |L_p|`.
+- **`-k K` is a beam at every node, ROOT INCLUDED**, ranked by the LARGEST sum of
+  squared ANSWER-bin sizes (all bins, all-green included), ties on the lowest
+  guess index -- the repo's rule turned upside down at the user's request
+  ("maximise average words remaining"). Values are LOWER bounds; the winner is the
+  best of the K examined. K in the filename and the stamp.
+- Data `data/shared/wrongle/{lose_d<D>,expect}_k<K>[_openers].csv`, resumable,
+  first line a stamp; a run asking a different question REFUSES to append. Log
+  under `data/local/wrongle/`. **No trees yet** -- open gap.
+- **`python3 tools/checkwrongle.py` is the GATE** (~3 s): per-opener values, both
+  objectives, several caps, against the reference (which recomputes legal sets
+  from the STRINGS); `--no-prune`; the beam at K=1..3 per opener and at the root;
+  the sweep's best and tie list; resume and stamp refusal; the refusals; the real
+  square matrix spot-checked. Coverage asserted. MUTATION-TESTED: flipped beam
+  tie-break, every word counted as an answer, and an unsound lose bound were each
+  caught.
+- **COST IS UNMEASURED.** Price with `--opener` before an exact sweep.
+
 ## `schedule(dynamic)` IS STATIC-STEAL ON THE MACS -- what a progress log means
 **MEASURED 2026-09-16, and it explains a log that reads like a bug.** libomp
 implements `schedule(dynamic, N)` as **static-steal**: each thread starts on its
