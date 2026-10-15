@@ -24,9 +24,10 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   g reveal_right — the guess glyphs flip over to letters             (04g, VO 5)
   h reveal_left  — the answer glyphs flip over to letters            (04h, VO 5)
   i piggy        — PIGGY rises from below the guess list to the top as
-                   the answers regroup into its groups; a scored
-                   PIGGY row atop each group                         (04i, VO 6)
-  j clear_out    — everything out, for scene 05 (not a script beat)
+                   the answers regroup into its groups              (04i, VO 6)
+  j piggy_colors — a scored PIGGY row atop each group      (04i, VO 6; split
+                   from i, user 2026-10-06)
+  k clear_out    — everything out, for scene 05 (not a script beat)
 
 REUSE MAP — every element and the one source it comes from:
   board                  assets/board.py `get_board`, as scenes 02/03
@@ -178,7 +179,7 @@ class Scene04(WordleBoardScene):
         self.play(FadeOut(self.board), run_time=0.6)
         self.board = None
         rows = [self.ans[w] for w in ANSWERS[:N_ROWS]] + [self.ans_dots]
-        self._reveal_list(self.ans_title, rows, 2.4)
+        self._reveal_list(self.ans_title, rows, 1.5)
 
     def _setup_guesses(self):
         self.gss_title = crisp_text(f"{DATA['n_guesses']:,} Guesses", font_size=TITLE_FS,
@@ -192,7 +193,7 @@ class Scene04(WordleBoardScene):
     @subscene
     def guesses(self):
         self._setup_guesses()
-        self._reveal_list(self.gss_title, self.gss + [self.gss_dots], 2.4)
+        self._reveal_list(self.gss_title, self.gss + [self.gss_dots], 1.5)
 
     def _setup_group_aahed(self):
         assert self.gss[0].word == TOP_GUESS
@@ -223,12 +224,12 @@ class Scene04(WordleBoardScene):
     def group_more(self):
         self._setup_group_more()
         slots, scale, _, _ = self.lay2
-        self._regroup(slots, scale, 2.0, extra=self._swap_guess(self.guess, self.guess2))
+        self._regroup(slots, scale, 1.0, extra=self._swap_guess(self.guess, self.guess2))
         self.remove(self.guess)
-        self.wait(1.0)                              # PIGGY's groups hold a moment
+        self.wait(0.5)                              # PIGGY's groups hold a moment
 
         slots, scale, _, _ = self.lay3
-        self._regroup(slots, scale, 2.0, extra=self._swap_guess(self.guess2, self.guess3))
+        self._regroup(slots, scale, 1.0, extra=self._swap_guess(self.guess2, self.guess3))
         self.remove(self.guess2)
         self.guess = self.guess3
         self.guess2 = self.guess3 = self.lay2 = self.lay3 = None
@@ -268,11 +269,10 @@ class Scene04(WordleBoardScene):
         # PIGGY starts below the guess list, where it would sit if the list ran on
         self.guess = PigpenWord(SECOND, revealed=True) \
             .move_to([RIGHT_X, -config.frame_y_radius - 0.6, 0])
-        self.slots, self.gscale, heads, groups = _layout(SECOND, header=True)
-        self.heads = scored_headers(SECOND, groups, heads, self.gscale)
+        self.slots, self.gscale, _heads, _groups = _layout(SECOND, header=True)
 
     # i : PIGGY rises from below the guess list to the top WHILE the answers regroup
-    #     into its groups; then each group's coloured PIGGY
+    #     into its groups
     @subscene
     def piggy(self):
         self._setup_piggy()
@@ -282,9 +282,20 @@ class Scene04(WordleBoardScene):
             FadeOut(self.gss_title), FadeOut(self.gss_dots),
             FadeOut(self.ans_title), FadeOut(self.ans_dots),
             self.guess.animate.scale(GUESS_SCALE).move_to([0, GUESS_Y, 0])])
+
+    def _setup_piggy_colors(self):
+        # the same layout i regrouped into, so each header sits on its own group
+        _slots, gscale, heads, groups = _layout(SECOND, header=True)
+        self.heads = scored_headers(SECOND, groups, heads, gscale)
+
+    # j : each group's coloured PIGGY (split from i, user 2026-10-06 — the script
+    #     has i as one beat)
+    @subscene
+    def piggy_colors(self):
+        self._setup_piggy_colors()
         self.play(*[FadeIn(h) for h in self.heads], run_time=0.8)
 
-    # j : everything out, so scene 05 starts on an empty frame (not a script beat —
+    # k : everything out, so scene 05 starts on an empty frame (not a script beat —
     #     split from i so the clear can be placed on its own in the edit)
     @subscene
     def clear_out(self):
