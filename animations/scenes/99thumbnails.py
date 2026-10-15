@@ -17,6 +17,8 @@ BEAT MAP
                 the video's own tile borders; lines white (b's black, swapped) / gold /
                 yellow / orange
   j, k        — a and g with gaps between the bars, at 08's proportion
+  l first_tree — FIRST's whole optimal tree on navy, exactly as at the end of
+                 07z (same layout, same turn), tree only: no average block
 
 REUSE MAP
   background    WordleScene (BG_COLOR, the channel's light blue)
@@ -30,6 +32,9 @@ REUSE MAP
                 exact value as in 08, SALET at its bar's centre
   tile borders  thin black (user's call); the video's own (get_scored_row) in f-i
   arrow         manim DoubleArrow, navy (white in f-i, with the axis)
+  FIRST's tree  assets/full_tree.py `full_tree` / `full_start` (07z's builder,
+                moved there to share); tree from assets/tree_data.py `full["first"]`;
+                background BOARD_NAVY, 07's
 """
 from pathlib import Path
 from collections import Counter
@@ -46,6 +51,8 @@ from bpkfigures.histogram import get_histogram
 from assets import histogram_data
 from assets.board import get_scored_row
 from assets.word_stacks import WORD_W, PITCH
+from assets.full_tree import full_tree, full_start
+from assets import tree_data
 
 from wordle import pattern
 
@@ -65,6 +72,8 @@ TILE_BORDER_W = 2.0
 GAP_RATIO = WORD_W / PITCH       # j, k: 08's bars, a word wide on a word + gap pitch
 QAJAQ_UNDER = "audio"            # QAJAQ sits directly below this row ...
 QAJAQ_FRAC = 0.5                 # ... this far from it down to the x-axis
+FIRST_TURN = (8,)                # l: the branch pointing straight down -- 07's BIG_CODE
+                                 #   (- - - G G), so the tree is turned as at the end of 07z
 # the two schemes: (background, bars, axis + arrow, tile border)
 LIGHT = (BG_COLOR, BOARD_NAVY, BOARD_NAVY, BLACK)
 DARK = (BOARD_NAVY, BG_COLOR, WHITE, None)     # inverted; border None = the video's own
@@ -139,6 +148,15 @@ class Thumbnails(WordleScene):
     @thumbnail
     def gaps_dark(self):
         self._histogram(ACCENT_GOLD, DARK, gaps=True)
+
+    # l : FIRST's whole optimal tree, as at the end of 07z, tree only
+    @thumbnail
+    def first_tree(self):
+        self.camera.background_color = BOARD_NAVY
+        tree = tree_data.load()["full"]["first"]
+        root, nodes, lines, _ = full_tree(tree, ORIGIN,
+                                          full_start(tree, FIRST_TURN, -np.pi / 2))
+        self.add(*lines.values(), root, *[m for ms in nodes.values() for m in ms])
 
     def _histogram(self, line_color, scheme=LIGHT, gaps=False):
         bg, ink, axis_color, border = scheme
