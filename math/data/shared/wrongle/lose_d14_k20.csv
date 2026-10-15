@@ -1,0 +1,22 @@
+# wrongle objective=lose depth=14 topk=20 root=sweep guesses=12972 answers=2315
+opener,status,value,bound,per_answer,secs
+jujus,solved,21,2305,0.009071,150.247
+qajaq,solved,39,2310,0.016847,294.336
+yukky,solved,26,2305,0.011231,149.972
+kudzu,solved,10,2304,0.004320,75.634
+zoppo,solved,20,2304,0.008639,117.318
+kibbi,solved,18,2301,0.007775,110.913
+fuzzy,solved,15,2299,0.006479,95.629
+buzzy,solved,17,2295,0.007343,67.914
+bubby,solved,28,2295,0.012095,127.474
+gyppy,solved,12,2293,0.005184,114.801
+susus,solved,37,2295,0.015983,187.070
+yummy,solved,21,2293,0.009071,92.930
+immix,solved,32,2293,0.013823,157.405
+hyphy,solved,13,2292,0.005616,88.503
+jugum,solved,9,2291,0.003888,91.125
+fuffy,solved,25,2289,0.010799,115.065
+xylyl,solved,27,2291,0.011663,141.837
+mummy,solved,22,2285,0.009503,10.923
+oxbow,solved,16,2289,0.006911,80.570
+vivid,solved,24,2283,0.010367,95.411
