@@ -1,5 +1,5 @@
 width,k,guesses,answers,classes,opener,total,expected,seconds
-8,1,374246,17723,11765,48-32=16,52700,2.973537,229.0
+8,1,374246,17723,11765,48-32=16,52700,2.973537,96.9
 
 rank,guess,sum_of_squares
 1,48-32=16,551362
