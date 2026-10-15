@@ -48,7 +48,7 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                    right: FIRST scored G-YG-, its line out the top, FRESH
                    under it (FRESH is the user's pick)                 (07m, VO 5)
   n type_fresh   — FRESH typed below that FIRST, tiles appearing as typed (07n, VO 5)
-  o score_fresh  — FRESH scored, all green                            (07o, VO 5)
+  o score_fresh  — FRESH scored all green, a quick sequence as in s   (07o, VO 5)
   p fresh_win    — the bottom word fades as FRESH does the win bounce (07p, VO 5)
   q pair_swap    — FRESH's case off left, the two-word case in from the right:
                    FIRST scored --GGG, its line, BURST and WORST under it
@@ -59,42 +59,46 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                    and right, a line from BURST's R to each; each BURST
                    flips to its scoring on the way (all green left, --GGG
                    right); BURST and WORST glide under their cases (07s-u, VO 6)
-  t left_win     — the left case's winning bounce as BURST fades       (07v, VO 6)
-  u right_branch — WORST typed under the right case's BURST; a copy of the
-                   case branches straight down, its WORST flipping to
-                   all green on the way, the black WORST coming down
-                   with it; winning bounce as the black WORST fades    (07w, VO 6)
+  t right_branch — the left case's winning bounce as BURST fades, WHILE
+                   WORST is typed under the right case's BURST (merged
+                   2026-10-06); a copy of the case branches straight
+                   down, its WORST flipping to all green on the way, the
+                   black WORST coming down with it; winning bounce as the
+                   black WORST fades                               (07v-w, VO 6)
 
-  v six_cases    — the BURST/WORST tree off to the left; TEASE's and FIERY's
+  u six_cases    — the BURST/WORST tree off to the left; TEASE's and FIERY's
                    6-word groups in from the right, side by side (user's
                    picks: TEASE's next guess is in its group, FIERY's,
                    BOXEN, is not; both from FIRST's optimal tree)      (07x, VO 7)
-  w tease_tree   — FIERY's group shrinks into the top-right corner as
+  v tease_tree   — FIERY's group shrinks into the top-right corner as
                    TEASE's goes to the root; then its whole tree grows
                    across the frame, r-u's steps with every branch at once (07y, VO 7)
-  x fiery_tree   — TEASE's tree shrinks into the top-left corner as FIERY's
+  w fiery_tree   — TEASE's tree shrinks into the top-left corner as FIERY's
                    group comes to the root; then its tree grows the same (07z, VO 7)
 
-  y big_case     — everything off to the left; FIRST's BBBGG group (14 words,
+  x big_case     — everything off to the left; FIRST's BBBGG group (14 words,
                    code 8; the user's pick over the script's 48-word BYBYB) in
                    from the right, the words in a grid                 (07za, VO 8)
 
-  z big_trees    — the optimal tree for the 14 words after each forced next
+  y big_trees    — the optimal tree for the 14 words after each forced next
                    guess in turn, AFTER, AGAIN, OTHER then BAGEL (the
                    optimal one): each whole tree sprouts from the root, no
                    typing and no win bounces (user's call, for time); the
                    tree contracts into the root between guesses; trees from
                    solver/run-subgroup-tree.sh                         (07zb, VO 8)
 
-  za first_full  — zoom out: every piece of BAGEL's tree moves into its place
+  z first_full  — zoom out: every piece of BAGEL's tree moves into its place
                    as one branch of FIRST's WHOLE optimal tree (radial, node
                    widths as sqrt(group size), big groups near the middle),
                    centred on FIRST; the rest fades in; the corner counts to
                    FIRST's average (3.52, white: not the best opener)  (07zc, VO 9)
 
-  NB from s on the LETTERS run behind the script's: three script beats (s, t, u)
-  are one subscene, so the script's v is subscene t, w is u, x is v, y is w and
-  z is x, za is y, zb is z, zc is za.
+  za move_up     — the camera moves up, the tree sliding down and off, to the
+                   empty navy frame scene 08 opens on (not a script beat)
+
+  NB from s on the LETTERS run behind the script's: the script's s, t and u are
+  one subscene (s), and its v and w are another (t), so the script's x is
+  subscene u, y is v, z is w, za is x, zb is y and zc is z.
 
 REUSE MAP — every element and the one source it comes from:
   board, typing, reveal   assets/board.py `get_board`, `type_word` (its
@@ -322,14 +326,15 @@ class Scene07(MovingCameraScene, WordleBoardScene):
     pair_swap — FRESH's case out left, the BURST/WORST case in from the right
     type_burst — BURST typed under FIRST
     branch_score — rise, branch, score both BURSTs, words under, all at once
-    left_win — the left case bounces
-    right_branch — WORST typed; a copy branches down, WORST scoring as it goes
+    right_branch — the left case bounces as WORST is typed; a copy branches down,
+        WORST scoring as it goes
     six_cases — the two 6-word groups in from the right
     tease_tree — FIERY's group to a corner; TEASE's tree grows
     fiery_tree — TEASE's tree to a corner; FIERY's tree grows
     big_case — FIRST's 14-word BBBGG group in from the right
     big_trees — the optimal tree after AFTER, AGAIN, OTHER, then BAGEL
     first_full — zoom out: BAGEL's tree into place in FIRST's whole tree
+    move_up — the camera up, the tree down and off, to scene 08's empty frame
     """
 
     def setup_scene(self):
@@ -509,7 +514,7 @@ class Scene07(MovingCameraScene, WordleBoardScene):
     def after_split(self):
         self._setup_split(AFTER)
         self.board.type_word(self, 1, AFTER, 0.65, per_letter=key_cues(self), appear=True)
-        self._split(2.0)
+        self._split(1.0)
 
     def _setup_after_narrow(self):
         (g, stack, row), rest = self.blocks[0], self.blocks[1:]
@@ -526,8 +531,8 @@ class Scene07(MovingCameraScene, WordleBoardScene):
     @subscene
     def after_narrow(self):
         self._setup_after_narrow()
-        self.board.reveal(self, 1, KEEP[AFTER], 1.6)
-        self._focus(2.0)
+        self.board.reveal(self, 1, KEEP[AFTER], 1.0)
+        self._focus(1.0)
 
     # g : THIRD typed into row 2, its tiles appearing as typed; the words regroup
     #     into THIRD's subgroups, FIRST and AFTER over each, a scored THIRD fading in
@@ -535,7 +540,7 @@ class Scene07(MovingCameraScene, WordleBoardScene):
     def third_split(self):
         self._setup_split(THIRD)
         self.board.type_word(self, 2, THIRD, 0.65, per_letter=key_cues(self), appear=True)
-        self._split(2.0)
+        self._split(1.0)
 
     # ── back to FIRST's groups, and FIRST's own branch (h-l) ──────────────────
     def _setup_rewind(self):
@@ -583,7 +588,7 @@ class Scene07(MovingCameraScene, WordleBoardScene):
     @subscene
     def rewind(self):
         self._setup_rewind()
-        self.play(*self.r_anims, run_time=1.5)
+        self.play(*self.r_anims, run_time=1.0)
         first_row, target = self.r_swap
         self.remove(*self.r_gone, *self.r_later, *self.r_back)
         self.add(target, *self.dots.values(), *[row for row, _ in self.units.values()])
@@ -626,7 +631,7 @@ class Scene07(MovingCameraScene, WordleBoardScene):
         self.play(*[grp.animate.shift(v) for grp, v, _ in self.up],
                   *[l.animate.put_start_and_end_on(l.get_start(), l.get_end() + v)
                     for _, v, l in self.up],
-                  run_time=1.2)
+                  run_time=1.0)
         self.remove(*[grp for grp, _, _ in self.up])
         self.up = None
 
@@ -665,7 +670,7 @@ class Scene07(MovingCameraScene, WordleBoardScene):
                   Transform(self.g_line, self.g_line_new),
                   *[l.animate.put_start_and_end_on(self.g_start, l.get_end())
                     for l in self.gone],
-                  run_time=2.0)
+                  run_time=1.0)
         self.remove(self.g_dot)
         self.g_dot = self.g_line_new = self.g_start = None
 
@@ -698,7 +703,7 @@ class Scene07(MovingCameraScene, WordleBoardScene):
                   UpdateFromAlphaFunc(self.g_line, lambda m, a: self._connect(a),
                                       rate_func=linear),
                   *self._avg_in(),
-                  run_time=1.5)
+                  run_time=1.0)
         self.remove(self.left, *self.gone)
         self.left = self.gone = self.k_ends = self.k_up = self.k_shift = None
 
@@ -777,10 +782,12 @@ class Scene07(MovingCameraScene, WordleBoardScene):
         self._setup_type_fresh()
         self.guess2.type_word(self, 0, SINGLE, 0.65, per_letter=key_cues(self), appear=True)
 
-    # o : FRESH scored — all green
+    # o : FRESH scored — all green, a quick sequence of flips matching s's: the
+    #     tiles a quarter-flip apart (lag_ratio 0.25) over ~0.9s, which is how long
+    #     s's flips are visible in the middle of its 1.8s move (MEASURED from frames)
     @subscene
     def score_fresh(self):
-        self.guess2.reveal(self, 0, ALL_GREEN, 1.6)
+        self.guess2.reveal(self, 0, ALL_GREEN, 0.9, lag_ratio=0.25)
 
     # p : the word at the bottom vanishes AS FRESH does the winning row's bounce (as l)
     @subscene
@@ -894,18 +901,10 @@ class Scene07(MovingCameraScene, WordleBoardScene):
     def branch_score(self):
         self._setup_branch_score()
         self.add(*self.kid_lines, *self.s_firsts, *self.s_olds)
-        flip(self, self.s_flips, 1.8, extra=self.s_anims)
+        flip(self, self.s_flips, 1.0, extra=self.s_anims)
         self.remove(VGroup(self.pcase, self.prow))
         self.add(self.pcase, self.prow, *self.prow.letters[0], *self.s_firsts)
         self.s_anims = self.s_olds = self.s_flips = self.s_firsts = None
-
-    # t (script v) : the left case (all green) does the winning bounce as BURST under it fades
-    @subscene
-    def left_win(self):
-        row = self.kids[0][1]
-        self.play(FadeOut(self.pwords[0]), row.bounce_anim(0, height=_jump(row)),
-                  run_time=1.0)
-        self.remove(self.pwords[0])
 
     def _setup_right_branch(self):
         """The row WORST is typed into, under the right case's BURST — where the black
@@ -931,14 +930,22 @@ class Scene07(MovingCameraScene, WordleBoardScene):
                          w.animate.move_to(self._under(w, [self.gwin]))])
         self.add(self.gfirst)
 
-    # u (script w) : WORST typed under the right case's BURST; then a copy of the
-    #     case branches straight down, its WORST flipping to all green on the way and
-    #     the black WORST coming down with it; the winning bounce as the black WORST
-    #     fades (user's call: the same shape as r and s)
+    # t (script v and w) : the left case (all green) does the winning bounce as BURST
+    #     under it fades, WHILE WORST is typed under the right case's BURST (user's
+    #     call 2026-10-06, merging the old t into u); then a copy of the case branches
+    #     straight down, its WORST flipping to all green on the way and the black
+    #     WORST coming down with it; the winning bounce as the black WORST fades
     @subscene
     def right_branch(self):
         self._setup_right_branch()
-        self.wrow.type_word(self, 0, PAIR[1], 0.65, per_letter=key_cues(self), appear=True)
+        left = self.kids[0][1]
+        typing, type_rt = self.wrow.type_anim(self, 0, PAIR[1], 0.65,
+                                              per_letter=key_cues(self), appear=True)
+        # no play-level run_time: the win keeps its 1.0s, the typing its own length
+        self.play(AnimationGroup(FadeOut(self.pwords[0]),
+                                 left.bounce_anim(0, height=_jump(left)), run_time=1.0),
+                  AnimationGroup(typing, run_time=type_rt))
+        self.remove(self.pwords[0])
         self._branch_down()
         self.play(FadeOut(self.pwords[1]), self.gwin.bounce_anim(0, height=_jump(self.gwin)),
                   *self._avg_show(str(PAIR_CODE)), run_time=1.0)
@@ -984,7 +991,7 @@ class Scene07(MovingCameraScene, WordleBoardScene):
         self.x_in = VGroup(*[m for c in self.cases for m in (c["row"], c["line"], *c["words"])])
         self.x_in.shift(RIGHT * SWAP_DIST)
 
-    # x : the BURST/WORST tree off to the left; two 6-word groups in from the right —
+    # u (script x) : the BURST/WORST tree off to the left; two 6-word groups in from the right —
     #     TEASE's (its next guess is one of its words) and FIERY's (its next guess,
     #     BOXEN, is not)
     @subscene
@@ -1135,7 +1142,7 @@ class Scene07(MovingCameraScene, WordleBoardScene):
             fiery["row"].tiles[0][2])
         self.y_root = self._to_root(tease)
 
-    # y : FIERY's group shrinks into the top-right corner as TEASE's goes to the root;
+    # v (script y) : FIERY's group shrinks into the top-right corner as TEASE's goes to the root;
     #     then TEASE's whole tree grows across the frame
     @subscene
     def tease_tree(self):
@@ -1161,7 +1168,7 @@ class Scene07(MovingCameraScene, WordleBoardScene):
                                                       tease["row"].tiles[0][2])
         self.z_root = self._to_root(fiery)
 
-    # z : TEASE's tree shrinks into the top-left corner as FIERY's group comes out of
+    # w (script z) : TEASE's tree shrinks into the top-left corner as FIERY's group comes out of
     #     its corner to the root; then FIERY's whole tree grows across the frame
     @subscene
     def fiery_tree(self):
@@ -1200,7 +1207,7 @@ class Scene07(MovingCameraScene, WordleBoardScene):
         self.za_old = VGroup(*self._leaves())
         self.za_in = VGroup(self.big, self.big_line, *self.big_words).shift(RIGHT * SWAP_DIST)
 
-    # y (script za) : FIERY's tree and TEASE's off to the left; FIRST's BBBGG group
+    # x (script za) : FIERY's tree and TEASE's off to the left; FIRST's BBBGG group
     #     (the user's pick over the script's BYBYB), all 14 words, in from the right
     @subscene
     def big_case(self):
@@ -1354,7 +1361,7 @@ class Scene07(MovingCameraScene, WordleBoardScene):
         self.remove(tree)
         self.add(self.big_line, self.big, self.avg_lab, self.avg_num)
 
-    # z (script zb) : the optimal tree after each forced guess in turn -- AFTER,
+    # y (script zb) : the optimal tree after each forced guess in turn -- AFTER,
     #     AGAIN, OTHER, then BAGEL (the optimal one) -- each sprouting at once, the tree
     #     contracting back into the root between guesses
     @subscene
@@ -1577,7 +1584,7 @@ class Scene07(MovingCameraScene, WordleBoardScene):
         # a bright line over a faint one that snapped off at the end
         self.ff_shown = [b for _, b in pairs]
 
-    # za (script zc) : zoom out -- the camera pulls back from BAGEL's tree to FIRST's
+    # z (script zc) : zoom out -- the camera pulls back from BAGEL's tree to FIRST's
     #     whole tree, already in place above, while the branch's edge contracts and
     #     BAGEL's pieces move into their radial places; FIRST's tree has its own
     #     average block, BAGEL's stays behind
@@ -1587,10 +1594,27 @@ class Scene07(MovingCameraScene, WordleBoardScene):
         self.play(self.ff_avg.animate.shift(RIGHT * self.ff_avg_off), run_time=0.6)
         self.remove(self.ff_avg, *self.ff_avg)
         self.add(*self.ff_rest, *self.ff_shown)
-        self.play(*self.ff_anims, run_time=4.0)
+        self.play(*self.ff_anims, run_time=8.0)
         self.remove(*self.ff_gone)
         self.add(*self.ff_keep)
         self.ff_anims = self.ff_gone = self.ff_keep = self.ff_rest = self.ff_shown = None
         self.ff_avg = self.ff_avg_off = None
         self.big_keyed = self.big_row = None
+
+    # za : the CAMERA moves up, so the tree slides down and off, leaving the empty
+    #      navy frame scene 08 opens on (not a script beat — the 7-to-8 transition,
+    #      user 2026-10-07). It rises at least a page, and further if anything reaches
+    #      above the frame, so nothing scrolls INTO view on the way. Moving the camera
+    #      rather than the tree is the same picture at a fraction of the cost: the
+    #      tree is far too big to copy and shift every frame.
+    @subscene
+    def move_up(self):
+        f = self.camera.frame
+        drawn = [x for m in self.mobjects for x in m.family_members_with_points()]
+        top = max(x.get_top()[1] for x in drawn) if drawn else f.get_top()[1]
+        d = max(f.height, top - f.get_bottom()[1] + 0.1)
+        home = f.get_center()
+        self.play(f.animate.shift(UP * d), run_time=1.2)
+        self.remove(*self.mobjects)
+        f.move_to(home)                       # an empty frame either way; back home
 
