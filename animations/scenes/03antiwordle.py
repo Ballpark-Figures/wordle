@@ -35,6 +35,9 @@ from assets.board import get_board, TILE, GAP, COLS, ROWS
 from assets import game_data
 from assets.keys import key_cues
 
+# dB: this scene types quieter than the video-wide TYPING_GAIN (-6) (user 2026-10-06)
+TYPING_GAIN_03 = -12.0
+
 GAME = game_data.load("antiwordle")
 WORDS = [g["word"] for g in GAME["guesses"]]
 CODES = [g["code"] for g in GAME["guesses"]]
@@ -74,12 +77,14 @@ class Scene03(WordleBoardScene):
     # a : the chain — type, quick-score; past the 6th guess, shrink to fit a row
     @subscene
     def chain(self):
-        type_rt, score_rt, grow_rt = 0.45, 0.4, 0.35       # lockstep, all 16
+        type_rt, score_rt, grow_rt = 0.35, 0.3, 0.25       # lockstep, all 16
         for i, word in enumerate(WORDS):
             if i >= ROWS:
                 self.board.add_row(self, grow_rt, column_height(i + 1))
+            elif i > 0:
+                self.wait(grow_rt)       # the first six keep the grow's beat (none before guess 1)
             self.board.type_word(self, i, word, type_rt,
-                                 per_letter=key_cues(self))
+                                 per_letter=key_cues(self, gain=TYPING_GAIN_03))
             self.board.reveal(self, i, CODES[i], score_rt, lag_ratio=0)
 
     def _setup_columns(self):

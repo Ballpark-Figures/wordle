@@ -83,7 +83,7 @@ from manim import MovingCameraScene
 
 from config import *
 from assets.board import get_board, get_scored_row
-from assets.keys import key_cues
+from assets.keys import key_cues, INTRO_TYPING_GAIN
 from assets import intro_data
 from assets.word_stacks import (WordStacks, StacksCamera, PITCH, STEP, SIDE,
                                 WORD_W)
@@ -119,7 +119,7 @@ WORD_SFX = "notify-text"      # f: the sound of a word landing in the histogram
 WORD_GAIN = -6.0              # dB — f's word dings, quieter than the library level (user 2026-10-06)
 NOISE_GAIN = -12.0            # dB — i's two pings, quieter still (user's call)
 # PING_SFX (h onward: a word emphasised / called out, and i's noise) and WHOOSH_SFX
-# (under every camera move: d, e, f's pan, g, j-m) come from assets/stacks_view.py
+# (under the camera moves of d, e, f's pan, g, j, m and n; l's has none, user 2026-10-06) come from assets/stacks_view.py
 FILL_SFX_MAX_PER_S = 15.0     # f: one cue per word, but no more than this many a
                               # second — at the fill's peak ~40 words land PER FRAME,
                               # and hundreds of overlapping copies of a 1.1s sound
@@ -485,7 +485,7 @@ class Scene01(StacksView, MovingCameraScene, WordleDarkScene):
         # run_time is ONE letter's pop, the same as a word typed over 0.8s at the
         # default pace; key_gap slows only the typist
         self.board.type_word(self, 0, "start", run_time=0.44, key_gap=0.33,
-                             per_letter=key_cues(self))
+                             per_letter=key_cues(self, gain=INTRO_TYPING_GAIN))
 
     # b : bottom five rows fade, board drops so START is centred, bg to navy
     def _setup_to_navy(self):
@@ -626,25 +626,25 @@ class Scene01(StacksView, MovingCameraScene, WordleDarkScene):
     def starters(self):
         # the rest dims as the first comes up, then one word at a time
         self.sfx(PING_SFX, gain=PING_GAIN)
-        self._move_view(VIEW_STARTERS, run_time=0.5, weights={"irate": 1})
-        self.wait(0.4)
+        self._move_view(VIEW_STARTERS, run_time=0.3, weights={"irate": 1})
+        #self.wait(0.4)
         self.sfx(PING_SFX, gain=PING_GAIN)
-        self._move_view(VIEW_STARTERS, run_time=0.5, weights={"train": 1})
-        self.wait(0.4)
+        self._move_view(VIEW_STARTERS, run_time=0.3, weights={"train": 1})
+        #self.wait(0.4)
         self.sfx(PING_SFX, gain=PING_GAIN)
-        self._move_view(VIEW_STARTERS, run_time=0.5, weights={"arise": 1})
-        self.wait(0.4)
+        self._move_view(VIEW_STARTERS, run_time=0.3, weights={"arise": 1})
+        #self.wait(0.4)
         self.sfx(PING_SFX, gain=PING_GAIN)
-        self._move_view(VIEW_STARTERS, run_time=0.5, weights={"crane": 1})
-        self.wait(0.4)
+        self._move_view(VIEW_STARTERS, run_time=0.3, weights={"crane": 1})
+        #self.wait(0.4)
         self.sfx(PING_SFX, gain=PING_GAIN)
-        self._move_view(VIEW_STARTERS, run_time=0.5, weights={"raise": 1})
-        self.wait(0.4)
+        self._move_view(VIEW_STARTERS, run_time=0.3, weights={"raise": 1})
+        #self.wait(0.4)
         self.sfx(PING_SFX, gain=PING_GAIN)
-        self._move_view(VIEW_STARTERS, run_time=0.5, weights={"slate": 1})
-        self.wait(0.4)
+        self._move_view(VIEW_STARTERS, run_time=0.3, weights={"slate": 1})
+        #self.wait(0.4)
         self.sfx(PING_SFX, gain=PING_GAIN)
-        self._move_view(VIEW_STARTERS, run_time=0.5, weights={"stare": 1})
+        self._move_view(VIEW_STARTERS, run_time=0.3, weights={"stare": 1})
 
     # i : the noise — no change
     @subscene
@@ -653,6 +653,7 @@ class Scene01(StacksView, MovingCameraScene, WordleDarkScene):
         # cue would fall in the trailing hold, which the stitch trims and the edit
         # covers with a still — i.e. it would never be heard
         self.sfx(PING_SFX, gain=NOISE_GAIN)                 # ADIEU
+        self.wait(0.3)
         self.sfx(PING_SFX, at=0.6, gain=NOISE_GAIN)         # AUDIO
         self.wait(1.9)
 
@@ -674,19 +675,24 @@ class Scene01(StacksView, MovingCameraScene, WordleDarkScene):
     # and called out now, off screen, for m to uncover.
     @subscene
     def those_words(self):
-        self._move_view(VIEW_THOSE_WORDS, run_time=3.0, whoosh=True, appear=["those", "words"],
-                        weights={"adieu": 1, "audio": 1}, present=["adieu", "audio"])
+        # rush_from: the zoom is already moving on the first frame (smooth's ease-in
+        # read as a pause before it), and THOSE and WORDS light up while it moves,
+        # close together in time: THOSE appear_gap seconds before WORDS, which enters
+        # as soon as it fits
+        self._move_view(VIEW_THOSE_WORDS, run_time=1.0, appear=["those", "words"],
+                        weights={"adieu": 1, "audio": 1}, present=["adieu", "audio"],
+                        rate_func=rush_from, appear_gap=0.3)
 
     # m : out to HELLO, uncovering ADIEU and AUDIO already there; HELLO lights up and
     # gets its callout the moment it is on screen
     @subscene
     def hello(self):
-        self._move_view(VIEW_HELLO, run_time=2.5, whoosh=True, appear=["hello"])
+        self._move_view(VIEW_HELLO, run_time=1.5, appear=["hello"])
 
     # n : out the rest of the way; callouts and emphasis fade
     @subscene
     def zoom_out(self):
-        self._move_view(self.full_view, run_time=3.0, whoosh=True, dim=0.0, callout_alpha=0.0,
+        self._move_view(self.full_view, run_time=3.0, dim=0.0, callout_alpha=0.0,
                         weights={w: 0 for w in CALLED_OUT})
         self.remove(*[m for c in self.callouts for m in (c["row"], c["line"])])
         self.callouts = None

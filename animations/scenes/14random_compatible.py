@@ -110,7 +110,8 @@ ROW_DY = 0.72                   # scene 10's
 AVG_X = 0.0                     # the Average Guesses column's centre: the screen's
                                 # (user's call); the averages, aligned on their
                                 # decimal points, are centred on it as a block
-TURN_X = AVG_X - 3.8            # the turn column's centre, as far left as before
+TURN_X = AVG_X - 1.6            # the turn column's centre (condensed from 3.8 once the
+                                # header went to two lines; user 2026-10-07)
 HEADER_SIZE = 28                # scene 10's
 CELL_SIZE = 30                  # scene 10's
 SMALL_SIZE = 20                 # rows 4-5's third and fourth decimals (user's call)
@@ -186,16 +187,16 @@ class Scene14(StrategyLine, MovingCameraScene, WordleBoardScene):
         self.first_row = self.rest_rows = None
         # quick score (03's, as 13f-j): all five tiles at once (user 2026-10-07)
         # the compatible words fade in DURING CHOSE's flip (user 2026-10-07)
-        self._flip_and_words_in(0, flip_run_time=0.35, words_run_time=0.8, lag_ratio=0)
+        self._flip_and_words_in(0, flip_run_time=0.35, words_run_time=0.5, lag_ratio=0)
         # VIDEO: no separate highlight step — it lights up in the grid as it is typed;
         # the words narrow during its flip (user 2026-10-07)
-        self._type(1, 0.65, highlight_word=True)
-        self._flip_and_narrow(1, flip_run_time=0.35, narrow_run_time=1.0, lag_ratio=0)
+        self._type(1, 0.5, highlight_word=True)
+        self._flip_and_narrow(1, flip_run_time=0.35, narrow_run_time=0.5, lag_ratio=0)
         # NOVEL, the same
-        self._type(2, 0.65, highlight_word=True)
-        self._flip_and_narrow(2, flip_run_time=0.35, narrow_run_time=1.0, lag_ratio=0)
+        self._type(2, 0.5, highlight_word=True)
+        self._flip_and_narrow(2, flip_run_time=0.35, narrow_run_time=0.5, lag_ratio=0)
         # WOVEN: typed, flipped all green, the win bounce
-        self._type(3, 0.65, highlight_word=True)
+        self._type(3, 0.5, highlight_word=True)
         self._flip(3, 0.35, lag_ratio=0)
         self._win_bounce(3, 1.0)
 
@@ -227,8 +228,10 @@ class Scene14(StrategyLine, MovingCameraScene, WordleBoardScene):
         lines = [crisp_text(t, color=WHITE, font_size=FONT_SIZE_LG) for t in TABLE_TITLE]
         self.table_title = VGroup(*lines).arrange(DOWN, buff=TITLE_GAP)
         self.table_title.to_edge(UP, buff=TITLE_BUFF).shift(UP * TABLE_DY)
-        self.table_head = crisp_text("Average Guesses", font_size=HEADER_SIZE,
-                                     color=WHITE, weight=BOLD).move_to([AVG_X, _row_y(0), 0])
+        # two lines, centred (user 2026-10-07), so the table can be narrower
+        self.table_head = crisp_paragraph("Average", "Guesses", font_size=HEADER_SIZE,
+                                          color=WHITE, weight=BOLD, alignment="center")
+        self.table_head.move_to([AVG_X, _row_y(0), 0])
         self.table_turns = VGroup(*[crisp_text(str(k), font_size=CELL_SIZE, color=WHITE)
                                     .move_to([TURN_X, _row_y(k), 0]) for k in range(1, 6)])
         # the decimal point's x that centres the aligned averages on AVG_X
@@ -236,9 +239,16 @@ class Scene14(StrategyLine, MovingCameraScene, WordleBoardScene):
         self.dot_x = AVG_X - block.get_center()[0]
         # zebra stripes, from the turn column to the averages' (or the head's) right
         right = max(block.get_right()[0] + self.dot_x, self.table_head.get_right()[0])
-        self.table_stripes = row_stripes([_row_y(k) for k in range(1, 6)],
-                                         self.table_turns.get_left()[0] - STRIPE_PAD,
-                                         right + STRIPE_PAD, ROW_DY)
+        left = self.table_turns.get_left()[0] - STRIPE_PAD
+        right += STRIPE_PAD
+        self.table_stripes = row_stripes([_row_y(k) for k in range(1, 6)], left, right,
+                                         ROW_DY)
+        # the whole table centred on the screen (user 2026-10-07): its columns keep
+        # their spacing, the averages (placed later at dot_x) moving with them
+        dx = -(left + right) / 2
+        for m in (self.table_stripes, self.table_head, self.table_turns):
+            m.shift(RIGHT * dx)
+        self.dot_x += dx
         self.add(self.table_stripes, self.table_title, self.table_head, self.table_turns)
 
     @subscene
