@@ -1,0 +1,23 @@
+# greedy letter-by-letter build (see math/greedybuild.py)
+# settings pool=custom words=4 topk=1 ssq_first=2 answers=2315
+step,opening,unsolved,ssq,placed_letter,placed_word,placed_pos
+1,_____ _____ _____ ___e_,2315,7341262,e,0,3
+2,_____ _____ _____ ___es,2315,3050656,s,3,4
+3,_____ _____ _____ _c_es,2307,2071272,c,3,1
+4,_____ _____ _c_es l____,2284,1191980,l,0,0
+5,_____ _____ _c_es l__p_,2249,878208,p,3,3
+6,_____ __u__ _c_es l__p_,2184,599604,u,0,2
+7,__i__ __u__ _c_es l__p_,2070,309904,i,0,2
+8,__i__ __u__ _c_es l__pt,1896,176146,t,3,4
+9,__i__ __u__ _c_es l_apt,1644,81924,a,3,2
+10,__i__ _c_es _ru__ l_apt,1325,42428,r,1,1
+11,__i__ _c_es _ru_n l_apt,1025,26674,n,2,4
+12,_c_es _ru_n d_i__ l_apt,737,18276,d,0,0
+13,_c_es bru_n d_i__ l_apt,510,14000,b,1,0
+14,_c_es bru_n doi__ l_apt,336,10800,o,2,1
+15,_ches bru_n doi__ l_apt,245,9196,h,0,2
+16,_ches bru_n doi_g l_apt,173,7870,g,2,4
+17,_ches bru_n doi_g leapt,162,7632,e,3,1
+18,_ches bru_n doing leapt,157,7554,n,2,3
+19,aches bru_n doing leapt,155,7330,a,0,0
+20,aches bruin doing leapt,154,7278,i,1,3

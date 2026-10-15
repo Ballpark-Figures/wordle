@@ -1,0 +1,17 @@
+# DIGEST of k18_clamp-feign-worst_t1000000_s0.csv (0.2 GB), which is gitignored: over GitHub's file-size limit.
+# The lines below are copied verbatim from that file's own summary block.
+# multiwordle, blind opening then the greedy rule (see math/multiwordle.py)
+# boards=18 trials=1000000 opening=clamp feign worst seed=0 strategy=greedy
+# answers drawn without replacement from the 2315 mystery words; no guess cap
+# strategy greedy, trials 1000000, boards 18, opening clamp feign worst, seed 0
+# mean total guesses 21.0475  +/- 0.0003 (standard error)
+# sd 0.3086   min 18   median 21.0   max 25
+# mean guesses per board 1.1693
+#   18 guesses       1    0.00%
+#   19 guesses     172    0.02%
+#   20 guesses   21104    2.11%
+#   21 guesses  913016   91.30%
+#   22 guesses   62566    6.26%
+#   23 guesses    3038    0.30%
+#   24 guesses     100    0.01%
+#   25 guesses       3    0.00%

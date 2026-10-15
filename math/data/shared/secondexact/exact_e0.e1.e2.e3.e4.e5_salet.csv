@@ -1,0 +1,13 @@
+# secondexact: the EXACT best predetermined second word, and the exact value of the
+# strategy -- opener, then that word when the reply fires, then a uniformly random
+# consistent ANSWER.  No seed and no standard error: the random tail is summed 
+# exactly (math/secondexact.py states the recursion).
+# expected is over all 2315 answers; decline/fired split it by whether the rule fired.
+# settings fire=e0.e1.e2.e3.e4.e5 openers=1 follow_up=answer topk=0 third=-1 third_key=none third_decline=0 ladder=0
+opener,fires,second,expected,total,decline,fired,qualifying,scanned,cut
+salet,e5,brond,3.719957,8611.6996,0.0000,866.9317,221,12971,0
+salet,e4,orcin,3.719957,8611.6996,0.0000,3091.8829,803,12971,0
+salet,e3,corni,3.719957,8611.6996,0.0000,3134.4022,854,12971,0
+salet,e2,chirp,3.719957,8611.6996,0.0000,1279.7328,365,12971,0
+salet,e1,graph,3.719957,8611.6996,0.0000,227.7500,68,12971,0
+salet,e0,slate,3.719957,8611.6996,0.0000,11.0000,4,12971,0

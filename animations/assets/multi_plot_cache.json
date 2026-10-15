@@ -1,0 +1,1032 @@
+{
+ "ks": [
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8,
+  9,
+  10,
+  11,
+  12,
+  13,
+  14,
+  15,
+  16,
+  17,
+  18,
+  19,
+  20,
+  21,
+  22,
+  23,
+  24,
+  25,
+  26,
+  27,
+  28,
+  29,
+  30,
+  31,
+  32
+ ],
+ "lines": {
+  "1": {
+   "winners": {
+    "1": "slate",
+    "2": "plant",
+    "3": "plant",
+    "4": "plant",
+    "5": "plant",
+    "6": "compt",
+    "7": "compt",
+    "8": "dempt",
+    "9": "dempt",
+    "10": "dempt",
+    "11": "dempt",
+    "12": "mpret",
+    "13": "mpret",
+    "14": "mpret",
+    "15": "mpret",
+    "16": "mpret",
+    "18": "rotan",
+    "20": "rotan",
+    "22": "rotan",
+    "24": "rotan",
+    "26": "rotan",
+    "28": "rotan",
+    "30": "rotan",
+    "32": "rotan"
+   },
+   "provisional": [],
+   "points": [
+    {
+     "k": 1,
+     "misses": 2.8211,
+     "stderr": 0.001,
+     "opening": "slate",
+     "source": "run"
+    },
+    {
+     "k": 2,
+     "misses": 3.4767,
+     "stderr": 0.0011,
+     "opening": "plant",
+     "source": "run"
+    },
+    {
+     "k": 3,
+     "misses": 3.7104,
+     "stderr": 0.0011,
+     "opening": "plant",
+     "source": "run"
+    },
+    {
+     "k": 4,
+     "misses": 3.7571,
+     "stderr": 0.0011,
+     "opening": "plant",
+     "source": "run"
+    },
+    {
+     "k": 5,
+     "misses": 3.6995,
+     "stderr": 0.0011,
+     "opening": "plant",
+     "source": "run"
+    },
+    {
+     "k": 6,
+     "misses": 3.5835,
+     "stderr": 0.0011,
+     "opening": "compt",
+     "source": "run"
+    },
+    {
+     "k": 7,
+     "misses": 3.4294,
+     "stderr": 0.0011,
+     "opening": "compt",
+     "source": "run"
+    },
+    {
+     "k": 8,
+     "misses": 3.2573,
+     "stderr": 0.001,
+     "opening": "dempt",
+     "source": "run"
+    },
+    {
+     "k": 9,
+     "misses": 3.0882,
+     "stderr": 0.001,
+     "opening": "dempt",
+     "source": "run"
+    },
+    {
+     "k": 10,
+     "misses": 2.9298,
+     "stderr": 0.001,
+     "opening": "dempt",
+     "source": "run"
+    },
+    {
+     "k": 11,
+     "misses": 2.7866,
+     "stderr": 0.0009,
+     "opening": "dempt",
+     "source": "run"
+    },
+    {
+     "k": 12,
+     "misses": 2.6498,
+     "stderr": 0.0009,
+     "opening": "mpret",
+     "source": "run"
+    },
+    {
+     "k": 13,
+     "misses": 2.5252,
+     "stderr": 0.0009,
+     "opening": "mpret",
+     "source": "run"
+    },
+    {
+     "k": 14,
+     "misses": 2.4147,
+     "stderr": 0.0008,
+     "opening": "mpret",
+     "source": "run"
+    },
+    {
+     "k": 15,
+     "misses": 2.318,
+     "stderr": 0.0008,
+     "opening": "mpret",
+     "source": "run"
+    },
+    {
+     "k": 16,
+     "misses": 2.234,
+     "stderr": 0.0008,
+     "opening": "mpret",
+     "source": "run"
+    },
+    {
+     "k": 17,
+     "misses": 2.1612,
+     "stderr": 0.0008,
+     "opening": "mpret",
+     "source": "run"
+    },
+    {
+     "k": 18,
+     "misses": 2.0833,
+     "stderr": 0.0008,
+     "opening": "rotan",
+     "source": "run"
+    },
+    {
+     "k": 19,
+     "misses": 2.0176,
+     "stderr": 0.0008,
+     "opening": "rotan",
+     "source": "run"
+    },
+    {
+     "k": 20,
+     "misses": 1.9577,
+     "stderr": 0.0007,
+     "opening": "rotan",
+     "source": "run"
+    },
+    {
+     "k": 21,
+     "misses": 1.9067,
+     "stderr": 0.0007,
+     "opening": "rotan",
+     "source": "run"
+    },
+    {
+     "k": 22,
+     "misses": 1.8584,
+     "stderr": 0.0007,
+     "opening": "rotan",
+     "source": "run"
+    },
+    {
+     "k": 23,
+     "misses": 1.8155,
+     "stderr": 0.0007,
+     "opening": "rotan",
+     "source": "run"
+    },
+    {
+     "k": 24,
+     "misses": 1.7767,
+     "stderr": 0.0007,
+     "opening": "rotan",
+     "source": "run"
+    },
+    {
+     "k": 25,
+     "misses": 1.7414,
+     "stderr": 0.0007,
+     "opening": "rotan",
+     "source": "run"
+    },
+    {
+     "k": 26,
+     "misses": 1.7093,
+     "stderr": 0.0007,
+     "opening": "rotan",
+     "source": "run"
+    },
+    {
+     "k": 27,
+     "misses": 1.6795,
+     "stderr": 0.0006,
+     "opening": "rotan",
+     "source": "run"
+    },
+    {
+     "k": 28,
+     "misses": 1.6511,
+     "stderr": 0.0006,
+     "opening": "rotan",
+     "source": "run"
+    },
+    {
+     "k": 29,
+     "misses": 1.6261,
+     "stderr": 0.0006,
+     "opening": "rotan",
+     "source": "run"
+    },
+    {
+     "k": 30,
+     "misses": 1.6022,
+     "stderr": 0.0006,
+     "opening": "rotan",
+     "source": "run"
+    },
+    {
+     "k": 31,
+     "misses": 1.5795,
+     "stderr": 0.0006,
+     "opening": "rotan",
+     "source": "run"
+    },
+    {
+     "k": 32,
+     "misses": 1.5585,
+     "stderr": 0.0006,
+     "opening": "rotan",
+     "source": "run"
+    }
+   ],
+   "missing": []
+  },
+  "2": {
+   "winners": {
+    "1": "clint parse",
+    "2": "clint parse",
+    "3": "clint parse",
+    "4": "clint parse",
+    "6": "clasp drent",
+    "8": "clamp trend",
+    "12": "corbe plant",
+    "16": "clamp tribe",
+    "24": "farce spilt",
+    "32": "doubt range"
+   },
+   "provisional": [],
+   "points": [
+    {
+     "k": 1,
+     "misses": 2.6946,
+     "stderr": 0.0008,
+     "opening": "clint parse",
+     "source": "run"
+    },
+    {
+     "k": 2,
+     "misses": 3.0125,
+     "stderr": 0.0009,
+     "opening": "clint parse",
+     "source": "run"
+    },
+    {
+     "k": 3,
+     "misses": 3.1302,
+     "stderr": 0.001,
+     "opening": "clint parse",
+     "source": "run"
+    },
+    {
+     "k": 4,
+     "misses": 3.1401,
+     "stderr": 0.001,
+     "opening": "clint parse",
+     "source": "run"
+    },
+    {
+     "k": 5,
+     "misses": 3.08,
+     "stderr": 0.001,
+     "opening": "clint parse",
+     "source": "run"
+    },
+    {
+     "k": 6,
+     "misses": 2.9713,
+     "stderr": 0.0009,
+     "opening": "clasp drent",
+     "source": "run"
+    },
+    {
+     "k": 7,
+     "misses": 2.85,
+     "stderr": 0.0009,
+     "opening": "clasp drent",
+     "source": "run"
+    },
+    {
+     "k": 8,
+     "misses": 2.706,
+     "stderr": 0.0008,
+     "opening": "clamp trend",
+     "source": "run"
+    },
+    {
+     "k": 9,
+     "misses": 2.5885,
+     "stderr": 0.0008,
+     "opening": "clamp trend",
+     "source": "run"
+    },
+    {
+     "k": 10,
+     "misses": 2.4905,
+     "stderr": 0.0007,
+     "opening": "clamp trend",
+     "source": "run"
+    },
+    {
+     "k": 11,
+     "misses": 2.4081,
+     "stderr": 0.0006,
+     "opening": "clamp trend",
+     "source": "run"
+    },
+    {
+     "k": 12,
+     "misses": 2.3546,
+     "stderr": 0.0006,
+     "opening": "corbe plant",
+     "source": "run"
+    },
+    {
+     "k": 13,
+     "misses": 2.2954,
+     "stderr": 0.0006,
+     "opening": "corbe plant",
+     "source": "run"
+    },
+    {
+     "k": 14,
+     "misses": 2.2473,
+     "stderr": 0.0005,
+     "opening": "corbe plant",
+     "source": "run"
+    },
+    {
+     "k": 15,
+     "misses": 2.208,
+     "stderr": 0.0005,
+     "opening": "corbe plant",
+     "source": "run"
+    },
+    {
+     "k": 16,
+     "misses": 2.1625,
+     "stderr": 0.0004,
+     "opening": "clamp tribe",
+     "source": "run"
+    },
+    {
+     "k": 17,
+     "misses": 2.1356,
+     "stderr": 0.0004,
+     "opening": "clamp tribe",
+     "source": "run"
+    },
+    {
+     "k": 18,
+     "misses": 2.1132,
+     "stderr": 0.0004,
+     "opening": "clamp tribe",
+     "source": "run"
+    },
+    {
+     "k": 19,
+     "misses": 2.0956,
+     "stderr": 0.0004,
+     "opening": "clamp tribe",
+     "source": "run"
+    },
+    {
+     "k": 20,
+     "misses": 2.0796,
+     "stderr": 0.0003,
+     "opening": "clamp tribe",
+     "source": "run"
+    },
+    {
+     "k": 21,
+     "misses": 2.067,
+     "stderr": 0.0003,
+     "opening": "clamp tribe",
+     "source": "run"
+    },
+    {
+     "k": 22,
+     "misses": 2.0556,
+     "stderr": 0.0003,
+     "opening": "clamp tribe",
+     "source": "run"
+    },
+    {
+     "k": 23,
+     "misses": 2.0454,
+     "stderr": 0.0003,
+     "opening": "clamp tribe",
+     "source": "run"
+    },
+    {
+     "k": 24,
+     "misses": 2.0482,
+     "stderr": 0.0003,
+     "opening": "farce spilt",
+     "source": "run"
+    },
+    {
+     "k": 25,
+     "misses": 2.0401,
+     "stderr": 0.0003,
+     "opening": "farce spilt",
+     "source": "run"
+    },
+    {
+     "k": 26,
+     "misses": 2.0334,
+     "stderr": 0.0003,
+     "opening": "farce spilt",
+     "source": "run"
+    },
+    {
+     "k": 27,
+     "misses": 2.0275,
+     "stderr": 0.0003,
+     "opening": "farce spilt",
+     "source": "run"
+    },
+    {
+     "k": 28,
+     "misses": 2.0222,
+     "stderr": 0.0003,
+     "opening": "farce spilt",
+     "source": "run"
+    },
+    {
+     "k": 29,
+     "misses": 2.0174,
+     "stderr": 0.0003,
+     "opening": "farce spilt",
+     "source": "run"
+    },
+    {
+     "k": 30,
+     "misses": 2.013,
+     "stderr": 0.0003,
+     "opening": "farce spilt",
+     "source": "run"
+    },
+    {
+     "k": 31,
+     "misses": 2.0091,
+     "stderr": 0.0002,
+     "opening": "farce spilt",
+     "source": "run"
+    },
+    {
+     "k": 32,
+     "misses": 1.9964,
+     "stderr": 0.0002,
+     "opening": "doubt range",
+     "source": "run"
+    }
+   ],
+   "missing": []
+  },
+  "3": {
+   "winners": {
+    "1": "dance horst blimp",
+    "2": "chant dorse blimp",
+    "3": "chant dorse blimp",
+    "4": "chant dorse blimp",
+    "6": "clint drape wombs",
+    "8": "bland copse might",
+    "12": "cried plant wombs",
+    "16": "clamp feign worst",
+    "24": "crisp leant gumbo",
+    "32": "clamp singe turbo"
+   },
+   "provisional": [],
+   "points": [
+    {
+     "k": 1,
+     "misses": 3.1647,
+     "stderr": 0.0004,
+     "opening": "dance horst blimp",
+     "source": "run"
+    },
+    {
+     "k": 2,
+     "misses": 3.2455,
+     "stderr": 0.0005,
+     "opening": "chant dorse blimp",
+     "source": "run"
+    },
+    {
+     "k": 3,
+     "misses": 3.2759,
+     "stderr": 0.0005,
+     "opening": "chant dorse blimp",
+     "source": "run"
+    },
+    {
+     "k": 4,
+     "misses": 3.2807,
+     "stderr": 0.0005,
+     "opening": "chant dorse blimp",
+     "source": "run"
+    },
+    {
+     "k": 5,
+     "misses": 3.272,
+     "stderr": 0.0005,
+     "opening": "chant dorse blimp",
+     "source": "run"
+    },
+    {
+     "k": 6,
+     "misses": 3.2556,
+     "stderr": 0.0005,
+     "opening": "clint drape wombs",
+     "source": "run"
+    },
+    {
+     "k": 7,
+     "misses": 3.2307,
+     "stderr": 0.0005,
+     "opening": "clint drape wombs",
+     "source": "run"
+    },
+    {
+     "k": 8,
+     "misses": 3.1847,
+     "stderr": 0.0005,
+     "opening": "bland copse might",
+     "source": "run"
+    },
+    {
+     "k": 9,
+     "misses": 3.1649,
+     "stderr": 0.0004,
+     "opening": "bland copse might",
+     "source": "run"
+    },
+    {
+     "k": 10,
+     "misses": 3.1475,
+     "stderr": 0.0004,
+     "opening": "bland copse might",
+     "source": "run"
+    },
+    {
+     "k": 11,
+     "misses": 3.133,
+     "stderr": 0.0004,
+     "opening": "bland copse might",
+     "source": "run"
+    },
+    {
+     "k": 12,
+     "misses": 3.1293,
+     "stderr": 0.0004,
+     "opening": "cried plant wombs",
+     "source": "run"
+    },
+    {
+     "k": 13,
+     "misses": 3.1146,
+     "stderr": 0.0004,
+     "opening": "cried plant wombs",
+     "source": "run"
+    },
+    {
+     "k": 14,
+     "misses": 3.1007,
+     "stderr": 0.0004,
+     "opening": "cried plant wombs",
+     "source": "run"
+    },
+    {
+     "k": 15,
+     "misses": 3.0889,
+     "stderr": 0.0003,
+     "opening": "cried plant wombs",
+     "source": "run"
+    },
+    {
+     "k": 16,
+     "misses": 3.066,
+     "stderr": 0.0003,
+     "opening": "clamp feign worst",
+     "source": "run"
+    },
+    {
+     "k": 17,
+     "misses": 3.0558,
+     "stderr": 0.0003,
+     "opening": "clamp feign worst",
+     "source": "run"
+    },
+    {
+     "k": 18,
+     "misses": 3.0475,
+     "stderr": 0.0003,
+     "opening": "clamp feign worst",
+     "source": "run"
+    },
+    {
+     "k": 19,
+     "misses": 3.0397,
+     "stderr": 0.0003,
+     "opening": "clamp feign worst",
+     "source": "run"
+    },
+    {
+     "k": 20,
+     "misses": 3.0324,
+     "stderr": 0.0003,
+     "opening": "clamp feign worst",
+     "source": "run"
+    },
+    {
+     "k": 21,
+     "misses": 3.0254,
+     "stderr": 0.0003,
+     "opening": "clamp feign worst",
+     "source": "run"
+    },
+    {
+     "k": 22,
+     "misses": 3.0199,
+     "stderr": 0.0003,
+     "opening": "clamp feign worst",
+     "source": "run"
+    },
+    {
+     "k": 23,
+     "misses": 3.0147,
+     "stderr": 0.0003,
+     "opening": "clamp feign worst",
+     "source": "run"
+    },
+    {
+     "k": 24,
+     "misses": 3.0174,
+     "stderr": 0.0003,
+     "opening": "crisp leant gumbo",
+     "source": "run"
+    },
+    {
+     "k": 25,
+     "misses": 3.0117,
+     "stderr": 0.0003,
+     "opening": "crisp leant gumbo",
+     "source": "run"
+    },
+    {
+     "k": 26,
+     "misses": 3.0066,
+     "stderr": 0.0003,
+     "opening": "crisp leant gumbo",
+     "source": "run"
+    },
+    {
+     "k": 27,
+     "misses": 3.0018,
+     "stderr": 0.0003,
+     "opening": "crisp leant gumbo",
+     "source": "run"
+    },
+    {
+     "k": 28,
+     "misses": 2.9973,
+     "stderr": 0.0003,
+     "opening": "crisp leant gumbo",
+     "source": "run"
+    },
+    {
+     "k": 29,
+     "misses": 2.9927,
+     "stderr": 0.0003,
+     "opening": "crisp leant gumbo",
+     "source": "run"
+    },
+    {
+     "k": 30,
+     "misses": 2.9892,
+     "stderr": 0.0003,
+     "opening": "crisp leant gumbo",
+     "source": "run"
+    },
+    {
+     "k": 31,
+     "misses": 2.9855,
+     "stderr": 0.0003,
+     "opening": "crisp leant gumbo",
+     "source": "run"
+    },
+    {
+     "k": 32,
+     "misses": 2.9766,
+     "stderr": 0.0002,
+     "opening": "clamp singe turbo",
+     "source": "run"
+    }
+   ],
+   "missing": []
+  },
+  "improved": {
+   "winners": {
+    "1": "trace",
+    "2": "canst",
+    "3": "canst",
+    "4": "clapt",
+    "6": "compt",
+    "8": "compt",
+    "12": "compt",
+    "16": "tamed",
+    "24": "filet",
+    "32": "filet"
+   },
+   "provisional": [
+    24,
+    32
+   ],
+   "points": [
+    {
+     "k": 1,
+     "misses": 2.4436,
+     "opening": "trace",
+     "source": "exact"
+    },
+    {
+     "k": 2,
+     "misses": 2.8617,
+     "stderr": 0.0022,
+     "opening": "canst",
+     "source": "run"
+    },
+    {
+     "k": 3,
+     "misses": 3.0338,
+     "stderr": 0.0024,
+     "opening": "canst",
+     "source": "run"
+    },
+    {
+     "k": 4,
+     "misses": 3.0894,
+     "stderr": 0.0026,
+     "opening": "clapt",
+     "source": "run"
+    },
+    {
+     "k": 5,
+     "misses": 3.0757,
+     "stderr": 0.0027,
+     "opening": "clapt",
+     "source": "run"
+    },
+    {
+     "k": 6,
+     "misses": 2.9878,
+     "stderr": 0.0027,
+     "opening": "compt",
+     "source": "run"
+    },
+    {
+     "k": 7,
+     "misses": 2.8763,
+     "stderr": 0.0027,
+     "opening": "compt",
+     "source": "run"
+    },
+    {
+     "k": 8,
+     "misses": 2.7593,
+     "stderr": 0.0026,
+     "opening": "compt",
+     "source": "run"
+    },
+    {
+     "k": 9,
+     "misses": 2.6469,
+     "stderr": 0.0025,
+     "opening": "compt",
+     "source": "run"
+    },
+    {
+     "k": 10,
+     "misses": 2.5388,
+     "stderr": 0.0024,
+     "opening": "compt",
+     "source": "run"
+    },
+    {
+     "k": 11,
+     "misses": 2.4399,
+     "stderr": 0.0023,
+     "opening": "compt",
+     "source": "run"
+    },
+    {
+     "k": 12,
+     "misses": 2.352,
+     "stderr": 0.0022,
+     "opening": "compt",
+     "source": "run"
+    },
+    {
+     "k": 13,
+     "misses": 2.2747,
+     "stderr": 0.0021,
+     "opening": "compt",
+     "source": "run"
+    },
+    {
+     "k": 14,
+     "misses": 2.2103,
+     "stderr": 0.002,
+     "opening": "compt",
+     "source": "run"
+    },
+    {
+     "k": 15,
+     "misses": 2.1501,
+     "stderr": 0.0019,
+     "opening": "compt",
+     "source": "run"
+    },
+    {
+     "k": 16,
+     "misses": 2.0804,
+     "stderr": 0.0021,
+     "opening": "tamed",
+     "source": "run"
+    },
+    {
+     "k": 17,
+     "misses": 2.0218,
+     "stderr": 0.0021,
+     "opening": "tamed",
+     "source": "run"
+    },
+    {
+     "k": 18,
+     "misses": 1.9676,
+     "stderr": 0.002,
+     "opening": "tamed",
+     "source": "run"
+    },
+    {
+     "k": 19,
+     "misses": 1.9233,
+     "stderr": 0.002,
+     "opening": "tamed",
+     "source": "run"
+    },
+    {
+     "k": 20,
+     "misses": 1.8805,
+     "stderr": 0.0019,
+     "opening": "tamed",
+     "source": "run"
+    },
+    {
+     "k": 21,
+     "misses": 1.84,
+     "stderr": 0.0019,
+     "opening": "tamed",
+     "source": "run"
+    },
+    {
+     "k": 22,
+     "misses": 1.8063,
+     "stderr": 0.0019,
+     "opening": "tamed",
+     "source": "run"
+    },
+    {
+     "k": 23,
+     "misses": 1.7741,
+     "stderr": 0.0019,
+     "opening": "tamed",
+     "source": "run"
+    },
+    {
+     "k": 24,
+     "misses": 1.7339,
+     "stderr": 0.0019,
+     "opening": "filet",
+     "source": "run"
+    },
+    {
+     "k": 25,
+     "misses": 1.7107,
+     "stderr": 0.0019,
+     "opening": "filet",
+     "source": "run"
+    },
+    {
+     "k": 26,
+     "misses": 1.6829,
+     "stderr": 0.0019,
+     "opening": "filet",
+     "source": "run"
+    },
+    {
+     "k": 27,
+     "misses": 1.6539,
+     "stderr": 0.0019,
+     "opening": "filet",
+     "source": "run"
+    },
+    {
+     "k": 28,
+     "misses": 1.6269,
+     "stderr": 0.0019,
+     "opening": "filet",
+     "source": "run"
+    },
+    {
+     "k": 29,
+     "misses": 1.6097,
+     "stderr": 0.0019,
+     "opening": "filet",
+     "source": "run"
+    },
+    {
+     "k": 30,
+     "misses": 1.5861,
+     "stderr": 0.0018,
+     "opening": "filet",
+     "source": "run"
+    },
+    {
+     "k": 31,
+     "misses": 1.5647,
+     "stderr": 0.0018,
+     "opening": "filet",
+     "source": "run"
+    },
+    {
+     "k": 32,
+     "misses": 1.5473,
+     "stderr": 0.0018,
+     "opening": "filet",
+     "source": "run"
+    }
+   ],
+   "missing": []
+  }
+ },
+ "notes": [
+  "greedy 1-word guess race at k=6 still has 2 live",
+  "greedy 1-word mystery race at k=16 still has 2 live",
+  "greedy 3-word triple_singletons_answers_exhaustive_top10000 race at k=4 still has 2 live",
+  "greedy 3-word triple_singletons_answers_exhaustive_top10000 race at k=16 still has 2 live",
+  "greedy 3-word triple_singletons_top10000 race at k=24 still has 3 live",
+  "greedy 3-word triple_singletons_top10000 race at k=32 still has 3 live",
+  "minavg race at k=24 not settled (30 live, 25600 games): leader filet used only where its runs exist",
+  "minavg race at k=32 not settled (2 live, 204800 games): leader filet used only where its runs exist"
+ ]
+}

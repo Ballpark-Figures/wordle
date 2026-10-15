@@ -412,6 +412,7 @@ static void masks_for(int og, uint8_t (*gf)[NPAT], uint8_t *fu,
     for (int p = 0; p < NPAT; p++) fu[p] = 0;
     for (int g = 0; g < NGROUP; g++) {
         groups_mask_for(&GRP[g], gvow, mvow, gf[g]);
+        gf[g][ALL_GREEN] = 0;                   /* see never_fire_on_a_win */
         for (int p = 0; p < NPAT; p++) fu[p] |= gf[g][p];
     }
 }
@@ -1797,7 +1798,7 @@ int main(int argc, char **argv) {
     const char *datadir = "data", *outpath = NULL, *patpath = NULL;
     const char *matchpath = NULL;              /* --dump-matched, the gate hook */
     const char *one = NULL, *openpath = NULL, *poolpath = NULL;
-    int min_grays = 3, by_grays = 0, threads = 0, limit = 0, no_prune = 0,
+    int min_grays = 3, by_grays = -1, threads = 0, limit = 0, no_prune = 0,
         memo_bits = 19, split_v = 0, split_mv = 0, split_nz = 0, print_label = 0, topk = 0;
     int third_max = -1;                        /* -1: no third level at all */
     int maxlvl = 0;                            /* 0: the fixed 2/3-level paths */
@@ -1818,7 +1819,17 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--min-grays") && i + 1 < argc) { min_grays = atoi(argv[++i]); min_grays_set = 1; }
         /* --by-grays N: a SEPARATE word for each grey count from 5 down to N,
          * which is secondword's e5.e4....eN partition. */
-        else if (!strcmp(argv[i], "--by-grays") && i + 1 < argc) by_grays = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--by-grays") && i + 1 < argc) {
+            /* -1 is "not given"; a negative typed here must be REFUSED by the
+             * range check, not read as "off" */
+            by_grays = atoi(argv[++i]);
+            if (by_grays < 0) by_grays = WORDLEN + 1;
+        }
+        /* --every-reply: allow a partition covering EVERY reply, which groups.c
+         * otherwise refuses as a blind opening.  With a word per grey count
+         * (--by-grays 0) the reply still chooses the word, so it is a strategy,
+         * just not one that ever falls back to the random tail on guess 2. */
+        else if (!strcmp(argv[i], "--every-reply")) GROUPS_EVERY_REPLY = 1;
         /* --group SPEC: any partition groups.c can express, including the vowel
          * atoms -- the same flag, the same grammar and the same canonical name
          * secondword uses, because it is the same code. */
@@ -1946,8 +1957,9 @@ int main(int argc, char **argv) {
                         "only the beam makes it affordable\n");
         return 1;
     }
-    if (by_grays && (by_grays < 1 || by_grays > WORDLEN)) {
-        fprintf(stderr, "--by-grays must be 1..%d\n", WORDLEN);
+    if (by_grays >= 0 && (by_grays < (GROUPS_EVERY_REPLY ? 0 : 1) || by_grays > WORDLEN)) {
+        fprintf(stderr, "--by-grays must be 1..%d (0 too under --every-reply, "
+                        "which gives every grey count its own word)\n", WORDLEN);
         return 1;
     }
     if (split_v + split_mv + split_nz > 1) {
@@ -1956,7 +1968,7 @@ int main(int argc, char **argv) {
                         "pick one\n");
         return 1;
     }
-    if ((split_v || split_mv || split_nz) && !by_grays) {
+    if ((split_v || split_mv || split_nz) && by_grays < 0) {
         fprintf(stderr, "--split-* splits the --by-grays groups; pass "
                         "--by-grays N too\n");
         return 1;
@@ -1998,7 +2010,7 @@ int main(int argc, char **argv) {
                             "the other\n");
             return 1;
         }
-        if (min_grays_set || by_grays || ngroupspec || split_v || split_mv || split_nz) {
+        if (min_grays_set || by_grays >= 0 || ngroupspec || split_v || split_mv || split_nz) {
             fprintf(stderr, "--ladder takes no firing condition: the level-2 "
                             "THRESHOLD is that condition, and it is\nwhat the "
                             "search is choosing.  A group would pin it while the "
@@ -2061,7 +2073,7 @@ int main(int argc, char **argv) {
          * checks to the opener loop), so this answers without loading a thing */
         char lab[512];
         groups_build_tiles();
-        if (by_grays) groups_add_by_grays(by_grays, split_v, split_mv, split_nz);
+        if (by_grays >= 0) groups_add_by_grays(by_grays, split_v, split_mv, split_nz);
         groups_resolve(min_grays, lab, sizeof lab);
         append_pool(lab, sizeof lab, poolname);
         printf("%s\n", lab);
@@ -2166,15 +2178,23 @@ int main(int argc, char **argv) {
         for (int p = 0; p < NPAT; p++) { GFIRE[0][p] = 1; FIRE[p] = 1; }
         OPENER_DEP = 0;
     } else {
-        if (by_grays) groups_add_by_grays(by_grays, split_v, split_mv, split_nz);
+        if (by_grays >= 0) groups_add_by_grays(by_grays, split_v, split_mv, split_nz);
         groups_resolve(min_grays, label, sizeof label);
         OPENER_DEP = groups_opener_dependent();
         if (!OPENER_DEP) {
             /* opener-independent: one set of masks serves every opener */
             int8_t zero[NPAT];
             for (int p = 0; p < NPAT; p++) zero[p] = 0;
-            for (int g = 0; g < NGROUP; g++)
+            /* never_fire_on_a_win: the opener's all-green reply means the game
+             * is already WON, so no group may commit a second word there.  Only
+             * a group with no greys can contain it (e0, or a 5g0y composition);
+             * e0 exists only under --every-reply, which is why this line was not
+             * needed before.  The ladder builds its own masks and handles the
+             * win itself. */
+            for (int g = 0; g < NGROUP; g++) {
                 groups_mask_for(&GRP[g], zero, zero, GFIRE[g]);
+                GFIRE[g][ALL_GREEN] = 0;
+            }
             for (int p = 0; p < NPAT; p++) {
                 FIRE[p] = 0;
                 for (int g = 0; g < NGROUP; g++) FIRE[p] |= GFIRE[g][p];

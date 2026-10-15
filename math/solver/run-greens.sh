@@ -70,11 +70,14 @@ TTBITS=28           # 8.6 GB of 24 GB
 TOPK=0              # 0 = the exact search; K = beam width at every node
 MUSTWIN=1           # 1 = must-win (default); 0 = the badge question
 SEED=""             # "" = none; "auto" = best contained run; N = explicit
+UNCAPPED=0          # 1 = no guess limit (greens --uncapped); refuses --depth
+DEPTH_SET=0
 OPENERS=()
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        --depth)   DEPTH="$2";   shift 2 ;;
+        --depth)   DEPTH="$2";   DEPTH_SET=1; shift 2 ;;
+        --uncapped) UNCAPPED=1;  shift ;;
         --threads) THREADS="$2"; shift 2 ;;
         --tt-bits) TTBITS="$2";  shift 2 ;;
         --opener)  OPENERS+=("$2"); shift 2 ;;
@@ -90,7 +93,16 @@ done
 # table.  A beamed value is not an optimum and must never land in the same file
 # as one, or be warm-started from another K's table -- the salt would reject it
 # anyway, but the filename is what stops anyone trying.
-SUF="d$DEPTH"
+# --uncapped: NO GUESS LIMIT.  The binary runs it at depth 32, which it proves
+# never binds, so the file is named for what it is -- "uncapped" -- and not d32.
+if [ "$UNCAPPED" -eq 1 ]; then
+    [ "$DEPTH_SET" -eq 1 ] && { echo "--uncapped sets its own depth; drop --depth" >&2; exit 1; }
+    SUF="uncapped"
+    DEPTHARGS=(--uncapped)
+else
+    SUF="d$DEPTH"
+    DEPTHARGS=(--depth "$DEPTH")
+fi
 KARGS=()
 if [ "$TOPK" -gt 0 ]; then
     SUF="${SUF}_k$TOPK"
@@ -181,7 +193,7 @@ if [ ${#OPENERS[@]} -gt 0 ]; then
     ./solver/greens "${ARGS[@]}" "${KARGS[@]+"${KARGS[@]}"}" \
         --out "$OUT" \
         --trees "$TREES" \
-        --depth "$DEPTH" \
+        "${DEPTHARGS[@]}" \
         --tt-bits "$TTBITS" --threads "$THREADS" $WARM \
         2>&1 | tee -a "$LOG"
     exit "${PIPESTATUS[0]}"
@@ -202,6 +214,10 @@ fi
 # (0 of 900 opener x depth cases broke it).  Seeding across depths would inject
 # values this beam cannot reach, and every run would report none reached.
 #
+# UNCAPPED EXACT is the one search that contains EVERY run: any strategy winning
+# within some cap wins with no cap, and a beam's value is a real strategy's.  So
+# under --uncapped with no -k, `auto` reads every may-lose run at any depth and K.
+#
 # `auto` takes the best exact row of every such run on disk, partial or
 # finished, excluding this run's own file (its rows are the resume's business).
 # The binary guarantees
@@ -214,15 +230,17 @@ if [ -n "$SEED" ]; then
     if [ "$SEED" = auto ]; then
         PICK=$(for f in "$SHR"/best_opener_d*_k*.csv; do
                    [ "$f" = "$OUT" ] && continue
-                   awk -F, -v obj="$OBJ" -v D="$DEPTH" -v K="$TOPK" -v f="$f" '
+                   awk -F, -v obj="$OBJ" -v D="$DEPTH" -v K="$TOPK" -v U="$UNCAPPED" -v f="$f" '
                        NR == 1 {
                            if ($0 !~ /^# greens /) exit
                            for (i = 1; i <= split($0, t, " "); i++) {
                                split(t[i], kv, "="); s[kv[1]] = kv[2]
                            }
                            ok = s["objective"] == obj && s["guesses"] == 12972 &&
-                                s["answers"] == 2315 && s["depth"] + 0 == D + 0 &&
-                                s["topk"] + 0 >= 1 && (K + 0 == 0 || s["topk"] + 0 <= K + 0)
+                                s["answers"] == 2315 &&
+                                (U + 0 ? K + 0 == 0
+                                       : s["depth"] + 0 == D + 0 && s["topk"] + 0 >= 1 &&
+                                         (K + 0 == 0 || s["topk"] + 0 <= K + 0))
                            if (!ok) exit
                            next
                        }
@@ -249,7 +267,7 @@ echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] greens: opener screen, $SUF $WARM" | tee 
 ./solver/greens --sweep "${KARGS[@]+"${KARGS[@]}"}" "${SEEDARGS[@]+"${SEEDARGS[@]}"}" \
     --out "$OUT" \
     --trees "$TREES" \
-    --depth "$DEPTH" \
+    "${DEPTHARGS[@]}" \
     --tt-bits "$TTBITS" --threads "$THREADS" $WARM \
     2>&1 | tee -a "$LOG"
 # The SOLVER's status, not tee's -- or a crash reads as success, and a loop of

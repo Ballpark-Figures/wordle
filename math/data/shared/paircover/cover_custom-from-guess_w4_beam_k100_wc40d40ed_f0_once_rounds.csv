@@ -1,0 +1,4 @@
+# pair-cover loop (see math/paircover.py)
+# settings pool=custom candidates=guess words=4 topk=100 cap=6 search=beam final_top=0 source=data/shared/paircover/cover_custom-from-guess_w4_k1_s1000_f0_pairs.csv
+round,opening,unsolved,ssq,harvested,new_pairs,total_pairs,secs
+1,bumfs pownd verge latch,6,5112,6,0,7101,198.0

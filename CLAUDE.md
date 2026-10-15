@@ -975,6 +975,27 @@ its state arithmetic against `strspace.py` over a shared deterministic walk — 
     never does. Not yet chased. Under a seed it would show as "none reached".
 - **The seed opener's context was freed BEFORE its tree was written** until
   2026-09-29: harmless by luck on macOS, a segfault on every fresh Linux sweep.
+- **`--uncapped` IS THE BADGE GAME WITH NO GUESS LIMIT** (added 2026-10-03, user's
+  call; `run-greens.sh --may-lose --uncapped`, files named `uncapped`, not `d32`).
+  It runs at depth 32, which `greens.c` PROVES never binds: a yellow-free reply
+  only ever pins green positions (<= 5) and exact letter counts (<= 26), the search
+  only plays guesses that split the live set, so a line is at most 31 splitting
+  guesses plus the naming one. Because the cap never binds, the table key drops
+  the budget, so a candidate set reached at different depths shares one entry.
+  - **May-lose only**: with no limit every answer is winnable, so must-win is the
+    same quantity and is refused. `--depth` is refused too.
+  - **It CONTAINS EVERY RUN**, so under `--seed auto` with no `-k` it seeds from the
+    best may-lose row of ANY depth and K -- the one exception to same-depth-only.
+  - **Gated in `checkgreens.py` section 11 by an oracle that does not use the
+    depth-32 proof**: on the small case every guess removes a candidate, so a cap
+    of n + 1 cannot bind, and the Python reference there IS the uncapped value.
+    Also diffed against C capped at n + 1 (the table-key change alone) and as a
+    sweep; mutation-tested with the depth set to 4 (caught three ways).
+- **`--screen-only` + the `root cut:` line** (2026-10-03): every sweep now prints
+  how many openers the starting incumbent leaves to SEARCH. The quartiles only
+  bracket it, and the CSV cannot show it early (the walk visits the highest bounds
+  first, so instant cut rows arrive last). At 1387 it is **565 of 12972**, the same
+  at d15 and uncapped, because the two-ply bound has saturated with depth.
 
 ## Absurdle (adversarial Wordle) — OUR word lists, NOT Absurdle's
 - **The host never commits to a word.** It holds a CANDIDATE SET (initially the answer
@@ -1767,6 +1788,20 @@ that becomes true, and the survivors keep playing on a doubling schedule.
 - Data: standings + eliminations CSVs in `data/shared/multiwordle/race_*`,
   checkpoint and log under `data/local/multiwordle/`.
 
+### Scene 16's chart — the best opener FOUND goes in, from whichever race found it
+`animations/assets/multi_plot_data.py` builds the "Average Misses in Multi-Wordle"
+lines. **Standing rule (user, 2026-10-02): if any race finds an opener better than
+the one the chart uses at some k, it goes in the chart.** So at each bracket k EVERY
+settled race field for that line competes (unrestricted AND answers-only), lowest
+race mean wins -- the unrestricted pair/triple fields are screens of a ranking built
+for another question, and an answers-only race found pairs (CLAMP TREND k=8, CLAMP
+TRIBE k=16) the unrestricted one never examined. A new field is one entry in
+`FIELDS`. While a new winner's fill-in runs are unfinished, the opener it replaced
+stands in (`source: fallback`), and the module prints every stand-in.
+- **Improved-strategy shortlists are the LAST 50 openers still in the PLAIN-strategy
+  1-word race at the same k** (user's rule) -- never a top-N cut from the improved
+  race's own early rounds. A round straddling 50 is ranked by gap behind its leader.
+
 ### `run-multiwordle-exact.sh` — the one cell where sampling is unnecessary
 **`minavg` at k=1 only.** The answer is one word drawn uniformly from the 2315 and
 the rule is deterministic, so those 2315 games ARE the population: the mean is the
@@ -2430,6 +2465,15 @@ is the proven optimum over all 12972 x 12972 (opener, second word) pairs.
   - **MEASURED: ~18 CPU-seconds per opener**, so a full run is around three hours
     on 18 threads — and that is the worst case, from a probe whose incumbent was
     weak. Watch the `evaluated / cut` line.
+  - **`--by-grays 0 --every-reply` gives EVERY grey count 0-5 its own word**
+    (added 2026-09-30, user's ask, for scene 12i on SALET). groups.c refuses a
+    partition covering every reply as a blind opening; `GROUPS_EVERY_REPLY`
+    lifts that and ONLY `secondexact` sets it. The second guess then never
+    falls back to the random tail — **except on the opener's own all-green WIN,
+    which fires no group** (`GFIRE[g][ALL_GREEN] = 0`; only a no-grey group can
+    hold it, so nothing before `e0` needed it). Gated as check 6b, which is
+    mutation-tested on exactly that exclusion. The label
+    `e0.e1.e2.e3.e4.e5` is its own file.
 - **THE g3 RESULT (2026-09-10): `clint` then `parse`, 3.666937 exact**, over all
   12972 openers with 11324 evaluated and 1648 cut, in 653 s. **`spilt` is only
   4th** (3.671133) — it won the RACE because that race used the one-ply table's
@@ -4611,11 +4655,72 @@ still be a POSSIBLE ANSWER — consistent with every clue so far?". Run it with
     pools, and a pool where it is exercises none of the search; on random seeds the
     tally came up empty as often as not. So the gate keeps drawing until greedy is
     STRICTLY short of the answer, and failing to find one is itself a finding.
+- **`--plays guess`: ONLY THE LAST WORD MUST BE AN ANSWER** (added 2026-10-14,
+  user's call). Every play must still be consistent with every clue, but may be any
+  of the 12972; the run must END on one of the 2315. The binary flag is `--answers
+  PATH` (the pool stays `--words`); without it nothing changes. The one search
+  change: a branch is followable only while it still holds an answer. It needs the
+  SQUARE matrix and runs the `eldrowmaxg` build (same source, `MAXP 13000`, bigger
+  candidate arena and dedup table -- per-thread memory is far larger than the
+  2315 build's). Reference `eldrow.longest_run` (recomputes legal sets from the
+  strings); gated in `checkeldrowmax.py` on both builds, mutation-tested (dropping
+  the answer-holding test, and treating every word as an answer, both caught).
+  **A strictly larger play pool, so its number is never tabled beside the plain
+  one.** Cost on the full lists UNMEASURED -- `--greedy` first.
+  - **A WITNESS BELOW THE MAXIMUM MAY END WITH SEVERAL WORDS ALIVE**, and the
+    rebuild then names the lowest-index ANSWER among them. Only a line of the
+    PROVEN maximum (exact mode, or the ladder's last line once the next bar fails)
+    must end on one word, and only those are checked for it. The check used to be
+    unconditional and killed the first full `--plays guess` ladder at bar 14
+    (2026-10-14) — a latent bug in plain mode too, where short witnesses just
+    happened to end on singletons. Gated by `--target` below the maximum in both
+    modes, with coverage asserting some witness really ended with company;
+    mutation-tested (naming `mem[0]` regardless of answer-hood is caught).
 - Data under `math/data/shared/eldrow/eldrowmax.<pool>.csv`, one row per run with
   every knob as a column; log under `math/data/local/eldrow/`.
 - **The rest of the antiwordle family (`antistall`, `antiexpect`, `antiwordle.py`,
   `eldrow.py`) has NO section here** — the source headers and the wrapper comments
   are the documentation. Worth writing up when one of them is next touched.
+
+## `wrongle` — compatible guesses only, trying NOT to find the answer
+`math/wrongle.py` states the rule and both value functions and IS the source of
+truth; `solver/wrongle.c` is the solver. Run it with **`bash solver/run-wrongle.sh
+[--objective lose|expect] [--depth D] [-k K] [--opener W]`** (from `math/`),
+attached, tee'd log, `--dry-run`. Built 2026-10-14 (user's spec).
+- **Wrongle is a real App Store game** ("more is more": every guess must follow
+  the feedback so far, Wrongler Trophy at 6+ guesses). The OBJECTIVES here are the
+  user's, and the word lists are ours, not Wrongle's.
+- **LEGALITY = ultraturns', NOT eldrowmax's** (user's call): any of the 12972 legal
+  words that is CONSISTENT with every clue so far, so guess-only words are playable.
+  Answer uniform over the 2315. **The state is the legal set L** (one more clue just
+  filters it); answers still possible = L restricted to the answers. Needs the
+  SQUARE matrix (`build_patterns.py --full`).
+- **TWO OBJECTIVES, two quantities, never in one table** (nor beside an
+  optturns-family total, which minimise). **The binary has NO default objective**;
+  the wrapper defaults to `lose`, depth 6, and forwards both explicitly.
+  - `lose --depth D`: maximise answers NOT found within D guesses. D is the
+    objective (6 = lose the Wordle, 5 = reach the trophy); each D its own file.
+  - `expect`: maximise expected guesses, UNCAPPED, reported as the integer total
+    over the 2315. Refuses `--depth`.
+- **`|L| <= d` means 0 lost, exactly** (each guess removes the word played and
+  never the answer). Child bounds: lose `|A_p|` (0 when `|L_p| <= d`), expect
+  `|A_p| * |L_p|`.
+- **`-k K` is a beam at every node, ROOT INCLUDED**, ranked by the LARGEST sum of
+  squared ANSWER-bin sizes (all bins, all-green included), ties on the lowest
+  guess index -- the repo's rule turned upside down at the user's request
+  ("maximise average words remaining"). Values are LOWER bounds; the winner is the
+  best of the K examined. K in the filename and the stamp.
+- Data `data/shared/wrongle/{lose_d<D>,expect}_k<K>[_openers].csv`, resumable,
+  first line a stamp; a run asking a different question REFUSES to append. Log
+  under `data/local/wrongle/`. **No trees yet** -- open gap.
+- **`python3 tools/checkwrongle.py` is the GATE** (~3 s): per-opener values, both
+  objectives, several caps, against the reference (which recomputes legal sets
+  from the STRINGS); `--no-prune`; the beam at K=1..3 per opener and at the root;
+  the sweep's best and tie list; resume and stamp refusal; the refusals; the real
+  square matrix spot-checked. Coverage asserted. MUTATION-TESTED: flipped beam
+  tie-break, every word counted as an answer, and an unsound lose bound were each
+  caught.
+- **COST IS UNMEASURED.** Price with `--opener` before an exact sweep.
 
 ## `schedule(dynamic)` IS STATIC-STEAL ON THE MACS -- what a progress log means
 **MEASURED 2026-09-16, and it explains a log that reads like a bug.** libomp
@@ -4691,12 +4796,25 @@ a correction to one is invisible to the rest.
 
 ## Style
 - Uses `bpkfigures` style + the local `config.py` for colors/fonts.
+- **A camera move WHOOSHES only when it moves around content ALREADY ON SCREEN** —
+  panning along 01's stacks of words, zooming in and out of 08's histogram. **A move
+  that brings a DIFFERENT screen into view is SILENT**, whatever code drives it: a pan
+  up to a number line, down to a board, across to a histogram or a table. Judge by
+  what the viewer sees arrive, never by the helper: 19i and 19m use the same
+  `_move_view` as 01 and 08, and kept their whoosh for that reason until the user
+  pointed out both bring on new screens (2026-10-08).
 - **EVERY grid of words — a group's members, under a guess or on their own — goes
   through `animations/assets/groups.py` `grid_cells(n)`**: scene 04's rule, ceil(sqrt(n))
   columns, filled row by row, a short last row centred (6 words = 3+3, 14 = 4+4+4+2).
-  Never pick a column count by hand. The ONE deliberate exception is
-  `ranked_word_layout` (07d-g), whose grid shape is searched for the largest words
-  (user's call). (Bit us 2026-09-30: scene 07 hardcoded 3 columns, then 8, then
+  Never pick a column count by hand. The deliberate exception is a word grid meant
+  to FILL A REGION: that goes through `ranked_word_layout`, whose grid shape is
+  searched for the largest words (07d-g, and 13g-k's compatible answers). The user,
+  2026-09-30: the square grid "makes a lot more sense for dots than for 5-letter
+  words" — at 04's pitches ceil(sqrt(n)) columns makes a grid ~5x wider than tall, so
+  a big set (13g's 332) is capped by the frame's width and unreadable however much
+  height is free. `ranked_word_layout` sizes by `pigpen.WORD_W` (the LIST-size word),
+  NOT `word_stacks.WORD_W` (the full board row) — mixing them overlaps every word.
+  (Bit us 2026-09-30: scene 07 hardcoded 3 columns, then 8, then
   "fill rows evenly", giving 8+6 and then 7+7 grids the video uses nowhere else.)
 - **EVERY dictionary definition on screen ("n. Obsolete variant of rote") goes
   through `animations/assets/gloss.py` `gloss(lines, font_size, italic=...)`, never a

@@ -1,0 +1,129 @@
+# wordle single-board simulation (see math/wordlesim.py)
+# strategy=random-blind follow_up=answer trials=100 seed=0 win_within=6
+# the follow-up fills in wherever the rule declines; it draws a random word still
+# consistent with every reply, from the 2315 mystery list
+# answers drawn uniformly from the 2315 mystery words; guesses from the 12972 legal words
+# NO guess cap: play continues past 6 until the word is found, so the mean is unconstrained
+# and the win rate is the fraction of those untruncated scores that came in at 6 or fewer
+game,guesses,won,answer,sequence
+0,10,0,surer,privy magic eagle fella aphid beget aging cleat spoon surer
+1,3,1,pygmy,trite lumpy pygmy
+2,3,1,phone,wharf semen phone
+3,6,1,preen,motel never unset elect sprig preen
+4,6,1,realm,abide grime swift myrrh amply realm
+5,12,0,skull,sense style cleft blame tabby alien moose berth exult lease hilly skull
+6,6,1,guide,alpha abuse broom adapt ready guide
+7,4,1,media,purer drill pizza media
+8,8,0,skirt,gorge junto yeast spice wimpy godly rhyme skirt
+9,4,1,vigil,quail stout rigor vigil
+10,10,0,rupee,grasp teeth buyer opine scoop stunk media gloat ferry rupee
+11,4,1,hinge,lemur scene thyme hinge
+12,7,0,beast,unlit might furry rebus occur dread beast
+13,6,1,fizzy,scent parse lunch flyer sissy fizzy
+14,3,1,great,flesh tiara great
+15,15,0,duchy,debug savoy plunk artsy bigot gloss stilt gruff sneer fifty diner snuff tense bench duchy
+16,4,1,awful,realm flung odder awful
+17,6,1,cedar,swoon ionic title sorry sadly cedar
+18,24,0,deign,slant atone nylon guilt yearn crank venom blast plunk orbit topic extol tough rebar tibia crass silly vague artsy gazer prism booth madam deign
+19,6,1,posse,skirt tying halve idiot lapse posse
+20,6,1,vista,cower lousy aside hobby vault vista
+21,4,1,pleat,fried wrote peril pleat
+22,8,0,verve,agile jumpy stoic silky gusto login hefty verve
+23,5,1,meter,deign snare belie hater meter
+24,10,0,emcee,shady shook satin tweet unfit coast bravo burst seize emcee
+25,4,1,whale,tying ratty weigh whale
+26,4,1,taste,agape brief table taste
+27,9,0,bezel,wince steak vogue gamma cause manic where genre bezel
+28,5,1,tiara,gorge stalk decry leapt tiara
+29,4,1,flask,delve timer speck flask
+30,5,1,cagey,twang wharf dusty homer cagey
+31,3,1,moist,quilt image moist
+32,5,1,cause,undue rivet apart spout cause
+33,3,1,setup,clump pixel setup
+34,5,1,loyal,alpha tying scene ferry loyal
+35,3,1,agile,blaze silky agile
+36,5,1,cavil,maker topaz umbra dwell cavil
+37,3,1,baron,lobby strap baron
+38,10,0,poise,basic quail forum debar house teach weary cameo niece poise
+39,11,0,sixty,droll eclat dirty crock throw curve death brunt broth smart sixty
+40,5,1,equip,speck ovine swing musty equip
+41,17,0,skulk,spite bacon newer jerky equip itchy harsh lipid squat stash polyp sappy vouch privy gipsy bezel skulk
+42,14,0,mushy,delay parry alloy suite vapid carol staff gummy apnea triad utile apron parka mushy
+43,12,0,stall,snort haute swoon steep brand adobe board gazer bough below droll stall
+44,8,0,quash,meaty edify vigor ruler pried value snaky quash
+45,17,0,buddy,ankle tacit gusty axial lathe golly hovel hotly ficus liken lingo whole roach slung adage femur buddy
+46,12,0,witty,eagle madam tabby prong there choke mafia print forum offal wrote witty
+47,14,0,shall,fifth balmy cluck eater theft easel spook edify ratty melon vomit noose twirl shall
+48,5,1,wagon,shock poser sword yacht wagon
+49,4,1,donut,night cameo booby donut
+50,5,1,react,arrow savvy stair chunk react
+51,4,1,repel,gripe tipsy trial repel
+52,4,1,omega,nicer sappy onset omega
+53,3,1,shine,coven smith shine
+54,4,1,medic,shove mealy feast medic
+55,5,1,blade,media windy angry obese blade
+56,4,1,ingot,acorn motel sling ingot
+57,4,1,shear,wider metal paler shear
+58,8,0,waxen,finch spade comic gaudy rebel opium covet waxen
+59,5,1,quoth,onion tuber penne think quoth
+60,9,0,waive,bison beard lucky lousy nadir shelf fiery climb waive
+61,4,1,repay,grape uncut baggy repay
+62,16,0,salvo,screw easel bitty filly grind wield teary deity lager peach tripe buyer slain twice trove salvo
+63,4,1,elder,budge parry beefy elder
+64,3,1,bulky,batty crook bulky
+65,7,0,tangy,rebus pride woody lofty aorta chock tangy
+66,5,1,droop,recap funny filly braid droop
+67,16,0,sassy,alley jumpy shell lymph rifle snort daunt bleed await opera dully craft shaft spilt vista sassy
+68,4,1,liken,maybe worse lunar liken
+69,5,1,clued,dried waltz aptly speak clued
+70,6,1,purer,leash stink spore idiom penny purer
+71,5,1,skimp,quest lemur troop thick skimp
+72,5,1,barge,mouse stoic bilge goner barge
+73,5,1,macaw,flank roger write gawky macaw
+74,5,1,smirk,breed lemur abuse hilly smirk
+75,6,1,after,tepee wench birch squat salty after
+76,6,1,facet,snoop waist spare roach fjord facet
+77,5,1,phase,sound savvy dealt harpy phase
+78,5,1,gauge,rodeo heard hedge moose gauge
+79,4,1,opium,brain twice guppy opium
+80,4,1,cleft,aback hunky shell cleft
+81,7,0,exalt,sushi crate caddy graze rupee exult exalt
+82,5,1,stair,alert winch array study stair
+83,27,0,abode,hippy fence wield quest while hater lunar lucid shrub macho troop cough later donor table cable ruder trick event elite slate panic oaken thing bless edict abode
+84,5,1,great,trump beefy itchy later great
+85,6,1,again,horse pushy hippo fauna ovoid again
+86,22,0,wimpy,broke entry unity excel reuse frock stank overt tonal prize outdo liken apart brink satyr prose nurse break state sorry milky wimpy
+87,7,0,drawn,spoon mauve yeast email frisk spend drawn
+88,8,0,clack,fizzy great scrub shrew snipe icing pizza clack
+89,11,0,paddy,slimy budge filly screw creak elude widow corer young syrup paddy
+90,9,0,chasm,noble flair legal piggy topaz undue biome clock chasm
+91,6,1,roomy,crest flesh overt cleft wrong roomy
+92,5,1,reedy,debut gaunt purse flint reedy
+93,9,0,plumb,value gecko crass enter maize nanny allay pubic plumb
+94,5,1,chock,pound thigh coupe snore chock
+95,5,1,amuse,natal raspy dairy smite amuse
+96,9,0,navel,heart affix buxom sauna guppy scamp wafer pupil navel
+97,6,1,shear,pinky eying beefy pitch dolly shear
+98,9,0,brink,offal pilot grime pouch wreak silly tweak basis brink
+99,6,1,chain,fussy paler rogue roomy train chain
+# strategy random-blind, follow-up answer, trials 100, seed 0
+# mean guesses 7.0900  +/- 0.4533 (standard error)
+# win rate (within 6) 66.0000%  +/- 4.7371%  (66 of 100 games)
+# sd 4.5329   min 3   median 5.0   max 27
+#    3 guesses       9    9.00%
+#    4 guesses      19   19.00%
+#    5 guesses      24   24.00%
+#    6 guesses      14   14.00%
+#    7 guesses       4    4.00%   (loss)
+#    8 guesses       5    5.00%   (loss)
+#    9 guesses       6    6.00%   (loss)
+#   10 guesses       4    4.00%   (loss)
+#   11 guesses       2    2.00%   (loss)
+#   12 guesses       3    3.00%   (loss)
+#   14 guesses       2    2.00%   (loss)
+#   15 guesses       1    1.00%   (loss)
+#   16 guesses       2    2.00%   (loss)
+#   17 guesses       2    2.00%   (loss)
+#   22 guesses       1    1.00%   (loss)
+#   24 guesses       1    1.00%   (loss)
+#   27 guesses       1    1.00%   (loss)

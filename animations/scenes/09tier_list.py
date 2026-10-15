@@ -7,36 +7,47 @@ BEAT MAP (one subscene per Script.md beat)
   b poll          — a swipe: the watch page slides off to the LEFT as the dark-mode
                     community poll page slides in from the RIGHT (VO 2: "…I posted
                     this poll 3 days before the Hangman video came out.")
-  c hangman_tiers — the poll page fades out; the Hangman tier list fades in with the
+  c hangman_clip  — a swipe BACK: the poll page slides off to the RIGHT as the watch
+                    page slides in from the LEFT, its player already on the clip's
+                    first frame, then 15 s of the Hangman video from 2:18 plays (VO 3)
+  d hangman_tiers — the watch page fades out; the Hangman tier list fades in with the
                     title "Hangman Tier List" at the top (VO 3)
-  d wordle_tiers  — hangman list + title slide LEFT; a copy MORPHS into the Wordle
+  e wordle_tiers  — hangman list + title slide LEFT; a copy MORPHS into the Wordle
                     tier list on the right ("Wordle Tier List" fading in as it moves),
                     arrow drawn AFTER — the hangman scene-17 comparison style (VO 4)
-  e histogram     — the camera jumps (invisibly) to 08's histogram view; the navy
+  f emph_i        — on BOTH lists every tile but I dims (hangman 17's letter
+                    spotlight)                                               (VO 5)
+  g emph_s        — the spotlight moves to S; "*The ranking for S goes down"
+                    (ranking bold) fades in at the bottom                   (VO 5)
+  h emph_lh       — the spotlight moves to L and H; the footnote fades      (VO 5)
+  i histogram     — the camera jumps (invisibly) to 08's histogram view; the navy
                     background fades in, the Hangman list, the titles and the arrow
                     fade out, the Wordle list shrinks into the top-RIGHT corner, its
                     panels turning lighter; then 08's histogram grows back up with
-                    its axis and title                                       (VO 5)
-  f low_tiers     — the corner list dims every tier but LOW▲ and LOW▼      (VO 6)
-  g low_1         — the 1+ low-tier layer grows up over the bars, with a legend
-                    row (Yahtzee 07's overlay style; no row for the whole chart) (VO 6)
-  h low_2         — the 2+ layer grows up over it; its legend row appears    (VO 6)
-  i low_3         — the 3+ layer, POPPED: it grows up exaggerated and straight
-                    back down to its true height, so its shape can be seen    (VO 6)
-  j list_center   — the histogram, its layers and legend fall/fade away; the list
-                    returns to the centre at full brightness                 (VO 7)
-  k doubles       — the list morphs into the list WITH DOUBLES: LOW splits into
-                    LOW▲ / LOW■ / LOW▼ and the doubles ride in with their rows (VO 7)
-  l histogram_2   — the list slides off to the right AS the histogram grows back (VO 8)
-  m dup_1 / n dup_2 / o dup_3 — the duplicate-letter layers, as g-i (o popped) (VO 8)
-  p restore       — the duplicate layers fall back to the axis, legend out   (VO 8)
-  q vowel_3 / r vowel_4 — the distinct-vowel layers, as g-h (r popped)       (VO 9)
-  s to_black      — everything fades out as the navy page turns Wordle's black
+                    its axis and title                                       (VO 6)
+  j low_tiers     — the corner list dims every tier but LOW▲ and LOW▼      (VO 7)
+  k low_1         — the 1+ low-tier layer grows up over the bars, with a legend
+                    row (Yahtzee 07's overlay style; no row for the whole chart) (VO 7)
+  l low_2         — the 2+ layer grows up over it; its legend row appears    (VO 7)
+  m low_3         — the 3+ layer, POPPED: it grows up exaggerated and straight
+                    back down to its true height, so its shape can be seen    (VO 7)
+  n list_center   — the histogram, its layers and legend fall/fade away; the list
+                    returns to the centre at full brightness                 (VO 8)
+  o doubles       — the list morphs into the list WITH DOUBLES: LOW splits into
+                    LOW▲ / LOW■ / LOW▼ and the doubles ride in with their rows (VO 8)
+  p histogram_2   — the list slides off to the right AS the histogram grows back (VO 9)
+  q dup_1 / r dup_2 / s dup_3 — the duplicate-letter layers, as k-m (s popped) (VO 9)
+  t restore       — the duplicate layers fall back to the axis, legend out   (VO 9)
+  u vowel_3 / v vowel_4 — the distinct-vowel layers, as k-l (v popped)      (VO 10)
+  w to_black      — everything fades out as the navy page turns Wordle's black
                     (WORDLE_BG), the background scene 10 opens on (the user's
                     call, 2026-09-29; not a script beat)
 
 REUSE MAP
   watch page      bpkfigures.youtube_card.youtube_watch (as hangman 93youtube_test c)
+  clip            bpkfigures.youtube_card.play_clip, from footage/hangman.mp4 (the
+                  YouTube upload, pulled with yt-dlp; gitignored, so a fresh machine
+                  needs it re-pulled)
   poll            bpkfigures.youtube_card.youtube_poll
   tier lists      bpkfigures.tier_list (promoted from hangman's asset): filled_list,
                   morph_into; the LIST_SCALE / LEFT_X / RIGHT_X / LIST_Y / title height,
@@ -50,7 +61,8 @@ REUSE MAP
                   grown by bar_graph.grow_bars and dropped by bar_graph.shrink_bars
                   (yahtzee 07's _grow_up / _fall_down); legend = yahtzee's
                   make_hist_legend look (0.22 swatch + FONT_SIZE_SM label), in white
-  emphasis        tier_list.emphasize (dim the rest)
+  emphasis        tier_list.emphasize (dim the rest); f-h's letter spotlight
+                  tier_list.emphasize_letters (promoted from hangman 17)
   doubles         tier_list tokens: a small copy then a full-size copy
 
 NUMBERS / ORDERINGS — all SOURCED
@@ -85,7 +97,7 @@ d's ROW MAP: every Wordle tier travels in from the Hangman list — the reverse 
 hangman video's tier MERGE: Hangman's TOP SPLITS into Wordle's TOP▲ and TOP▼, and
 each HIGH/MID/LOW half becomes the Wordle half of the same name.
 
-Render:  render 09a --fast (…09d)  /  render 09 sub  for the whole scene
+Render:  render 09a --fast (…09e)  /  render 09 sub  for the whole scene
 """
 from pathlib import Path
 import sys
@@ -97,7 +109,7 @@ import numpy as np
 from manim import MovingCameraScene
 
 from config import *
-from bpkfigures.youtube_card import youtube_watch, youtube_poll
+from bpkfigures.youtube_card import youtube_watch, youtube_poll, play_clip, show_clip_frame
 from bpkfigures import tier_list as tl
 from bpkfigures.bar_graph import grow_bars, shrink_bars
 from assets.youtube_data import get as yt_get
@@ -110,6 +122,7 @@ from assets.histogram_view import (HistogramChrome, full_stacks, layer_bars, to_
                                    TALLEST)
 
 HANGMAN_VIDEO = yt_get("hangman")
+HANGMAN_FILE = str(Path(__file__).resolve().parents[2] / "footage" / "hangman.mp4")
 POLL = poll_get("wordle")
 LAYERS = subhist_data.load()["layers"]
 
@@ -127,7 +140,7 @@ LOW_TIERS = {6, 7}                               # LOW▲, LOW▼ — the user's
 CORNER_SCALE = 0.40               # the tier list in the corner
 CORNER_UR = (7.7, 2.3)            # its top-RIGHT corner (bars short there)
 LEGEND_GAP = 0.35                 # the legend's right edge to the corner list's left
-PANEL_ON_NAVY = interpolate_color(BOARD_NAVY, WHITE, 0.22)   # e on: lighter panels
+PANEL_ON_NAVY = td.PANEL_ON_NAVY  # e on: lighter panels (moved to tier_data, shared)
 LAYER_COLORS = [ACCENT_ORANGE, ACCENT_RED, ACCENT_PURPLE]    # outermost first
 POP_FRAC = 0.35                   # a popped layer's tallest bar, over the histogram's
 LEGEND_LABELS = {
@@ -178,10 +191,22 @@ class Scene09(MovingCameraScene, WordleScene):
         self.add(self.poll_page)
         self.play(self.video_page.animate.shift(LEFT * config.frame_width),
                   self.poll_page.animate.shift(LEFT * config.frame_width), run_time=1.0)
-        self.remove(self.video_page)
-        self.video_page = None
+        self.remove(self.video_page)              # kept off-frame: c swipes it back
 
-    # c : the poll page leaves; the Hangman tier list + its title fade in
+    # c : swipe back — the poll page slides off RIGHT as the watch page slides in from
+    #     LEFT, its player already on the clip's first frame (not the thumbnail);
+    #     then the Hangman video plays from 2:18 for 15 s (user 2026-10-07)
+    @subscene
+    def hangman_clip(self):
+        show_clip_frame(self.video_page, HANGMAN_FILE, "2:18")
+        self.add(self.video_page)
+        self.play(self.video_page.animate.shift(RIGHT * config.frame_width),
+                  self.poll_page.animate.shift(RIGHT * config.frame_width), run_time=1.0)
+        self.remove(self.poll_page)
+        self.poll_page = None
+        self.play(play_clip(self.video_page, HANGMAN_FILE, "2:18"), run_time=15.0)
+
+    # d : the watch page leaves; the Hangman tier list + its title fade in
     def _setup_hangman_tiers(self):
         self.hang = tl.filled_list(td.HANGMAN_LETTERS, names=td.HANGMAN_NAMES,
                                    scale=LIST_SCALE).move_to([0, LIST_Y, 0])
@@ -190,11 +215,11 @@ class Scene09(MovingCameraScene, WordleScene):
     @subscene
     def hangman_tiers(self):
         self._setup_hangman_tiers()
-        self.play(FadeOut(self.poll_page), run_time=0.6)
-        self.poll_page = None
+        self.play(FadeOut(self.video_page), run_time=0.6)
+        self.video_page = None
         self.play(FadeIn(self.hang, self.hang_title), run_time=0.8)
 
-    # d : hangman list slides left; a copy morphs into the Wordle list; arrow after
+    # e : hangman list slides left; a copy morphs into the Wordle list; arrow after
     def _setup_wordle_tiers(self):
         self.wordle = tl.filled_list(td.WORDLE_LETTERS, names=td.WORDLE_NAMES,
                                      scale=LIST_SCALE).move_to([RIGHT_X, LIST_Y, 0])
@@ -211,6 +236,38 @@ class Scene09(MovingCameraScene, WordleScene):
                       None, 2.0, extra=[FadeIn(self.wordle_title)],
                       split_from=WORDLE_ROWS_FROM)
         self.play(GrowArrow(self.arrow), run_time=0.5)
+
+    # f-h : spotlight letters on both lists (every other tile dims)
+    def _spotlight(self, letters, run_time, extra=()):
+        self.play(*tl.emphasize_letters([(self.hang, td.HANGMAN_LETTERS),
+                                         (self.wordle, td.WORDLE_LETTERS)], letters),
+                  *extra, run_time=run_time)
+
+    # f : spotlight I
+    @subscene
+    def emph_i(self):
+        self._spotlight("I", 0.6)
+
+    # g : spotlight S, with a footnote at the bottom (user 2026-10-07)
+    def _setup_emph_s(self):
+        # the shared footnote (16's FORTH note), in the tier lists' black, centred
+        # in the space under the lists
+        self.s_note = footnote("The ranking for S goes down", color=TITLE_COLOR,
+                               t2w={"ranking": BOLD})
+        bottom = min(self.hang.get_bottom()[1], self.wordle.get_bottom()[1])
+        self.s_note.move_to([0, (bottom - config.frame_y_radius) / 2, 0])
+
+    @subscene
+    def emph_s(self):
+        self._setup_emph_s()
+        self._spotlight("S", 0.6, extra=[FadeIn(self.s_note)])
+
+    # h : spotlight L and H; S's footnote goes with the spotlight
+    @subscene
+    def emph_lh(self):
+        self._spotlight("LH", 0.6, extra=[FadeOut(self.s_note)])
+        self.remove(self.s_note)
+        self.s_note = None
 
     # ── histogram helpers ─────────────────────────────────────────────────────
     def _list_at(self, letters, names, scale, *, ur=None, center=(0, LIST_Y),
@@ -320,8 +377,9 @@ class Scene09(MovingCameraScene, WordleScene):
         self.remove(*self.layers, *bars, self.legend)   # bars: see _drop_histogram
         self.layers, self.legend = [], None
 
-    # e : the invisible camera jump, then navy in, Hangman list out, Wordle list to
-    #     the corner; then the histogram grows back
+    # i : the invisible camera jump, then navy in, Hangman list out, Wordle list to
+    #     the corner; then the histogram grows back. The corner list is a fresh build at
+    #     full brightness, so the Transform also un-dims f-h's letters
     def _to_histogram_view(self):
         for m in list(self.mobjects):
             to_view(m)
@@ -348,27 +406,27 @@ class Scene09(MovingCameraScene, WordleScene):
         self._grow_histogram(1.5)
         self.bring_to_front(self.wordle)
 
-    # f : dim every tier but the two LOW ones
+    # j : dim every tier but the two LOW ones
     @subscene
     def low_tiers(self):
         self.play(*tl.emphasize(self.wordle, LOW_TIERS), run_time=0.8)
 
-    # g : the 1+ low-tier layer
+    # k : the 1+ low-tier layer
     @subscene
     def low_1(self):
         self._layer("low", 0, 1.0)
 
-    # h : the 2+ low-tier layer
+    # l : the 2+ low-tier layer
     @subscene
     def low_2(self):
         self._layer("low", 1, 1.0)
 
-    # i : the 3+ low-tier layer
+    # m : the 3+ low-tier layer
     @subscene
     def low_3(self):
         self._layer("low", 2, 2.0, pop=True)
 
-    # j : the histogram goes; the list returns to the centre, undimmed
+    # n : the histogram goes; the list returns to the centre, undimmed
     def _setup_list_center(self):
         self.center_list = self._list_at(td.WORDLE_LETTERS, td.WORDLE_NAMES, LIST_SCALE)
 
@@ -379,7 +437,7 @@ class Scene09(MovingCameraScene, WordleScene):
         self.play(Transform(self.wordle, self.center_list), run_time=1.2)
         self.center_list = None
 
-    # k : the list morphs into the list WITH DOUBLES (LOW splits in three)
+    # o : the list morphs into the list WITH DOUBLES (LOW splits in three)
     def _setup_doubles(self):
         self.doubles = self._list_at(
             td.WORDLE_DOUBLE_LETTERS, td.WORDLE_DOUBLE_NAMES, LIST_SCALE,
@@ -393,44 +451,44 @@ class Scene09(MovingCameraScene, WordleScene):
                       td.WORDLE_DOUBLE_LETTERS, None, 2.0, split_from=DOUBLES_ROWS_FROM)
         self.wordle, self.doubles = self.doubles, None
 
-    # l : the list slides off to the right; the histogram grows back
+    # p : the list slides off to the right; the histogram grows back
     @subscene
     def histogram_2(self):
         self._grow_histogram(1.5, extra=[self.wordle.animate.shift(RIGHT * WIDTH)])
         self.remove(self.wordle)
         self.wordle = None
 
-    # m : the 1+ duplicate layer
+    # q : the 1+ duplicate layer
     @subscene
     def dup_1(self):
         self._layer("dup", 0, 1.0)
 
-    # n : the 2+ duplicate layer
+    # r : the 2+ duplicate layer
     @subscene
     def dup_2(self):
         self._layer("dup", 1, 1.0)
 
-    # o : the 3+ duplicate layer
+    # s : the 3+ duplicate layer
     @subscene
     def dup_3(self):
         self._layer("dup", 2, 2.0, pop=True)
 
-    # p : the duplicate layers fall back to the axis; the legend fades
+    # t : the duplicate layers fall back to the axis; the legend fades
     @subscene
     def restore(self):
         self._drop_layers(1.0)
 
-    # q : the 3+ distinct-vowel layer
+    # u : the 3+ distinct-vowel layer
     @subscene
     def vowel_3(self):
         self._layer("vowel", 0, 1.0)
 
-    # r : the 4+ distinct-vowel layer
+    # v : the 4+ distinct-vowel layer
     @subscene
     def vowel_4(self):
         self._layer("vowel", 1, 2.0, pop=True)
 
-    # s : everything fades as the navy page turns Wordle's black — scene 10 opens on it
+    # w : everything fades as the navy page turns Wordle's black — scene 10 opens on it
     @subscene
     def to_black(self):
         rest = [m for m in self.mobjects if m is not self.navy]

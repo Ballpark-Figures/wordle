@@ -1,0 +1,69 @@
+# secondexact: the EXACT best predetermined second word, and the exact value of the
+# strategy -- opener, then that word when the reply fires, then a uniformly random
+# consistent ANSWER.  No seed and no standard error: the random tail is summed 
+# exactly (math/secondexact.py states the recursion).
+# expected is over all 2315 answers; decline/fired split it by whether the rule fired.
+# settings fire=ladderL3_wmystery openers=20 follow_up=answer topk=20 third=-1 third_key=none third_decline=0 ladder=3
+# TOPK=20: each group's word is the best of the 20 ranked by the one-ply
+# score, so every total here is an UPPER BOUND, not the optimum.
+opener,fires,second,expected,total,decline,fired,qualifying,scanned,cut
+arose,ladder,glint,3.783396,8758.5626,1777.4296,6981.1330,1840,100,0
+arose,L2|t3,glint,3.783396,8758.5626,,,,,level2
+arose,L3|t1,dumpy,3.783396,8758.5626,,,,,level3
+stare,ladder,cling,3.741926,8662.5587,1784.0048,6878.5540,1801,100,0
+stare,L2|t3,cling,3.741926,8662.5587,,,,,level2
+stare,L3|t1,dumpy,3.741926,8662.5587,,,,,level3
+irate,ladder,scold,3.766964,8720.5206,1741.5324,6978.9881,1821,100,0
+irate,L2|t3,scold,3.766964,8720.5206,,,,,level2
+irate,L3|t1,nymph,3.766964,8720.5206,,,,,level3
+alone,ladder,crust,3.745612,8671.0925,1227.7903,7443.3022,1951,100,0
+alone,L2|t3,crust,3.745612,8671.0925,,,,,level2
+alone,L3|t1,dumpy,3.745612,8671.0925,,,,,level3
+aisle,ladder,torch,3.767869,8722.6176,1384.7137,7337.9038,1916,100,0
+aisle,L2|t3,torch,3.767869,8722.6176,,,,,level2
+aisle,L3|t1,dumpy,3.767869,8722.6176,,,,,level3
+crane,ladder,spilt,3.669809,8495.6081,1326.2708,7169.3373,1918,100,0
+crane,L2|t3,spilt,3.669809,8495.6081,,,,,level2
+crane,L3|t1,dough,3.669809,8495.6081,,,,,level3
+leant,ladder,crisp,3.681259,8522.1142,1287.2547,7234.8595,1924,100,0
+leant,L2|t3,crisp,3.681259,8522.1142,,,,,level2
+leant,L3|t1,dough,3.681259,8522.1142,,,,,level3
+raise,ladder,cloth,3.768707,8724.5562,1702.1652,7022.3910,1846,120,0
+raise,L2|t3,cloth,3.768707,8724.5562,,,,,level2
+raise,L3|t1,dumpy,3.768707,8724.5562,,,,,level3
+alter,ladder,sonic,3.744629,8668.8165,1745.6654,6923.1512,1819,120,0
+alter,L2|t3,sonic,3.744629,8668.8165,,,,,level2
+alter,L3|t1,dumpy,3.744629,8668.8165,,,,,level3
+later,ladder,sonic,3.741031,8660.4874,1733.8285,6926.6589,1819,120,0
+later,L2|t3,sonic,3.741031,8660.4874,,,,,level2
+later,L3|t1,dumpy,3.741031,8660.4874,,,,,level3
+arise,ladder,cloth,3.789244,8772.1006,1736.9460,7035.1546,1846,120,0
+arise,L2|t3,cloth,3.789244,8772.1006,,,,,level2
+arise,L3|t2,pudgy,3.789244,8772.1006,,,,,level3
+alert,ladder,sonic,3.733553,8643.1749,1738.4212,6904.7537,1819,120,0
+alert,L2|t3,sonic,3.733553,8643.1749,,,,,level2
+alert,L3|t1,dumpy,3.733553,8643.1749,,,,,level3
+snare,ladder,clout,3.745382,8670.5588,1588.7032,7081.8556,1866,120,0
+snare,L2|t3,clout,3.745382,8670.5588,,,,,level2
+snare,L3|t1,dumpy,3.745382,8670.5588,,,,,level3
+slate,ladder,corny,3.717490,8605.9882,1434.7816,7171.2067,1879,120,0
+slate,L2|t3,corny,3.717490,8605.9882,,,,,level2
+slate,L3|t0,-,3.717490,8605.9882,,,,,level3
+saner,ladder,clout,3.752725,8687.5588,1598.3866,7089.1722,1866,120,0
+saner,L2|t3,clout,3.752725,8687.5588,,,,,level2
+saner,L3|t1,dumpy,3.752725,8687.5588,,,,,level3
+least,ladder,crony,3.728299,8631.0117,1447.5365,7183.4752,1879,120,0
+least,L2|t3,crony,3.728299,8631.0117,,,,,level2
+least,L3|t0,-,3.728299,8631.0117,,,,,level3
+learn,ladder,hoist,3.739808,8657.6548,1512.3478,7145.3070,1880,120,0
+learn,L2|t3,hoist,3.739808,8657.6548,,,,,level2
+learn,L3|t1,dumpy,3.739808,8657.6548,,,,,level3
+trace,ladder,sling,3.700452,8566.5475,1451.0216,7115.5259,1875,120,0
+trace,L2|t3,sling,3.700452,8566.5475,,,,,level2
+trace,L3|t1,dumpy,3.700452,8566.5475,,,,,level3
+stale,ladder,corny,3.738190,8653.9096,1444.1392,7209.7704,1879,120,0
+stale,L2|t3,corny,3.738190,8653.9096,,,,,level2
+stale,L3|t0,-,3.738190,8653.9096,,,,,level3
+crate,ladder,sling,3.705054,8577.2003,1459.9212,7117.2791,1875,120,0
+crate,L2|t3,sling,3.705054,8577.2003,,,,,level2
+crate,L3|t1,dumpy,3.705054,8577.2003,,,,,level3

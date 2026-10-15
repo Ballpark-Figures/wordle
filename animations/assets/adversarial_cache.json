@@ -1,0 +1,104 @@
+{
+ "source": "math/data/shared/freqsearch/topk1.csv (freq_search k=1, custom.txt)",
+ "patterns": [
+  {
+   "pattern": "F__FF",
+   "multiplier": 42.5
+  },
+  {
+   "pattern": "Y___Y",
+   "multiplier": 31.375
+  },
+  {
+   "pattern": "W___W",
+   "multiplier": 29.25
+  },
+  {
+   "pattern": "__VV_",
+   "multiplier": 24.5
+  },
+  {
+   "pattern": "N_NN_",
+   "multiplier": 23.375
+  },
+  {
+   "pattern": "R_R_R",
+   "multiplier": 21.875
+  },
+  {
+   "pattern": "V_V__",
+   "multiplier": 20.25
+  },
+  {
+   "pattern": "W_W__",
+   "multiplier": 20.0
+  },
+  {
+   "pattern": "L_LL_",
+   "multiplier": 18.0
+  },
+  {
+   "pattern": "_M_M_",
+   "multiplier": 17.875
+  },
+  {
+   "pattern": "__B_B",
+   "multiplier": 16.875
+  },
+  {
+   "pattern": "D_DD_",
+   "multiplier": 16.5
+  }
+ ],
+ "words": [
+  {
+   "word": "YUMMY",
+   "pct": 1.878933
+  },
+  {
+   "word": "NANNA",
+   "pct": 0.699921
+  },
+  {
+   "word": "NINNY",
+   "pct": 0.699921
+  },
+  {
+   "word": "WOWED",
+   "pct": 0.598863
+  },
+  {
+   "word": "JAFFA",
+   "pct": 0.56892
+  },
+  {
+   "word": "JIFFY",
+   "pct": 0.56892
+  },
+  {
+   "word": "LOLLY",
+   "pct": 0.538977
+  },
+  {
+   "word": "DIDDY",
+   "pct": 0.494062
+  },
+  {
+   "word": "UPPER",
+   "pct": 0.404233
+  },
+  {
+   "word": "HIGHT",
+   "pct": 0.359318
+  },
+  {
+   "word": "HIGHS",
+   "pct": 0.359318
+  },
+  {
+   "word": "NANNY",
+   "pct": 0.349961
+  }
+ ],
+ "n_words": 4229
+}

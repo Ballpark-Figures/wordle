@@ -1,0 +1,14 @@
+# pairs the opening could not guarantee splitting
+# settings pool=custom words=4 cap=6
+word1,word2,count
+anion,axion,1
+dried,drier,1
+jaunt,taunt,1
+jaunt,vaunt,1
+movie,moxie,1
+paper,parer,1
+piper,riper,1
+piper,viper,1
+riper,viper,1
+savoy,savvy,1
+taunt,vaunt,1

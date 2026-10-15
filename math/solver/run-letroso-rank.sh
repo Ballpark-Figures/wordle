@@ -59,7 +59,7 @@ STEM="root_rank_${PRIOR}"
     echo "missing the length-3 lists" >&2
     echo "  run: python3 build_letroso_lists.py" >&2; exit 1; }
 
-. "$(dirname "${BASH_SOURCE[0]}")/_guard.sh"
+. "$MATH/solver/_guard.sh"
 guard_output letroso_solve.py "$OUTDIR/${STEM}_top.csv" || exit 1
 
 echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] letroso rank $STEM" | tee -a "$LOC/$STEM.log"

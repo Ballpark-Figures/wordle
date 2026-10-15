@@ -1,0 +1,23 @@
+# greedy letter-by-letter build (see math/greedybuild.py)
+# settings pool=custom words=4 topk=1 ssq_first=11 answers=2315
+step,opening,unsolved,ssq,placed_letter,placed_word,placed_pos
+1,_____ _____ _____ ___e_,2315,7341262,e,0,3
+2,_____ _____ _____ ___es,2315,3050656,s,3,4
+3,_____ _____ _____ _a_es,2315,1321902,a,3,1
+4,_____ _____ _a_es _o___,2305,663116,o,0,1
+5,_____ _a_es _o___ _r___,2287,352424,r,0,1
+6,_____ _a_es _o___ _r_l_,2228,197700,l,3,3
+7,_____ _a_es _o_t_ _r_l_,2070,109864,t,2,3
+8,_____ _a_es _ont_ _r_l_,1848,63990,n,2,2
+9,_a_es _i___ _ont_ _r_l_,1590,41496,i,0,1
+10,_a_es _i___ _r_l_ cont_,1243,28706,c,2,0
+11,_a_es _i___ cont_ dr_l_,965,19814,d,2,0
+12,_a_es cont_ dr_l_ pi___,689,14742,p,1,0
+13,cont_ dr_l_ ma_es pi___,475,11390,m,0,0
+14,cont_ dr_l_ ma_es pi__h,328,9636,h,3,4
+15,cont_ dr_l_ mages pi__h,226,8056,g,2,2
+16,cont_ dr_ly mages pi__h,176,7270,y,1,4
+17,conte dr_ly mages pi__h,151,7080,e,0,4
+18,conte dr_ly mages pit_h,147,6960,t,3,2
+19,conte dr_ly mages pitch,145,6942,c,3,3
+20,conte dryly mages pitch,145,6936,y,1,2

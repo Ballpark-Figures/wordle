@@ -1,0 +1,49 @@
+# secondexact: the EXACT best predetermined second word, and the exact value of the
+# strategy -- opener, then that word when the reply fires, then a uniformly random
+# consistent ANSWER.  No seed and no standard error: the random tail is summed 
+# exactly (math/secondexact.py states the recursion).
+# expected is over all 2315 answers; decline/fired split it by whether the rule fired.
+# settings fire=ladderL2 openers=20 follow_up=answer topk=20 third=-1 third_key=none third_decline=0 ladder=2
+# TOPK=20: each group's word is the best of the 20 ranked by the one-ply
+# score, so every total here is an UPPER BOUND, not the optimum.
+opener,fires,second,expected,total,decline,fired,qualifying,scanned,cut
+arles,ladder,point,3.756803,8696.9992,1817.0237,6879.9755,1821,100,0
+arles,L2|t3,point,3.756803,8696.9992,,,,,level2
+artel,ladder,coins,3.729661,8634.1657,1740.4004,6893.7653,1818,120,0
+artel,L2|t3,coins,3.729661,8634.1657,,,,,level2
+raile,ladder,ponts,3.741532,8661.6476,1676.7563,6984.8913,1846,100,0
+raile,L2|t3,ponts,3.741532,8661.6476,,,,,level2
+ratel,ladder,cions,3.716274,8603.1732,1731.2078,6871.9654,1818,120,0
+ratel,L2|t3,cions,3.716274,8603.1732,,,,,level2
+later,ladder,cions,3.729660,8634.1640,1733.8285,6900.3356,1819,120,0
+later,L2|t3,cions,3.729660,8634.1640,,,,,level2
+saner,ladder,clipt,3.717099,8605.0835,101.8333,8503.2502,2276,120,0
+saner,L2|t4,clipt,3.717099,8605.0835,,,,,level2
+alter,ladder,coins,3.739081,8655.9737,1745.6654,6910.3083,1819,120,0
+alter,L2|t3,coins,3.739081,8655.9737,,,,,level2
+aesir,ladder,cloth,3.828269,8862.4423,1754.4171,7108.0252,1845,120,0
+aesir,L2|t3,cloth,3.828269,8862.4423,,,,,level2
+arise,ladder,cloth,3.792125,8778.7682,1736.9460,7041.8222,1846,120,0
+arise,L2|t3,cloth,3.792125,8778.7682,,,,,level2
+soare,ladder,clint,3.707377,8582.5773,118.0000,8464.5773,2277,120,0
+soare,L2|t4,clint,3.707377,8582.5773,,,,,level2
+roate,ladder,clips,3.741118,8660.6872,1831.8071,6828.8801,1806,100,0
+roate,L2|t3,clips,3.741118,8660.6872,,,,,level2
+irate,ladder,clons,3.731942,8639.4458,1741.5324,6897.9134,1821,100,0
+irate,L2|t3,clons,3.731942,8639.4458,,,,,level2
+orate,ladder,clips,3.753631,8689.6555,1832.4151,6857.2404,1806,100,0
+orate,L2|t3,clips,3.753631,8689.6555,,,,,level2
+ariel,ladder,ponts,3.771728,8731.5503,1711.8837,7019.6666,1846,100,0
+ariel,L2|t3,ponts,3.771728,8731.5503,,,,,level2
+realo,ladder,dints,3.804802,8808.1168,1866.8714,6941.2454,1820,100,0
+realo,L2|t3,dints,3.804802,8808.1168,,,,,level2
+raine,ladder,clots,3.714910,8600.0172,1553.5218,7046.4954,1870,100,0
+raine,L2|t3,clots,3.714910,8600.0172,,,,,level2
+arose,ladder,clint,3.735366,8647.3720,1777.4296,6869.9424,1840,100,0
+arose,L2|t3,clint,3.735366,8647.3720,,,,,level2
+snare,ladder,clipt,3.701484,8568.9348,101.9333,8467.0015,2276,120,0
+snare,L2|t4,clipt,3.701484,8568.9348,,,,,level2
+taler,ladder,cions,3.717863,8606.8526,1734.3595,6872.4931,1818,120,0
+taler,L2|t3,cions,3.717863,8606.8526,,,,,level2
+raise,ladder,cloth,3.771535,8731.1027,1702.1652,7028.9375,1846,120,0
+raise,L2|t3,cloth,3.771535,8731.1027,,,,,level2

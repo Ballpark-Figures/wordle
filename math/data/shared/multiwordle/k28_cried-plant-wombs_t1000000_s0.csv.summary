@@ -1,0 +1,15 @@
+# DIGEST of k28_cried-plant-wombs_t1000000_s0.csv (0.4 GB), which is gitignored: over GitHub's file-size limit.
+# The lines below are copied verbatim from that file's own summary block.
+# multiwordle, blind opening then the greedy rule (see math/multiwordle.py)
+# boards=28 trials=1000000 opening=cried plant wombs seed=0 strategy=greedy
+# answers drawn without replacement from the 2315 mystery words; no guess cap
+# strategy greedy, trials 1000000, boards 28, opening cried plant wombs, seed 0
+# mean total guesses 31.0052  +/- 0.0002 (standard error)
+# sd 0.2310   min 29   median 31.0   max 34
+# mean guesses per board 1.1073
+#   29 guesses     159    0.02%
+#   30 guesses   23058    2.31%
+#   31 guesses  948753   94.88%
+#   32 guesses   27491    2.75%
+#   33 guesses     533    0.05%
+#   34 guesses       6    0.00%

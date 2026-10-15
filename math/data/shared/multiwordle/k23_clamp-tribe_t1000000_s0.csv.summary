@@ -1,0 +1,15 @@
+# DIGEST of k23_clamp-tribe_t1000000_s0.csv (0.3 GB), which is gitignored: over GitHub's file-size limit.
+# The lines below are copied verbatim from that file's own summary block.
+# multiwordle, blind opening then the greedy rule (see math/multiwordle.py)
+# boards=23 trials=1000000 opening=clamp tribe seed=0 strategy=greedy
+# answers drawn without replacement from the 2315 mystery words; no guess cap
+# strategy greedy, trials 1000000, boards 23, opening clamp tribe, seed 0
+# mean total guesses 25.0454  +/- 0.0003 (standard error)
+# sd 0.2927   min 23   median 25.0   max 28
+# mean guesses per board 1.0889
+#   23 guesses     101    0.01%
+#   24 guesses   18579    1.86%
+#   25 guesses  919382   91.94%
+#   26 guesses   59769    5.98%
+#   27 guesses    2112    0.21%
+#   28 guesses      57    0.01%

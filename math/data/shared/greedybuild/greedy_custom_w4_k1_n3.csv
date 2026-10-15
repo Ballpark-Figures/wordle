@@ -1,0 +1,23 @@
+# greedy letter-by-letter build (see math/greedybuild.py)
+# settings pool=custom words=4 topk=1 ssq_first=3 answers=2315
+step,opening,unsolved,ssq,placed_letter,placed_word,placed_pos
+1,_____ _____ _____ ___e_,2315,7341262,e,0,3
+2,_____ _____ _____ ___es,2315,3050656,s,3,4
+3,_____ _____ _____ _a_es,2315,1321902,a,3,1
+4,_____ _____ _a_es _v___,2292,1192172,v,0,1
+5,_____ _____ _a_es _v__l,2255,707046,l,3,4
+6,_____ _____ _ates _v__l,2187,395700,t,2,2
+7,_____ _ates _v__l p____,2076,283064,p,0,0
+8,_____ _ates _v__l p_i__,1925,152026,i,3,2
+9,_____ _ates _v__l pri__,1712,76570,r,3,1
+10,_____ _ates _v__l pric_,1427,50646,c,3,3
+11,___n_ _ates _v__l pric_,1120,30902,n,0,3
+12,___n_ _v__l dates pric_,854,20820,d,1,0
+13,_v__l b__n_ dates pric_,627,15376,b,0,0
+14,_v__l bu_n_ dates pric_,414,11740,u,1,1
+15,_v__l bu_ny dates pric_,295,9984,y,1,4
+16,_v__l bu_ny dates prick,216,8616,k,3,4
+17,_va_l bu_ny dates prick,194,8292,a,0,2
+18,_va_l bunny dates prick,181,8112,n,1,2
+19,ava_l bunny dates prick,171,7934,a,0,0
+20,avail bunny dates prick,168,7858,i,0,3

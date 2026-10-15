@@ -1,0 +1,58 @@
+# the LAST 50 openers still in race_greedy_k24_guess_sig5_s0 (the plain-strategy
+# 1-word race at k=24): its winner plus the 49 eliminated last, most games first.
+# NB no clean break at 50: openers eliminated at 12800 games straddle
+# the cut; that round's openers are ranked by their GAP BEHIND THE LEADER when
+# eliminated, smallest first (user's call) -- one leader per round, so this is the
+# same order as the mean.
+# User's rule (2026-10-02) for the improved strategy's shortlists.
+word,games_survived,mean_when_out,status
+rotan,102400,25.777100,winner
+dinar,102400,25.794268,out
+filet,102400,25.795098,out
+metro,51200,25.798418,out
+laten,51200,25.800371,out
+peart,51200,25.801074,out
+carte,51200,25.801953,out
+apert,51200,25.802813,out
+morat,51200,25.803828,out
+caret,51200,25.804082,out
+flirt,51200,25.804766,out
+tamed,51200,25.805312,out
+brute,51200,25.807227,out
+truce,51200,25.808008,out
+merit,51200,25.812500,out
+earth,51200,25.813477,out
+moten,25600,25.806758,out
+tepal,25600,25.808711,out
+perst,25600,25.808906,out
+carle,25600,25.810195,out
+curet,25600,25.810859,out
+toran,25600,25.810938,out
+train,25600,25.811055,out
+tared,25600,25.811641,out
+potin,25600,25.812344,out
+thrae,25600,25.812461,out
+chart,25600,25.812773,out
+caron,25600,25.813086,out
+trace,25600,25.813398,out
+paten,25600,25.814805,out
+pated,25600,25.816758,out
+patin,25600,25.817187,out
+cater,25600,25.817578,out
+derat,25600,25.817773,out
+ligan,25600,25.818281,out
+resin,25600,25.819258,out
+racon,25600,25.819336,out
+mitre,25600,25.819570,out
+trema,25600,25.820273,out
+gland,25600,25.820352,out
+therm,25600,25.822461,out
+lacer,25600,25.824375,out
+acorn,25600,25.824883,out
+dotal,12800,25.818203,out
+redan,12800,25.818203,out
+piert,12800,25.818672,out
+metol,12800,25.819766,out
+heron,12800,25.819844,out
+bloat,12800,25.820078,out
+party,12800,25.820234,out

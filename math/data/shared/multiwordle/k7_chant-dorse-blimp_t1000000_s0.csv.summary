@@ -1,0 +1,18 @@
+# DIGEST of k7_chant-dorse-blimp_t1000000_s0.csv (0.1 GB), which is gitignored: over GitHub's file-size limit.
+# The lines below are copied verbatim from that file's own summary block.
+# multiwordle, blind opening then the greedy rule (see math/multiwordle.py)
+# boards=7 trials=1000000 opening=chant dorse blimp seed=0 strategy=greedy
+# answers drawn without replacement from the 2315 mystery words; no guess cap
+# strategy greedy, trials 1000000, boards 7, opening chant dorse blimp, seed 0
+# mean total guesses 10.2409  +/- 0.0005 (standard error)
+# sd 0.5111   min 8   median 10.0   max 16
+# mean guesses per board 1.4630
+#    8 guesses       9    0.00%
+#    9 guesses    4676    0.47%
+#   10 guesses  781015   78.10%
+#   11 guesses  186022   18.60%
+#   12 guesses   25443    2.54%
+#   13 guesses    2664    0.27%
+#   14 guesses     164    0.02%
+#   15 guesses       6    0.00%
+#   16 guesses       1    0.00%

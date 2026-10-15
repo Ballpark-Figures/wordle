@@ -85,11 +85,12 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from eldrow import longest_chain
+from eldrow import longest_chain, longest_run
 from wordle import ALL_GREEN, load_words, pattern
 
 MATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BINARY = os.path.join(MATH, "solver", "eldrowmax")
+BIG = os.path.join(MATH, "solver", "eldrowmaxg")       # the same source, MAXP 13000
 
 FAILS = []
 WARNS = []
@@ -266,6 +267,204 @@ def check_csv(pool, expect_val):
     return bad
 
 
+# ------------------------------------------------- --answers: only the last word
+#
+# THE MODE: any pool word may be played, only the LAST must be an answer.  The
+# reference is eldrow.longest_run, which recomputes legal sets from the strings over
+# the whole pool at every step.  Pools are reachable states of the GUESS list (so
+# most words are not answers), and both builds -- eldrowmax and eldrowmaxg -- are
+# diffed, since they are one source under different compile-time limits.
+
+def run_sub(binary, pool, answers, extra=()):
+    with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as fp, \
+         tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as fa:
+        fp.write("\n".join(pool) + "\n")
+        fa.write("\n".join(answers) + "\n")
+        pp, pa = fp.name, fa.name
+    try:
+        cmd = [binary, "--words", pp, "--answers", pa, "--no-out", "--data", "data",
+               "--tt-bits", "20", "--threads", "1"] + list(extra)
+        p = subprocess.run(cmd, cwd=MATH, capture_output=True, text=True)
+    finally:
+        os.unlink(pp)
+        os.unlink(pa)
+    if p.returncode != 0:
+        FAILS.append(f"{os.path.basename(binary)} --answers failed ({p.returncode}): "
+                     f"{p.stderr.strip()[-300:]}")
+        return None, ""
+    out = p.stdout.splitlines()
+    for i, row in enumerate(out):
+        m = RESULT.match(row)
+        if m:
+            return int(m.group("val")), out[i + 1].strip()
+    FAILS.append(f"no result line in:\n{p.stdout}")
+    return None, ""
+
+
+def replay_sub(pool, answers, line, final=True):
+    """The line from the STRINGS: every play legal and consistent with every
+    earlier clue against the LAST word, which must be an answer.  A FINAL (proven
+    longest) line must also leave only that word alive; a shorter witness may
+    stop with company, but the answer it names must still be alive."""
+    words = line.split()
+    if not words:
+        return ["empty line"]
+    answer = words[-1]
+    if answer not in answers:
+        return [f"the line ends on {answer}, which is not an answer"]
+    alive = list(pool)
+    for k, w in enumerate(words[:-1]):
+        if w not in alive:
+            return [f"play {k + 1} {w} was not legal"]
+        p = pattern(w, answer)
+        if p == ALL_GREEN:
+            return [f"play {k + 1} {w} was the answer"]
+        alive = [x for x in alive if pattern(w, x) == p]
+    if answer not in alive:
+        return [f"the line ends on {answer}, which the clues had ruled out"]
+    if final and alive != [answer]:
+        return [f"{len(alive)} words still legal at the end, not 1"]
+    return []
+
+
+TARGET = re.compile(r"^TARGET (?P<val>\d+): (?P<kind>\w+)")
+
+
+def run_target(binary, pool, answers, need):
+    """--target NEED, which rebuilds a witness of exactly NEED words.  Returns
+    (reached, line).  Below the maximum this is the path that may end with
+    several words alive -- the one that killed the first --answers ladder."""
+    files = []
+    try:
+        for words in (pool, answers):
+            if words is None:
+                continue
+            with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as fh:
+                fh.write("\n".join(words) + "\n")
+                files.append(fh.name)
+        cmd = [binary, "--words", files[0], "--no-out", "--data", "data",
+               "--tt-bits", "20", "--threads", "1", "--target", str(need)]
+        if answers is not None:
+            cmd += ["--answers", files[1]]
+        p = subprocess.run(cmd, cwd=MATH, capture_output=True, text=True)
+    finally:
+        for f in files:
+            os.unlink(f)
+    if p.returncode != 0:
+        FAILS.append(f"{os.path.basename(binary)} --target {need} failed "
+                     f"({p.returncode}): {p.stderr.strip()[-300:]}")
+        return None, ""
+    out = p.stdout.splitlines()
+    for i, row in enumerate(out):
+        m = TARGET.match(row)
+        if m:
+            return m.group("kind") == "reached", out[i + 1].strip()
+    FAILS.append(f"no TARGET line in:\n{p.stdout}")
+    return None, ""
+
+
+def check_short_witnesses(cases):
+    """A witness BELOW the maximum, in both modes, replayed from the strings.
+
+    Each case is (tag, pool, answers or None, maximum).  For every need from 2 up
+    to the maximum the target must be reached, the line must be exactly `need`
+    long, and it must replay -- with the singleton rule only at the maximum.
+    COVERAGE: fails unless some short witness actually ended with company, since
+    that is the case the old unconditional assertion died on."""
+    company = 0
+    for tag, pool, answers, best in cases:
+        ans = set(answers) if answers is not None else set(pool)
+        for need in range(2, best + 1):
+            for binary in (BINARY, BIG):
+                if not os.path.exists(binary):
+                    continue
+                ok, line = run_target(binary, pool, answers, need)
+                if ok is None:
+                    continue
+                name = os.path.basename(binary)
+                check(f"{tag} target {need}", ok, True, f"{name}: a length at or below the maximum must be reached")
+                check(f"{tag} target {need}", len(line.split()), need, f"{name}: the witness's length")
+                for complaint in replay_sub(pool, ans, line, final=(need == best)):
+                    FAILS.append(f"{tag} target {need} {name}: replayed, {complaint}")
+                words = line.split()
+                if words and need < best:
+                    alive = list(pool)
+                    for w in words[:-1]:
+                        p = pattern(w, words[-1])
+                        alive = [x for x in alive if pattern(w, x) == p]
+                    company += len(alive) > 1
+    print(f"coverage: {company} short witness(es) ended with more than one word alive")
+    if not company:
+        FAILS.append("coverage: no short witness ever ended with company, so the "
+                     "multi-survivor ending went untested")
+
+
+def sample_guess_pool(guesses, mystery, size, rng):
+    """A reachable state of the GUESS list, cut to `size`, holding >= 2 answers."""
+    for _ in range(200):
+        alive = list(guesses)
+        for _ in range(40):
+            if len(alive) <= size * 3:
+                break
+            g = rng.choice(alive)
+            b = {}
+            for w in alive:
+                b.setdefault(pattern(g, w), []).append(w)
+            usable = [v for p, v in b.items() if p != ALL_GREEN
+                      and sum(w in mystery for w in v) >= 2 and len(v) >= size]
+            if not usable:
+                break
+            alive = rng.choice(usable)
+        ans = [w for w in alive if w in mystery]
+        rest = [w for w in alive if w not in mystery]
+        if len(ans) < 2 or len(rest) < 2:
+            continue
+        na = min(len(ans), max(2, size // 3))
+        pick = rng.sample(ans, na) + rng.sample(rest, min(len(rest), size - na))
+        return sorted(pick), sorted(w for w in pick if w in mystery)
+    raise SystemExit("could not draw a guess-list pool holding answers")
+
+
+def check_subanswers(cases, size, rng):
+    guesses = load_words("guess")
+    mystery = set(load_words("mystery"))
+    binds = nonanswer_played = 0
+    short = []
+    print(f"\n--answers (only the last word must be an answer): {cases} pools of {size}")
+    for case in range(cases):
+        pool, ans = sample_guess_pool(guesses, mystery, size, rng)
+        tag = f"sub{case}"
+        want, _ = longest_run(pool, ans)
+        loose, _ = longest_run(pool, pool)
+        binds += want < loose
+        for binary in (BINARY, BIG):
+            name = os.path.basename(binary)
+            if not os.path.exists(binary):
+                FAILS.append(f"no solver/{name} -- run 'sh build.sh' in solver/")
+                continue
+            v, line = run_sub(binary, pool, ans)
+            check(tag, v, want, f"{name} --answers against eldrow.longest_run")
+            if v is not None:
+                check(tag, len(line.split()), v, f"{name}: the line's length against the value")
+                for complaint in replay_sub(pool, set(ans), line):
+                    FAILS.append(f"{tag} {name}: replayed from the strings, {complaint}")
+                nonanswer_played += any(w not in mystery for w in line.split()[:-1])
+        ev, _ = run_sub(BINARY, pool, ans, ("--exact",))
+        check(tag, ev, want, "--answers --exact against the reference")
+        uv, _ = run_sub(BINARY, pool, ans, ("--exact", "--no-prune"))
+        check(tag, uv, want, "--answers --no-prune against the reference")
+        short.append((tag, pool, ans, want))
+        print(f"{tag:>7}  {want:>3}  (every word an answer: {loose})  "
+              f"{len(ans)} answers of {len(pool)}")
+    check_short_witnesses(short)
+    print(f"coverage: the answer rule shortened the run on {binds} pool(s); "
+          f"a non-answer was played on {nonanswer_played} line(s)")
+    if not binds:
+        FAILS.append("coverage: the last-word rule never changed a value")
+    if not nonanswer_played:
+        FAILS.append("coverage: no line ever played a non-answer word")
+
+
 def check(tag, got, want, why):
     if got != want:
         FAILS.append(f"{tag}: {why} -- got {got}, want {want}")
@@ -337,9 +536,11 @@ def main():
               f"{csecs:>6.2f} {pysecs:>6.2f}  {cline}")
         return cval, greedy
 
+    plain_short = []
     for case in range(args.cases):
         pool = sample_pool(answers, args.size, rng)
         cval, greedy = diff_case(str(case), pool)
+        plain_short.append((f"plain{case}", pool, None, cval))
         if case == 0:
             for complaint in check_csv(pool, cval):
                 FAILS.append(f"case 0 CSV: {complaint}")
@@ -362,6 +563,10 @@ def main():
         saw_search += 1
         if cval >= 4:
             saw_long += 1
+
+    print("\nshort witnesses, plain mode (every word an answer):")
+    check_short_witnesses(plain_short)
+    check_subanswers(args.cases, args.size, rng)
 
     print()
     print(f"coverage: {saw_search} pool(s) where greedy was strictly short of the "

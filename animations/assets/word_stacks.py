@@ -34,6 +34,17 @@ centred — the scene puts START's board row there, so the hand-off is seamless.
 `squash` scales the VERTICAL only (row spacing, tile and letter height) about the
 row-0 line, so the histogram can be flattened to fit the frame as it grows.
 
+BAR MODE (`bar_color=...`, scene 08). Each word is ONE rectangle, WORD_W wide and
+STEP * squash tall, stacked with no gap, so a stack reads as a plain solid bar of a
+bar chart while every word is still its own slice that can be emphasised. `origin`
+is then the BASELINE (the bottom of every stack), and squash grows the bars up from
+it. No letters are drawn. Off by default, so scene 01 draws exactly as before.
+
+LEVELS (bar mode only). `level` is, per bar (see `bar_bins`), how many words up from
+the bottom are LIT, as a FLOAT: while `dim` is up, a full-strength bar of that height
+is drawn over the dimmed one, so a highlight can rise and fall continuously like any
+growing bar. Per-word weights still work alongside it (a single lit slice).
+
 SCORED-TILE SIZE. A scored board tile is a `TILE` square with a `board.STROKE`
 border in its own fill colour; cairo line width is 0.01 unit per stroke unit and
 scales with the camera, so the visible square is TILE + STROKE*0.01. `SIDE` is that,
@@ -183,20 +194,28 @@ class WordStacks(VGroup):
     frame may hold up to N_GROUPS distinct weights (the rest, the focus, and words
     fading between them)."""
 
-    def __init__(self, data, origin, origin_bin, **kwargs):
+    def __init__(self, data, origin, origin_bin, bar_color=None, **kwargs):
         super().__init__(**kwargs)
         self.words = data["words"]
+        self.bars = bar_color is not None
         bins = np.array(data["bins"])
         self.row = np.array(data["rows"], dtype=float)
         # the order words land in — the scene's to decide (set_order); until then
         # only the pinned words are drawn
         self.order = np.zeros(0, dtype=int)
-        self.pinned = np.array([self.words.index(w) for w in data["pinned"]])
-        self.state = np.array([_trits(c) for c in data["codes"]])       # (N, 5)
+        self.pinned = np.array([self.words.index(w) for w in data.get("pinned", [])],
+                               dtype=int)
+        if self.bars:        # one slice per word, every slice the same colour
+            self.state = np.zeros((len(self.words), 1), dtype=int)
+        else:
+            self.state = np.array([_trits(c) for c in data["codes"]])   # (N, 5)
         self.letters_of = np.array([[ord(ch) - 97 for ch in w] for w in self.words])
         self.x = origin[0] + (bins - origin_bin) * PITCH                  # word centre
+        self.x0, self.bin0 = origin[0], origin_bin
         self.y0 = origin[1]
         self.index = {w: i for i, w in enumerate(self.words)}
+        self.bar_bins = np.unique(bins)                 # one entry per bar, in order
+        self.bar_x = origin[0] + (self.bar_bins - origin_bin) * PITCH
 
         # what to draw — the scene sets these (see set_state), then calls refresh
         self.n = 0                  # words of `order` placed so far (pinned always are)
@@ -204,25 +223,35 @@ class WordStacks(VGroup):
         self.letter_opacity = 1.0
         self.weight = np.zeros(len(self.words))
         self.dim = 0.0
+        self.level = None           # bar mode: lit words per bar (floats), or None
 
         self.groups = []
         for _ in range(N_GROUPS):
-            tiles = [RectBatch(fill_color=TILE_STATE[s], fill_opacity=1.0,
+            tiles = [RectBatch(fill_color=bar_color if self.bars else TILE_STATE[s],
+                               fill_opacity=1.0,
                                stroke_width=0).set_rects(np.zeros((0, 4)))
                      for s in range(3)]
             text = GlyphBatch(fill_color=TILE_TEXT, fill_opacity=1.0, stroke_width=0)
             text.set_glyphs(*[np.zeros(0)] * 4)
             self.groups.append((tiles, text))
+        # the lit level of each bar (bar mode), over every slice
+        self.lit = RectBatch(fill_color=bar_color or WHITE, fill_opacity=1.0,
+                             stroke_width=0).set_rects(np.zeros((0, 4)))
         # all tiles under all letters
-        self.add(*[t for g in self.groups for t in g[0]], *[g[1] for g in self.groups])
+        self.add(*[t for g in self.groups for t in g[0]], *[g[1] for g in self.groups],
+                 self.lit)
 
     # ── what to draw ──────────────────────────────────────────────────────────
     def set_order(self, order):
         self.order = np.asarray(order, dtype=int)
         return self
 
-    def set_state(self, n=None, squash=None, letters=None, dim=None, weights=None):
-        """`weights` is {word: weight}; words not named keep theirs."""
+    def set_state(self, n=None, squash=None, letters=None, dim=None, weights=None,
+                  level=False):
+        """`weights` is {word: weight}; words not named keep theirs. `level` is an
+        array over `bar_bins` (or None to clear it); omitted, it is kept."""
+        if level is not False:
+            self.level = None if level is None else np.asarray(level, dtype=float)
         if n is not None:
             self.n = int(round(n))
         if squash is not None:
@@ -246,7 +275,21 @@ class WordStacks(VGroup):
         """Where `word` sits at the current (or a given) squash."""
         i = self.index[word]
         s = self.squash if squash is None else squash
-        return np.array([self.x[i], self.y0 + self.row[i] * STEP * s, 0.0])
+        lift = 0.5 if self.bars else 0.0          # bar mode: slices sit ON the baseline
+        return np.array([self.x[i], self.y0 + (self.row[i] + lift) * STEP * s, 0.0])
+
+    def word_box(self, word, squash=None):
+        """(left, bottom, right, top) of `word`'s row (tiles) or slice (bars)."""
+        c = self.word_center(word, squash)
+        s = self.squash if squash is None else squash
+        h = (STEP if self.bars else SIDE) * s
+        return c[0] - WORD_W / 2, c[1] - h / 2, c[0] + WORD_W / 2, c[1] + h / 2
+
+    def x_of_value(self, v):
+        """The x of average-guess value `v`, on the same scale as the bins: bin b
+        covers [b, b+1) hundredths and its bar is centred at b + 0.5, so a whole
+        hundredth lands mid-gap between two bars."""
+        return self.x0 + (v * 100 - 0.5 - self.bin0) * PITCH
 
     # ── rebuild ───────────────────────────────────────────────────────────────
     def refresh(self, frame):
@@ -277,8 +320,12 @@ class WordStacks(VGroup):
                 levels.append((sel, tile_op, max(self.letter_opacity * tile_op, w), None))
         assert len(levels) <= N_GROUPS, f"{len(levels)} emphasis levels in one frame"
 
-        offs = (np.arange(COLS) - (COLS - 1) / 2) * STEP
-        h = SIDE * s
+        if self.bars:        # one slice per word: [x -+ WORD_W/2] x [y, y + STEP*s]
+            offs, wid, h, dy = np.zeros(1), WORD_W, STEP * s, 0.0
+        else:
+            offs, wid, h = (np.arange(COLS) - (COLS - 1) / 2) * STEP, SIDE, SIDE * s
+            dy = -h / 2
+        ncol = len(offs)
         for g, (tiles, text) in enumerate(self.groups):
             if g >= len(levels):
                 for t in tiles:
@@ -287,14 +334,17 @@ class WordStacks(VGroup):
                 continue
             sel, tile_op, let_op, lit = levels[g]
             tx = (self.x[sel, None] + offs).ravel()
-            ty = np.repeat(y[sel], COLS)
+            ty = np.repeat(y[sel], ncol)
             st = self.state[sel].ravel()
             for k in range(3):
                 m = st == k
                 n = int(m.sum())
-                tiles[k].set_rects(np.stack([tx[m] - SIDE / 2, ty[m] - h / 2,
-                                             np.full(n, SIDE), np.full(n, h)], axis=1))
+                tiles[k].set_rects(np.stack([tx[m] - wid / 2, ty[m] + dy,
+                                             np.full(n, wid), np.full(n, h)], axis=1))
                 tiles[k].set_fill(opacity=tile_op)
+            if self.bars:
+                text.set_glyphs(*[np.zeros(0)] * 4)
+                continue
             if lit is not None and self.letter_opacity <= 0:
                 # undimmed, letters faded: only emphasised words carry letters, at
                 # their own weight (a word can be lit before the rest is dimmed)
@@ -304,6 +354,15 @@ class WordStacks(VGroup):
             else:
                 text.set_glyphs(*[np.zeros(0)] * 4)
             text.set_fill(opacity=let_op)
+        # the lit level: a full-strength bar of `level` words over each dimmed bar
+        if self.bars and self.level is not None and self.dim > 0:
+            on = self.level > 1e-6
+            n = int(on.sum())
+            self.lit.set_rects(np.stack([self.bar_x[on] - WORD_W / 2,
+                                         np.full(n, self.y0), np.full(n, WORD_W),
+                                         self.level[on] * STEP * s], axis=1))
+        else:
+            self.lit.set_rects(np.zeros((0, 4)))
         return self
 
     def _fill_glyphs(self, mob, idx, y, s):

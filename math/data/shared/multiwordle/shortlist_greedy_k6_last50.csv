@@ -1,0 +1,57 @@
+# the LAST 50 openers in race_greedy_k6_guess_sig5_s0 (the plain-strategy 1-word race at
+# k=6): the 2 STILL IN (the race had not finished) plus the 48 eliminated last.
+# NB no clean break at 50: openers eliminated at 12800 games straddle the cut;
+# that round's openers are ranked by their GAP BEHIND THE LEADER when eliminated,
+# smallest first (user's call).
+# User's rule (2026-10-02) for the improved strategy's shortlists.
+word,games_survived,mean_when_out,status
+clipt,26214400,9.583090,live
+compt,26214400,9.583153,live
+plant,26214400,9.584585,out
+clept,6553600,9.584786,out
+dempt,1638400,9.587668,out
+clapt,204800,9.595640,out
+clump,51200,9.607988,out
+dript,51200,9.610156,out
+mulct,51200,9.612227,out
+delph,25600,9.620977,out
+prent,25600,9.625781,out
+depth,25600,9.626484,out
+mpret,25600,9.628086,out
+thrip,25600,9.629375,out
+pwned,25600,9.630977,out
+clint,25600,9.632734,out
+blent,25600,9.633555,out
+crept,12800,9.629609,out
+bumph,12800,9.630313,out
+depot,12800,9.631328,out
+pownd,12800,9.631641,out
+thump,12800,9.632969,out
+dropt,12800,9.634688,out
+prunt,12800,9.634922,out
+ploat,12800,9.635078,out
+clomp,12800,9.635156,out
+print,12800,9.637266,out
+spend,12800,9.637578,out
+crimp,12800,9.637656,out
+nempt,12800,9.637891,out
+clamp,12800,9.638359,out
+blunt,12800,9.638516,out
+burnt,12800,9.638984,out
+trump,12800,9.640391,out
+plumb,12800,9.643047,out
+tepid,12800,9.643516,out
+point,12800,9.644844,out
+blond,12800,9.645703,out
+slipt,12800,9.645938,out
+dimps,12800,9.646016,out
+cupid,12800,9.646250,out
+blend,12800,9.646484,out
+tulip,12800,9.647734,out
+dumps,12800,9.647969,out
+thrid,12800,9.648203,out
+tromp,12800,9.648359,out
+bundt,12800,9.648516,out
+tuple,12800,9.649375,out
+crump,12800,9.649844,out
+climb,12800,9.650625,out

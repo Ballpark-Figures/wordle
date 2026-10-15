@@ -1,0 +1,1041 @@
+# wordle single-board simulation (see math/wordlesim.py)
+# strategy=random-blind follow_up=answer trials=1000 seed=0 win_within=6
+# the follow-up fills in wherever the rule declines; it draws a random word still
+# consistent with every reply, from the 2315 mystery list
+# answers drawn uniformly from the 2315 mystery words; guesses from the 12972 legal words
+# NO guess cap: play continues past 6 until the word is found, so the mean is unconstrained
+# and the win rate is the fraction of those untruncated scores that came in at 6 or fewer
+game,guesses,won,answer,sequence
+0,10,0,surer,privy magic eagle fella aphid beget aging cleat spoon surer
+1,3,1,pygmy,trite lumpy pygmy
+2,3,1,phone,wharf semen phone
+3,6,1,preen,motel never unset elect sprig preen
+4,6,1,realm,abide grime swift myrrh amply realm
+5,12,0,skull,sense style cleft blame tabby alien moose berth exult lease hilly skull
+6,6,1,guide,alpha abuse broom adapt ready guide
+7,4,1,media,purer drill pizza media
+8,8,0,skirt,gorge junto yeast spice wimpy godly rhyme skirt
+9,4,1,vigil,quail stout rigor vigil
+10,10,0,rupee,grasp teeth buyer opine scoop stunk media gloat ferry rupee
+11,4,1,hinge,lemur scene thyme hinge
+12,7,0,beast,unlit might furry rebus occur dread beast
+13,6,1,fizzy,scent parse lunch flyer sissy fizzy
+14,3,1,great,flesh tiara great
+15,15,0,duchy,debug savoy plunk artsy bigot gloss stilt gruff sneer fifty diner snuff tense bench duchy
+16,4,1,awful,realm flung odder awful
+17,6,1,cedar,swoon ionic title sorry sadly cedar
+18,24,0,deign,slant atone nylon guilt yearn crank venom blast plunk orbit topic extol tough rebar tibia crass silly vague artsy gazer prism booth madam deign
+19,6,1,posse,skirt tying halve idiot lapse posse
+20,6,1,vista,cower lousy aside hobby vault vista
+21,4,1,pleat,fried wrote peril pleat
+22,8,0,verve,agile jumpy stoic silky gusto login hefty verve
+23,5,1,meter,deign snare belie hater meter
+24,10,0,emcee,shady shook satin tweet unfit coast bravo burst seize emcee
+25,4,1,whale,tying ratty weigh whale
+26,4,1,taste,agape brief table taste
+27,9,0,bezel,wince steak vogue gamma cause manic where genre bezel
+28,5,1,tiara,gorge stalk decry leapt tiara
+29,4,1,flask,delve timer speck flask
+30,5,1,cagey,twang wharf dusty homer cagey
+31,3,1,moist,quilt image moist
+32,5,1,cause,undue rivet apart spout cause
+33,3,1,setup,clump pixel setup
+34,5,1,loyal,alpha tying scene ferry loyal
+35,3,1,agile,blaze silky agile
+36,5,1,cavil,maker topaz umbra dwell cavil
+37,3,1,baron,lobby strap baron
+38,10,0,poise,basic quail forum debar house teach weary cameo niece poise
+39,11,0,sixty,droll eclat dirty crock throw curve death brunt broth smart sixty
+40,5,1,equip,speck ovine swing musty equip
+41,17,0,skulk,spite bacon newer jerky equip itchy harsh lipid squat stash polyp sappy vouch privy gipsy bezel skulk
+42,14,0,mushy,delay parry alloy suite vapid carol staff gummy apnea triad utile apron parka mushy
+43,12,0,stall,snort haute swoon steep brand adobe board gazer bough below droll stall
+44,8,0,quash,meaty edify vigor ruler pried value snaky quash
+45,17,0,buddy,ankle tacit gusty axial lathe golly hovel hotly ficus liken lingo whole roach slung adage femur buddy
+46,12,0,witty,eagle madam tabby prong there choke mafia print forum offal wrote witty
+47,14,0,shall,fifth balmy cluck eater theft easel spook edify ratty melon vomit noose twirl shall
+48,5,1,wagon,shock poser sword yacht wagon
+49,4,1,donut,night cameo booby donut
+50,5,1,react,arrow savvy stair chunk react
+51,4,1,repel,gripe tipsy trial repel
+52,4,1,omega,nicer sappy onset omega
+53,3,1,shine,coven smith shine
+54,4,1,medic,shove mealy feast medic
+55,5,1,blade,media windy angry obese blade
+56,4,1,ingot,acorn motel sling ingot
+57,4,1,shear,wider metal paler shear
+58,8,0,waxen,finch spade comic gaudy rebel opium covet waxen
+59,5,1,quoth,onion tuber penne think quoth
+60,9,0,waive,bison beard lucky lousy nadir shelf fiery climb waive
+61,4,1,repay,grape uncut baggy repay
+62,16,0,salvo,screw easel bitty filly grind wield teary deity lager peach tripe buyer slain twice trove salvo
+63,4,1,elder,budge parry beefy elder
+64,3,1,bulky,batty crook bulky
+65,7,0,tangy,rebus pride woody lofty aorta chock tangy
+66,5,1,droop,recap funny filly braid droop
+67,16,0,sassy,alley jumpy shell lymph rifle snort daunt bleed await opera dully craft shaft spilt vista sassy
+68,4,1,liken,maybe worse lunar liken
+69,5,1,clued,dried waltz aptly speak clued
+70,6,1,purer,leash stink spore idiom penny purer
+71,5,1,skimp,quest lemur troop thick skimp
+72,5,1,barge,mouse stoic bilge goner barge
+73,5,1,macaw,flank roger write gawky macaw
+74,5,1,smirk,breed lemur abuse hilly smirk
+75,6,1,after,tepee wench birch squat salty after
+76,6,1,facet,snoop waist spare roach fjord facet
+77,5,1,phase,sound savvy dealt harpy phase
+78,5,1,gauge,rodeo heard hedge moose gauge
+79,4,1,opium,brain twice guppy opium
+80,4,1,cleft,aback hunky shell cleft
+81,7,0,exalt,sushi crate caddy graze rupee exult exalt
+82,5,1,stair,alert winch array study stair
+83,27,0,abode,hippy fence wield quest while hater lunar lucid shrub macho troop cough later donor table cable ruder trick event elite slate panic oaken thing bless edict abode
+84,5,1,great,trump beefy itchy later great
+85,6,1,again,horse pushy hippo fauna ovoid again
+86,22,0,wimpy,broke entry unity excel reuse frock stank overt tonal prize outdo liken apart brink satyr prose nurse break state sorry milky wimpy
+87,7,0,drawn,spoon mauve yeast email frisk spend drawn
+88,8,0,clack,fizzy great scrub shrew snipe icing pizza clack
+89,11,0,paddy,slimy budge filly screw creak elude widow corer young syrup paddy
+90,9,0,chasm,noble flair legal piggy topaz undue biome clock chasm
+91,6,1,roomy,crest flesh overt cleft wrong roomy
+92,5,1,reedy,debut gaunt purse flint reedy
+93,9,0,plumb,value gecko crass enter maize nanny allay pubic plumb
+94,5,1,chock,pound thigh coupe snore chock
+95,5,1,amuse,natal raspy dairy smite amuse
+96,9,0,navel,heart affix buxom sauna guppy scamp wafer pupil navel
+97,6,1,shear,pinky eying beefy pitch dolly shear
+98,9,0,brink,offal pilot grime pouch wreak silly tweak basis brink
+99,6,1,chain,fussy paler rogue roomy train chain
+100,2,1,cabin,claim cabin
+101,10,0,fever,chute scalp harpy totem enema force extol dimly stove fever
+102,5,1,stale,exact ovate terra lathe stale
+103,8,0,towel,dried death beast prank agora clink optic towel
+104,5,1,idler,corny major whisk witch idler
+105,7,0,borax,shrew issue knave grimy stony delve borax
+106,4,1,ovary,shone hater puffy ovary
+107,4,1,brick,screw farce bible brick
+108,6,1,evoke,frost pulse mason sting homer evoke
+109,4,1,three,aphid flame coven three
+110,7,0,goody,vapor bylaw china gusty sushi adage goody
+111,8,0,stalk,smear graze apron kneed ruddy stank cheer stalk
+112,7,0,repel,nadir stony sappy sigma sweat rival repel
+113,11,0,grime,trite nasty stall bobby clock mouse shock villa birch swoop grime
+114,20,0,hoist,vigil groom tryst cream forgo urban woman blind carol above unset flack midge woven store dummy glaze stern loath hoist
+115,10,0,clash,utter ovoid slurp vomit pinky scaly swirl willy mocha clash
+116,10,0,offer,rayon witch irony stony elegy small brace thrum foist offer
+117,7,0,prank,cameo fungi bliss merit woozy debit prank
+118,7,0,dying,smack conch civic crypt omega lunar dying
+119,21,0,miser,aloof rebar fiber sissy stink boule evict poise clear hatch frill pivot sheik robot filet overt speck sever sniff mason miser
+120,8,0,organ,kayak piper envoy jumbo decoy lunch roger organ
+121,8,0,snaky,rogue clean covey gleam wheel aloud realm snaky
+122,6,1,event,midst birth strap tawny level event
+123,6,1,smell,latch scuba drive filly chasm smell
+124,13,0,jelly,satyr smite stuff corer relay early giant girth olden ozone ninny banjo jelly
+125,6,1,unzip,sushi grant occur chord prime unzip
+126,5,1,tenth,ultra title avert arson tenth
+127,13,0,shall,crane condo prior axiom snoop clock phone pouty couch grunt briar wimpy shall
+128,5,1,lurid,catty spree shark curio lurid
+129,26,0,focal,begat nasty mummy audio cough jerky basin sheen sloop saner stake speak grout inter event civic elder scour gamut yearn ombre randy merge south fugue focal
+130,4,1,piper,prize taint refit piper
+131,6,1,pause,needy avert grand fetus poesy pause
+132,7,0,fifth,papal lorry foist lying fancy cumin fifth
+133,16,0,mound,worse piper plait pinch these goofy hippy noisy needy wooer close horde crony strut musky mound
+134,6,1,betel,cobra tempo image vague bleak betel
+135,4,1,druid,mouth affix graze druid
+136,5,1,leech,dicey cluck twixt wheel leech
+137,10,0,lover,tonic leper wacky aptly peril apple mange thigh stilt lover
+138,5,1,cruel,quash chunk dough honey cruel
+139,6,1,unlit,realm ideal crept sloop panel unlit
+140,12,0,lower,queer clump troop exalt leach offal clear canon larva afoul pesky lower
+141,3,1,humus,dimly skier humus
+142,4,1,flash,pivot crock flake flash
+143,4,1,polyp,scant prove legal polyp
+144,8,0,drain,zesty trice slunk ester stein opera drone drain
+145,4,1,smirk,chair opium crass smirk
+146,5,1,beefy,human infer maize abyss beefy
+147,14,0,cover,bezel smell ashen tango crude fifth flunk lyric gazer parse glyph score worth cover
+148,8,0,cater,brief embed credo serif scree novel wrest cater
+149,7,0,torso,winch inlay musty gummy empty feast torso
+150,5,1,sheik,delay caste quake model sheik
+151,8,0,dummy,fanny synod aphid earth neigh rebut oddly dummy
+152,6,1,novel,sloop poser posit toast since novel
+153,12,0,civic,weedy cease vapor broad windy begun three minor ninny chose burly civic
+154,4,1,spiky,diver align jerky spiky
+155,5,1,glide,irony lanky barge cumin glide
+156,6,1,eagle,fully hippo daisy speak emcee eagle
+157,5,1,hyper,twixt yield heady grant hyper
+158,3,1,graft,fugue piney graft
+159,7,0,prose,ralph smelt rabid eagle billy harpy prose
+160,5,1,otter,truer shaky filly sooth otter
+161,4,1,queue,paddy sweet bunch queue
+162,9,0,livid,biddy shear flack slink udder sweet lance plied livid
+163,6,1,today,bravo jumbo etude shush world today
+164,8,0,lemon,jaunt salve dread filer chuck tiara lying lemon
+165,13,0,dusky,pluck acorn geeky scone waltz rehab brush quill scale right cagey ovoid dusky
+166,12,0,grass,bravo witty razor story acrid heady clued train helix raise glyph grass
+167,5,1,unity,bride bulky honey outer unity
+168,9,0,plush,talon gloss vicar salve odder deity sheen caper plush
+169,13,0,aware,shone ditty rayon niche hotel jerky cabin fatty rally golem shore venue aware
+170,3,1,choir,corny ripen choir
+171,10,0,dread,fully tried trove tweed shout arson edify prawn urban dread
+172,3,1,drill,allow rowdy drill
+173,6,1,coast,theta disco buddy setup crept coast
+174,6,1,melee,wheel kiosk exalt daisy loamy melee
+175,6,1,sieve,shack breed pansy donut geese sieve
+176,5,1,spiel,stash irony doubt tense spiel
+177,6,1,swear,penal heart snore grill comfy swear
+178,4,1,vigor,fifty ripen glory vigor
+179,5,1,where,loath nutty lager thigh where
+180,4,1,stall,moist clash focal stall
+181,11,0,surly,white thump wacky beget heist admin basic ethos opine gruff surly
+182,6,1,gusto,whale young beach freed smirk gusto
+183,4,1,gaudy,lasso manic bulky gaudy
+184,6,1,intro,geeky harsh golly abide ditty intro
+185,5,1,roach,every worth hefty gauge roach
+186,4,1,waist,crate juice spiky waist
+187,5,1,vigil,undid amber lucid basal vigil
+188,10,0,hoist,aloud endow range study cyber gusty olive slide sooth hoist
+189,5,1,wryly,floor mower dogma acorn wryly
+190,11,0,scree,jumpy latch maker cavil scuba bison basis shalt going swoop scree
+191,8,0,state,tibia cower madam voila chant stomp death state
+192,3,1,exult,jaunt liver exult
+193,4,1,sushi,strap quail ionic sushi
+194,4,1,eerie,earth shyly geese eerie
+195,5,1,husky,exert wispy guise horse husky
+196,5,1,tasty,stood brush again taker tasty
+197,6,1,scarf,tunic grout crypt loser claim scarf
+198,7,0,crash,sauna uncle emcee crate taste niche crash
+199,3,1,realm,patsy scare realm
+200,10,0,swing,birth kneed stale steer strap meant drain vocal upset swing
+201,4,1,scaly,hussy tried fecal scaly
+202,4,1,valet,sedan speed scent valet
+203,4,1,broil,boney broth vixen broil
+204,10,0,plaid,tryst easel micro grace scoop class smock skier ramen plaid
+205,17,0,swear,youth bused stiff manic stony grind basic snort carol kitty sauce serif array nomad bison wider swear
+206,9,0,mania,hedge guava world shave haute seedy cluck grown mania
+207,4,1,smith,spine eater loamy smith
+208,6,1,noisy,sweet pupil maxim crate liver noisy
+209,6,1,angel,quark woozy paper squad grime angel
+210,11,0,brook,grain suite price drive slate donut dozen sling feast sigma brook
+211,6,1,zesty,stunt spied cabin miner shirt zesty
+212,8,0,thigh,koala cubic flare hover shade chasm stung thigh
+213,9,0,whose,fjord torch charm comet wrath owner truth lobby whose
+214,4,1,erode,drank spout bleat erode
+215,10,0,bland,pinto tripe deuce sloth rhino crack rover exact mangy bland
+216,7,0,paste,cleat fully rumor shale craft paper paste
+217,7,0,brass,cried under pilot twist after brush brass
+218,5,1,brace,floss chili ingot frown brace
+219,6,1,relic,adult idiom uncut swami diner relic
+220,8,0,crank,earth tonga gloat buxom usurp snuff frond crank
+221,11,0,pound,hover agile extol hound whole mammy gayly canoe biddy pecan pound
+222,10,0,quite,polar scaly catch gland manly cross recur hairy table quite
+223,6,1,icing,dusty wrung wooly swing macho icing
+224,4,1,plier,crazy court spire plier
+225,7,0,rigid,loose sinew clock beget macaw godly rigid
+226,8,0,decor,flask deign nymph ideal quasi alibi clout decor
+227,4,1,geeky,koala spoon wreak geeky
+228,5,1,ankle,agent stein given trawl ankle
+229,7,0,flown,spite gulch basil taper cider hyper flown
+230,4,1,ditch,thief gamer olden ditch
+231,4,1,array,hitch civic drama array
+232,5,1,caddy,stand tibia pulpy lucky caddy
+233,8,0,crowd,noble bully juice brunt caulk treat joust crowd
+234,4,1,guide,hunch stain leash guide
+235,7,0,toast,email debar crier among abhor cloth toast
+236,4,1,filth,slink ghost agate filth
+237,5,1,guava,ninth affix corny viper guava
+238,9,0,slang,radii leaky datum mucky skill evade idiom joint slang
+239,4,1,raspy,arise prime spite raspy
+240,12,0,avian,tramp petty showy floss locus shard study peace abode mossy range avian
+241,7,0,ember,slash slump flask enemy swell riper ember
+242,6,1,aback,eagle preen plush facet tough aback
+243,6,1,posit,fluid draft gooey crock golem posit
+244,6,1,polka,snout logic jumbo comfy macaw polka
+245,3,1,those,rainy theta those
+246,4,1,mania,mucus borax saint mania
+247,10,0,tower,irony nurse spear forge stint foyer skulk slosh ditto tower
+248,5,1,renew,alley showy quite anger renew
+249,5,1,harem,swill tithe gaily swoon harem
+250,7,0,theme,minim burnt gloss ramen sauna zesty theme
+251,8,0,sandy,purse resin shush strip zesty omega decal sandy
+252,9,0,mangy,theft manic wench thumb strip genie taper stray mangy
+253,18,0,humor,lunge posse binge abase input pence ester terse merit alarm swarm loose clone ozone lasso ascot ought humor
+254,6,1,roach,slept demon utile stare mulch roach
+255,10,0,heath,tumor intro flunk locus skulk patsy skirt gourd munch heath
+256,8,0,freer,class husky grail tempo essay vault wedge freer
+257,4,1,cheap,pulse scent treat cheap
+258,4,1,whale,exalt nymph horse whale
+259,6,1,midge,nosey power fudge drunk joint midge
+260,6,1,utile,peace slide alpha bluer foggy utile
+261,4,1,abuse,aback owing ledge abuse
+262,4,1,kneed,piano stalk bleep kneed
+263,8,0,sieve,disco rowdy spent wooer stout raise grant sieve
+264,9,0,fairy,sport clink elder edict saint wrist moult three fairy
+265,4,1,idiom,tepid quiet solid idiom
+266,7,0,afoot,these china forth event stove repel afoot
+267,5,1,churn,saint elder repel moose churn
+268,11,0,slate,torch beret quasi booty tumor sweep vegan funny pinto novel slate
+269,6,1,bathe,lumpy maybe polyp droll belch bathe
+270,5,1,allay,slept sassy brood trait allay
+271,7,0,rerun,craft guava waist lithe acute rearm rerun
+272,6,1,waste,given stung armor baton watch waste
+273,13,0,flood,maybe drive sheep gnome midst tying stage whine nobly amity broke enjoy flood
+274,6,1,prune,tulle clank brace stand papal prune
+275,7,0,reply,flack using plump posse stock dealt reply
+276,8,0,roast,natal lucid slime eject sauce spice forge roast
+277,4,1,diner,queue dough untie diner
+278,13,0,billy,revue inter genre nasty tribe carry steak heart sweat sigma boozy cycle billy
+279,4,1,essay,bingo snout masse essay
+280,10,0,eight,sheen beefy annul retro showy spare paddy prude condo eight
+281,19,0,found,caddy nerve relic algae clank night olden swept shady belle blink goose beech chord drown going sheep afoot found
+282,8,0,mania,steal sloth lodge flank hussy noble pence mania
+283,11,0,viper,sunny sense ester petal dwarf kitty ashen dwelt dusty purer viper
+284,5,1,basal,endow apnea coupe mushy basal
+285,4,1,druid,clung shire befit druid
+286,4,1,burly,truly weird cause burly
+287,18,0,spoon,blind jumpy wharf koala raspy trick screw alley ninja briny batty stack straw stove heart horde green spoon
+288,4,1,stung,bylaw tough brand stung
+289,7,0,filmy,maxim adept nudge abhor march clung filmy
+290,5,1,pitch,macaw tepee mauve lunch pitch
+291,5,1,girth,gnome posse drier delay girth
+292,7,0,fecal,mossy newly itchy sooth cabal idyll fecal
+293,8,0,route,aphid civil comma tapir blare pasta flour route
+294,3,1,newer,revel sound newer
+295,10,0,panel,quack radio datum jerky valet boule cadet exalt mangy panel
+296,6,1,mafia,rupee logic dream diver ramen mafia
+297,11,0,start,women humph slate stunk penny dunce bused vague pinch brace start
+298,7,0,hazel,sleep loser alarm elope deuce hydro hazel
+299,6,1,tarot,fully frill tepid unify algae tarot
+300,6,1,uncle,drone spasm comma groan inane uncle
+301,4,1,swine,welsh joker naval swine
+302,4,1,brute,badge sushi vowel brute
+303,14,0,spunk,crony bylaw molar taker trite marry heard sheik trail dwell niche crust spiel spunk
+304,12,0,suite,eagle pearl decry cater angry gecko froze swirl scalp knock curry suite
+305,5,1,flunk,brisk folly hovel stark flunk
+306,11,0,throw,jelly ethos verso ultra fetus sulky sieve grime enter bingo throw
+307,14,0,slate,inept agony canal bulky spiel drone pesky tardy hence fjord digit leery spilt slate
+308,5,1,boozy,spilt noose there blitz boozy
+309,6,1,wordy,canal forum speak nylon diver wordy
+310,3,1,token,bacon metro token
+311,9,0,pence,weigh caste chili audio bosom stein midst grope pence
+312,6,1,delay,taffy least shelf leaky craze delay
+313,4,1,chill,billy album claim chill
+314,12,0,privy,loath razor furry early still synod known tatty nadir salad grand privy
+315,6,1,aglow,shunt lever rinse fudge rhyme aglow
+316,11,0,waver,slime start grout moose bride tumor squat manly foyer navel waver
+317,6,1,river,whiny worse final ruder voter river
+318,5,1,train,poise afoot ardor peril train
+319,3,1,boozy,bloke zesty boozy
+320,9,0,taunt,flask vying natal angel quest bushy fried stilt taunt
+321,9,0,woozy,rifle facet winch again sieve risky parse drive woozy
+322,7,0,molar,dirty admit sever smote debit gorge molar
+323,11,0,undue,booze troop mourn march girly moron petty along aging stone undue
+324,9,0,chord,usual moldy eagle piggy found bezel unlit prism chord
+325,5,1,usual,strap finch envoy quite usual
+326,4,1,matey,batty trail modal matey
+327,4,1,rumba,unmet crick valet rumba
+328,12,0,weave,patch force pudgy stare blurb itchy booth snort missy tulip level weave
+329,7,0,towel,snuck sperm seize flack delay tripe towel
+330,6,1,touch,champ cling droop atoll puppy touch
+331,5,1,tweak,shock budge askew totem tweak
+332,3,1,dying,spike giddy dying
+333,15,0,smell,sugar tense abbot evict tiara parka fluff toxin plain allot until spree badge whole smell
+334,4,1,moult,viral dairy broom moult
+335,4,1,rugby,bleep squat exert rugby
+336,5,1,dolly,pilot swoon speed climb dolly
+337,6,1,sleet,leapt preen bunny labor feign sleet
+338,5,1,donut,glean blank roger ruler donut
+339,11,0,fight,ramen metro petty qualm rayon snaky pence evade tripe await fight
+340,6,1,plush,devil chest mound month tepee plush
+341,3,1,queen,quirk mania queen
+342,6,1,phony,outdo amiss quake loopy tardy phony
+343,4,1,flock,musty freak peril flock
+344,9,0,vouch,fella chock sonic black knoll fault filet psalm vouch
+345,10,0,gayly,eagle foamy safer jerky roger worse hyper pearl stoic gayly
+346,10,0,graft,flair jiffy plunk paste money comma beach liner fraud graft
+347,3,1,angst,ninja chose angst
+348,10,0,white,sloop smote sauna lease filet coyly dunce eagle safer white
+349,9,0,apply,zonal other giver hitch perch quota sneer might apply
+350,4,1,adorn,hazel smoky frond adorn
+351,6,1,exile,aphid clout wispy sound beget exile
+352,4,1,water,allow nutty crust water
+353,4,1,penal,cabby femme sonar penal
+354,4,1,wagon,chain trove foggy wagon
+355,6,1,ascot,afoot rajah unfed fried fishy ascot
+356,7,0,basis,strut kiosk wagon stalk sedan scarf basis
+357,5,1,dross,tamer lithe dairy smock dross
+358,5,1,admit,rouse yacht steak shade admit
+359,7,0,motor,champ quirk flung gauze whirl couch motor
+360,3,1,virus,rouge niece virus
+361,4,1,abide,store smote avail abide
+362,7,0,actor,dress plain flung party quash booth actor
+363,7,0,tonga,papal build silky jumbo miser unity tonga
+364,5,1,rebus,ready salve sleek cress rebus
+365,3,1,width,twixt scaly width
+366,8,0,fleet,amble outer stack bobby shrub yacht chess fleet
+367,6,1,quell,macaw kappa usual nomad berry quell
+368,3,1,along,elfin dingo along
+369,5,1,sorry,whiny krill beset sharp sorry
+370,3,1,candy,sound octet candy
+371,10,0,fully,slope awake swamp cramp swore jaunt siren denim freak fully
+372,8,0,wreak,other flake spoon limit caddy tulip betel wreak
+373,4,1,outgo,judge palsy ferry outgo
+374,4,1,flack,abode wharf manic flack
+375,6,1,talon,glass truly thief lefty flown talon
+376,7,0,bitty,raise lunch novel dolly exult nobly bitty
+377,6,1,knelt,plume ghost polyp dicey gamut knelt
+378,7,0,black,snout atone arrow daisy rocky bicep black
+379,5,1,vodka,cello spiel brown dirty vodka
+380,7,0,glaze,stunk digit raspy about dolly ample glaze
+381,4,1,devil,would plier dodgy devil
+382,7,0,sieve,aphid crazy polka rebut mural angst sieve
+383,5,1,grasp,shown sewer blast upper grasp
+384,10,0,prick,groin vaunt glint flyer mammy adore depot heady class prick
+385,7,0,snuff,graph mouse reign blast agape risky snuff
+386,4,1,cacti,trust spilt brand cacti
+387,6,1,floor,waver nerdy detox avian block floor
+388,9,0,mummy,steep aloud freer cried salsa inlay cower meant mummy
+389,7,0,spear,brunt brand juice caulk smelt prose spear
+390,7,0,safer,horse giddy dilly lodge paddy spank safer
+391,6,1,sweet,dryly thump cairn ovate welsh sweet
+392,5,1,pansy,teach harem tease ralph pansy
+393,7,0,latte,pixie angle chard sheer sworn snout latte
+394,5,1,irony,waver etude angry coupe irony
+395,6,1,spool,beset flunk jiffy rarer prize spool
+396,15,0,torus,resin drain aloft wring spray annoy ascot brave algae learn lemon scene click twist torus
+397,5,1,badly,sugar kitty whale cabby badly
+398,6,1,idyll,myrrh gumbo altar paint skull idyll
+399,9,0,river,putty tower candy papal renal trail welch haven river
+400,3,1,alley,slide tardy alley
+401,6,1,young,scour below water salon wacky young
+402,5,1,tower,shard tithe merit tawny tower
+403,7,0,spawn,elide ought gumbo elite lyric swoon spawn
+404,4,1,wench,crash dunce downy wench
+405,5,1,racer,shale singe singe caste racer
+406,10,0,fluff,tardy apple lupus stack vocal build thyme brawl verge fluff
+407,6,1,churn,clued enemy stoic mange syrup churn
+408,4,1,angry,venue scold pygmy angry
+409,5,1,furor,giant horse owing skiff furor
+410,8,0,cheek,strip yacht reign scope stair foggy freed cheek
+411,7,0,truth,bride saucy spell flour frost uncle truth
+412,4,1,coven,flake savor finch coven
+413,5,1,sedan,amass gawky royal trump sedan
+414,2,1,bosom,missy bosom
+415,6,1,artsy,coupe quick lying weird stake artsy
+416,10,0,balmy,suave siren debut decor sweat swore abhor affix allay balmy
+417,5,1,coven,wrong whirl stove olden coven
+418,6,1,hoist,burly rabid about vital habit hoist
+419,4,1,marsh,hunch usual mince marsh
+420,3,1,spout,reply steed spout
+421,7,0,chaos,flout filmy berth audio freed yacht chaos
+422,4,1,shack,hippy spasm relic shack
+423,9,0,bloom,ensue opine canny gayly court caper agate groom bloom
+424,8,0,rigor,pupil would bravo bleak belle chore knave rigor
+425,4,1,spear,prowl prism dwell spear
+426,9,0,verse,welch gayly nymph horde feign envoy umbra sperm verse
+427,5,1,strip,comic hatch going verge strip
+428,5,1,quoth,smith troll alive spool quoth
+429,6,1,nasty,billy usage taboo rocky snuck nasty
+430,6,1,grasp,label sunny musky truce impel grasp
+431,8,0,elate,avian whine finer cadet trite gamma payee elate
+432,7,0,vogue,blood whine munch mania plant olive vogue
+433,9,0,spoke,wield other adult crazy qualm whack chair exalt spoke
+434,6,1,clone,scree still rigid tidal twang clone
+435,15,0,paper,skunk bride grant curry arson lingo quiet scuba adult exult attic gamma alike weary paper
+436,5,1,octet,crawl sneer parka batty octet
+437,9,0,riper,final bread gnome acrid torch basin puppy round riper
+438,3,1,guilt,liege tunic guilt
+439,7,0,sloth,rifle pixel rebel error sauce brass sloth
+440,7,0,moral,junto knelt payee where smack occur moral
+441,6,1,frock,gumbo steak blend swirl could frock
+442,7,0,kebab,witch wacky wagon quite abide loser kebab
+443,6,1,belle,class remit tubal curry serve belle
+444,7,0,rally,power crock unity groom major flare rally
+445,8,0,steep,dolly dingy slump vivid farce fungi trout steep
+446,7,0,afoul,conch jumpy title abbot chant beefy afoul
+447,6,1,exalt,cloak witty lever array basal exalt
+448,6,1,stoop,sauna chock voila marry spawn stoop
+449,6,1,vomit,kitty bride ultra glory llama vomit
+450,9,0,lyric,hoard quart natal flung fever dough among trash lyric
+451,8,0,print,adage amass wince widow cavil valet deity print
+452,4,1,unwed,serve dough shrew unwed
+453,6,1,track,maker rivet algae waltz daisy track
+454,8,0,honey,crime viper tilde canoe juice anvil slash honey
+455,2,1,teary,trail teary
+456,6,1,pluck,grief witty tweak vixen repel pluck
+457,11,0,melon,pesto flush irate greet iliac aptly flake adept elide limit melon
+458,12,0,lemon,cobra gusto given drunk slave beefy amber whiff perky octal miser lemon
+459,4,1,flume,floor stout geeky flume
+460,11,0,lever,trace stole elide chord whirl carry march derby snail swoop lever
+461,12,0,recut,skull magma flesh afire unity money swoop genie grape filmy peach recut
+462,5,1,focus,woman guava salad ethic focus
+463,5,1,cramp,kiosk payee salvo tiger cramp
+464,5,1,pique,mimic ladle kneel amuse pique
+465,6,1,shift,wield jelly fraud price jiffy shift
+466,8,0,actor,prune skiff eerie wafer guppy stung shear actor
+467,4,1,spurn,pinto lapel prawn spurn
+468,13,0,shake,store lilac slyly brand extol amply jazzy freer smear stone flint krill shake
+469,7,0,swear,boxer pearl amply adage merge weedy swear
+470,4,1,dough,quoth prong ready dough
+471,6,1,exact,order impel gauze canal duchy exact
+472,13,0,gully,blunt nudge judge midge eking board binge swoon broil savor tempo cause gully
+473,4,1,ulcer,bound burst clasp ulcer
+474,8,0,cheek,handy candy dodge glide decor boost porch cheek
+475,6,1,piano,brief chief crude mower trope piano
+476,9,0,hello,briar amaze daisy ninth tread baste smirk madly hello
+477,6,1,inlet,fluff wench grasp flask idler inlet
+478,12,0,parry,dough creed taker juicy inbox dodgy weary scold vixen coach amend parry
+479,3,1,those,stilt tonal those
+480,4,1,elbow,sleek aphid thorn elbow
+481,6,1,wooer,false gauge atoll lusty trawl wooer
+482,6,1,loser,ombre tract arbor goody slunk loser
+483,8,0,pupil,fixer mayor viola swung woman basic penny pupil
+484,6,1,whale,trash picky funny arose egret whale
+485,6,1,shelf,sepia deign neigh shape allot shelf
+486,9,0,dicey,fresh twist adapt betel femur usual knelt click dicey
+487,11,0,gaudy,prism meaty crept amass rival verve sinew crook abled bigot gaudy
+488,12,0,siege,phase maple realm mafia first axiom truce petty chard rebel clang siege
+489,3,1,under,study brawn under
+490,8,0,input,berry nerve snarl slate gummy lasso plate input
+491,5,1,tibia,awful dandy bonus limbo tibia
+492,7,0,abled,civic itchy dicey hotel pitch slain abled
+493,10,0,pence,soggy gonad palsy admin tread inlet brass eagle amend pence
+494,4,1,wrung,qualm opera howdy wrung
+495,7,0,thorn,hatch rival safer blaze daisy linen thorn
+496,4,1,mover,video twirl might mover
+497,4,1,finch,canal pedal skiff finch
+498,7,0,plunk,small torus shady solve racer spied plunk
+499,9,0,surer,plume house prude foist angry today mimic bingo surer
+500,5,1,craft,welsh spade cloak hobby craft
+501,5,1,flown,taunt speck dogma brown flown
+502,5,1,verse,glass bacon putty tepid verse
+503,9,0,float,rearm stung reach every sloop paler cinch frost float
+504,13,0,vowel,bough mucus elfin clone spunk false fight lumen foyer agape thumb rivet vowel
+505,4,1,truce,outer oddly winch truce
+506,18,0,bound,study drone sleep snuff crave gnome grass ulcer weary gnome agree woozy slain queue jiffy elide sharp bound
+507,5,1,mouse,spire spasm rearm doubt mouse
+508,8,0,untie,evoke trial hazel kitty gauze prior usher untie
+509,5,1,anode,purer crown paler route anode
+510,3,1,venom,lunge guava venom
+511,6,1,stave,rider visor cigar puree stint stave
+512,8,0,pubic,flesh scree layer manic aloof hedge catch pubic
+513,5,1,shard,spout spiel refit choke shard
+514,4,1,above,slave skate mange above
+515,12,0,pooch,honey verse fresh under lobby hence murky boxer fluid hedge gassy pooch
+516,9,0,groom,paler lousy tarot dowel smith flash apart balmy groom
+517,6,1,relay,shown tamer elite could reply relay
+518,4,1,grape,elbow gaudy strap grape
+519,5,1,agape,digit smelt brink amber agape
+520,5,1,smirk,shell decay motto clear smirk
+521,3,1,sauna,oaken solid sauna
+522,5,1,bagel,hunch needy belly agree bagel
+523,4,1,trawl,horny vowel haute trawl
+524,4,1,weary,binge sinew bevel weary
+525,3,1,align,owner gaily align
+526,5,1,abort,usage serve flack giant abort
+527,6,1,borne,dryer hotel villa tiger alien borne
+528,9,0,lemon,pooch erode agora shack goody cabal fever lapse lemon
+529,7,0,berry,money smoky lipid occur punch belie berry
+530,6,1,betel,whose equal bowel hunch lithe betel
+531,9,0,hunch,amber often gully surly lingo tweet swell dumpy hunch
+532,6,1,relax,flack front mayor coach salad relax
+533,4,1,argue,humid flick erase argue
+534,9,0,baggy,aorta clerk humid quake chute crazy under gleam baggy
+535,7,0,booze,actor sulky tripe spicy stove maize booze
+536,5,1,blind,blitz revel spore lipid blind
+537,7,0,relax,stale tacit cloak crawl close funky relax
+538,4,1,visor,shape crimp vicar visor
+539,3,1,hurry,slush churn hurry
+540,6,1,scary,flame meter flirt taste photo scary
+541,5,1,onset,metal blade vodka waste onset
+542,21,0,spilt,quail sheik croak excel femur fancy grind jolly adore evade intro colon untie crack vogue gnome inter flung toddy utile spilt
+543,6,1,hoard,pesto dimly tapir corer bloom hoard
+544,4,1,disco,antic cache stint disco
+545,10,0,glaze,hyena groan mulch grill eclat amuse humor chili bused glaze
+546,5,1,exert,wrath octet mucus cheek exert
+547,11,0,bloom,allow surly stone hound ruder primo idiot check adapt gripe bloom
+548,10,0,decal,loopy cress login micro stage tight locus acorn false decal
+549,6,1,debug,dwarf shaky fella newly lager debug
+550,6,1,trump,dully olive amble fauna crass trump
+551,7,0,brute,onset tense earth epoch floor helix brute
+552,7,0,droit,speak block cough cloth tease dread droit
+553,5,1,laugh,storm grain daddy churn laugh
+554,14,0,steam,grave sheet cabby whine arson shrub nudge bravo plaza usual guild stray shank steam
+555,4,1,imply,blimp humph fetus imply
+556,7,0,amble,stain curly vaunt savvy smoky bound amble
+557,6,1,color,wrath month alibi bloat wrack color
+558,3,1,breed,exalt buddy breed
+559,7,0,junta,order moult shake erode doing cycle junta
+560,8,0,revel,assay leant stand decry whelp spied brunt revel
+561,6,1,ranch,swoon suave scold woken shore ranch
+562,16,0,probe,grant patio aware exist riser inert waist lowly quote gouge dense truer mocha cairn brisk probe
+563,7,0,crowd,scare guava rebus foray infer bland crowd
+564,4,1,adept,nymph axion naval adept
+565,3,1,reset,trash rivet reset
+566,16,0,fever,often juice decal tapir rajah droll booth human porch opera ocean moody fugue butch curvy fever
+567,5,1,aping,scram plaza cloud ebony aping
+568,5,1,check,koala press allay racer check
+569,5,1,built,board strap drunk trick built
+570,4,1,bloom,woman troop board bloom
+571,4,1,adapt,stash fritz ditty adapt
+572,5,1,cheat,cluck kneel small trait cheat
+573,6,1,ditto,salon usage gamer older comet ditto
+574,4,1,talon,sadly ranch moral talon
+575,6,1,eject,scoff small arena glove clash eject
+576,10,0,opine,finch bosom kneed canny nutty sandy niece lanky morph opine
+577,8,0,palsy,nomad crook heard fault elide click maple palsy
+578,8,0,corny,broad woozy shook abbey virus homer aunty corny
+579,7,0,stunt,smock fluke dandy inept flung ethos stunt
+580,13,0,amply,snare welsh grail niece inter betel diner fixer hardy whose proxy axiom amply
+581,4,1,sniff,trunk forty elope sniff
+582,4,1,abase,belle occur poise abase
+583,6,1,ditto,toddy shied geese plied frank ditto
+584,5,1,avert,drunk nosey fetch leaky avert
+585,7,0,basin,teary lupus tally foray primo chuck basin
+586,9,0,thing,score tuber timid ember spiky elite bylaw image thing
+587,8,0,troll,swarm habit stung trout sword biddy elbow troll
+588,11,0,witty,thick bloat align shift house savoy tight sight heath dodge witty
+589,9,0,strip,shoal folio maker bloom arose horde bloke rebut strip
+590,7,0,elude,zesty sugar filer hoist totem eerie elude
+591,3,1,venue,minus begun venue
+592,5,1,flirt,check felon shack crane flirt
+593,7,0,honor,frock wring chose creek offal crept honor
+594,8,0,glory,cheap anvil posse cubic click leach leggy glory
+595,7,0,elegy,drift theta thyme awash butch purge elegy
+596,8,0,sworn,swore usual tulip plush lefty bugle guide sworn
+597,7,0,elite,angry drove kiosk facet quack fresh elite
+598,6,1,flyer,unlit chill elect label zonal flyer
+599,5,1,chime,gourd navel bayou joist chime
+600,4,1,grind,wrong offer chirp grind
+601,7,0,nudge,primo taper crass clout heath basin nudge
+602,7,0,shirt,trice logic query gamut vegan thump shirt
+603,5,1,mange,tatty ardor gooey gonad mange
+604,6,1,blind,snoop forgo allay comet steed blind
+605,4,1,shied,kneed prong prior shied
+606,6,1,lupus,skill agile solar weary moose lupus
+607,7,0,afoul,spicy merge belie howdy bagel druid afoul
+608,11,0,payee,tiara wound forte freak noise scrum bunch gnome attic risen payee
+609,13,0,stout,pause built idyll bylaw quote quill gleam crush booty smile death began stout
+610,7,0,store,amend movie godly light tally shorn store
+611,4,1,buxom,mossy abuse bribe buxom
+612,9,0,leave,grill input lurch hymen choir defer cameo sappy leave
+613,6,1,spunk,surly pupil jazzy email twirl spunk
+614,3,1,ficus,scamp grief ficus
+615,4,1,being,bosom usurp vague being
+616,5,1,greet,sport poser elfin cleft greet
+617,3,1,spiel,matey lease spiel
+618,3,1,cycle,stain query cycle
+619,5,1,habit,favor leggy yearn built habit
+620,5,1,botch,aider ninth offal clump botch
+621,5,1,piper,evoke trail swoop poesy piper
+622,11,0,lowly,clink blame stand segue thong inane mural bible opine legal lowly
+623,12,0,corer,index sheen outer coupe hunch swami pedal photo rupee brash worth corer
+624,7,0,woozy,naval bleed idler curio sauce worse woozy
+625,7,0,troop,smack alike taker angst medic whose troop
+626,5,1,stone,mount stark atoll glove stone
+627,3,1,rabid,fried bloat rabid
+628,5,1,leggy,booty joist guest ratio leggy
+629,3,1,rally,repay staid rally
+630,28,0,joker,swash assay grain forte willy angry cadet manic ready arose delta amass salty grown known rouge amber lager arena nicer exalt macro bloke budge rigid token junta joker
+631,11,0,clone,puffy watch rarer amber array patsy hater could retch ankle clone
+632,10,0,tower,ahead vaunt squad gooey caput olive steep unlit bribe tower
+633,9,0,argue,wiser white flown jerky decay sumac layer chute argue
+634,5,1,decoy,until deuce slosh ovary decoy
+635,3,1,quasi,toxic clash quasi
+636,3,1,zebra,hyper bayou zebra
+637,5,1,overt,kebab guava crier timer overt
+638,17,0,assay,mummy crate blame dicey tempo scoff fetch utile clamp hefty pubic befit spilt filet erupt guest assay
+639,11,0,libel,mammy weigh adapt iliac qualm glass field mulch minty sally libel
+640,4,1,maize,pudgy chide ample maize
+641,10,0,cluck,using store judge swish rural grass payee blood choke cluck
+642,8,0,belch,wrong adage sneer strap rebus ombre eagle belch
+643,7,0,libel,couch boozy bland valve naval rogue libel
+644,13,0,crook,basil helix infer sixth sally phone kebab filet blare bleed vista felon crook
+645,7,0,gloat,craft allot moult cavil heron basil gloat
+646,9,0,fuzzy,wreck grail plied gusty given holly quack fleck fuzzy
+647,5,1,crisp,singe utile meter press crisp
+648,7,0,adorn,thumb happy china daunt smock paste adorn
+649,8,0,silly,storm beefy sheet crest broke stoic lover silly
+650,5,1,pagan,knack admit ideal sword pagan
+651,3,1,giddy,acrid ridge giddy
+652,9,0,shall,brisk wafer aside beast pudgy gooey crawl chart shall
+653,13,0,fuzzy,teach tunic lobby candy rupee sunny shown gully ready couch weary women fuzzy
+654,9,0,essay,photo roach dairy vouch skimp smoky girth apart essay
+655,5,1,mimic,drape funky taffy chock mimic
+656,5,1,doubt,steal roost salad nomad doubt
+657,7,0,dross,verge merge blimp afire cynic stump dross
+658,4,1,flood,dairy amble fella flood
+659,4,1,ovoid,tibia tower coyly ovoid
+660,15,0,plaid,regal blurb avert marsh ocean chafe slept alley noose ghost wrong ensue panel awash plaid
+661,4,1,heist,repay exalt twice heist
+662,4,1,prick,privy scoff thank prick
+663,7,0,gusty,fugue vigor mummy rigid large piggy gusty
+664,6,1,bread,erode snoop witch gulch ditch bread
+665,8,0,glass,llama odder juicy bused krill noose gamut glass
+666,7,0,troop,sauna again spray spree bylaw stiff troop
+667,4,1,aphid,soapy inbox torch aphid
+668,17,0,zesty,choir raspy fetid piggy fluid infer solid south honor barge reedy plane ovoid spout verve gauze zesty
+669,4,1,polka,ionic squat false polka
+670,4,1,droop,joint scrap quite droop
+671,4,1,creep,aback pithy apple creep
+672,6,1,daunt,maxim steam crash goofy dally daunt
+673,4,1,sushi,hyper dumpy musty sushi
+674,12,0,belch,sheep snare crave catch talon friar suing moron opera yacht bunny belch
+675,6,1,liege,humph assay barge proof wedge liege
+676,5,1,speed,champ loyal terra begin speed
+677,4,1,media,satin fifth trade media
+678,4,1,berry,banjo nobly elfin berry
+679,6,1,grief,cloth brick cross beset foamy grief
+680,3,1,koala,chill cabal koala
+681,5,1,cliff,duvet nobly wimpy shark cliff
+682,5,1,sally,heave scour trade whole sally
+683,3,1,arson,coast grasp arson
+684,6,1,topic,ridge bevel phone relay noisy topic
+685,7,0,elate,probe stove truth track ovate medal elate
+686,3,1,adorn,graze anode adorn
+687,9,0,funny,witch usurp vivid swirl crane tawny purge refit funny
+688,6,1,smell,ahead stare hunch sleet tumor smell
+689,6,1,flood,blast white gauze toxic trash flood
+690,11,0,fewer,ember pulse smear argue essay enjoy hello doing clone wooly fewer
+691,6,1,there,juice unity frock prude sneer there
+692,6,1,thrum,skiff gipsy cello yearn bring thrum
+693,4,1,stole,focal scrap cagey stole
+694,11,0,baste,clank total crick stink extol forte ratio leant month begun baste
+695,8,0,fluff,extra minus groan bison gnash frown slide fluff
+696,6,1,mimic,title elate heist trove chock mimic
+697,15,0,froze,trail shalt caper botch picky teary manor mangy grown punch carol silky pinto budge froze
+698,5,1,tweet,state dirty lusty venue tweet
+699,4,1,fleet,mealy evade satin fleet
+700,3,1,minty,manly major minty
+701,7,0,choir,tread bevel exist angel drake armor choir
+702,5,1,moult,inlet exult freed matey moult
+703,7,0,scaly,gnash guava drool liege minus buyer scaly
+704,4,1,false,scene brace fauna false
+705,8,0,foray,skimp level reuse solid pubic cloth after foray
+706,6,1,midge,spurn bulky plate recut phone midge
+707,5,1,imbue,stole roost crone femur imbue
+708,10,0,parry,seize while pesto steep elite tubal tepid meant jetty parry
+709,5,1,begin,manga rainy willy steam begin
+710,4,1,juice,envoy pixel jumpy juice
+711,3,1,filmy,enema lilac filmy
+712,3,1,close,elite swamp close
+713,6,1,utter,relic avail modal growl steed utter
+714,6,1,haven,doing stock recur cliff video haven
+715,3,1,dilly,spill frond dilly
+716,8,0,ruddy,habit swill lymph flush lemur gaffe ready ruddy
+717,12,0,admit,growl robot decal synod array hefty aware thing alive stark ardor admit
+718,5,1,slant,squad gavel skirt sniff slant
+719,7,0,dandy,pithy sumac virus carry canon loopy dandy
+720,4,1,sooty,boozy icing usurp sooty
+721,3,1,drape,poise amend drape
+722,4,1,query,umbra stony apple query
+723,26,0,lower,syrup titan goner exact toast jiffy fibre sushi ramen refit gayly there fluid nicer puree llama slung scale canal nurse bilge tidal diary scuba carve lower
+724,7,0,brawl,ditto dream twang woken train burst brawl
+725,4,1,plank,riper train black plank
+726,4,1,ethos,terse blimp joker ethos
+727,4,1,gecko,sheer thank batch gecko
+728,4,1,alpha,growl teeth raspy alpha
+729,20,0,jolly,rower shell stole mercy eater blank trick shack scary buggy gouge vapor cabin magma blunt punch wider again forth jolly
+730,9,0,cable,ultra squad towel awash wager apple snowy birch cable
+731,5,1,month,clean alloy shorn blurb month
+732,4,1,ranch,world snowy leech ranch
+733,15,0,skate,three banal blame donut sushi ultra empty mirth humus rupee pygmy whoop paint twixt skate
+734,6,1,began,twixt jolly happy tabby miser began
+735,9,0,flask,basil decay arrow gummy minty aider defer epoch flask
+736,7,0,front,noose dowel shrub kneed spire tying front
+737,7,0,prick,deign alert betel amuse virus parry prick
+738,4,1,privy,bacon girth risky privy
+739,4,1,lumen,humid block level lumen
+740,9,0,fetch,river anode newly cedar manic large since bezel fetch
+741,5,1,older,flail dried papal point older
+742,7,0,swung,rumor decor bathe gaunt hover elder swung
+743,5,1,savvy,entry snare vying savor savvy
+744,9,0,humor,spoil spire mogul cease budge juror balmy knelt humor
+745,4,1,armor,plume halve rebus armor
+746,5,1,march,green ridge crank grace march
+747,11,0,vapor,odder girth tying brown dicey moral sooty crick brace spawn vapor
+748,9,0,groom,risky retry peach ratty agate clank hilly refit groom
+749,4,1,murky,dealt skirt macro murky
+750,10,0,folly,brine untie shire inert macaw biome augur hussy after folly
+751,7,0,strap,began comma eying fjord moist whose strap
+752,11,0,quilt,beech coast focal winch ideal theft leash sound movie quart quilt
+753,6,1,revue,embed graze drove angel clash revue
+754,5,1,focal,evoke algae ounce lower focal
+755,9,0,mushy,taper offer bigot roost gummy erode trite notch mushy
+756,12,0,stein,hussy shape wench sassy pleat acute gnome husky zonal thyme scree stein
+757,4,1,scope,condo frond trace scope
+758,8,0,newer,cable plaza quest table leaky mower sneak newer
+759,4,1,swath,eight shall amity swath
+760,4,1,yearn,humid folly intro yearn
+761,5,1,mango,azure power float agape mango
+762,9,0,print,molar graph krill order elide widow place fence print
+763,11,0,scone,stick react graze train khaki kitty amuse sauce bride clone scone
+764,7,0,bathe,quasi avian burnt dwarf sooty hello bathe
+765,10,0,spoof,claim cadet marry twice shunt lilac ghoul troll skill spoof
+766,7,0,tacky,crone frown edify seize loser there tacky
+767,2,1,amber,zebra amber
+768,6,1,inlay,drape steep snoop stack grain inlay
+769,7,0,winch,basis decal embed chock chest wrist winch
+770,5,1,scope,rider moult knack chain scope
+771,5,1,liver,pesky shrug child civil liver
+772,3,1,ocean,creed forty ocean
+773,9,0,dowdy,since ideal llama chick stank third frond guild dowdy
+774,5,1,guise,abbey edict salsa robin guise
+775,6,1,squat,udder brine bawdy humid outer squat
+776,6,1,hilly,minor aging stray tarot lathe hilly
+777,17,0,infer,power mushy exist poppy plain twang stain again brick repay rearm lying breed paler smile lefty infer
+778,9,0,maxim,shore piano curry grove vista leash sooty climb maxim
+779,7,0,curry,stage child dolly fetal penne solve curry
+780,3,1,rhino,owing exact rhino
+781,5,1,enact,brink rouse chess niece enact
+782,8,0,canny,skimp laugh scrap forth creed catty sauna canny
+783,4,1,timid,blurb drift miser timid
+784,6,1,aback,newly fiend noose drink budge aback
+785,3,1,groan,aloud deuce groan
+786,6,1,rabbi,flyer cyber nasal crust basil rabbi
+787,3,1,groom,baste tramp groom
+788,4,1,dream,quail idler minty dream
+789,6,1,mercy,squat fatal hutch altar cyber mercy
+790,4,1,thong,gusty ensue stone thong
+791,14,0,lover,prone bloat roach canoe bathe recur unity digit tease pinky abhor medal prove lover
+792,8,0,might,order torso roach lance pouty troop blame might
+793,4,1,penal,bench sheep elect penal
+794,6,1,labor,dumpy pried stony topic cello labor
+795,7,0,paler,tried rough above coven kneel belly paler
+796,13,0,flunk,viral rabbi clump mambo fiber derby gusto goody spurt sieve excel kayak flunk
+797,6,1,cheat,wrack honor alibi start olive cheat
+798,6,1,arbor,snarl minim reedy rupee abyss arbor
+799,5,1,knead,suing taunt shall gonad knead
+800,4,1,algae,sally lanky cigar algae
+801,6,1,medal,cabby debit pride order hound medal
+802,5,1,uncut,moldy bleep plain trout uncut
+803,7,0,ember,small liken women stove seven blare ember
+804,5,1,satyr,obese cause steam patio satyr
+805,10,0,album,tonal scale spawn creak havoc flora teddy abode crimp album
+806,6,1,folly,arbor stoke geeky berry drift folly
+807,3,1,truly,loyal hound truly
+808,16,0,rowdy,loath palsy ennui tangy untie chock crane pouty smash swarm melee poesy fiend blade relic rowdy
+809,9,0,gipsy,soggy eager terse whole badly dowel agree final gipsy
+810,4,1,eaten,assay flier stuck eaten
+811,4,1,dwell,agile condo recut dwell
+812,4,1,embed,enemy serum balmy embed
+813,6,1,gaffe,wheat owing abbey munch floss gaffe
+814,3,1,sprig,shaft rapid sprig
+815,9,0,jewel,stale reuse mushy gummy ashen blitz gauze vodka jewel
+816,3,1,eking,clock crime eking
+817,5,1,clout,quack kitty steam humus clout
+818,8,0,slosh,flick favor crane jazzy patsy every grimy slosh
+819,5,1,geese,value inter froze worth geese
+820,3,1,bunch,berth lower bunch
+821,5,1,habit,clack truck apart onset habit
+822,15,0,dandy,fuzzy truce sight antic wince other shore peace trice stunk ninth borax facet fraud dandy
+823,2,1,buyer,budge buyer
+824,3,1,valid,billy coven valid
+825,4,1,waist,sooth colon parry waist
+826,8,0,snare,gummy ethos fecal downy agile mealy trade snare
+827,8,0,credo,ninja slunk slave iliac quoth shoot tilde credo
+828,7,0,motel,boney embed rivet about rumor swirl motel
+829,4,1,labor,borax count lunar labor
+830,8,0,idiom,creak aider worse scene crisp wordy manic idiom
+831,5,1,sumac,facet local caddy savor sumac
+832,5,1,taboo,first gross found opine taboo
+833,5,1,gooey,hotel smash taboo froze gooey
+834,7,0,twirl,penne scamp solve abase under whiff twirl
+835,5,1,rouse,lapse modem needy sprig rouse
+836,6,1,blend,grate mummy kneed eking sweat blend
+837,4,1,quart,awash fluke stool quart
+838,4,1,court,smirk clown wharf court
+839,8,0,bring,erect allot papal drawl tipsy nanny alike bring
+840,4,1,stork,stamp sleek sprig stork
+841,5,1,brake,quake phone onset award brake
+842,4,1,vogue,barge gripe roomy vogue
+843,8,0,graze,graph gavel folly lunar creek rusty tried graze
+844,5,1,ideal,utile humor whiny comma ideal
+845,8,0,dying,mucus hovel crude plush plume coupe wight dying
+846,4,1,email,index risky chair email
+847,4,1,verge,wreck trait grave verge
+848,8,0,scene,lousy badge teary amply salty mourn knack scene
+849,4,1,choir,syrup opium dough choir
+850,4,1,corny,clove cabal quart corny
+851,4,1,older,goody laugh minus older
+852,61,0,crave,shout tamer ladle shiny using sinew catch blimp stork ninny snoop sheep bribe graph munch realm smote tonga haunt mimic lemon butte shift debut sworn smoky grill slung stony brand spook orbit brick prime rayon hunky stank error stony cargo heath theft crust tonal clack angry swami unmet flout widen spied light picky great curly trick hedge drain spike slave crave
+853,7,0,tardy,piece frost manly smelt retch award tardy
+854,5,1,swarm,metal twang cacti spook swarm
+855,7,0,waive,slang round quart fruit recut wager waive
+856,8,0,randy,bluff great input stern femme fritz wreck randy
+857,6,1,fishy,black earth merge welsh daisy fishy
+858,3,1,elope,rogue sever elope
+859,13,0,label,crone swamp pixie scalp tryst sixty duchy field caulk chasm exult grail label
+860,4,1,putty,annex depot ditty putty
+861,4,1,gonad,pixel dirge creak gonad
+862,3,1,movie,anode vowel movie
+863,7,0,ninny,revue smelt befit condo admit twang ninny
+864,12,0,below,force caddy micro crime price miner movie scrum ought snort boney below
+865,8,0,flame,lover paper shoot carol canal prude umbra flame
+866,5,1,cabby,baker shelf smell hefty cabby
+867,10,0,grain,wacky evade aware sumac radii stair adorn phony tubal grain
+868,7,0,gonad,queer snore slave cello thong grown gonad
+869,4,1,lusty,hello skill chest lusty
+870,4,1,gayly,guide wordy ghost gayly
+871,11,0,sassy,canon purse caulk whiff waxen lemur batch drill brook swoon sassy
+872,8,0,wedge,dozen vigor scald fluke pride boast woozy wedge
+873,5,1,piece,spill hyper shelf viper piece
+874,6,1,sleet,build diner small dowdy allot sleet
+875,5,1,augur,crier depth fable thrum augur
+876,4,1,choke,miser sonic weave choke
+877,15,0,clasp,stall junta arise bulge acorn slunk ideal realm blend ascot valid clone annul poise clasp
+878,12,0,dowdy,hilly assay faith palsy pouch anger think sloth koala conch dally dowdy
+879,6,1,forth,minor befit patch islet crock forth
+880,4,1,wrist,setup pansy moron wrist
+881,5,1,snore,quill annoy ivory putty snore
+882,6,1,icily,showy crone fanny tight flash icily
+883,8,0,craft,exalt dowel pique gavel emcee which burly craft
+884,5,1,mural,wield carve ripen storm mural
+885,5,1,quake,erupt slosh alert nasty quake
+886,14,0,seven,knack wagon gorge title crash annoy exist kappa octal corer canoe fanny navel seven
+887,4,1,comfy,rayon snack fresh comfy
+888,6,1,elude,hyper waxen horny medal briar elude
+889,3,1,ocean,conic snide ocean
+890,29,0,field,repel jelly synod skimp budge dream locus savor mouth quirk botch purse sever layer jazzy lumpy pleat soapy tabby chest salve skull slide giant ethos block ingot crawl field
+891,3,1,twang,scowl grasp twang
+892,7,0,fight,labor human bully jolly rayon gaffe fight
+893,4,1,debar,label choke dealt debar
+894,5,1,taper,spiel cliff cruel paint taper
+895,9,0,slick,dusty totem lefty barge trump wreak slope stain slick
+896,3,1,slate,fetus bleed slate
+897,3,1,robin,boozy oxide robin
+898,5,1,slick,fizzy leach knave suave slick
+899,7,0,flyer,gloat owner posse freer dwarf jazzy flyer
+900,7,0,grunt,brave loose lover clear heath grain grunt
+901,5,1,alibi,fully agile diode drawl alibi
+902,6,1,sinew,fence phone rarer humph spout sinew
+903,5,1,offal,guild ingot blast floor offal
+904,9,0,exalt,daddy carol rover wrack afoot alloy blush stale exalt
+905,6,1,nosey,baler erect abort epoch poesy nosey
+906,9,0,sleek,worth wrath stain milky brink abhor night penal sleek
+907,10,0,jerky,shyly turbo clout dizzy ditto sting crimp minus snack jerky
+908,6,1,octet,undue strip speed tapir gorge octet
+909,5,1,neigh,smirk pulpy mound chunk neigh
+910,6,1,halve,grimy joint parka butch widen halve
+911,15,0,wheel,grout stand trail crimp drawn pulse ankle boost larva blink scale caste pause nymph wheel
+912,10,0,viral,filth witty stone tulle photo envoy sweet bless waltz viral
+913,5,1,daisy,brake conic flaky emcee daisy
+914,5,1,gruel,stunk gecko scoff dimly gruel
+915,3,1,labor,salon class labor
+916,29,0,clock,fresh rural spiel grasp wheat metro paddy quiet skirt purse finer diode swami knave fluid flunk porch width rusty posse stank flock slump downy junto afoot shout beret clock
+917,7,0,coyly,spook dream dingo brook prune pluck coyly
+918,7,0,villa,horde brink kitty unlit floss conic villa
+919,4,1,slash,thong brawl segue slash
+920,8,0,tripe,stair slash fully macho erode worst pansy tripe
+921,8,0,lorry,plant triad swoon chuck brisk right guise lorry
+922,5,1,frill,daunt sprig funny peace frill
+923,6,1,duchy,plumb brine navel fault hippo duchy
+924,8,0,wrote,spill rivet piggy palsy fanny spasm force wrote
+925,11,0,puffy,realm kinky heady mania aging artsy chant sheik obese funny puffy
+926,5,1,begin,sting briny harsh sonar begin
+927,5,1,reset,newly hussy fleck chart reset
+928,6,1,anode,marry locus water horde doing anode
+929,8,0,inner,corny clang strut plead golem balmy mafia inner
+930,6,1,frisk,niche picky other blimp spiky frisk
+931,5,1,arena,gusty cello lusty omega arena
+932,4,1,bible,write tense delta bible
+933,4,1,rebut,basil flout decay rebut
+934,5,1,climb,worse metal lapse clear climb
+935,7,0,order,gecko dread mucus annoy limbo enact order
+936,3,1,myrrh,cider youth myrrh
+937,2,1,cause,crust cause
+938,6,1,slope,index scaly augur blimp spite slope
+939,12,0,pasty,overt thrum twirl truly quirk roach later fever metro midge irony pasty
+940,5,1,night,flout heron pesky swill night
+941,10,0,heady,droit stain audio tamer lager flyer agent river table heady
+942,5,1,hovel,lofty ditty cubic worth hovel
+943,7,0,whoop,digit stiff rabid swish skiff aware whoop
+944,7,0,rodeo,usurp black focus entry screw retro rodeo
+945,2,1,dogma,dream dogma
+946,5,1,jewel,weird spice iliac inter jewel
+947,7,0,murky,elder lunar flint hover wheat knack murky
+948,5,1,decor,trump sassy alive cabal decor
+949,5,1,whack,dunce brave vodka house whack
+950,5,1,pence,roach papal spasm erect pence
+951,3,1,quite,equal limit quite
+952,5,1,clear,tibia prowl hunky bylaw clear
+953,3,1,donut,incur smile donut
+954,3,1,liner,noble ester liner
+955,4,1,butte,evict flint borax butte
+956,16,0,blame,alike moose heard cedar shrug scalp trawl naive toddy wheat hotly adorn harpy scalp flung blame
+957,8,0,creek,death angel razor poser ruddy mound elite creek
+958,5,1,faith,sweet lymph pitch avert faith
+959,6,1,beady,honey wench ombre winch teddy beady
+960,6,1,sniff,sugar yacht south gaffe tunic sniff
+961,5,1,bunch,heart tidal input bossy bunch
+962,2,1,admin,align admin
+963,23,0,joker,chaos macho nerdy naive zesty visit amber bezel minor fetal align holly heave stead amity queen still sperm carol boast cover flock joker
+964,5,1,bless,agora poise twang shape bless
+965,8,0,scene,crump gamer retch lunge muddy admit canon scene
+966,5,1,smoky,shake truss hence drill smoky
+967,5,1,eject,ruder prawn major kinky eject
+968,10,0,rarer,avail octal pansy medal agape panel aback boozy skiff rarer
+969,7,0,black,fungi fiber angry blade reply gnash black
+970,5,1,payer,betel repel chuck heavy payer
+971,9,0,safer,fluff allay perch pagan child friar dodge shove safer
+972,7,0,manic,speak could brawn glean grown final manic
+973,5,1,fruit,crumb prize rugby flake fruit
+974,8,0,adobe,puree maple stilt fugue flume lynch paddy adobe
+975,25,0,melon,spurn aside witch psalm tango fifth whine tying worry curry banal heard patsy error adorn glean bless cabin cease petal windy brood ratio moist melon
+976,5,1,proud,thumb aside quite hurry proud
+977,3,1,under,sound masse under
+978,23,0,ionic,trump among scoff gayly hyper amaze recap dusty melon syrup adage saint night dusty rerun muddy patsy guard trunk rugby tonga imply ionic
+979,9,0,stuck,tawny adobe tying dough swept unite build lefty stuck
+980,6,1,empty,frock track abode urine input empty
+981,7,0,vinyl,hippo adult child forum broke hyper vinyl
+982,8,0,rupee,guard noose altar train dodgy stoke vapor rupee
+983,3,1,cheek,treat creek cheek
+984,7,0,bulky,woken aside warty satyr wheat clerk bulky
+985,7,0,ruddy,exist fella zebra bride thief tonal ruddy
+986,8,0,chart,swish glade jazzy guppy slain awoke pasty chart
+987,9,0,lilac,howdy corny smack spurt mucky threw stern plied lilac
+988,6,1,clank,daisy radii matey groin hence clank
+989,4,1,apnea,tweet baste unity apnea
+990,4,1,coral,moody cease drool coral
+991,5,1,amiss,dough blast covet cagey amiss
+992,8,0,index,horse scorn earth amuse award saute crony index
+993,4,1,fifty,silly gassy fetch fifty
+994,5,1,zesty,nutty cocoa karma shown zesty
+995,5,1,ovary,graze quake tamer dogma ovary
+996,10,0,spear,moose crass goody adobe rouge worse clean woven parse spear
+997,17,0,dizzy,react dowel lusty slide axiom sperm axiom icily delay sewer holly vital refer sperm piece inlay dizzy
+998,7,0,crone,taffy stuff flack write badge plunk crone
+999,4,1,acrid,flame sonic uncle acrid
+# strategy random-blind, follow-up answer, trials 1000, seed 0
+# mean guesses 6.8810  +/- 0.1283 (standard error)
+# win rate (within 6) 59.1000%  +/- 1.5547%  (591 of 1000 games)
+# sd 4.0558   min 2   median 6.0   max 61
+#    2 guesses       8    0.80%
+#    3 guesses      76    7.60%
+#    4 guesses     174   17.40%
+#    5 guesses     183   18.30%
+#    6 guesses     150   15.00%
+#    7 guesses     115   11.50%   (loss)
+#    8 guesses      75    7.50%   (loss)
+#    9 guesses      59    5.90%   (loss)
+#   10 guesses      41    4.10%   (loss)
+#   11 guesses      30    3.00%   (loss)
+#   12 guesses      22    2.20%   (loss)
+#   13 guesses      15    1.50%   (loss)
+#   14 guesses       8    0.80%   (loss)
+#   15 guesses      10    1.00%   (loss)
+#   16 guesses       7    0.70%   (loss)
+#   17 guesses       7    0.70%   (loss)
+#   18 guesses       3    0.30%   (loss)
+#   19 guesses       1    0.10%   (loss)
+#   20 guesses       2    0.20%   (loss)
+#   21 guesses       2    0.20%   (loss)
+#   22 guesses       1    0.10%   (loss)
+#   23 guesses       2    0.20%   (loss)
+#   24 guesses       1    0.10%   (loss)
+#   25 guesses       1    0.10%   (loss)
+#   26 guesses       2    0.20%   (loss)
+#   27 guesses       1    0.10%   (loss)
+#   28 guesses       1    0.10%   (loss)
+#   29 guesses       2    0.20%   (loss)
+#   61 guesses       1    0.10%   (loss)

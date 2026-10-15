@@ -1,0 +1,21 @@
+# DIGEST of k3_plant_t1000000_s0.csv (0.1 GB), which is gitignored: over GitHub's file-size limit.
+# The lines below are copied verbatim from that file's own summary block.
+# multiwordle, blind opening then the greedy rule (see math/multiwordle.py)
+# boards=3 trials=1000000 opening=plant seed=0 strategy=greedy
+# answers drawn without replacement from the 2315 mystery words; no guess cap
+# strategy greedy, trials 1000000, boards 3, opening plant, seed 0
+# mean total guesses 6.7104  +/- 0.0011 (standard error)
+# sd 1.1060   min 3   median 7.0   max 14
+# mean guesses per board 2.2368
+#    3 guesses      16    0.00%
+#    4 guesses    6510    0.65%
+#    5 guesses  110309   11.03%
+#    6 guesses  336397   33.64%
+#    7 guesses  333090   33.31%
+#    8 guesses  155588   15.56%
+#    9 guesses   45527    4.55%
+#   10 guesses   10263    1.03%
+#   11 guesses    1925    0.19%
+#   12 guesses     343    0.03%
+#   13 guesses      26    0.00%
+#   14 guesses       6    0.00%

@@ -36,6 +36,14 @@ _flat = "".join(TIERS).lower()
 assert len(_flat) == len(set(_flat)), "a letter appears in two tiers"
 assert set(_flat) == set(string.ascii_lowercase), "the tiers do not cover the alphabet"
 
+# HARD MODE's list (scene 19za) -- the user's cuts (2026-10-03) on the greedy order in
+# data/shared/tiers/order_r1_top1000_hardturns.csv, within-tier order as that file
+# ranks them. Recorded, not computed, exactly as TIERS is.
+HARD_TIERS = ("E", "ATSR", "L", "NIOC", "PD", "HUBMGY", "FKWV", "XZJQ")
+_hflat = "".join(HARD_TIERS).lower()
+assert len(_hflat) == len(set(_hflat)), "a letter appears in two hard tiers"
+assert set(_hflat) == set(string.ascii_lowercase), "the hard tiers do not cover the alphabet"
+
 
 def tier_of(letter):
     """The tier index of `letter`, 0 = best."""

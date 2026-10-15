@@ -1,0 +1,16 @@
+# DIGEST of k7_clint-drape-wombs_t1000000_s0.csv (0.1 GB), which is gitignored: over GitHub's file-size limit.
+# The lines below are copied verbatim from that file's own summary block.
+# multiwordle, blind opening then the greedy rule (see math/multiwordle.py)
+# boards=7 trials=1000000 opening=clint drape wombs seed=0 strategy=greedy
+# answers drawn without replacement from the 2315 mystery words; no guess cap
+# strategy greedy, trials 1000000, boards 7, opening clint drape wombs, seed 0
+# mean total guesses 10.2307  +/- 0.0005 (standard error)
+# sd 0.5011   min 9   median 10.0   max 15
+# mean guesses per board 1.4615
+#    9 guesses    2338    0.23%
+#   10 guesses  795146   79.51%
+#   11 guesses  175599   17.56%
+#   12 guesses   23631    2.36%
+#   13 guesses    2973    0.30%
+#   14 guesses     300    0.03%
+#   15 guesses      13    0.00%

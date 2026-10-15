@@ -1,0 +1,16 @@
+# DIGEST of k17_corbe-plant_t1000000_s0.csv (0.2 GB), which is gitignored: over GitHub's file-size limit.
+# The lines below are copied verbatim from that file's own summary block.
+# multiwordle, blind opening then the greedy rule (see math/multiwordle.py)
+# boards=17 trials=1000000 opening=corbe plant seed=0 strategy=greedy
+# answers drawn without replacement from the 2315 mystery words; no guess cap
+# strategy greedy, trials 1000000, boards 17, opening corbe plant, seed 0
+# mean total guesses 19.1509  +/- 0.0004 (standard error)
+# sd 0.4112   min 18   median 19.0   max 24
+# mean guesses per board 1.1265
+#   18 guesses    6208    0.62%
+#   19 guesses  850115   85.01%
+#   20 guesses  131155   13.12%
+#   21 guesses   11695    1.17%
+#   22 guesses     789    0.08%
+#   23 guesses      36    0.00%
+#   24 guesses       2    0.00%

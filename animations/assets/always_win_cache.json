@@ -1,0 +1,777 @@
+{
+ "openers": {
+  "slate": {
+   "mean": 3.82136665,
+   "win_rate": 0.988670495
+  },
+  "parse clint": {
+   "mean": 3.693496242,
+   "win_rate": 0.994794138
+  },
+  "crane spilt": {
+   "mean": 3.699156122,
+   "win_rate": 0.995052834
+  },
+  "dance horst blimp": {
+   "mean": 4.164319312,
+   "win_rate": 0.998420583
+  },
+  "bland copse right": {
+   "mean": 4.168059584,
+   "win_rate": 0.999134698
+  },
+  "champ flint rugby sowed": {
+   "mean": 5.021922246,
+   "win_rate": 0.99924406
+  },
+  "bugle champ downy first": {
+   "mean": 5.023218143,
+   "win_rate": 0.998812095
+  }
+ },
+ "fixed": {
+  "blunk cimex grypt vozhd waqfs": {
+   "words": [
+    "blunk",
+    "cimex",
+    "grypt",
+    "vozhd",
+    "waqfs"
+   ],
+   "unsolved": 72,
+   "groups": [
+    {
+     "codes": [
+      9,
+      6,
+      30,
+      0,
+      0
+     ],
+     "members": [
+      "puree",
+      "purer",
+      "rupee",
+      "upper"
+     ]
+    },
+    {
+     "codes": [
+      81,
+      3,
+      0,
+      28,
+      27
+     ],
+     "members": [
+      "abode",
+      "adobe"
+     ]
+    },
+    {
+     "codes": [
+      0,
+      0,
+      0,
+      3,
+      109
+     ],
+     "members": [
+      "awash",
+      "swash"
+     ]
+    },
+    {
+     "codes": [
+      162,
+      0,
+      9,
+      54,
+      0
+     ],
+     "members": [
+      "bobby",
+      "booby"
+     ]
+    },
+    {
+     "codes": [
+      198,
+      3,
+      81,
+      0,
+      0
+     ],
+     "members": [
+      "bugle",
+      "bulge"
+     ]
+    },
+    {
+     "codes": [
+      27,
+      189,
+      0,
+      3,
+      0
+     ],
+     "members": [
+      "chili",
+      "chill"
+     ]
+    },
+    {
+     "codes": [
+      2,
+      162,
+      54,
+      27,
+      0
+     ],
+     "members": [
+      "crock",
+      "crook"
+     ]
+    },
+    {
+     "codes": [
+      0,
+      57,
+      108,
+      1,
+      0
+     ],
+     "members": [
+      "dirge",
+      "ridge"
+     ]
+    },
+    {
+     "codes": [
+      0,
+      0,
+      36,
+      55,
+      81
+     ],
+     "members": [
+      "dowry",
+      "rowdy"
+     ]
+    },
+    {
+     "codes": [
+      27,
+      0,
+      54,
+      28,
+      0
+     ],
+     "members": [
+      "droll",
+      "drool"
+     ]
+    },
+    {
+     "codes": [
+      0,
+      6,
+      28,
+      0,
+      1
+     ],
+     "members": [
+      "ester",
+      "steer"
+     ]
+    },
+    {
+     "codes": [
+      0,
+      6,
+      28,
+      3,
+      0
+     ],
+     "members": [
+      "ether",
+      "three"
+     ]
+    },
+    {
+     "codes": [
+      0,
+      3,
+      1,
+      3,
+      27
+     ],
+     "members": [
+      "heath",
+      "theta"
+     ]
+    },
+    {
+     "codes": [
+      24,
+      0,
+      2,
+      0,
+      54
+     ],
+     "members": [
+      "jaunt",
+      "taunt"
+     ]
+    },
+    {
+     "codes": [
+      30,
+      3,
+      27,
+      0,
+      27
+     ],
+     "members": [
+      "learn",
+      "renal"
+     ]
+    },
+    {
+     "codes": [
+      27,
+      3,
+      0,
+      3,
+      28
+     ],
+     "members": [
+      "leash",
+      "shale"
+     ]
+    },
+    {
+     "codes": [
+      27,
+      6,
+      30,
+      0,
+      0
+     ],
+     "members": [
+      "leper",
+      "repel"
+     ]
+    },
+    {
+     "codes": [
+      27,
+      6,
+      27,
+      81,
+      0
+     ],
+     "members": [
+      "lever",
+      "revel"
+     ]
+    },
+    {
+     "codes": [
+      27,
+      9,
+      27,
+      54,
+      27
+     ],
+     "members": [
+      "molar",
+      "moral"
+     ]
+    },
+    {
+     "codes": [
+      3,
+      6,
+      27,
+      0,
+      81
+     ],
+     "members": [
+      "newer",
+      "renew"
+     ]
+    },
+    {
+     "codes": [
+      0,
+      6,
+      30,
+      0,
+      54
+     ],
+     "members": [
+      "paper",
+      "parer"
+     ]
+    },
+    {
+     "codes": [
+      0,
+      0,
+      13,
+      0,
+      55
+     ],
+     "members": [
+      "pasty",
+      "patsy"
+     ]
+    },
+    {
+     "codes": [
+      0,
+      60,
+      30,
+      0,
+      0
+     ],
+     "members": [
+      "piper",
+      "riper"
+     ]
+    },
+    {
+     "codes": [
+      3,
+      60,
+      27,
+      0,
+      1
+     ],
+     "members": [
+      "risen",
+      "siren"
+     ]
+    },
+    {
+     "codes": [
+      9,
+      6,
+      27,
+      1,
+      0
+     ],
+     "members": [
+      "ruder",
+      "udder"
+     ]
+    },
+    {
+     "codes": [
+      0,
+      3,
+      27,
+      3,
+      28
+     ],
+     "members": [
+      "share",
+      "shear"
+     ]
+    },
+    {
+     "codes": [
+      1,
+      3,
+      1,
+      0,
+      28
+     ],
+     "members": [
+      "skate",
+      "stake"
+     ]
+    },
+    {
+     "codes": [
+      3,
+      0,
+      3,
+      27,
+      1
+     ],
+     "members": [
+      "snoop",
+      "spoon"
+     ]
+    },
+    {
+     "codes": [
+      0,
+      3,
+      30,
+      0,
+      28
+     ],
+     "members": [
+      "spare",
+      "spear"
+     ]
+    },
+    {
+     "codes": [
+      27,
+      27,
+      5,
+      0,
+      1
+     ],
+     "members": [
+      "spilt",
+      "split"
+     ]
+    },
+    {
+     "codes": [
+      27,
+      3,
+      1,
+      0,
+      28
+     ],
+     "members": [
+      "stale",
+      "steal"
+     ]
+    },
+    {
+     "codes": [
+      0,
+      3,
+      1,
+      0,
+      28
+     ],
+     "members": [
+      "state",
+      "tease"
+     ]
+    },
+    {
+     "codes": [
+      15,
+      27,
+      81,
+      0,
+      1
+     ],
+     "members": [
+      "suing",
+      "using"
+     ]
+    },
+    {
+     "codes": [
+      27,
+      27,
+      55,
+      0,
+      27
+     ],
+     "members": [
+      "trail",
+      "trial"
+     ]
+    },
+    {
+     "codes": [
+      12,
+      30,
+      1,
+      0,
+      0
+     ],
+     "members": [
+      "unite",
+      "untie"
+     ]
+    }
+   ]
+  },
+  "chott dumbo fawny verge spill": {
+   "words": [
+    "chott",
+    "dumbo",
+    "fawny",
+    "verge",
+    "spill"
+   ],
+   "unsolved": 16,
+   "groups": [
+    {
+     "codes": [
+      0,
+      0,
+      27,
+      5,
+      3
+     ],
+     "members": [
+      "algae",
+      "glaze"
+     ]
+    },
+    {
+     "codes": [
+      180,
+      1,
+      0,
+      9,
+      0
+     ],
+     "members": [
+      "crock",
+      "crook"
+     ]
+    },
+    {
+     "codes": [
+      0,
+      162,
+      0,
+      36,
+      18
+     ],
+     "members": [
+      "dried",
+      "drier"
+     ]
+    },
+    {
+     "codes": [
+      27,
+      54,
+      2,
+      0,
+      81
+     ],
+     "members": [
+      "husky",
+      "hussy"
+     ]
+    },
+    {
+     "codes": [
+      0,
+      0,
+      3,
+      27,
+      12
+     ],
+     "members": [
+      "liken",
+      "linen"
+     ]
+    },
+    {
+     "codes": [
+      9,
+      82,
+      0,
+      36,
+      0
+     ],
+     "members": [
+      "odder",
+      "order"
+     ]
+    },
+    {
+     "codes": [
+      0,
+      0,
+      0,
+      36,
+      36
+     ],
+     "members": [
+      "piper",
+      "riper"
+     ]
+    },
+    {
+     "codes": [
+      0,
+      3,
+      27,
+      63,
+      0
+     ],
+     "members": [
+      "rebar",
+      "zebra"
+     ]
+    }
+   ]
+  },
+  "catty frond rumba spill verge whack": {
+   "words": [
+    "catty",
+    "frond",
+    "rumba",
+    "spill",
+    "verge",
+    "whack"
+   ],
+   "unsolved": 0,
+   "groups": []
+  }
+ },
+ "same": {
+  "codes": [
+   9,
+   6,
+   30,
+   0,
+   0
+  ],
+  "members": [
+   "puree",
+   "purer",
+   "rupee",
+   "upper"
+  ]
+ },
+ "climb": {
+  "start": [
+   "query",
+   "ninny",
+   "baler",
+   "masse"
+  ],
+  "start_unsolved": 1049,
+  "moves": [
+   {
+    "section": "swap",
+    "unsolved": 245,
+    "rows": [
+     [
+      0,
+      "dutch"
+     ]
+    ]
+   },
+   {
+    "section": "swap",
+    "unsolved": 95,
+    "rows": [
+     [
+      1,
+      "pinky"
+     ]
+    ]
+   },
+   {
+    "section": "swap",
+    "unsolved": 39,
+    "rows": [
+     [
+      3,
+      "worms"
+     ]
+    ]
+   },
+   {
+    "section": "swap",
+    "unsolved": 15,
+    "rows": [
+     [
+      2,
+      "gable"
+     ]
+    ]
+   },
+   {
+    "section": "anagram",
+    "unsolved": 13,
+    "rows": [
+     [
+      2,
+      "budge"
+     ],
+     [
+      0,
+      "latch"
+     ]
+    ]
+   },
+   {
+    "section": "anagram+1",
+    "unsolved": 12,
+    "rows": [
+     [
+      2,
+      "butch"
+     ],
+     [
+      0,
+      "ledge"
+     ]
+    ]
+   },
+   {
+    "section": "anagram+1",
+    "unsolved": 7,
+    "rows": [
+     [
+      1,
+      "ramps"
+     ],
+     [
+      3,
+      "wonky"
+     ]
+    ]
+   },
+   {
+    "section": "anagram+1",
+    "unsolved": 6,
+    "rows": [
+     [
+      1,
+      "carbs"
+     ],
+     [
+      2,
+      "thump"
+     ]
+    ]
+   },
+   {
+    "section": "anagram3",
+    "unsolved": 1,
+    "rows": [
+     [
+      1,
+      "pawns"
+     ],
+     [
+      2,
+      "rocky"
+     ],
+     [
+      3,
+      "thumb"
+     ]
+    ]
+   }
+  ],
+  "final": [
+   "ledge",
+   "pawns",
+   "rocky",
+   "thumb"
+  ]
+ }
+}

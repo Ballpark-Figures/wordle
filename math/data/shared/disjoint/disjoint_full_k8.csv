@@ -1,0 +1,12 @@
+# EVERY set of 8 legal guesses, pairwise letter-disjoint, >= 1 of the
+# 2315 answers. One row per slot of each letter-set combination; the
+# word sets it stands for are the product of the slot sizes.
+set,answer_set,slot,letters,words,answers
+1,civ,1,civ,civic,civic
+1,civ,2,bfo,boffo,
+1,civ,3,ajq,qajaq,
+1,civ,4,glr,grrrl,
+1,civ,5,hpt,phpht,
+1,civ,6,emx,exeem|exeme,
+1,civ,7,nswy,wynns,
+1,civ,8,dkuz,kudzu,

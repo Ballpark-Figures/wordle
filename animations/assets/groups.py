@@ -65,6 +65,7 @@ DOT_REGION_TOP = 4.2       # the guess has left by then: dots take the whole fra
                            # as far from the top as REGION_BOT is from the bottom
 WORD_PAD = 0.3             # footprint padding round a packed word block (07)
 WORD_HEAD_GAP = 0.08       # between a packed block's scored rows and its words (07)
+HEAD_MAX_COLS = 3          # a word block's rows are at most this many word columns wide (07)
 HEAD_ROW_GAP = GAP / TILE  # between two stacked scored rows, per row height — the
                            # board's own row spacing (07)
 
@@ -392,38 +393,63 @@ def ranked_layout(data, guess, left, right=REGION_HALF_W, top=DOT_REGION_TOP,
     return (groups, *_fill(groups, bs, centres, f))
 
 
+def dot_grid(members, pitch, left, right, top):
+    """Every word of `members` a dot, in rows of as many as fit between `left` and
+    `right` at `pitch`, top row at `top` (just under the top edge), filled left to
+    right in member order, each row centred -- scene 16's candidates under a board.
+    No scored row on top (unlike `dot_layout`'s blocks). The PITCH IS THE CALLER'S,
+    so every board shows its candidates at one dot size and a count reads as an
+    area. Returns ({word: centre}, dot radius)."""
+    nc = max(1, int((right - left) / pitch))
+    n = len(members)
+    cx = (left + right) / 2
+    spots = {}
+    for k, word in enumerate(members):
+        i, j = divmod(k, nc)
+        in_row = min(nc, n - i * nc)
+        spots[word] = np.array([cx + (j - (in_row - 1) / 2) * pitch,
+                                top - (i + 0.5) * pitch, 0.0])
+    return spots, DOT_FRAC * pitch
+
+
 # ── words packed by size (07) ─────────────────────────────────────────────────
 WORD_ASPECTS = np.geomspace(0.2, 5.0, 33)   # grid shapes tried: columns ~ sqrt(n * a)
 
 
-def _word_block(n, heads, aspect):
+def _word_block(n, heads, aspect, nc=None):
     """A block of `n` words at scale 1 (GROUP_SCALE words, 04's CELL_GAP/CELL_DY
-    pitches) under a stack of `heads` scored rows, each HEADER_W wide (04's). The
-    grid has about sqrt(n * aspect * dy / (ww + cg)) columns — aspect 1 makes its
-    AREA square-ish."""
+    pitches) under a stack of `heads` scored rows, each AS WIDE AS THE WORD GRID --
+    sized by its group, as c's rows span their dots (user's call) -- but never
+    wider than HEAD_MAX_COLS columns of words. The grid has about
+    sqrt(n * aspect * dy / (ww + cg)) columns — aspect 1 makes its AREA square-ish.
+    `nc` fixes the column count instead."""
     ww, cg, dy = WORD_W * GROUP_SCALE, CELL_GAP, CELL_DY
-    nc = min(n, max(1, math.ceil(math.sqrt(n * aspect * dy / (ww + cg)))))
+    if nc is None:
+        nc = min(n, max(1, math.ceil(math.sqrt(n * aspect * dy / (ww + cg)))))
     nr = math.ceil(n / nc)
-    rh = HEADER_W * row_aspect()
+    gw = nc * ww + (nc - 1) * cg
+    hw = min(gw, HEAD_MAX_COLS * ww + (HEAD_MAX_COLS - 1) * cg)   # capped (user's call)
+    rh = hw * row_aspect()
     hh = heads * rh + (heads - 1) * rh * HEAD_ROW_GAP + WORD_HEAD_GAP if heads else 0.0
-    return dict(nc=nc, nr=nr, hh=hh, rh=rh,
-                w=max(nc * ww + (nc - 1) * cg, HEADER_W if heads else 0.0) + WORD_PAD,
+    return dict(nc=nc, nr=nr, hh=hh, rh=rh, gw=hw, w=gw + WORD_PAD,
                 h=nr * dy + hh + WORD_PAD)
 
 
 def ranked_word_layout(groups, left, right=REGION_HALF_W, top=DOT_REGION_TOP,
-                       bottom=REGION_BOT, heads=1):
+                       bottom=REGION_BOT, heads=1, ncols=None):
     """07: `groups` (in the order given — pass them largest first) as WORD blocks,
     packed as `ranked_layout` packs dot blocks, the last row centred; each block
-    under a stack of `heads` scored rows, HEADER_W wide at GROUP_SCALE (04's
-    proportion). The grid shape is the one of WORD_ASPECTS (the same for every
+    under a stack of `heads` scored rows as wide as its word grid. The grid shape is the one of WORD_ASPECTS (the same for every
     block) that gives the LARGEST words. One block alone sits centred at the top.
+    `ncols` (one per group) FIXES the column counts instead -- for a group that is
+    already on screen and should keep its arrangement while it resizes (07f).
 
     Returns (slots {word: centre}, word scale, [[header centre, top first] per
-    block], header width)."""
+    block], [header width per block])."""
     best = None
-    for a in WORD_ASPECTS:
-        bs = [_word_block(g["size"], heads, a) for g in groups]
+    for a in (WORD_ASPECTS if ncols is None else [1.0]):
+        bs = [_word_block(g["size"], heads, a, None if ncols is None else ncols[i])
+              for i, g in enumerate(groups)]
         f, centres = _pack(bs, left, right, top, bottom, center_last=True)
         if best is None or f > best[0]:
             best = (f, centres, bs)
@@ -441,7 +467,7 @@ def ranked_word_layout(groups, left, right=REGION_HALF_W, top=DOT_REGION_TOP,
             n_in_row = min(nc, n - i * nc)
             slots[word] = np.array([bx + (j - (n_in_row - 1) / 2) * (ww + cg) * f,
                                     gy - (i + 0.5) * dy * f, 0.0])
-    return slots, GROUP_SCALE * f, hds, HEADER_W * f
+    return slots, GROUP_SCALE * f, hds, [b["gw"] * f for b in bs]
 
 
 def enter_from_beyond(mob, origin=ENTER_FROM, dist=ENTER_DIST):

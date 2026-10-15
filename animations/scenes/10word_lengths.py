@@ -4,7 +4,8 @@ Opens on Wordle's black (WordleDarkScene, WORDLE_BG), the colour scene 09 ends o
 d turns it back to navy. Follows scene 09 directly, so it opens EMPTY and brings the
 chart in. Talking head THG follows, so it ends with the vowel board up.
 
-BEAT MAP — one subscene per Script.md beat, letters matching:
+BEAT MAP — one subscene per Script.md beat, plus d-g (the user's, 2026-10-09, not
+in the script yet), so from h on each RENDERED letter is four past the Doc's:
 
   a distribution — SALET typed in as tiles (the user's), then the Wordle-stats
                    "guess distribution" chart for SALET's optimal strategy
@@ -13,39 +14,49 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
                    already scored, fades in above bar 3                      (VO 1)
   c game_wheel   — bar 3 back to grey, bar 4 green; a mini board of SALET,
                    BEVOR, CHIMP, WHEEL fades in below bar 3                  (VO 1)
-  d wheel_center — ONE play: bar 4 greys as the chart, SALET's tiles and the
+  d emph_third_top — THIRD's top two rows (SALET, NORTH) emphasised: every other
+                   row of BOTH boards dims                                   (--)
+  e emph_wheel_top — WHEEL's top three rows (SALET, BEVOR, CHIMP) as well   (--)
+  f emph_answers  — just the winning rows, THIRD and WHEEL                  (--)
+  g unemph_games  — every row back to full                                  (--)
+  h wheel_center — ONE play: bar 4 greys as the chart, SALET's tiles and the
                    THIRD board fade,
                    the background turns navy, and the WHEEL board grows to the
                    middle with its WHEEL row fading while every other tile
                    FLIPS to black, keeping only the A (SALET), E O (BEVOR) and
                    I (CHIMP), the T flipping to Y and the V to U (the user's) (VO 1)
-  e triple_vowels — the tiles flip, one play each, through where the three best
+  i triple_vowels — the tiles flip, one play each, through where the three best
                    all-six-vowel triples in the singletons ranking put the
                    vowels: CURSE PAINT GODLY, CURSE POINT BADLY, BIONT CARSE
                    DUPLY                                                     (VO 2)
-  f adieu        — ADIEU in the first word, O in the middle of the second, Y at
+  j adieu        — ADIEU in the first word, O in the middle of the second, Y at
                    the end of the third                                      (VO 3)
-  g audio        — AUDIO in the first word, E in the middle of the second
+  k audio        — AUDIO in the first word, E in the middle of the second
                    (the script says U; the user's correction)                (VO 3)
-  h crypt        — CRYPT in the third word                                   (VO 3)
-  i table        — the boxes fade out; a table comes in: Word Length /
+  l crypt        — CRYPT in the third word                                   (VO 3)
+  m table        — the boxes fade out; a table comes in: Word Length /
                    Average Guesses / Best Opener, one row per length, 3 to 11 (the
                    longest with results) — only the lengths filled          (VO 4)
-  j salet_row    — SALET typed into length 5's row as tiles, then 3.42       (VO 4)
-  k avg_6 / l opener_6 / m avg_7 / n opener_7 — one cell each               (VO 5)
-  o both_8 / p both_9 / q both_10 / r both_11 — average, then opener        (VO 5)
-  s avg_4 / t opener_4                                                        (VO 6)
-  u path_4       — TALE's all-grey path (its tree's longest all-grey line, to
+  n salet_row    — SALET typed into length 5's row as tiles, then 3.42       (VO 4)
+  o avg_6 / p opener_6 / q avg_7 / r opener_7 — one cell each               (VO 5)
+  s both_8 / t both_9 / u both_10 / v both_11 — average, then opener        (VO 5)
+  w avg_4 / x opener_4                                                        (VO 6)
+  y path_4       — TALE's all-grey path (its tree's longest all-grey line, to
                    the answer) played out in the top-right corner at the
                    table's tile size, each row typed then quick-flipped.
                    NOT A SCRIPT BEAT YET (the user's): the Doc needs a matching
                    beat after 10t, or every letter from here on is one off   (VO 6)
-  v avg_3        — 3's average comes in as 4's path fades                  (VO 7)
-  w opener_3                                                                  (VO 7)
-  x path_3       — RAS's all-grey path, the same way. Also not a script beat
+  z avg_3        — 3's average comes in as 4's path fades                  (VO 7)
+  za opener_3                                                                 (VO 7)
+  zb path_3      — RAS's all-grey path, the same way. Also not a script beat
                    yet: needs one after the opener_3 beat                    (VO 7)
-  j and o-r fill a whole row the same way: average, then opener.
-  An average rises in (as i's rows do); an opener is TYPED in as tiles, as SALET is, its letters
+  n and s-v fill a whole row the same way: average, then opener.
+  DEFINITIONS (the user's): CARNET (p), CERATINS (s), SAPROLITE (t), METEORITICS
+  (v) and RAS (za) each get a one-line definition, fading UP in after the word
+  is typed — centred in the row below the word, RAS's to its right,
+  behind the next word typed over it — and fading OUT during the first
+  letter pop of the next word typed (an opener, or 3's path's first row in zb).
+  An average rises in (as m's rows do); an opener is TYPED in as tiles, as SALET is, its letters
   coloured vowel red / consonant blue (hangman's rule, Y a vowel — the user's).
   EVERY LETTER CHANGE IS A FLIP (the user's): a tile turns over and shows its new
   letter, or none — nothing slides or morphs. Only tiles that change flip, left to
@@ -63,8 +74,14 @@ REUSE MAP — every element and the one source it comes from:
   background     assets/background.py bg_to (promoted from scene 01's _bg_to)
   table letters  bpkfigures.tier_list.tile_color (hangman's vowel/consonant colours
                  for letters on a dark panel), via board.type_word's letter_color
+  h-l letters    tile_color too: vowel red / consonant blue (user 2026-10-09)
   letter flips   assets/board.py TileFlip, with the swap_to / to_center / to_scale
                  options added for this scene (off by default)
+  stripes        bpkfigures.table.row_stripes (the dark-background zebra, user's
+                 call 2026-10-05), each rising in with its row
+  definitions    assets/gloss.py gloss (italic part of speech), GLOSS_FS 28 as
+                 scene 06's; FadeIn(shift=UP * 0.2) as scene 08's
+                 TARSE definition, plain FadeOut
 
 NUMBERS — all SOURCED, from assets/word_lengths_data.py -> word_lengths_cache.json:
   counts per row   SALET's committed optimal tree (constrained to 6 guesses),
@@ -109,7 +126,10 @@ from assets.board import get_board, get_scored_row, GAP, TileFlip
 from assets.keys import key_cues
 from bpkfigures.tier_list import tile_color
 from assets.background import bg_to
+from assets.word_stacks import DIM          # the house dim-the-rest opacity (19's)
 from assets import word_lengths_data
+from assets.gloss import gloss
+from bpkfigures.table import row_stripes
 
 DATA = word_lengths_data.load()
 DIST = [(n, DATA["distribution"][n]) for n in sorted(DATA["distribution"], key=int)]
@@ -185,7 +205,24 @@ OPENER_X = 0.6                            # Best Opener column's LEFT edge (tile
 TABLE_TILE_SCALE = 0.6                    # opener tiles vs a full board tile
 HEADER_SIZE = 28
 CELL_SIZE = 30
+STRIPE_PAD = 0.15                         # the stripes' overhang past the table's edges
+STRIPE_Z = -2                             # behind the definitions (GLOSS_Z)
 
+
+# The openers' definitions (the user's wording), each on ONE line: under its word,
+# except RAS's, to its right. Each fades up in after its word is typed and fades
+# out with the first letter of the next word typed.
+DEFINITIONS = {
+    "carnet": "n. A notebook",
+    "ceratins": "n. Alt spelling of keratins",
+    "saprolite": "n. A chemically weathered rock",
+    "meteoritics": "n. The science of meteors",
+    "ras": "n. An Ethiopian royal",
+}
+BESIDE = {"ras"}                          # definitions to the RIGHT of the word
+GLOSS_FS = 28                             # scene 06's under-word definition size
+GLOSS_Z = -1                              # behind the next word, typed over it
+GLOSS_BUFF_RIGHT = 0.3                    # right of the tiles
 
 TABLE = {int(L): t for L, t in DATA["table"].items()}
 GREY_PATHS = {int(L): p for L, p in DATA["grey_paths"].items()}
@@ -195,6 +232,7 @@ CORNER_UR = (7.2, 3.8)
 CORNER_W = 3.0
 CORNER_H = 4.1
 assert sorted(TABLE) == LENGTHS
+assert set(DEFINITIONS) <= {t["opener"] for t in TABLE.values()}
 
 
 def _row_y(L):
@@ -272,8 +310,8 @@ class Scene10(WordleDarkScene):
     def distribution(self):
         self._setup_chart()
         c = self.chart
-        self.salet_tiles.type_word(self, 0, DATA["opener"], 0.65,
-                                   per_letter=key_cues(self), appear=True)
+        # typed SILENTLY: no keystroke sounds in 10a (user 2026-10-07)
+        self.salet_tiles.type_word(self, 0, DATA["opener"], 0.65, appear=True)
         self.play(FadeIn(c.title), FadeIn(c.labels), run_time=0.8)
         grow_bars(self, c.bars, 1.5, lag=0.08, edge=LEFT)
         self.play(FadeIn(c.values), run_time=0.6)
@@ -292,7 +330,36 @@ class Scene10(WordleDarkScene):
         self.play(self._bar_color("3", TILE_ABSENT), self._bar_color("4", TILE_CORRECT),
                   FadeIn(self.board_wheel), run_time=0.8)
 
-    # d : ONE play — bar 4 greys as the chart and THIRD's board fade, the background
+    # d-g : the two games' rows emphasised in turn — every row NOT named dims, in
+    #       BOTH boards (the user's beats, 2026-10-09; not in the script yet)
+    def _emph_rows(self, keep, run_time):
+        """Rows in `keep` (rows of either board) at full strength, every other row
+        of both boards dimmed; `keep` None restores every row."""
+        rows = list(self.board_third) + list(self.board_wheel)
+        self.play(*[r.animate.set_opacity(1.0 if keep is None or r in keep else DIM)
+                    for r in rows], run_time=run_time)
+
+    # d : THIRD's top two rows (SALET, NORTH)
+    @subscene
+    def emph_third_top(self):
+        self._emph_rows(list(self.board_third[:2]), 0.6)
+
+    # e : WHEEL's top three rows (SALET, BEVOR, CHIMP) as well
+    @subscene
+    def emph_wheel_top(self):
+        self._emph_rows(list(self.board_third[:2]) + list(self.board_wheel[:3]), 0.6)
+
+    # f : just the winning rows, THIRD and WHEEL
+    @subscene
+    def emph_answers(self):
+        self._emph_rows([self.board_third[-1], self.board_wheel[-1]], 0.6)
+
+    # g : every row back to full
+    @subscene
+    def unemph_games(self):
+        self._emph_rows(None, 0.6)
+
+    # h : ONE play — bar 4 greys as the chart and THIRD's board fade, the background
     #     turns navy, and WHEEL's board grows to the middle with its WHEEL row
     #     fading, while EVERY tile of the other three rows flips to Wordle's empty
     #     black, showing BOARD_D's letter (or none) on its new face
@@ -328,8 +395,9 @@ class Scene10(WordleDarkScene):
             self.new_d[(r, i)] = self._new_letter(r, i, ch, grown[r].tiles[0][i])
 
     def _new_letter(self, r, i, ch, tile):
-        """A letter for tile (r, i), built on `tile`'s pose, hidden until its flip."""
-        letter = self.upper[r]._letter(ch, tile)
+        """A letter for tile (r, i), built on `tile`'s pose, hidden until its flip;
+        vowel red / consonant blue (tile_color, as the table's openers and 11h)."""
+        letter = self.upper[r]._letter(ch, tile, color=tile_color(ch))
         letter.set_opacity(0).set_z_index(BOARD_Z + 1)
         self.upper[r].add(letter)
         self.add(letter)
@@ -383,29 +451,29 @@ class Scene10(WordleDarkScene):
         self.board = board
         self.play(LaggedStart(*flips, lag_ratio=lag), run_time=run_time)
 
-    # e : the vowels flip through the best three all-six-vowel triples' positions
+    # i : the vowels flip through the best three all-six-vowel triples' positions
     @subscene
     def triple_vowels(self):
         self._flip_to(BOARDS_E[0], 1.2)
         self._flip_to(BOARDS_E[1], 1.2)
         self._flip_to(BOARDS_E[2], 1.2)
 
-    # f : ADIEU in the first word, O mid second word, Y ending the third
+    # j : ADIEU in the first word, O mid second word, Y ending the third
     @subscene
     def adieu(self):
         self._flip_to(BOARD_F, 1.2)
 
-    # g : AUDIO in the first word, E mid second word (Y stays)
+    # k : AUDIO in the first word, E mid second word (Y stays)
     @subscene
     def audio(self):
         self._flip_to(BOARD_G, 1.2)
 
-    # h : CRYPT in the third word
+    # l : CRYPT in the third word
     @subscene
     def crypt(self):
         self._flip_to(BOARD_H, 1.2)
 
-    # i : the boxes fade out; the table comes in — headers, then a row per length
+    # m : the boxes fade out; the table comes in — headers, then a row per length
     def _setup_table(self):
         cell = lambda t, size, **kw: crisp_text(t, font_size=size, color=WHITE, **kw)
         heads = [cell(h, HEADER_SIZE, weight=BOLD) for h in HEADERS]
@@ -415,6 +483,16 @@ class Scene10(WordleDarkScene):
         self.table_head = VGroup(*heads)
         self.table_rows = VGroup(*[cell(str(L), CELL_SIZE).move_to([LEN_X, _row_y(L), 0])
                                    for L in LENGTHS])
+        # zebra stripes from the Word Length head to the longest opener's last tile
+        longest = get_board(rows=1, cols=max(LENGTHS)).scale(TABLE_TILE_SCALE).width
+        right = max(OPENER_X + longest, heads[2].get_right()[0]) + STRIPE_PAD
+        self.table_stripes = row_stripes([_row_y(L) for L in LENGTHS],
+                                         heads[0].get_left()[0] - STRIPE_PAD, right,
+                                         ROW_DY).set_z_index(STRIPE_Z)
+        # each row's stripe (if it has one) rises in with the row's length
+        stripe_of = dict(zip(LENGTHS[1::2], self.table_stripes))
+        self.table_row_parts = [VGroup(r, *([stripe_of[L]] if L in stripe_of else []))
+                                for L, r in zip(LENGTHS, self.table_rows)]
 
     @subscene
     def table(self):
@@ -422,34 +500,112 @@ class Scene10(WordleDarkScene):
         self.play(FadeOut(*self.mobjects), run_time=0.8)
         self.upper = self.board_wheel = self.shown = self.board = None
         self.play(FadeIn(self.table_head), run_time=0.5)
-        self.play(LaggedStart(*[FadeIn(r, shift=UP * 0.3) for r in self.table_rows],
+        self.play(LaggedStart(*[FadeIn(r, shift=UP * 0.3) for r in self.table_row_parts],
                               lag_ratio=0.12), run_time=1.2)
+        self.table_row_parts = None
 
     # ── j-v: filling in the table, one cell at a time ──────────────────────
     def _fill_avg(self, L, run_time, extra=()):
         """Length L's average guesses fades into its cell. A STUB total (None, see
         word_lengths_data) leaves the cell empty rather than showing a number."""
-        t = TABLE[L]
-        if t["total"] is None:
+        cell = self._avg_cell(L)
+        if cell is None:
             return
-        cell = crisp_text(_avg(t["total"], t["answers"]), font_size=CELL_SIZE,
-                          color=WHITE).move_to([AVG_X, _row_y(L), 0])
         # rising in, as the table's rows do in i
         self.play(FadeIn(cell, shift=UP * 0.3), *extra, run_time=run_time)
 
-    def _fill_opener(self, L, run_time):
+    def _avg_cell(self, L):
+        """Length L's average as a cell, unplayed; None for a STUB total."""
+        t = TABLE[L]
+        if t["total"] is None:
+            return None
+        return crisp_text(_avg(t["total"], t["answers"]), font_size=CELL_SIZE,
+                          color=WHITE).move_to([AVG_X, _row_y(L), 0])
+
+    def _type_flipping_gloss_out(self, board, row, word, run_time, sound=True, **kwargs):
+        """`board.type_word`, with the definition on screen (if any) fading out
+        during the FIRST letter's pop, in the same play. `sound=False` types it
+        silently."""
+        anim, total = board.type_anim(self, row, word, run_time,
+                                      per_letter=key_cues(self) if sound else None,
+                                      appear=True, **kwargs)
+        if self.definition is None:
+            self.play(anim, run_time=total)
+            return
+        n = len(word)
+        pop = total * n / (2 * n - 1)       # one TilePop's length (type_anim's lag 1/n)
+        anim.run_time = total
+        out = FadeOut(self.definition, run_time=pop)
+        self.play(AnimationGroup(anim, out))
+        self.remove(self.definition)
+        self.definition = None
+
+    def _fill_opener(self, L, run_time, sound=True):
         """Length L's best opener typed into its row as tiles (they appear as their
-        letters land), with the keystroke sounds."""
+        letters land), with the keystroke sounds unless `sound=False`. Returns the row."""
         row = get_board(rows=1, cols=L).scale(TABLE_TILE_SCALE)
         row.move_to([0, _row_y(L), 0]).align_to(np.array([OPENER_X, 0, 0]), LEFT)
-        row.type_word(self, 0, TABLE[L]["opener"], run_time,
-                      per_letter=key_cues(self), appear=True,
-                      letter_color=tile_color)
+        self._type_flipping_gloss_out(row, 0, TABLE[L]["opener"], run_time, sound=sound,
+                                      letter_color=tile_color)
+        self.opener_row = row
+        return row
 
-    def _fill_both(self, L, avg_run_time, opener_run_time):
+    def _gloss_in(self, L, run_time):
+        """Length L's opener's definition fades up into place, one line, under the word (to its
+        right for RAS)."""
+        d = self._make_gloss(L)
+        self.definition = d
+        # rising in, as scene 08's TARSE definition does
+        self.play(FadeIn(d, shift=UP * 0.2), run_time=run_time)
+
+    def _make_gloss(self, L):
+        """Length L's opener's definition, placed against self.opener_row, unplayed."""
+        word = TABLE[L]["opener"]
+        d = gloss([DEFINITIONS[word]], GLOSS_FS)
+        if word in BESIDE:
+            d.next_to(self.opener_row, RIGHT, buff=GLOSS_BUFF_RIGHT)
+        else:
+            # centred in the row below, flush left with the word
+            d.move_to([0, _row_y(L) - ROW_DY, 0]).align_to(self.opener_row, LEFT)
+        d.set_z_index(GLOSS_Z)
+        return d
+
+    def _fill_both(self, L, avg_run_time, opener_run_time, sound=True):
         """A whole row, as every row filled in one beat is: average, then opener."""
         self._fill_avg(L, avg_run_time)
-        self._fill_opener(L, opener_run_time)
+        self._fill_opener(L, opener_run_time, sound=sound)
+
+    def _fill_together(self, L, avg_run_time, opener_run_time, gloss_run_time=None,
+                       sound=True):
+        """A whole row AT ONCE (user 2026-10-07, 10o-q): the average, the opener's
+        typing and, with `gloss_run_time`, its definition all START together, each
+        keeping its own run_time. The definition already on screen fades out during
+        the first letter's pop, as _type_flipping_gloss_out does."""
+        anims = []
+        cell = self._avg_cell(L)
+        if cell is not None:
+            anims.append(FadeIn(cell, shift=UP * 0.3, run_time=avg_run_time))
+        row = get_board(rows=1, cols=L).scale(TABLE_TILE_SCALE)
+        row.move_to([0, _row_y(L), 0]).align_to(np.array([OPENER_X, 0, 0]), LEFT)
+        word = TABLE[L]["opener"]
+        typing, total = row.type_anim(self, 0, word, opener_run_time,
+                                      per_letter=key_cues(self) if sound else None,
+                                      appear=True, letter_color=tile_color)
+        typing.run_time = total
+        anims.append(typing)
+        old = self.definition
+        if old is not None:
+            n = len(word)
+            anims.append(FadeOut(old, run_time=total * n / (2 * n - 1)))
+        self.opener_row = row
+        new = None
+        if gloss_run_time is not None:
+            new = self._make_gloss(L)
+            anims.append(FadeIn(new, shift=UP * 0.2, run_time=gloss_run_time))
+        self.play(*anims)                 # no play-level run_time: each keeps its own
+        if old is not None:
+            self.remove(old)
+        self.definition = new
 
     def _setup_corner(self, L):
         """An empty board for length L's all-grey path, at the TABLE's tile size,
@@ -468,85 +624,88 @@ class Scene10(WordleDarkScene):
         """The path played as a game: each row typed, then quick-flipped (all its
         tiles at once) to its score."""
         for row, g in enumerate(GREY_PATHS[L]["guesses"]):
-            board.type_word(self, row, g["word"], type_run_time,
-                            per_letter=key_cues(self), appear=True)
+            self._type_flipping_gloss_out(board, row, g["word"], type_run_time)
             board.reveal(self, row, g["code"], flip_run_time, lag_ratio=0)
 
-    # j : SALET's row, the same way as every other whole row
+    # n : SALET's row, the same way as every other whole row
     @subscene
     def salet_row(self):
+        self.definition = None              # the opener definition on screen, if any
         self._fill_both(5, 0.5, 0.65)
 
-    # k : length 6's average
+    # o : length 6's average
     @subscene
     def avg_6(self):
         self._fill_avg(6, 0.5)
 
-    # l : length 6's opener
+    # p : length 6's opener
     @subscene
     def opener_6(self):
         self._fill_opener(6, 0.78)
+        self._gloss_in(6, 0.6)
 
-    # m : length 7's average
+    # q : length 7's average
     @subscene
     def avg_7(self):
         self._fill_avg(7, 0.5)
 
-    # n : length 7's opener
+    # r : length 7's opener
     @subscene
     def opener_7(self):
         self._fill_opener(7, 0.91)
 
-    # o : both for 8
+    # s : both for 8
     @subscene
     def both_8(self):
-        self._fill_both(8, 0.5, 1.04)
+        # o-r: number, typing and definition together (user 2026-10-07); typing sounds back in (user 2026-10-09)
+        self._fill_together(8, 0.5, 1.04, 0.6)
 
-    # p : both for 9
+    # t : both for 9
     @subscene
     def both_9(self):
-        self._fill_both(9, 0.5, 1.17)
+        self._fill_together(9, 0.5, 1.17, 0.6)
 
-    # q : both for 10
+    # u : both for 10
     @subscene
     def both_10(self):
-        self._fill_both(10, 0.5, 1.3)
+        self._fill_together(10, 0.5, 1.3)
 
-    # r : both for 11
+    # v : both for 11
     @subscene
     def both_11(self):
-        self._fill_both(11, 0.5, 1.43)
+        self._fill_together(11, 0.5, 1.43, 0.6)   # as o-q (user 2026-10-07)
 
-    # s : length 4's average
+    # w : length 4's average
     @subscene
     def avg_4(self):
         self._fill_avg(4, 0.5)
 
-    # t : length 4's opener
+    # x : length 4's opener
     @subscene
     def opener_4(self):
         self._fill_opener(4, 0.52)
 
-    # u : length 4's tree's all-grey path played out in the top-right corner
+    # y : length 4's tree's all-grey path played out in the top-right corner
     @subscene
     def path_4(self):
         self.path4 = self._setup_corner(4)
         if self.path4 is not None:          # a stub if the TALE tree is missing
             self._play_corner(self.path4, 4, 0.52, 0.4)
 
-    # v : length 3's average, as length 4's path fades from the corner
+    # z : length 3's average, as length 4's path fades from the corner
     @subscene
     def avg_3(self):
         out = [] if self.path4 is None else [FadeOut(self.path4)]
         self._fill_avg(3, 0.5, extra=out)
         self.path4 = None
 
-    # w : length 3's opener
+    # za : length 3's opener
     @subscene
     def opener_3(self):
         self._fill_opener(3, 0.39)
+        self._gloss_in(3, 0.6)
 
-    # x : length 3's tree's all-grey path played out in the corner
+    # zb : length 3's tree's all-grey path played out in the corner
     @subscene
     def path_3(self):
         self._play_corner(self._setup_corner(3), 3, 0.39, 0.4)

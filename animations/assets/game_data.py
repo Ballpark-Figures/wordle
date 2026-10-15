@@ -39,6 +39,33 @@ GAMES = {
     "snowy": ("snowy", ["trace", "loins", "dumpy", "snowy"]),
     # Scene 02 — Script.md 02a-02j: BEGIN, EDITS, MELEE, ENDED against ENDED.
     "rules": ("ended", ["begin", "edits", "melee", "ended"]),
+    # Scene 19b-e — "score all words against GREAT": AGAIN, then (SOLVE refused, not
+    # scored), AGAIN twice more, GREAT. hard_mode_data.py checks the hard-mode rule.
+    "hard_rules": ("great", ["again", "again", "again", "great"]),
+    # Scene 19s-t — "a game of EIGHT FIGHT ... WIGHT (scored based on WIGHT)", AUGHT
+    # moved to its top in 19t. hard_mode_data.py checks it IS aught's hard-mode tree
+    # line for WIGHT, the line FAMILIES.md describes.
+    "ight": ("wight", ["aught", "eight", "fight", "light", "might", "night", "right",
+                       "sight", "tight", "wight"]),
+}
+
+# name -> (answers, guesses in order): ONE set of guesses played on every board at
+# once, the multi-Wordle games. A board stops at the guess that solves it (Octordle
+# takes no more guesses on a solved board), so each board's rows are a prefix.
+MULTI = {
+    # Scene 16h -- "Start with SOLVE EIGHT WORDS and then do the 8 words in order."
+    # The opener and the answers are the user's (worked out in the scene-16 thread
+    # so every board is down to ONE candidate when its answer is played).
+    "octordle": (["first", "halve", "third", "forth", "fifth", "sixth", "seven", "octet"],
+                 ["solve", "eight", "words",
+                  "first", "halve", "third", "forth", "fifth", "sixth", "seven", "octet"]),
+    # Scene 16, end (not yet in the script) -- "an example with a weird order": the
+    # same answers after TRIAL GUESS COMBO, played in an order that keeps every board
+    # down to ONE candidate at its turn. User's pick from the scene-16 thread: the
+    # most scrambled of the 2648 orders that work (plain number order does not).
+    "octordle_weird": (["first", "halve", "third", "forth", "fifth", "sixth", "seven", "octet"],
+                       ["trial", "guess", "combo",
+                        "third", "sixth", "seven", "fifth", "octet", "first", "halve", "forth"]),
 }
 
 # name -> committed result file whose chain IS the game. Read, never typed in: the
@@ -95,6 +122,21 @@ def _build():
                     assert wordle.pattern(g, w) == wordle.pattern(g, answer), \
                         f"{name}: {w} contradicts the clue from {g}"
         out[name] = game
+
+    for name, (answers_, guesses) in MULTI.items():
+        for w in answers_ + guesses:
+            assert w in legal, f"{name}: {w} is not a legal word"
+        assert all(a in guesses for a in answers_), f"{name}: an answer is never played"
+        boards = []
+        for a in answers_:
+            played = guesses[:guesses.index(a) + 1]
+            rows = []
+            for g in played:
+                code = wordle.pattern(g, a)
+                rows.append({"word": g, "code": int(code),
+                             "tiles": [(code // 3 ** (4 - i)) % 3 for i in range(5)]})
+            boards.append({"answer": a, "in_mystery": a in answers, "guesses": rows})
+        out[name] = {"answers": answers_, "guesses": guesses, "boards": boards}
     return out
 
 
@@ -110,6 +152,12 @@ if __name__ == "__main__":
         f.write("\n")
     names = {0: "absent", 1: "present", 2: "correct"}
     for name, game in data.items():
+        if "boards" in game:
+            print(f"{name}: {len(game['boards'])} boards, guesses "
+                  + " ".join(g.upper() for g in game["guesses"]))
+            for b in game["boards"]:
+                print(f"  {b['answer'].upper()}: solved on guess {len(b['guesses'])}")
+            continue
         note = "" if game["in_mystery"] else "  (not one of the 2315 answers)"
         print(f"{name}: answer {game['answer'].upper()}{note}")
         for g in game["guesses"]:

@@ -281,6 +281,96 @@ def check_by_grays():
               "better than one shared word" % (checked, better))
 
 
+def check_every_reply():
+    """6b. --every-reply: a word for EVERY grey count, 0 through 5.
+
+    The groups then cover every reply, so the second guess never falls back to
+    the random tail -- except on the opener's own all-green WIN, which must fire
+    nothing.  No earlier partition could contain that reply (they all need a
+    grey), so this is the only check reaching it.  The mini lists get anagram
+    pairs so a NON-winning zero-grey reply (slate against stale) also occurs.
+    """
+    print("6b. a word for every grey count (--every-reply)")
+    tmp = tempfile.mkdtemp(prefix="checkse-every-")
+    extra_g = ["stale", "steal", "least", "crate", "react", "caret"]
+    extra_a = ["stale", "steal", "crate", "react"]
+    guesses = MINI_GUESSES + extra_g
+    answers = MINI_ANSWERS + extra_a
+    make_data(tmp, guesses, answers)
+    full = os.path.join(tmp, "full.csv")
+    pruned = os.path.join(tmp, "pruned.csv")
+    base = ["--data", tmp, "--by-grays", "0", "--every-reply", "--threads", "1"]
+    run(base + ["--no-prune", "--out", full])
+    run(base + ["--out", pruned])
+    groups = ["e%d" % n for n in range(6)]
+    rk = {g: read_rows(full, g) for g in groups}
+    checked = win_openers = e0_fired = 0
+    for opener in sorted(rk["e5"]):
+        words = {g: rk[g][opener][0] for g in groups if opener in rk[g]}
+        want = ref_total_groups(opener, words, lo=0, answers=answers)
+        if want is None:
+            break
+        got = float(rk["e5"][opener][2])
+        if abs(float(want) - got) > 1e-9:
+            bad("%s with %s: the C totals %.6f, the enumeration %.6f"
+                % (opener, words, got, float(want)))
+            break
+        checked += 1
+        reps = [tiles(opener, a) for a in answers]
+        if any(all(x == 2 for x in t) for t in reps):
+            win_openers += 1
+        if any(0 not in t and not all(x == 2 for x in t) for t in reps):
+            e0_fired += 1
+    if checked < 10:
+        bad("only %d openers were compared" % checked)
+    else:
+        print("   ok   %d openers match the enumeration (every non-winning reply "
+              "plays its grey count's word)" % checked)
+    # the win exclusion and a genuine zero-grey group both have to have OCCURRED
+    if not win_openers:
+        bad("no opener was itself an answer, so the all-green exclusion was "
+            "never exercised")
+    if not e0_fired:
+        bad("no opener saw a non-winning zero-grey reply, so e0 never fired")
+    if win_openers and e0_fired:
+        print("   ok   exercised: %d openers that can win outright, %d with a "
+              "non-winning zero-grey reply" % (win_openers, e0_fired))
+
+    # the bound must not change a winner: pruned against unpruned
+    rp = read_rows(pruned, "e5")
+    for w, r in rp.items():
+        if r and r[-1] != "cut" and r[2] and \
+                abs(float(r[2]) - float(rk["e5"][w][2])) > 1e-9:
+            bad("pruning changed %s's total: %s vs %s" % (w, r[2], rk["e5"][w][2]))
+            break
+    else:
+        print("   ok   the pruned walk agrees with the unpruned one")
+
+    # the flag is INERT on a partition that does not cover every reply
+    a = os.path.join(tmp, "plain.csv")
+    b = os.path.join(tmp, "flag.csv")
+    run(["--data", tmp, "--by-grays", "3", "--threads", "1", "--no-prune",
+         "--out", a])
+    run(["--data", tmp, "--by-grays", "3", "--every-reply", "--threads", "1",
+         "--no-prune", "--out", b])
+    ra, rb = read_rows(a, "e3"), read_rows(b, "e3")
+    if ra != rb:
+        bad("--every-reply changed a --by-grays 3 run")
+    else:
+        print("   ok   --every-reply leaves --by-grays 3 unchanged")
+
+    # and without the flag the full partition is still refused
+    if run(["--data", tmp, "--by-grays", "0", "--out", a],
+           expect_fail=True).returncode == 0:
+        bad("--by-grays 0 was accepted without --every-reply")
+    if run(["--data", tmp] + sum((["--group", g] for g in groups), [])
+           + ["--out", a], expect_fail=True).returncode == 0:
+        bad("the six e-groups were accepted without --every-reply")
+    else:
+        print("   ok   without the flag, a partition covering every reply is "
+              "still refused")
+
+
 def by_grays_label(opener, t):
     """The grey COUNT names the group."""
     return "e%d" % sum(1 for x in t if x == 0)
@@ -300,14 +390,20 @@ def matched_vowel_label(opener, t):
     return "e%d_mv%d" % (n, mv)
 
 
-def ref_total_groups(opener, words, label=by_grays_label):
-    """The strategy's total when `label` selects which committed word to play."""
+def ref_total_groups(opener, words, label=by_grays_label, lo=3,
+                     answers=MINI_ANSWERS):
+    """The strategy's total when `label` selects which committed word to play.
+
+    A reply fires when it shows at least `lo` greys -- EXCEPT the opener's own
+    all-green win, which never fires: the game is over (`lo=0` is the only case
+    that can reach it)."""
     tot = Fraction(0)
     decline, fired = {}, {}
-    for a in MINI_ANSWERS:
+    for a in answers:
         t = tiles(opener, a)
         n = sum(1 for x in t if x == 0)
-        (fired if n >= 3 else decline).setdefault(t, []).append(a)
+        won = all(x == 2 for x in t)
+        (fired if n >= lo and not won else decline).setdefault(t, []).append(a)
     for t, grp in decline.items():
         tot += len(grp)
         if any(x != 2 for x in t):
@@ -880,6 +976,7 @@ def main(argv):
     check_prune()
     check_bound()
     check_by_grays()
+    check_every_reply()
     check_vowel_groups()
     check_topk()
     check_resume()

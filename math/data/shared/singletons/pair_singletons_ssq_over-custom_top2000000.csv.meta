@@ -1,0 +1,10 @@
+mode=pair
+metric=ssq
+disjoint=0
+min_letters=0
+guesslist=
+openers=12972
+scored=84129906
+written=2000000
+complete=0
+parents_complete=0

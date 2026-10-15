@@ -1,0 +1,23 @@
+# greedy letter-by-letter build (see math/greedybuild.py)
+# settings pool=custom words=4 topk=10 ssq_first=8 answers=2315
+step,opening,unsolved,ssq,placed_letter,placed_word,placed_pos
+1,_____ _____ _____ ___e_,2315,7341262,e,0,3
+2,_____ _____ _____ ___es,2315,3050656,s,3,4
+3,_____ _____ _____ _a_es,2315,1321902,a,3,1
+4,_____ _____ _a___ _o_es,2305,663116,o,2,1
+5,_____ _a___ _o___ _r_es,2287,352424,r,1,1
+6,_____ _a___ _o_es _r_l_,2228,197700,l,3,3
+7,_____ _a_e_ _o_l_ _r_ts,2070,109864,t,3,3
+8,_____ _a_e_ _onts _r_l_,1848,63990,n,2,2
+9,___c_ _a_e_ _onts _r_l_,1545,43532,c,0,3
+10,___c_ _a_e_ _onts _ril_,1236,29006,i,3,2
+11,___c_ _a_e_ _onts dril_,960,20052,d,3,0
+12,___c_ _ane_ dril_ po_ts,693,14936,p,2,0
+13,___c_ dril_ mane_ po_ts,485,11506,m,1,0
+14,_abes dril_ mont_ p__c_,328,9272,b,0,2
+15,_abes dril_ mont_ p__ch,219,7950,h,3,4
+16,b__c_ dril_ month pages,147,6826,g,3,2
+17,b__ch dril_ monty pages,104,6276,y,2,4
+18,bu_ch dril_ monty pages,73,5918,u,0,1
+19,bu_ch drill monty pages,67,5812,l,1,4
+20,beech drill monty pages,60,5750,l,1,4

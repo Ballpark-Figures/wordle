@@ -56,7 +56,8 @@ OPTTURNS = os.path.join(MATH, "solver", "optturns")
 FAILS = []
 COVER = {"yellow line": 0, "yellow-free line": 0, "infeasible opener": 0,
          "must-win below plain": 0, "tied openers": 0, "beam below exact": 0,
-         "seed saved work": 0, "seed above best": 0}
+         "seed saved work": 0, "seed above best": 0,
+         "uncapped beats deepest cap": 0}
 
 
 def fail(msg):
@@ -144,9 +145,10 @@ _LINE = re.compile(r"^(\w+)\s+badges=(\d+) of (\d+)")
 
 def run_greens(apath, gpath, ppath, depth, openers, treedir=None, topk=0,
                must_win=False):
+    """depth=None runs --uncapped, which sets its own depth and refuses --depth."""
     cmd = [SOLVER, "--answer-list", apath, "--guess-list", gpath,
-           "--patterns", ppath, "--depth", str(depth), "--no-out",
-           "--tt-bits", "20", "--threads", "1"]
+           "--patterns", ppath, "--no-out", "--tt-bits", "20", "--threads", "1"]
+    cmd += ["--uncapped"] if depth is None else ["--depth", str(depth)]
     if topk:
         cmd += ["--topk", str(topk)]
     # ALWAYS explicit, in both directions: the default has moved once already and
@@ -435,10 +437,9 @@ _BEST = re.compile(r"^badges = (\d+) of (\d+)")
 def run_sweep(apath, gpath, ppath, depth, outpath=None, topk=0, must_win=False,
               extra=(), want_stdout=False):
     cmd = [SOLVER, "--sweep", "--answer-list", apath, "--guess-list", gpath,
-           "--patterns", ppath, "--depth", str(depth),
-           "--out", outpath] if outpath else [
-           SOLVER, "--sweep", "--answer-list", apath, "--guess-list", gpath,
-           "--patterns", ppath, "--depth", str(depth), "--no-out"]
+           "--patterns", ppath]
+    cmd += ["--uncapped"] if depth is None else ["--depth", str(depth)]
+    cmd += ["--out", outpath] if outpath else ["--no-out"]
     cmd += ["--tt-bits", "20", "--threads", "2"]
     if topk:
         cmd += ["--topk", str(topk)]
@@ -562,6 +563,74 @@ def check_sweep(tmp, answers, guesses, depth, must_win=False):
         print("   %-9s %d openers scanned: best %d, %d tied, agrees exactly"
               % ("must-win" if must_win else "plain", len(guesses), want,
                  len(want_ties)))
+
+
+# ----------------------------------------------------------- 11. --uncapped
+
+def check_uncapped(tmp, answers, guesses, openers, capped_depths):
+    """--uncapped: no guess limit, run at depth 32 with the budget dropped from
+    the table key.
+
+    THE ORACLE DOES NOT LEAN ON THE depth-32 PROOF.  Every guess the search plays
+    splits the live set, so a line never has more than n + 1 guesses, and a cap of
+    n + 1 cannot bind -- so the Python reference at depth n + 1 IS the uncapped
+    value, by an argument independent of the one in greens.c.  Three diffs:
+      - C --uncapped against that reference, per opener and as a sweep;
+      - C --uncapped against C capped at n + 1, which differ ONLY in the table
+        key, so this is the differential for dropping the budget from it;
+      - uncapped >= every capped value, and COVERAGE: strictly above the deepest
+        cap somewhere, or the cap was never binding and nothing was tested.
+    Plus the two refusals.
+    """
+    print("11. --uncapped, against the reference at a cap that cannot bind")
+    deep = len(answers) + 1
+    apath, gpath, ppath = build_case(tmp, answers, guesses, "u")
+    cands = tuple(sorted(answers))
+    gtuple = tuple(guesses)
+    unc = run_greens(apath, gpath, ppath, None, openers)
+    cap = run_greens(apath, gpath, ppath, deep, openers)
+    shallow = {d: run_greens(apath, gpath, ppath, d, openers) for d in capped_depths}
+    for w in openers:
+        ref = greens.solve_opener(w, cands, gtuple, deep, must_win=False)
+        if unc.get(w) != ref:
+            fail("uncapped %s: C says %s, reference at d=%d says %s"
+                 % (w, unc.get(w), deep, ref))
+        if cap.get(w) != unc.get(w):
+            fail("uncapped %s: %s, but capped at d=%d gives %s -- the table key change "
+                 "altered a value" % (w, unc.get(w), deep, cap.get(w)))
+        for d, vals in shallow.items():
+            if vals.get(w) is not None and unc.get(w) is not None and vals[w] > unc[w]:
+                fail("uncapped %s = %s is BELOW its d=%d value %s" % (w, unc[w], d, vals[w]))
+        top = shallow[max(capped_depths)].get(w)
+        if top is not None and unc.get(w) is not None and unc[w] > top:
+            COVER["uncapped beats deepest cap"] += 1
+        print("   %-6s uncapped=%-4s reference(d=%d)=%-4s capped(d=%d)=%-4s d=%d: %s"
+              % (w, unc.get(w), deep, ref, deep, cap.get(w), max(capped_depths), top))
+
+    small = answers[: max(6, len(answers) // 2)]
+    sapath, sgpath, sppath = build_case(tmp, small, guesses, "us")
+    scands = tuple(sorted(small))
+    sdeep = len(small) + 1
+    every = {w: greens.solve_opener(w, scands, gtuple, sdeep, must_win=False)
+             for w in guesses}
+    want = max(every.values())
+    want_ties = sorted(w for w, v in every.items() if v == want)
+    best, ties = run_sweep(sapath, sgpath, sppath, None)
+    if best != want or sorted(ties) != want_ties:
+        fail("uncapped sweep: best %s ties %s, exhaustive reference best %s ties %s"
+             % (best, sorted(ties), want, want_ties))
+    else:
+        print("   sweep over %d openers (%d answers): best %d, %d tied, agrees exactly"
+              % (len(guesses), len(small), want, len(want_ties)))
+
+    for extra, why in ((["--must-win"], "must-win"), (["--depth", "5"], "--depth")):
+        cmd = [SOLVER, "--answer-list", apath, "--guess-list", gpath, "--patterns",
+               ppath, "--no-out", "--uncapped", "--opener", openers[0]]
+        cmd += extra if why == "--depth" else []
+        cmd += ["--must-win"] if why == "must-win" else ["--may-lose"]
+        p = subprocess.run(cmd, capture_output=True, text=True, cwd=MATH)
+        if p.returncode == 0:
+            fail("--uncapped accepted %s, which it must refuse" % why)
 
 
 # --------------------------------------------------------------- 7. resume
@@ -720,6 +789,7 @@ def main():
         # where the tie list must be rebuilt from nothing
         check_seed(tmp, small, guesses, max(depths), must_win=mw)
     check_resume(tmp, small, guesses, max(depths))
+    check_uncapped(tmp, answers, guesses, openers, depths)
 
     print("\ncoverage: " + ", ".join("%s %d" % (k, v) for k, v in COVER.items()))
     for k, v in COVER.items():

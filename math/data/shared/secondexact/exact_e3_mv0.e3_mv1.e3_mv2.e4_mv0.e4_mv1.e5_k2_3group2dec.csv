@@ -1,0 +1,26 @@
+# secondexact: the EXACT best predetermined second word, and the exact value of the
+# strategy -- opener, then that word when the reply fires, then a uniformly random
+# consistent ANSWER.  No seed and no standard error: the random tail is summed 
+# exactly (math/secondexact.py states the recursion).
+# expected is over all 2315 answers; decline/fired split it by whether the rule fired.
+# settings fire=e3_mv0.e3_mv1.e3_mv2.e4_mv0.e4_mv1.e5 openers=2 follow_up=answer topk=2 third=2 third_key=group third_decline=1
+# TOPK=2: each group's word is the best of the 2 ranked by the one-ply
+# score, so every total here is an UPPER BOUND, not the optimum.
+opener,fires,second,expected,total,decline,fired,qualifying,scanned,cut
+raise,e5,could,3.760606,8705.8021,1703.1652,673.4557,168,2,12969
+raise,e5|m1,thong,3.760606,8705.8021,,,,,third
+raise,e4_mv1,clout,3.760606,8705.8021,1703.1652,2039.8370,523,2,12969
+raise,e4_mv1|m1,dingy,3.760606,8705.8021,,,,,third
+raise,e4_mv0,count,3.760606,8705.8021,1703.1652,792.2166,210,2,12969
+raise,e3_mv2,plant,3.760606,8705.8021,1703.1652,1169.3047,320,2,12969
+raise,e3_mv1,clout,3.760606,8705.8021,1703.1652,2199.3230,585,2,12969
+raise,e3_mv0,count,3.760606,8705.8021,1703.1652,128.5000,39,2,12969
+roate,e5,clips,3.738417,8654.4355,1831.8071,764.7551,195,2,12969
+roate,e5|m0,maund,3.738417,8654.4355,,,,,third
+roate,e4_mv1,sling,3.738417,8654.4355,1831.8071,1946.6036,509,2,12969
+roate,e4_mv1|m1,bumpy,3.738417,8654.4355,,,,,third
+roate,e4_mv0,sling,3.738417,8654.4355,1831.8071,555.2869,151,2,12969
+roate,e3_mv2,sling,3.738417,8654.4355,1831.8071,1115.8514,301,2,12969
+roate,e3_mv1,linds,3.738417,8654.4355,1831.8071,2316.6314,613,2,12969
+roate,e3_mv1|m2,chump,3.738417,8654.4355,,,,,third
+roate,e3_mv0,scuft,3.738417,8654.4355,1831.8071,123.5000,37,2,12969

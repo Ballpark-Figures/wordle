@@ -4,6 +4,8 @@
 #     bash solver/run-second-exact.sh --opener spilt       # one opener, seconds
 #     bash solver/run-second-exact.sh                      # ALL openers: a PROOF
 #     bash solver/run-second-exact.sh --by-grays 3        # a word PER grey count
+#     bash solver/run-second-exact.sh --opener salet --by-grays 0 --every-reply
+#                                                          # a word for EVERY grey count
 #     bash solver/run-second-exact.sh --limit 200 --dry-run
 #
 # --by-grays N gives a SEPARATE second word to each grey count from 5 down to N
@@ -12,6 +14,12 @@
 # decline branch plus a sum over groups, and each group's best word is found on
 # its own.  k separate argmins, not a joint search over k words, and since every
 # answer still lands in exactly one group the scanning work barely moves.
+#
+# --every-reply LETS THE GROUPS COVER EVERY REPLY, so `--by-grays 0` gives grey
+# counts 0 through 5 each their own word and the second guess NEVER falls back to
+# the random tail (only the opener's own all-green win skips it).  groups.c
+# refuses that otherwise, as a blind two-word opening; here the reply still picks
+# the word.  The label (e0.e1.e2.e3.e4.e5) says so, so it is its own file.
 #
 # WHAT IT COMPUTES.  Play an opener; if the reply shows at least --min-grays
 # greys play one word committed to in advance; otherwise, and from the third
@@ -82,6 +90,7 @@ THIRDKEY=""
 THIRDMAX=""
 THIRDDEC=0
 NOPRUNE=0
+EVERY=0
 DRYRUN=0
 
 while [ $# -gt 0 ]; do
@@ -105,6 +114,7 @@ while [ $# -gt 0 ]; do
         --third-max-matched) THIRDMAX="$2"; shift 2 ;;
         --third-decline)     THIRDDEC=1;    shift ;;
         --no-prune)   NOPRUNE=1;     shift ;;
+        --every-reply) EVERY=1;      shift ;;
         --dry-run)    DRYRUN=1;      shift ;;
         *) echo "unknown arg: $1" >&2; exit 1 ;;
     esac
@@ -144,6 +154,8 @@ COND=""
 COND="$COND$GSPECS"
 # --min-grays is the SUGAR for "no groups named", so it applies only then.
 [ -n "$COND" ] || COND=" --min-grays $MINGRAYS"
+# after the sugar test: it permits a condition, it does not name one
+[ "$EVERY" = 0 ]   || COND="$COND --every-reply"
 
 # --words RESTRICTS WHICH WORDS MAY BE COMMITTED TO, at every level and at the
 # root -- `--words mystery` is the answers-only variant, `secondword`'s
@@ -231,7 +243,7 @@ if [ "$DRYRUN" = 1 ]; then
     exit 0
 fi
 
-. "$(dirname "${BASH_SOURCE[0]}")/_guard.sh"
+. "$MATH/solver/_guard.sh"
 guard_output secondexact "$OUT" || exit 1
 
 mkdir -p "$OUTDIR" "$LOC"

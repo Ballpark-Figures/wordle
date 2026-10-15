@@ -1,0 +1,55 @@
+# race_minavg_k12_shortlist_greedy_k12_last50_top50_sig5_s0
+# settings strategy=minavg boards=12 sigma=5 block=100 growth=2 seed=0 openings=data/shared/multiwordle/shortlist_greedy_k12_last50.csv top=50
+# mean/stderr are the opening's OWN numbers; diff_vs_leader, paired_stderr and sigma are PAIRED against compt, and the cut uses the paired sigma
+# the leader is the best of the openings ENTERED, judged on the games actually played -- a screen, not a proof
+opening,status,games,mean,stderr,diff_vs_leader,paired_stderr,sigma,is_answer
+compt,live,25600,14.352070,0.004274,0.000000,0.000000,0.000,0
+pwned,out,25600,,,,,,0
+dempt,out,12800,,,,,,0
+pated,out,12800,,,,,,0
+tamed,out,12800,,,,,,0
+thrip,out,12800,,,,,,0
+tabid,out,12800,,,,,,0
+timed,out,12800,,,,,,0
+burnt,out,12800,,,,,,1
+print,out,12800,,,,,,1
+cubed,out,12800,,,,,,0
+clept,out,6400,,,,,,0
+plant,out,6400,,,,,,1
+prent,out,6400,,,,,,0
+dript,out,6400,,,,,,0
+taped,out,6400,,,,,,0
+crept,out,6400,,,,,,1
+clapt,out,6400,,,,,,0
+tepid,out,6400,,,,,,1
+delph,out,6400,,,,,,0
+clipt,out,6400,,,,,,0
+depot,out,6400,,,,,,1
+demit,out,6400,,,,,,0
+tubed,out,6400,,,,,,0
+bidet,out,6400,,,,,,0
+tempo,out,6400,,,,,,1
+mulct,out,6400,,,,,,0
+therm,out,6400,,,,,,0
+flirt,out,6400,,,,,,1
+paned,out,6400,,,,,,0
+potin,out,6400,,,,,,0
+delft,out,6400,,,,,,0
+toman,out,6400,,,,,,0
+ralph,out,6400,,,,,,1
+bepat,out,6400,,,,,,0
+point,out,6400,,,,,,1
+morat,out,6400,,,,,,0
+dwelt,out,6400,,,,,,1
+depth,out,6400,,,,,,1
+mpret,out,3200,,,,,,0
+caped,out,3200,,,,,,0
+tramp,out,3200,,,,,,1
+coapt,out,3200,,,,,,0
+apted,out,3200,,,,,,0
+tamin,out,3200,,,,,,0
+twerp,out,1600,,,,,,0
+merit,out,1600,,,,,,1
+deman,out,1600,,,,,,0
+bloat,out,1600,,,,,,1
+pleat,out,800,,,,,,1

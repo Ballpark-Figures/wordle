@@ -1,0 +1,11 @@
+mode=quad
+metric=ssq
+disjoint=0
+min_letters=0
+guesslist=data/shared/words/custom.txt
+openers=4282
+scored=4260355482
+written=1000000
+complete=0
+parents_complete=0
+minparent_meaning=best-of-sub-openers

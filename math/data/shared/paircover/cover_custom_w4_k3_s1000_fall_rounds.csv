@@ -1,0 +1,11 @@
+# pair-cover loop (see math/paircover.py)
+# settings pool=custom words=4 topk=3 cap=6 seed=data/shared/answerpairs/pairsplit_mystery_by-custom.csv seed_top=1000
+round,opening,unsolved,ssq,harvested,new_pairs,total_pairs,secs
+1,chomp bawdy flung trees,14,5144,15,6,15,123.3
+2,knave roost child bumpy,37,5734,49,49,64,34.5
+3,twigs fever porky bland,65,6088,73,72,136,272.5
+4,march twigs funky pedal,24,5362,17,14,150,145.0
+5,thumb verge flack ponds,19,5294,16,13,163,145.8
+6,chewy gumbo fiver plant,50,6524,57,48,211,211.3
+7,hawks moved rugby clint,21,5290,28,21,232,1927.5
+8,humps jawed frock glint,21,5334,21,12,244,124.2

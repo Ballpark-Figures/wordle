@@ -1,0 +1,21 @@
+# DIGEST of k4_plant_t1000000_s0.csv (0.1 GB), which is gitignored: over GitHub's file-size limit.
+# The lines below are copied verbatim from that file's own summary block.
+# multiwordle, blind opening then the greedy rule (see math/multiwordle.py)
+# boards=4 trials=1000000 opening=plant seed=0 strategy=greedy
+# answers drawn without replacement from the 2315 mystery words; no guess cap
+# strategy greedy, trials 1000000, boards 4, opening plant, seed 0
+# mean total guesses 7.7571  +/- 0.0011 (standard error)
+# sd 1.1279   min 4   median 8.0   max 15
+# mean guesses per board 1.9393
+#    4 guesses       4    0.00%
+#    5 guesses    6028    0.60%
+#    6 guesses  106770   10.68%
+#    7 guesses  325469   32.55%
+#    8 guesses  331181   33.12%
+#    9 guesses  164700   16.47%
+#   10 guesses   51213    5.12%
+#   11 guesses   11941    1.19%
+#   12 guesses    2290    0.23%
+#   13 guesses     350    0.04%
+#   14 guesses      50    0.01%
+#   15 guesses       4    0.00%

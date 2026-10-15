@@ -42,7 +42,7 @@ REUSE MAP — every element and the one source it comes from:
   sorted dot layout     assets/groups.py `ranked_layout` (b-f)
   every flip            assets/flip.py `flip` — anything into anything
   entrances, exits      assets/groups.py `enter_from_beyond` (b), `edge_out` (c-f)
-  definitions, lists    crisp_text, white, FadeIn; words verbatim from column 2,
+  definitions, lists    assets/gloss.py `gloss` (crisp_text, white), FadeIn; words verbatim from column 2,
                         italics from the Doc; listed words are PigpenWord rows
   guess on top          GUESS_Y / GUESS_SCALE from assets/groups.py, as 04i
   colours               BOARD_NAVY via WordleBoardScene; tiles config.py TILE_*
@@ -78,7 +78,6 @@ LAYOUT CHOICES, flagged:
   - The groups keep CORNER_MARGIN clear of the corner word's column.
 """
 from pathlib import Path
-import re
 import sys
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -91,6 +90,7 @@ from assets.flip import Flip, flip, row_parts
 from assets.groups import (layout, scored_headers, scored_row, ranked_layout, GUESS_Y,
                            GUESS_SCALE, HEADER_W, enter_from_beyond, edge_out)
 from assets import lists_data
+from assets.gloss import gloss
 
 DATA = lists_data.load()
 GUESS = "group"            # 06a's word — the user's choice, scene 06 only
@@ -103,16 +103,16 @@ AUREI_TIES = ["uraei"]                              # 06f, bottom left
 # 06d's definition, verbatim from the script, on two lines so it is no wider than
 # the definitions, verbatim from the script, broken into lines by hand so no line
 # is wider than the word above it (only "n. Representation" is, being one word),
-# with the words the Doc italicises
+# with any further words the Doc italicises (the part of speech, "n", is italicised
+# by assets/gloss.py itself, for every definition)
 GLOSSES = {
-    "roate": (["n. Obsolete", "variant of rote"], ["n", "rote"]),
-    "aesir": (["n. A group of", "Norse Gods", "associated", "with war"], ["n"]),
-    "reais": (["n. Plural of", "Real (Brazilian", "currency)"], ["n"]),
-    "serai": (["n. A palace or", "inn (Turkey/", "Middle East)"], ["n"]),
-    "aurei": (["n. Plural of", "Aureus (Roman", "gold coin)"], ["n"]),
-    "uraei": (["n. Representation", "of the sacred", "asp (ancient", "Egypt)"], ["n"]),
+    "roate": (["n. Obsolete", "variant of rote"], ["rote"]),
+    "aesir": (["n. A group of", "Norse Gods", "associated", "with war"], []),
+    "reais": (["n. Plural of", "Real (Brazilian", "currency)"], []),
+    "serai": (["n. A palace or", "inn (Turkey/", "Middle East)"], []),
+    "aurei": (["n. Plural of", "Aureus (Roman", "gold coin)"], []),
+    "uraei": (["n. Representation", "of the sacred", "asp (ancient", "Egypt)"], []),
 }
-GLOSS_LINE_BUFF = 0.1
 GLOSS_FS = 28              # under the corner word
 GLOSS_BUFF = 0.15          # between a word and its definition
 LIST_SCALE = 0.8           # a listed word's size (1 = scene 04's list size)
@@ -124,14 +124,11 @@ CORNER_BUFF = 0.3          # the corner label's gap to the frame's edges
 CORNER_MARGIN = 0.35       # clear space kept round the corner word (and definition)
 
 
-def _gloss(lines, italic, font_size):
-    """A definition, one crisp_text per line, left-aligned; whole words in
-    `italic` set italic."""
-    def slices(line):
-        return {f"[{m.start()}:{m.end()}]": ITALIC for it in italic
-                for m in re.finditer(rf"\b{re.escape(it)}\b", line)}
-    return VGroup(*[crisp_text(l, font_size=font_size, color=WHITE, t2s=slices(l))
-                    for l in lines]).arrange(DOWN, buff=GLOSS_LINE_BUFF, aligned_edge=LEFT)
+def _definition(word, font_size):
+    """`word`'s definition from GLOSSES, via the shared gloss (which italicises the
+    part of speech itself)."""
+    lines, italic = GLOSSES[word]
+    return gloss(lines, font_size, italic=italic)
 
 
 def _entries(words):
@@ -141,7 +138,7 @@ def _entries(words):
     for w in words:
         row = PigpenWord(w, revealed=True).scale(LIST_SCALE)
         if w in GLOSSES:
-            g = _gloss(*GLOSSES[w], LIST_FS)
+            g = _definition(w, LIST_FS)
             out.append(VGroup(row, g.next_to(row, DOWN, buff=GLOSS_BUFF, aligned_edge=LEFT)))
         else:
             out.append(VGroup(row))
@@ -303,7 +300,7 @@ class Scene06(WordleBoardScene):
         self.old_notes = None
 
     def _setup_roate(self):
-        gloss = _gloss(*GLOSSES[ROATE], GLOSS_FS) \
+        gloss = _definition(ROATE, GLOSS_FS) \
             .next_to(self.guess, DOWN, buff=GLOSS_BUFF, aligned_edge=LEFT)
         self._setup_notes(ROATE, [gloss])
 
@@ -326,7 +323,7 @@ class Scene06(WordleBoardScene):
         self._switch_notes(2.0)
 
     def _setup_aurei(self):
-        gloss = _gloss(*GLOSSES[AUREI], GLOSS_FS) \
+        gloss = _definition(AUREI, GLOSS_FS) \
             .next_to(self.guess, DOWN, buff=GLOSS_BUFF, aligned_edge=LEFT)
         other = _entries(AUREI_TIES).to_corner(DL, buff=CORNER_BUFF)
         self._setup_notes(AUREI, [gloss, other])

@@ -52,7 +52,6 @@ TWO LAYOUT CHOICES, flagged:
     9 columns x 27 rows of five-tile rows.
 No on-screen text but the tiles' letters: 243 / 238 / 150 are spoken, not shown.
 """
-from itertools import product
 from pathlib import Path
 import sys
 
@@ -60,8 +59,12 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 
 from config import *
-from assets.board import TILE, GAP, STROKE, LETTER_FRAC
+from assets.board import TILE, GAP
 from assets import colorings_data
+from assets.stacks_view import VANISH_SFX, VANISH_PEAK, VANISH_GAIN
+from assets.colorings import (code as _code, trits as _trits, slot as _slot,
+                              letters_on as _letters_on, coloring as _coloring,
+                              tile_size as _tile_size, level)
 
 DATA = colorings_data.load()
 IMPOSSIBLE = set(DATA["impossible"])
@@ -69,108 +72,17 @@ TRACE = set(DATA["trace"])
 WORD = "COLOR"
 TRACE_WORD = DATA["word"].upper()
 
-ORDER = (2, 1, 0)          # tile colour per split, in slot order: green, yellow, gray
-NAMES = {"G": 2, "Y": 1, "-": 0}
-
-
-def _code(tiles):
-    """'GGYGG' -> wordle.pattern integer, position 0 the most significant trit."""
-    c = 0
-    for ch in tiles:
-        c = 3 * c + NAMES[ch]
-    return c
-
-
-def _trits(code, n=5):
-    return [(code // 3 ** (n - 1 - i)) % 3 for i in range(n)]
-
-
-def _slot(code):
-    """A coloring's index in the 243 — the split order is ORDER, not the trit order."""
-    s = 0
-    for t in _trits(code):
-        s = 3 * s + ORDER.index(t)
-    return s
-
-
 FOCUS = _code("GGYGG")                                  # 05b
 STACK = [_code(s) for s in ("GGGGY", "GGGYG", "GGYGG", "GYGGG", "YGGGG")]  # 05h, top down
 assert set(STACK) == IMPOSSIBLE, "the script's five are not the cache's impossible set"
 
-# ── the build-up (yahtzee 03dice) ────────────────────────────────────────────
-BUILD_W, BUILD_H = 15.6, 8.6
-CELL_GAP = 0.04            # gap between sibling cells, as a fraction of the box
-SPLITS = [(1, 3), (3, 1), (1, 3), (3, 1), (3, 1)]     # (rows, cols) per letter
-TILE_BUFF = GAP / TILE     # tile gap as a fraction of tile size — the board's ratio
-
 DIM = 0.2                  # the house dim-the-rest opacity
 ROW_PITCH = TILE + GAP     # 05h's stack: board rows, board spacing
 
-def _glyph(ch, size):
-    """One crisp_text per letter, built once and copied.
-
-    The cache lives ON THIS FUNCTION, not as a module global, on purpose: the
-    snapshot digest records the printed value of every module global a subscene
-    touches, and a cache prints `{}` when a render starts but full by the time a
-    snapshot is saved — so the key saved never matched the key looked up, and
-    every render replayed from the top. A function is digested by its source.
-    """
-    cache = _glyph.__dict__.setdefault("cache", {})
-    if ch not in cache:
-        cache[ch] = crisp_text(ch, color=TILE_TEXT, weight=BOLD)
-    return cache[ch].copy().scale_to_fit_height(size * LETTER_FRAC)
-
-
-def _letters_on(tiles, word):
-    return VGroup(*[_glyph(ch, t.height).move_to(t) for ch, t in zip(word, tiles)])
-
-
-def _coloring(trits, word, size):
-    """A scored row: `.tiles` in their colours, `.letters` on top (board look)."""
-    tiles = VGroup(*[Square(side_length=size, stroke_width=STROKE,
-                            stroke_color=TILE_STATE[t], fill_color=TILE_STATE[t],
-                            fill_opacity=1.0) for t in trits])
-    tiles.arrange(RIGHT, buff=size * TILE_BUFF)
-    letters = _letters_on(tiles, word)
-    row = VGroup(tiles, letters)
-    row.tiles, row.letters = tiles, letters
-    return row
-
-
-def _centers(splits, cx, cy, w, h):
-    """Cell centres for nested splits, lex order (splits[0] = first letter)."""
-    if not splits:
-        return [(cx, cy)]
-    (r, c), rest = splits[0], splits[1:]
-    gx, gy = w * CELL_GAP, h * CELL_GAP
-    cw, ch = (w - (c - 1) * gx) / c, (h - (r - 1) * gy) / r
-    out = []
-    for v in range(r * c):
-        rr, cc = divmod(v, c)
-        out.extend(_centers(rest, cx + (cc - (c - 1) / 2) * (cw + gx),
-                            cy + ((r - 1) / 2 - rr) * (ch + gy), cw, ch))
-    return out
-
-
-def _tile_size(k):
-    """Largest tile so a k-tile row fits the leaf cell (yahtzee's `_die_size`)."""
-    w, h = BUILD_W, BUILD_H
-    for r, c in SPLITS[:k]:
-        w = (w - (c - 1) * w * CELL_GAP) / c
-        h = (h - (r - 1) * h * CELL_GAP) / r
-    return max(min(w * 0.98 / (k + TILE_BUFF * (k - 1)), h * 0.94), 0.01)
-
 
 def _level(k):
-    """All 3**k colorings of COLOR's first k letters, in slot order, placed."""
-    size = _tile_size(k)
-    centers = _centers(SPLITS[:k], 0.0, 0.0, BUILD_W, BUILD_H)
-    rows = []
-    for i, digits in enumerate(product(range(3), repeat=k)):
-        row = _coloring([ORDER[d] for d in digits], WORD[:k], size)
-        row.move_to([*centers[i], 0.0])
-        rows.append(row)
-    return rows
+    """All 3**k colorings of COLOR's first k letters (assets/colorings.py)."""
+    return level(k, WORD)
 
 
 class Scene05(WordleBoardScene):
@@ -263,15 +175,16 @@ class Scene05(WordleBoardScene):
         self._grow(4, 0.8)
         self.grid, self.level = self.level, None
 
-    # g : everything else fades; GGYGG grows to board size at the centre
+    # g : everything else fades; GGYGG grows to board size at the centre — into a
+    #     board-spaced row (the grid's tile gap is wider than the board's)
     @subscene
     def focus(self):
-        self.focus_row = self.grid[_slot(FOCUS)]
-        others = VGroup(*[r for r in self.grid if r is not self.focus_row])
+        row = self.grid[_slot(FOCUS)]
+        others = VGroup(*[r for r in self.grid if r is not row])
+        self.focus_row = _coloring(_trits(FOCUS), WORD, TILE).move_to(ORIGIN)
         self.focus_row.set_z_index(1)
-        f = TILE / self.focus_row.tiles[0].width
-        self.play(FadeOut(others),
-                  self.focus_row.animate.scale(f).move_to(ORIGIN), run_time=1.2)
+        self.play(FadeOut(others), ReplacementTransform(row, self.focus_row),
+                  run_time=1.2)
         self.grid = None
 
     def _emph(self, on, run_time):
@@ -350,7 +263,9 @@ class Scene05(WordleBoardScene):
     # o : the five impossible colorings fade out, leaving five empty slots (05i)
     @subscene
     def vanish(self):
-        self.play(*[FadeOut(self.grid[_slot(c)]) for c in IMPOSSIBLE], run_time=0.8)
+        rt = 0.8
+        self.sfx(VANISH_SFX, at=max(0.0, rt / 2 - VANISH_PEAK), gain=VANISH_GAIN)
+        self.play(*[FadeOut(self.grid[_slot(c)]) for c in IMPOSSIBLE], run_time=rt)
 
     # ── j ─────────────────────────────────────────────────────────────────────
     def _setup_trace(self):

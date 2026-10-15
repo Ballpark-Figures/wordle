@@ -1,0 +1,15 @@
+# DIGEST of k26_mpret_t1000000_s0.csv (0.3 GB), which is gitignored: over GitHub's file-size limit.
+# The lines below are copied verbatim from that file's own summary block.
+# multiwordle, blind opening then the greedy rule (see math/multiwordle.py)
+# boards=26 trials=1000000 opening=mpret seed=0 strategy=greedy
+# answers drawn without replacement from the 2315 mystery words; no guess cap
+# strategy greedy, trials 1000000, boards 26, opening mpret, seed 0
+# mean total guesses 27.7739  +/- 0.0006 (standard error)
+# sd 0.6333   min 27   median 28.0   max 32
+# mean guesses per board 1.0682
+#   27 guesses  332836   33.28%
+#   28 guesses  566492   56.65%
+#   29 guesses   94809    9.48%
+#   30 guesses    5642    0.56%
+#   31 guesses     216    0.02%
+#   32 guesses       5    0.00%

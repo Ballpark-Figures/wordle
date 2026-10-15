@@ -1,0 +1,55 @@
+# race_minavg_k6_shortlist_greedy_k6_last50_top50_sig5_s0
+# settings strategy=minavg boards=6 sigma=5 block=100 growth=2 seed=0 openings=data/shared/multiwordle/shortlist_greedy_k6_last50.csv top=50
+# mean/stderr are the opening's OWN numbers; diff_vs_leader, paired_stderr and sigma are PAIRED against compt, and the cut uses the paired sigma
+# the leader is the best of the openings ENTERED, judged on the games actually played -- a screen, not a proof
+opening,status,games,mean,stderr,diff_vs_leader,paired_stderr,sigma,is_answer
+compt,live,51200,8.982285,0.003771,0.000000,0.000000,0.000,0
+clapt,out,51200,,,,,,0
+spend,out,51200,,,,,,1
+clipt,out,25600,,,,,,0
+plant,out,12800,,,,,,1
+clept,out,12800,,,,,,0
+clint,out,12800,,,,,,0
+dropt,out,12800,,,,,,0
+blunt,out,12800,,,,,,1
+burnt,out,12800,,,,,,1
+cupid,out,12800,,,,,,0
+dempt,out,6400,,,,,,0
+thrip,out,6400,,,,,,0
+print,out,6400,,,,,,1
+clamp,out,6400,,,,,,1
+point,out,6400,,,,,,1
+blend,out,6400,,,,,,1
+climb,out,6400,,,,,,1
+clump,out,3200,,,,,,1
+dript,out,3200,,,,,,0
+mulct,out,3200,,,,,,0
+delph,out,3200,,,,,,0
+prent,out,3200,,,,,,0
+depth,out,3200,,,,,,1
+mpret,out,3200,,,,,,0
+pwned,out,3200,,,,,,0
+blent,out,3200,,,,,,0
+crept,out,3200,,,,,,1
+bumph,out,3200,,,,,,0
+depot,out,3200,,,,,,1
+pownd,out,3200,,,,,,0
+thump,out,3200,,,,,,1
+prunt,out,3200,,,,,,0
+ploat,out,3200,,,,,,0
+clomp,out,3200,,,,,,0
+crimp,out,3200,,,,,,1
+nempt,out,3200,,,,,,0
+trump,out,3200,,,,,,1
+plumb,out,3200,,,,,,1
+tepid,out,3200,,,,,,1
+blond,out,3200,,,,,,1
+slipt,out,3200,,,,,,0
+dimps,out,3200,,,,,,0
+thrid,out,3200,,,,,,0
+tromp,out,3200,,,,,,0
+bundt,out,3200,,,,,,0
+tuple,out,3200,,,,,,0
+tulip,out,1600,,,,,,1
+dumps,out,1600,,,,,,0
+crump,out,1600,,,,,,1

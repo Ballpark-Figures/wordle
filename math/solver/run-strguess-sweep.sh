@@ -66,7 +66,7 @@ LOC=data/local/strguess/$TAG
 OUT=$OUTDIR/opener_totals_$TAG.csv
 mkdir -p "$OUTDIR" "$LOC"
 
-. "$(dirname "${BASH_SOURCE[0]}")/_guard.sh"
+. "$MATH/solver/_guard.sh"
 guard_output strguess "$OUT" || exit 1
 
 FLAGS="--topk $TOPK --answers data/shared/words/$ANSWERS.txt"

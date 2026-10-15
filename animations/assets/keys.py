@@ -36,18 +36,39 @@ def _build_key_map():
 
 KEY_MAP = _build_key_map()
 
+# How loud typing plays, in dB against the library's level: quieter than the library
+# everywhere (user 2026-10-06) EXCEPT the intro, which passes INTRO_TYPING_GAIN. One
+# value for keystrokes and the delete key alike, since both are the same keyboard.
+TYPING_GAIN = -6.0
+INTRO_TYPING_GAIN = 0.0
+
 
 def key_for(ch):
     """The keystroke sound for a letter. Q and Z share; every other letter is its own."""
     return KEY_MAP[ch.lower()]
 
 
-def key_cues(scene):
-    """A `per_letter` callback for `WordleBoard.type_word` firing each letter's key.
+def key_cues(scene, gain=TYPING_GAIN):
+    """A `per_letter` callback for `WordleBoard.type_word` firing each letter's key,
+    at `gain` dB (TYPING_GAIN unless a scene asks otherwise).
 
     `at` places the cue at the letter's own moment — the word is ONE play, so the
     call order alone would stack every cue at its start.
     """
     def per_letter(i, ch, at):
-        scene.sfx(key_for(ch), at=at)
+        scene.sfx(key_for(ch), at=at, gain=gain)
     return per_letter
+
+
+# THE DELETE KEY (scene 19c's backspace): one physical key, so ONE sound for every
+# press. All 25 captures already belong to letters, so it borrows the one Q and Z
+# share — the two rarest letters, so the doubling is the least likely to be heard.
+BACKSPACE = KEY_SOUNDS[_Q]
+
+
+def backspace_cues(scene, gain=TYPING_GAIN):
+    """A `per_press` callback for `WordleBoard.delete_word`: the delete key on
+    every press, at the press's own moment, at `gain` dB."""
+    def per_press(i, at):
+        scene.sfx(BACKSPACE, at=at, gain=gain)
+    return per_press

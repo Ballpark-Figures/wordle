@@ -48,12 +48,18 @@ class TileFlip(Animation):
                  built at the tile's END pose; the flip positions it.
       to_center  the tile travels here during the flip (a board moving as it flips)
       to_scale   the tile (and its letters) grow by this factor during the flip
+
+    AND TWO MORE for flipping something ON or OFF screen with this same motion
+    (scene 16's opener under the chart): `vanish` hides the tile and its letter at
+    the midpoint instead of showing a new face, `appear` keeps them hidden until the
+    midpoint. The fill is untouched, so `tile` may be any mobject (a line of text).
     """
 
     _KEEP = object()                     # swap_to's default: the letter stays
 
     def __init__(self, tile, letter, fill, stroke=None, swap_to=_KEEP,
-                 to_center=None, to_scale=1.0, **kwargs):
+                 to_center=None, to_scale=1.0, vanish=False, appear=False, **kwargs):
+        self.vanish, self.appear = vanish, appear
         self.tile, self.letter, self.fill = tile, letter, fill
         self.stroke = fill if stroke is None else stroke   # the new face's border
         self.h_tile = tile.height
@@ -81,6 +87,13 @@ class TileFlip(Animation):
     def interpolate_mobject(self, alpha):
         a = self.rate_func(alpha)
         scale = max(abs(np.cos(np.pi * a)), 1e-3)
+        if self.vanish or self.appear:          # on or off screen: same motion,
+            shown = (a >= 0.5) == self.appear   # hidden on the far side of the turn
+            for m, h in ((self.tile, self.h_tile), (self.letter, self.h_letter)):
+                if m is not None and h:
+                    m.stretch_to_fit_height(h * scale).move_to(self.center)
+                    m.set_opacity(1.0 if shown else 0.0)
+            return
         if a >= 0.5 and not self._swapped:      # past the midpoint: the tile has
             self._swapped = True                # turned over, so show the new face
             self.tile.set_fill(self.fill, opacity=1.0).set_stroke(self.stroke, STROKE)
@@ -118,13 +131,20 @@ class TilePop(Animation):
     `there_and_back` in `bounce`.
     """
 
-    def __init__(self, tile, letter, bump=0.10, appear=False, **kwargs):
-        self.tile, self.letter, self.bump = tile, letter, bump
+    def __init__(self, tile, letter, bump=0.10, appear=False, stroke=STROKE, **kwargs):
+        # `letter=None` pops an EMPTY tile in (scene 11 types out blank words); it
+        # needs `appear=True` to mean anything, since a visible empty tile has
+        # nothing to land. Every existing caller passes a letter and is unchanged.
+        # `stroke` is the border the landed tile takes: the board's STROKE unless a
+        # tiny row needs a thinner one (scene 12's dot-sized rows).
+        self.tile, self.letter, self.bump, self.stroke = tile, letter, bump, stroke
         self.appear = appear            # the tile itself is hidden until its letter lands
         self.t_h, self.t_w = tile.height, tile.width
-        self.l_h, self.l_w = letter.height, letter.width
+        if letter is not None:
+            self.l_h, self.l_w = letter.height, letter.width
         self.center = tile.get_center()
-        super().__init__(VGroup(tile, letter), **kwargs)
+        parts = [tile] if letter is None else [tile, letter]
+        super().__init__(VGroup(*parts), **kwargs)
 
     def interpolate_mobject(self, alpha):
         # Visibility is driven by ALPHA, not set in begin(): an AnimationGroup —
@@ -132,17 +152,54 @@ class TilePop(Animation):
         # revealing there made all five letters of a word appear at once, at the
         # moment the first one was typed. A member that has not reached its lag
         # offset yet sits at alpha 0, which is exactly "not typed".
-        self.letter.set_opacity(1.0 if alpha > 0 else 0.0)
+        if self.letter is not None:
+            self.letter.set_opacity(1.0 if alpha > 0 else 0.0)
         if self.appear:                 # same alpha rule for the tile's own visibility
             self.tile.set_fill(opacity=1.0 if alpha > 0 else 0.0)
             self.tile.set_stroke(opacity=1.0 if alpha > 0 else 0.0)
         if alpha > 0:
-            self.tile.set_stroke(TILE_FILLED_BORDER, STROKE)
+            self.tile.set_stroke(TILE_FILLED_BORDER, self.stroke)
         s = 1 + self.bump * np.sin(np.pi * self.rate_func(alpha))
         self.tile.stretch_to_fit_height(self.t_h * s) \
                  .stretch_to_fit_width(self.t_w * s).move_to(self.center)
+        if self.letter is None:
+            return
         self.letter.stretch_to_fit_height(self.l_h * s) \
                    .stretch_to_fit_width(self.l_w * s).move_to(self.center)
+
+
+class RowShake(Animation):
+    """The real game's refusal: a row jiggles sideways, `cycles` swings decaying to
+    rest, and ends EXACTLY where it began (the offset is zero at alpha 1). Shifts
+    by the change in offset each frame, so the parts can be any mobjects. Scene 19's
+    word refused by hard mode. Play it with rate_func=linear: the decay is built in."""
+
+    def __init__(self, parts, amplitude, cycles=4, **kwargs):
+        self.amp, self.cycles, self._dx = amplitude, cycles, 0.0
+        super().__init__(VGroup(*parts), **kwargs)
+
+    def interpolate_mobject(self, alpha):
+        dx = self.amp * np.sin(2 * np.pi * self.cycles * alpha) * (1 - alpha)
+        self.mobject.shift(RIGHT * (dx - self._dx))
+        self._dx = dx
+
+
+class Backspace(Animation):
+    """Delete-key presses, evenly spaced: `pairs` [(tile, letter)] in the order they
+    are deleted. Press k lands at alpha k / n, where its letter vanishes and its tile
+    takes the empty border — discrete, like the real key. Alpha-driven (TilePop's
+    rule), so it is exact at any frame rate and needs no updater."""
+
+    def __init__(self, pairs, **kwargs):
+        self.pairs = pairs
+        super().__init__(VGroup(*[m for p in pairs for m in p]), **kwargs)
+
+    def interpolate_mobject(self, alpha):
+        n = len(self.pairs)
+        for k, (tile, letter) in enumerate(self.pairs):
+            gone = alpha >= k / n
+            letter.set_opacity(0.0 if gone else 1.0)
+            tile.set_stroke(TILE_EMPTY_BORDER if gone else TILE_FILLED_BORDER)
 
 
 class WordleBoard(VGroup):
@@ -215,11 +272,13 @@ class WordleBoard(VGroup):
         scene.play(anim, run_time=total)
 
     def type_anim(self, scene, row, word, run_time, per_letter=None, key_gap=None,
-                  appear=False, letter_color=None):
+                  appear=False, letter_color=None, stroke=STROKE):
         """`type_word` unplayed: the letters are made and put on the scene (hidden),
         and (animation, the run_time to play it for) comes back — so several words
         can be typed in ONE play (scene 07 types a row of final answers at once).
-        Same arguments and timing as `type_word`, which is this played."""
+        Same arguments and timing as `type_word`, which is this played. `stroke` is
+        the landed tiles' border -- STROKE unless a tiny row needs it thinner (scene
+        12 types 148 words at dot-view sizes)."""
         n = max(len(word), 1)
         if key_gap is None:
             lag, total = 1.0 / n, run_time
@@ -255,7 +314,7 @@ class WordleBoard(VGroup):
                 # i * run_time / (2n - 1). Using the even spacing instead fired every
                 # cue progressively later than the letter it belonged to.
                 per_letter(i, ch, at(i))
-        pops = [TilePop(self.tiles[row][i], self.letters[row][i], appear=appear)
+        pops = [TilePop(self.tiles[row][i], self.letters[row][i], appear=appear, stroke=stroke)
                 for i in range(len(word))]
         return LaggedStart(*pops, lag_ratio=lag), total
 
@@ -295,6 +354,35 @@ class WordleBoard(VGroup):
         flips = [TileFlip(self.tiles[row][i], self.letters[row][i], TILE_EMPTY_FILL,
                           stroke=TILE_FILLED_BORDER) for i in range(self.n_cols)]
         return LaggedStart(*flips, lag_ratio=lag_ratio)
+
+    # ── a refused word ────────────────────────────────────────────────────────
+    def shake(self, scene, row, run_time, amplitude=0.08):
+        """`row` jiggles sideways and settles — the real game refusing a word (scene
+        19: SOLVE, not allowed in hard mode). `amplitude` is a fraction of a tile."""
+        parts = [m for i in range(self.n_cols)
+                 for m in (self.tiles[row][i], self.letters[row][i]) if m is not None]
+        amp = amplitude * self.tiles[row][0].width
+        scene.play(RowShake(parts, amp), run_time=run_time, rate_func=linear)
+
+    def delete_word(self, scene, row, run_time, per_press=None):
+        """Backspace the typed `row`, right to left, ONE KEYPRESS PER LETTER, as the
+        real game's delete key does: on each press a letter VANISHES and its tile's
+        border goes back to empty — no fade. The presses are `run_time / n` apart,
+        the first at the start. `per_press(i, at)` fires for each press (i the
+        column, `at` its offset in seconds), so the scene can place a key sound —
+        type_word's `per_letter` hook, minus the letter (it is the same key). The letters leave the board, so the row
+        can be typed again."""
+        cols = [i for i in reversed(range(self.n_cols)) if self.letters[row][i] is not None]
+        gap = run_time / len(cols)
+        if per_press is not None:
+            for k, i in enumerate(cols):
+                per_press(i, k * gap)
+        scene.play(Backspace([(self.tiles[row][i], self.letters[row][i]) for i in cols]),
+                   run_time=run_time, rate_func=linear)
+        for i in cols:
+            self.remove(self.letters[row][i])
+            scene.remove(self.letters[row][i])
+            self.letters[row][i] = None
 
     # ── growing past six rows ──────────────────────────────────────────────────
     def add_row(self, scene, run_time, height, center=ORIGIN):
@@ -349,6 +437,11 @@ class WordleBoard(VGroup):
     def bounce_anim(self, row, height=0.35, lag_ratio=0.12):
         """`bounce`'s animation, unplayed — to join a larger play (scene 07 fades a
         word out while the row jumps)."""
+        return LaggedStart(*self.bounce_tiles(row, height), lag_ratio=lag_ratio)
+
+    def bounce_tiles(self, row, height=0.35):
+        """`bounce`'s per-tile jumps, unstaggered -- for a wave running across
+        several boards' rows in ONE LaggedStart (scene 16's ending)."""
         ups = []
         for i in range(self.n_cols):
             parts = [self.tiles[row][i]]
@@ -356,7 +449,7 @@ class WordleBoard(VGroup):
                 parts.append(self.letters[row][i])
             ups.append(VGroup(*parts).animate(rate_func=there_and_back)
                        .shift(UP * height))
-        return LaggedStart(*ups, lag_ratio=lag_ratio)
+        return ups
 
 
 def get_board(**kwargs):

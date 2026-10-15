@@ -153,6 +153,55 @@ def longest_chain(candidates, bound="size", word_len=WORD_LEN):
     return length, line
 
 
+def longest_run(plays, answers):
+    """Exact longest run when only the LAST word must be an answer: (length, line).
+
+    The rule (the user's, 2026-10-14): every word played must be in `plays` AND
+    consistent with every clue so far; the run ends by playing the answer, which
+    must be in `answers` (itself a subset of `plays`).  Clues are taken against
+    that final answer, so a branch is only followable while it still holds an
+    answer.  `length` COUNTS THE FINAL ANSWER, as eldrowmax does -- unlike
+    `longest_chain` above, which counts guesses-until-a-singleton.
+
+    The REFERENCE for `eldrowmax --answers`.  It recomputes the legal set FROM THE
+    STRINGS, over the whole of `plays`, from the history at every step, and
+    memoises only on the result.  Exponential: small lists only.
+    """
+    plays = list(plays)
+    answers = set(answers)
+    if not answers <= set(plays):
+        raise ValueError("every answer must be playable")
+    memo = {}
+
+    def legal(history):
+        return tuple(w for w in plays
+                     if all(pattern(g, w) == p for g, p in history))
+
+    def best(history):
+        live = legal(history)
+        if live in memo:
+            return memo[live]
+        poss = [w for w in live if w in answers]
+        out = (1, [poss[0]])                     # name an answer now
+        for g in live:
+            for p in sorted({pattern(g, a) for a in poss}):
+                if p == ALL_GREEN_CODE:
+                    continue
+                n, line = best(history + ((g, p),))
+                if 1 + n > out[0]:
+                    out = (1 + n, [g] + line)
+        memo[live] = out
+        return out
+
+    if not answers:
+        return 0, []
+    n, line = best(())
+    return n, line
+
+
+ALL_GREEN_CODE = 3 ** WORD_LEN - 1
+
+
 # --- heuristic level searches: scale to the full dictionary -------------------
 #
 # All the old beam controllers (sizePassLevelSearch, passLevelSearch, levelSearch,

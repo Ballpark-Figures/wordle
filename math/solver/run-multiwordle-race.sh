@@ -136,7 +136,7 @@ mkdir -p "$OUTDIR" "$LOC"
 
 # Shared refuse-if-something-else-writes-this-file guard.  Its second check is by
 # process NAME, which is "python" here, so only the output-file half applies.
-. "$(dirname "${BASH_SOURCE[0]}")/_guard.sh"
+. "$MATH/solver/_guard.sh"
 guard_output multiwordle_race.py "$OUT" || exit 1
 
 FLAGS="--strategy $STRATEGY -k $K --seed $SEED --sigma $SIGMA --block $BLOCK"

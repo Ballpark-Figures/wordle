@@ -1,0 +1,18 @@
+# DIGEST of k9_clamp-trend_t1000000_s0.csv (0.1 GB), which is gitignored: over GitHub's file-size limit.
+# The lines below are copied verbatim from that file's own summary block.
+# multiwordle, blind opening then the greedy rule (see math/multiwordle.py)
+# boards=9 trials=1000000 opening=clamp trend seed=0 strategy=greedy
+# answers drawn without replacement from the 2315 mystery words; no guess cap
+# strategy greedy, trials 1000000, boards 9, opening clamp trend, seed 0
+# mean total guesses 11.5885  +/- 0.0008 (standard error)
+# sd 0.7614   min 9   median 11.0   max 17
+# mean guesses per board 1.2876
+#    9 guesses       3    0.00%
+#   10 guesses    3808    0.38%
+#   11 guesses  543679   54.37%
+#   12 guesses  335200   33.52%
+#   13 guesses   97408    9.74%
+#   14 guesses   17556    1.76%
+#   15 guesses    2148    0.21%
+#   16 guesses     188    0.02%
+#   17 guesses      10    0.00%

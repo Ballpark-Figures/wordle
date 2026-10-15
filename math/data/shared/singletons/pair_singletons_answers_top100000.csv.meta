@@ -1,0 +1,10 @@
+mode=pair
+metric=singles
+disjoint=0
+min_letters=0
+guesslist=data/shared/words/mystery.txt
+openers=2315
+scored=2678455
+written=100000
+complete=0
+parents_complete=0

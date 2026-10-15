@@ -219,7 +219,7 @@ if [ "$DRYRUN" = 1 ]; then
     exit 0
 fi
 
-. "$(dirname "${BASH_SOURCE[0]}")/_guard.sh"
+. "$MATH/solver/_guard.sh"
 guard_output ladder "$OUT" || exit 1
 
 mkdir -p "$OUTDIR" "$LOC"

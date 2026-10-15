@@ -1,0 +1,23 @@
+# greedy letter-by-letter build (see math/greedybuild.py)
+# settings pool=custom words=4 topk=1 ssq_first=1 answers=2315
+step,opening,unsolved,ssq,placed_letter,placed_word,placed_pos
+1,_____ _____ _____ ___e_,2315,7341262,e,0,3
+2,_____ _____ _____ _f_e_,2309,6224502,f,3,1
+3,_____ _____ _f_e_ _h___,2298,4494474,h,0,1
+4,_____ _f_e_ _h___ d____,2281,3092092,d,0,0
+5,_____ _f_e_ _h___ d___r,2251,1663080,r,3,4
+6,_____ _f_e_ _h___ d__ar,2192,768604,a,3,3
+7,_____ _f_e_ _h__t d__ar,2091,418354,t,2,4
+8,_f_e_ _h__t _n___ d__ar,1952,240236,n,0,1
+9,_f_e_ _h__t d__ar sn___,1766,98988,s,2,0
+10,_f_e_ _h__t d__ar sni__,1477,57542,i,3,2
+11,_f_e_ _h_lt d__ar sni__,1144,33330,l,1,3
+12,_f_e_ _h_lt d__ar snip_,885,23166,p,3,3
+13,_f_e_ _h_lt d_bar snip_,649,16862,b,2,2
+14,_h_lt d_bar of_e_ snip_,449,12490,o,0,0
+15,_h_lt d_bar of_e_ snipe,383,11630,e,3,4
+16,_halt d_bar of_e_ snipe,330,10732,a,0,2
+17,_halt debar of_e_ snipe,312,10374,e,1,1
+18,_halt debar ofte_ snipe,301,10124,t,2,2
+19,_halt debar often snipe,291,9928,n,2,4
+20,debar often shalt snipe,291,9928,s,0,0

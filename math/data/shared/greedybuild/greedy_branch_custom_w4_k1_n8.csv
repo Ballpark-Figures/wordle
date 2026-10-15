@@ -1,0 +1,4 @@
+# greedy letter-by-letter build (see math/greedybuild.py)
+# settings search=branch pool=custom words=4 topk=1 ssq_first=8 answers=2315
+found_at,nodes,opening,unsolved,ssq
+7.4,20,butch drill month pages,88,6078

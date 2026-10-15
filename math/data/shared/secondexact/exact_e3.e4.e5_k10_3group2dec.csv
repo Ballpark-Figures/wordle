@@ -1,0 +1,59 @@
+# secondexact: the EXACT best predetermined second word, and the exact value of the
+# strategy -- opener, then that word when the reply fires, then a uniformly random
+# consistent ANSWER.  No seed and no standard error: the random tail is summed 
+# exactly (math/secondexact.py states the recursion).
+# expected is over all 2315 answers; decline/fired split it by whether the rule fired.
+# settings fire=e3.e4.e5 openers=10 follow_up=answer topk=10 third=2 third_key=group third_decline=1
+# TOPK=10: each group's word is the best of the 10 ranked by the one-ply
+# score, so every total here is an UPPER BOUND, not the optimum.
+opener,fires,second,expected,total,decline,fired,qualifying,scanned,cut
+raine,e5,plush,3.707570,8583.0241,1553.5218,759.0000,195,10,12961
+raine,e5|m0,gombo,3.707570,8583.0241,,,,,third
+raine,e4,clots,3.707570,8583.0241,1553.5218,2754.3487,730,10,12961
+raine,e3,colts,3.707570,8583.0241,1553.5218,3516.1537,945,10,12961
+raile,e5,musth,3.729240,8633.1916,1676.7563,668.0413,173,10,12961
+raile,e5|m0,goody,3.729240,8633.1916,,,,,third
+raile,e4,shunt,3.729240,8633.1916,1676.7563,2670.1680,705,10,12961
+raile,e4|m1,cadgy,3.729240,8633.1916,,,,,third
+raile,e3,ponts,3.729240,8633.1916,1676.7563,3618.2259,968,10,12961
+ariel,e5,musth,3.766595,8719.6664,1711.8837,668.0413,173,10,12961
+ariel,e5|m0,goody,3.766595,8719.6664,,,,,third
+ariel,e4,ponts,3.766595,8719.6664,1711.8837,2694.4639,705,10,12961
+ariel,e4|m1,fudgy,3.766595,8719.6664,,,,,third
+ariel,e3,ponts,3.766595,8719.6664,1711.8837,3645.2776,968,10,12961
+irate,e5,plush,3.727253,8628.5911,1742.5324,761.3770,194,10,12961
+irate,e5|m0,goody,3.727253,8628.5911,,,,,third
+irate,e5|m1,boong,3.727253,8628.5911,,,,,third
+irate,e4,clons,3.727253,8628.5911,1742.5324,2548.3875,677,10,12961
+irate,e4|m1,pudgy,3.727253,8628.5911,,,,,third
+irate,e3,clops,3.727253,8628.5911,1742.5324,3576.2942,949,10,12961
+roate,e5,clips,3.731237,8637.8148,1831.8071,764.7551,195,10,12961
+roate,e5|m0,maund,3.731237,8637.8148,,,,,third
+roate,e4,sling,3.731237,8637.8148,1831.8071,2505.0655,660,10,12961
+roate,e4|m1,bumph,3.731237,8637.8148,,,,,third
+roate,e3,clips,3.731237,8637.8148,1831.8071,3536.1871,951,10,12961
+orate,e5,clips,3.745451,8670.7196,1832.4151,764.7551,195,10,12961
+orate,e5|m0,maund,3.745451,8670.7196,,,,,third
+orate,e4,sling,3.745451,8670.7196,1832.4151,2508.5965,660,10,12961
+orate,e4|m1,chimb,3.745451,8670.7196,,,,,third
+orate,e3,clips,3.745451,8670.7196,1832.4151,3564.9529,951,10,12961
+soare,e5,clint,3.711107,8591.2139,1771.8444,715.8447,183,10,12961
+soare,e5|m0,dumpy,3.711107,8591.2139,,,,,third
+soare,e4,clint,3.711107,8591.2139,1771.8444,2555.1281,686,10,12961
+soare,e4|m1,hedgy,3.711107,8591.2139,,,,,third
+soare,e3,clint,3.711107,8591.2139,1771.8444,3548.3968,970,10,12961
+arose,e5,clint,3.732288,8640.2469,1778.4296,715.8447,183,10,12961
+arose,e5|m0,dumpy,3.732288,8640.2469,,,,,third
+arose,e4,clint,3.732288,8640.2469,1778.4296,2553.7042,686,10,12961
+arose,e4|m1,hedgy,3.732288,8640.2469,,,,,third
+arose,e3,clint,3.732288,8640.2469,1778.4296,3592.2683,970,10,12961
+arise,e5,blond,3.778916,8748.1903,1737.9460,656.5885,168,10,12961
+arise,e5|m0,tumpy,3.778916,8748.1903,,,,,third
+arise,e4,count,3.778916,8748.1903,1737.9460,2833.9577,733,10,12961
+arise,e4|m1,duply,3.778916,8748.1903,,,,,third
+arise,e3,cloth,3.778916,8748.1903,1737.9460,3519.6981,944,10,12961
+raise,e5,blond,3.758089,8699.9768,1703.1652,656.5885,168,10,12961
+raise,e5|m0,tumpy,3.758089,8699.9768,,,,,third
+raise,e4,count,3.758089,8699.9768,1703.1652,2827.3944,733,10,12961
+raise,e4|m1,duply,3.758089,8699.9768,,,,,third
+raise,e3,cloth,3.758089,8699.9768,1703.1652,3512.8286,944,10,12961

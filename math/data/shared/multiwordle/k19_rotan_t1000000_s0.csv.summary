@@ -1,0 +1,16 @@
+# DIGEST of k19_rotan_t1000000_s0.csv (0.2 GB), which is gitignored: over GitHub's file-size limit.
+# The lines below are copied verbatim from that file's own summary block.
+# multiwordle, blind opening then the greedy rule (see math/multiwordle.py)
+# boards=19 trials=1000000 opening=rotan seed=0 strategy=greedy
+# answers drawn without replacement from the 2315 mystery words; no guess cap
+# strategy greedy, trials 1000000, boards 19, opening rotan, seed 0
+# mean total guesses 21.0176  +/- 0.0008 (standard error)
+# sd 0.7580   min 20   median 21.0   max 26
+# mean guesses per board 1.1062
+#   20 guesses  241469   24.15%
+#   21 guesses  533564   53.36%
+#   22 guesses  193750   19.38%
+#   23 guesses   28469    2.85%
+#   24 guesses    2599    0.26%
+#   25 guesses     144    0.01%
+#   26 guesses       5    0.00%

@@ -82,7 +82,7 @@ STEM="exact_${STRATEGY}_k1_${LIST}"
 OUT="$OUTDIR/$STEM.csv"
 mkdir -p "$OUTDIR" "$LOC"
 
-. "$(dirname "${BASH_SOURCE[0]}")/_guard.sh"
+. "$MATH/solver/_guard.sh"
 guard_output multiwordle_exact.py "$OUT" || exit 1
 
 FLAGS="--strategy $STRATEGY -k 1 --openings $OPENINGS --out $OUT$EXTRA"

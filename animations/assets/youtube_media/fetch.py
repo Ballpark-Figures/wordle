@@ -4,7 +4,9 @@ channel's avatar (<key>_avatar.png); for each CHANNELS entry just the avatar. Ma
 so manim's ImageMobject shows them directly (rounded corners / circle crop). Run with
 the RENDER venv (it ships Pillow):
 
-    .venv/bin/python animations/assets/youtube_media/fetch.py
+    .venv/bin/python animations/assets/youtube_media/fetch.py [key ...]
+
+With keys, only those entries are fetched (every other image stays as committed).
 
 The avatar URL comes from the YouTube Data API (`channels.list` by handle),
 `videos.list` for thumbnails, authenticated with the `YOUTUBE_API_KEY` in
@@ -22,7 +24,9 @@ from PIL import Image, ImageDraw, ImageOps
 OUT = Path(__file__).resolve().parent
 _ENV = Path(__file__).resolve().parents[4] / "analytics" / ".env"
 CHANNELS = {"bpk": "@BPKFigures"}   # key -> channel handle
-VIDEOS = {"hangman": "ApdLgfgfh5o"}  # key -> video id (Ballpark Figures, "I Tried to Solve Hangman")
+VIDEOS = {"hangman": "ApdLgfgfh5o",   # key -> video id (Ballpark Figures, "I Tried to Solve Hangman")
+          "rasmussen": "zoh5eLOjwHA",  # Ellie Rasmussen, "You should play Wordle wrong" (bonus video)
+          "pokecheese": "dCUvQ7HIDmA"}  # Pokecheese, the "Broken" Wordle strategy video (bonus video)
 
 
 def _api_key():
@@ -76,7 +80,12 @@ def _circle(img):
 
 
 if __name__ == "__main__":
+    import sys
+    # optional keys: fetch just those, leaving every other committed image untouched
+    only = set(sys.argv[1:])
     for key, handle in CHANNELS.items():
+        if only and key not in only:
+            continue
         items = _api("channels", part="snippet", forHandle=handle).get("items") or []
         if not items:
             raise RuntimeError(f"no channel found for handle {handle!r}")
@@ -85,6 +94,8 @@ if __name__ == "__main__":
         avatar.save(OUT / f"{key}_avatar.png")
         print(f"{key}: {chan['title']!r} -> {key}_avatar.png {avatar.size}")
     for key, vid in VIDEOS.items():
+        if only and key not in only:
+            continue
         v = _api("videos", part="snippet", id=vid)["items"][0]["snippet"]
         chan = _api("channels", part="snippet", id=v["channelId"])["items"][0]["snippet"]
         thumb = _rounded(_open(_get(_best(v["thumbnails"]))))

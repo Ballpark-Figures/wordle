@@ -1,0 +1,91 @@
+# secondexact: the EXACT best predetermined second word, and the exact value of the
+# strategy -- opener, then that word when the reply fires, then a uniformly random
+# consistent ANSWER.  No seed and no standard error: the random tail is summed 
+# exactly (math/secondexact.py states the recursion).
+# expected is over all 2315 answers; decline/fired split it by whether the rule fired.
+# settings fire=ladderL5_wcustom openers=20 follow_up=answer topk=20 third=-1 third_key=none third_decline=0 ladder=5
+# TOPK=20: each group's word is the best of the 20 ranked by the one-ply
+# score, so every total here is an UPPER BOUND, not the optimum.
+opener,fires,second,expected,total,decline,fired,qualifying,scanned,cut
+stare,ladder,colin,3.713841,8597.5429,1784.0048,6813.5381,1801,100,0
+stare,L2|t3,colin,3.713841,8597.5429,,,,,level2
+stare,L3|t1,dumpy,3.713841,8597.5429,,,,,level3
+stare,L4|t0,-,3.713841,8597.5429,,,,,level4
+laser,ladder,point,3.748423,8677.5992,1800.6418,6876.9574,1821,100,0
+laser,L2|t3,point,3.748423,8677.5992,,,,,level2
+laser,L3|t1,dogma,3.748423,8677.5992,,,,,level3
+laser,L4|t0,-,3.748423,8677.5992,,,,,level4
+raine,ladder,clots,3.712797,8595.1257,1553.5218,7041.6039,1870,100,0
+raine,L2|t3,clots,3.712797,8595.1257,,,,,level2
+raine,L3|t1,dumpy,3.712797,8595.1257,,,,,level3
+raine,L4|t0,-,3.712797,8595.1257,,,,,level4
+ariel,ladder,shunt,3.780645,8752.1934,1711.8837,7040.3097,1846,100,0
+ariel,L2|t3,shunt,3.780645,8752.1934,,,,,level2
+ariel,L3|t1,goody,3.780645,8752.1934,,,,,level3
+ariel,L4|t0,-,3.780645,8752.1934,,,,,level4
+irate,ladder,colds,3.764413,8714.6166,1741.5324,6973.0842,1821,100,0
+irate,L2|t3,colds,3.764413,8714.6166,,,,,level2
+irate,L3|t1,nymph,3.764413,8714.6166,,,,,level3
+irate,L4|t0,-,3.764413,8714.6166,,,,,level4
+arose,ladder,clint,3.733253,8642.4806,1777.4296,6865.0509,1840,100,0
+arose,L2|t3,clint,3.733253,8642.4806,,,,,level2
+arose,L3|t1,dumpy,3.733253,8642.4806,,,,,level3
+arose,L4|t0,-,3.733253,8642.4806,,,,,level4
+alter,ladder,coins,3.736969,8651.0822,1745.6654,6905.4168,1819,120,0
+alter,L2|t3,coins,3.736969,8651.0822,,,,,level2
+alter,L3|t1,dumpy,3.736969,8651.0822,,,,,level3
+alter,L4|t0,-,3.736969,8651.0822,,,,,level4
+alert,ladder,coins,3.726007,8625.7061,1738.4212,6887.2850,1819,120,0
+alert,L2|t3,coins,3.726007,8625.7061,,,,,level2
+alert,L3|t1,dumpy,3.726007,8625.7061,,,,,level3
+alert,L4|t0,-,3.726007,8625.7061,,,,,level4
+later,ladder,coins,3.728166,8630.7050,1733.8285,6896.8765,1819,120,0
+later,L2|t3,coins,3.728166,8630.7050,,,,,level2
+later,L3|t1,dumpy,3.728166,8630.7050,,,,,level3
+later,L4|t0,-,3.728166,8630.7050,,,,,level4
+slate,ladder,prion,3.703960,8574.6675,1434.7816,7139.8859,1879,120,0
+slate,L2|t3,prion,3.703960,8574.6675,,,,,level2
+slate,L3|t1,dogma,3.703960,8574.6675,,,,,level3
+slate,L4|t0,-,3.703960,8574.6675,,,,,level4
+trace,ladder,loins,3.688029,8537.7861,1451.0216,7086.7645,1875,120,0
+trace,L2|t3,loins,3.688029,8537.7861,,,,,level2
+trace,L3|t1,dumpy,3.688029,8537.7861,,,,,level3
+trace,L4|t0,-,3.688029,8537.7861,,,,,level4
+rates,ladder,colin,3.736979,8651.1072,1831.0496,6820.0576,1800,120,0
+rates,L2|t3,colin,3.736979,8651.1072,,,,,level2
+rates,L3|t1,dumpy,3.736979,8651.1072,,,,,level3
+rates,L4|t0,-,3.736979,8651.1072,,,,,level4
+taser,ladder,colin,3.724350,8621.8702,1804.2833,6817.5868,1800,120,0
+taser,L2|t3,colin,3.724350,8621.8702,,,,,level2
+taser,L3|t1,dumpy,3.724350,8621.8702,,,,,level3
+taser,L4|t0,-,3.724350,8621.8702,,,,,level4
+snare,ladder,clout,3.745382,8670.5588,1588.7032,7081.8556,1866,120,0
+snare,L2|t3,clout,3.745382,8670.5588,,,,,level2
+snare,L3|t1,dumpy,3.745382,8670.5588,,,,,level3
+snare,L4|t0,-,3.745382,8670.5588,,,,,level4
+saner,ladder,clout,3.752725,8687.5588,1598.3866,7089.1722,1866,120,0
+saner,L2|t3,clout,3.752725,8687.5588,,,,,level2
+saner,L3|t1,dumpy,3.752725,8687.5588,,,,,level3
+saner,L4|t0,-,3.752725,8687.5588,,,,,level4
+carle,ladder,point,3.702629,8571.5866,1472.6915,7098.8951,1884,120,0
+carle,L2|t3,point,3.702629,8571.5866,,,,,level2
+carle,L3|t1,midst,3.702629,8571.5866,,,,,level3
+carle,L4|t0,-,3.702629,8571.5866,,,,,level4
+arise,ladder,cloth,3.788922,8771.3551,1736.9460,7034.4091,1846,120,0
+arise,L2|t3,cloth,3.788922,8771.3551,,,,,level2
+arise,L3|t1,pudgy,3.788922,8771.3551,,,,,level3
+arise,L4|t3,funky,3.788922,8771.3551,,,,,level4
+arise,L5|t0,-,3.788922,8771.3551,,,,,level5
+raise,ladder,cloth,3.768332,8723.6896,1702.1652,7021.5243,1846,120,0
+raise,L2|t3,cloth,3.768332,8723.6896,,,,,level2
+raise,L3|t1,pudgy,3.768332,8723.6896,,,,,level3
+raise,L4|t3,funky,3.768332,8723.6896,,,,,level4
+raise,L5|t0,-,3.768332,8723.6896,,,,,level5
+carte,ladder,loins,3.688974,8539.9747,1471.9719,7068.0028,1874,120,0
+carte,L2|t3,loins,3.688974,8539.9747,,,,,level2
+carte,L3|t1,dumpy,3.688974,8539.9747,,,,,level3
+carte,L4|t0,-,3.688974,8539.9747,,,,,level4
+crate,ladder,loins,3.686072,8533.2576,1459.9212,7073.3364,1875,120,0
+crate,L2|t3,loins,3.686072,8533.2576,,,,,level2
+crate,L3|t1,dumpy,3.686072,8533.2576,,,,,level3
+crate,L4|t0,-,3.686072,8533.2576,,,,,level4

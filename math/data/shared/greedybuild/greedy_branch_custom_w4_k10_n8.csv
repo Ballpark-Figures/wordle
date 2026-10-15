@@ -1,0 +1,10 @@
+# greedy letter-by-letter build (see math/greedybuild.py)
+# settings search=branch pool=custom words=4 topk=10 ssq_first=8 answers=2315
+found_at,pct,nodes,leaves,opening,unsolved,ssq
+7.8,0.0000,20,1,butch drill month pages,88,6078
+8.2,0.0000,41,7,block drill month pages,87,5796
+8.7,0.0000,78,19,beech drill month pages,78,6084
+29.8,0.0000,1500,303,butch drill monty pages,63,5742
+30.0,0.0000,1513,309,beech drill monty pages,60,5750
+2090.6,0.0000,158569,19577,drill month pluck wages,60,5744
+31184.7,0.0000,1619388,163449,brill deuce month pages,59,5810

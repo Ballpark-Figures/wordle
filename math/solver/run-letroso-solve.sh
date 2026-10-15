@@ -84,7 +84,7 @@ if [ -n "$LIVE" ]; then
     exit 1
 fi
 
-. "$(dirname "${BASH_SOURCE[0]}")/_guard.sh"
+. "$MATH/solver/_guard.sh"
 guard_output letroso_solve.py "$OUT" || exit 1
 
 echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] letroso solve $STEM" | tee -a "$LOC/$STEM.log"

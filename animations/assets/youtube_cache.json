@@ -13,5 +13,35 @@
   },
   "thumbnail": "youtube_media/hangman_thumb.png",
   "avatar": "youtube_media/bpk_logo.png"
+ },
+ "rasmussen": {
+  "video_id": "zoh5eLOjwHA",
+  "title": "You should play Wordle wrong",
+  "channel": "Ellie Rasmussen",
+  "duration": "16:14",
+  "meta": "189K views \u00b7 1 year ago",
+  "source": {
+   "view_count": 189445,
+   "published_at": "2025-08-29T00:02:46+00:00",
+   "duration_seconds": 974,
+   "sampled_at": "2026-10-11T04:55:08.666165+00:00"
+  },
+  "thumbnail": "youtube_media/rasmussen_thumb.png",
+  "avatar": "youtube_media/rasmussen_avatar.png"
+ },
+ "pokecheese": {
+  "video_id": "dCUvQ7HIDmA",
+  "title": "This \"Broken\" Wordle Strategy Isn't Actually That Great. Here's Why.",
+  "channel": "Pokecheese",
+  "duration": "3:39",
+  "meta": "75K views \u00b7 4 years ago",
+  "source": {
+   "view_count": 75433,
+   "published_at": "2022-04-28T16:57:00+00:00",
+   "duration_seconds": 219,
+   "sampled_at": "2026-10-11T05:14:06.643097+00:00"
+  },
+  "thumbnail": "youtube_media/pokecheese_thumb.png",
+  "avatar": "youtube_media/pokecheese_avatar.png"
  }
 }

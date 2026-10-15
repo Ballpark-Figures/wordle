@@ -1,0 +1,58 @@
+# greedy token order, best first: the ranking notebooks/letter_explorer.ipynb computes over the pooled optimal trees.  Exact and deterministic -- no sampling, no seed.
+# THE ORDER IS COMPUTED; THE TIER CUTS ARE NOT IN THIS FILE.  Read them off top2_diff and record them in math/tiers.py.
+# The trees minimise TOTAL guesses subject to resolving every answer within 6, so any ranking derived here inherits that constraint.
+# settings max_repeat=2 num_trees=1000 tokens=52 paths=2315000 solver=optturns weighting=uniform min_gap=0.5 openers_sha=82c5827ddd75a09c
+# openers salet, reast, crate, trace, slate, crane, carle, slane, +992 more
+step,token,set_before_outside,pairs_outside_before_set,top2_diff
+1,e,0.0,1.6894,0.9045
+2,a,0.0,3.7075,0.3139
+3,r,0.0,5.4552,0.2568
+4,t,0.0,6.8366,0.0861
+5,s,0.0253,7.7102,0.9515
+6,l,0.0788,8.8554,0.8814
+7,i,0.1681,10.1833,0.05
+8,o,0.2708,10.8019,0.0758
+9,n,0.507,10.8204,0.5857
+10,c,0.8062,10.6792,1.2172
+11,d,1.1834,11.0013,0.2737
+12,p,1.6952,10.8656,1.1429
+13,h,1.9988,11.2291,0.1324
+14,u,2.2963,11.1687,0.4211
+15,b,2.5498,11.0135,0.1044
+16,m,2.8614,10.4627,0.2157
+17,g,3.1948,9.642,0.2115
+18,y,3.4845,8.5846,0.9008
+19,f,3.6663,8.0374,0.3486
+20,k,3.8461,7.5457,0.0259
+21,ee,4.0433,6.8115,0.1986
+22,w,4.2171,6.0395,0.394
+23,v,4.3526,5.4493,0.4789
+24,aa,4.4354,5.1975,0.0669
+25,oo,4.536,4.9066,0.0304
+26,ll,4.6385,4.5477,0.0572
+27,tt,4.7229,4.1555,0.0852
+28,rr,4.8012,3.7665,0.1831
+29,ss,4.863,3.4925,0.1468
+30,x,4.8945,3.3164,0.0202
+31,cc,4.9393,3.1199,0.022
+32,z,4.9698,2.9061,0.0175
+33,j,5.0044,2.6732,0.0703
+34,dd,5.0378,2.477,0.0165
+35,ii,5.0685,2.2686,0.0033
+36,q,5.0989,2.0352,0.0199
+37,ff,5.1379,1.7935,0.0122
+38,nn,5.1657,1.5375,0.0584
+39,pp,5.192,1.3164,0.0352
+40,bb,5.2193,1.1105,0.0426
+41,mm,5.2436,0.9297,0.011
+42,gg,5.2642,0.7443,0.0404
+43,hh,5.2784,0.5856,0.0171
+44,kk,5.2957,0.4324,0.01
+45,uu,5.3104,0.2785,0.0398
+46,yy,5.3233,0.1553,0.0488
+47,zz,5.3344,0.074,0.0279
+48,vv,5.3388,0.0161,0.044
+49,ww,5.3404,0.0,0.0166
+50,jj,5.3404,0.0,0.0
+51,qq,5.3404,0.0,0.0
+52,xx,5.3404,0.0,

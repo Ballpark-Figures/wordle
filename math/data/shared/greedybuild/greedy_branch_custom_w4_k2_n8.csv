@@ -1,0 +1,15 @@
+# greedy letter-by-letter build (see math/greedybuild.py)
+# settings search=branch pool=custom words=4 topk=2 ssq_first=8 answers=2315
+found_at,nodes,opening,unsolved,ssq
+7.3,20,butch drill month pages,88,6078
+7.5,31,block drill month pages,87,5796
+8.5,57,butch drill monty pages,63,5742
+528.0,13900,britt dolly munch pages,53,5606
+535.9,14142,britt dolly games punch,51,5610
+554.9,14656,britt dames folly punch,50,5642
+555.0,14662,britt dames foyle punch,45,5664
+1131.4,30710,boron chute dimly pages,45,5532
+1761.2,46951,broth cafes mould pinky,42,5404
+1917.2,50661,bugle crowd minty paves,30,5366
+21429.9,388271,bench forte mails pudgy,25,5210
+30341.7,525574,congo draft sable wimpy,24,5380
