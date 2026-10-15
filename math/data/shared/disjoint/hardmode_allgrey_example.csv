@@ -1,0 +1,11 @@
+# Seven legal guesses, pairwise letter-disjoint: one with no vowel,
+# one per vowel A E I O U Y; at least one is an answer. The FIRST set
+# found (see tools/disjoint_words.py for the order), not the only one.
+word,vowel,answer
+crwth,-,0
+flyby,y,0
+gunks,u,0
+vivid,i,1
+zoppo,o,0
+exeem,e,0
+qajaq,a,0

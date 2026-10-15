@@ -284,7 +284,7 @@ class Scene06(WordleBoardScene):
     @subscene
     def trace(self):
         self._setup_switch(TRACE)
-        self._switch(2.0)
+        self._switch(1.5)
 
     # ── notes: a definition under a word, a list of words (06d-f) ─────────────
     def _setup_notes(self, word, notes):
@@ -309,7 +309,7 @@ class Scene06(WordleBoardScene):
     @subscene
     def roate(self):
         self._setup_roate()
-        self._switch_notes(2.0)
+        self._switch_notes(1.5)
 
     def _setup_arise(self):
         ties = _entries(ARISE_TIES).to_corner(DL, buff=CORNER_BUFF)
@@ -320,7 +320,7 @@ class Scene06(WordleBoardScene):
     @subscene
     def arise(self):
         self._setup_arise()
-        self._switch_notes(2.0)
+        self._switch_notes(1.5)
 
     def _setup_aurei(self):
         gloss = _definition(AUREI, GLOSS_FS) \
@@ -333,4 +333,4 @@ class Scene06(WordleBoardScene):
     @subscene
     def aurei(self):
         self._setup_aurei()
-        self._switch_notes(2.0)
+        self._switch_notes(1.5)

@@ -23,24 +23,30 @@ BEAT MAP — one subscene per Script.md beat, letters matching:
   m replay_rest   — SIXTH SEVEN FIFTH OCTET FIRST HALVE FORTH, faster,
                     then the win wave                                     (16m, VO 4)
   n blank_all     — every row back to black, candidates out               (16n, VO 5)
-  o solve_again   — SOLVE typed and scored (NOT IN THE SCRIPT YET)        (--,  VO 5)
+  o solve_again   — SOLVE back in one flip (NOT IN THE SCRIPT YET)        (--,  VO 5)
   p flip_eight    — row 2 back to coloured EIGHT in one flip              (16o, VO 5)
   q flip_words    — row 3 back to WORDS in one flip                       (16p, VO 5)
   r after_solve   — rows 2-3 back to black, SOLVE's candidates back       (16q, VO 5)
-  s greedy        — fewest-candidates board emphasised, a random one of
-                    its candidates guessed, candidates updated, to the end (16r, VO 5)
+  s greedy_first  — fewest-candidates board emphasised, a random one of
+                    its candidates guessed, candidates updated: the first
+                    guess only (split from t: user's call)              (16r, VO 5)
+  t greedy        — the same for every later guess, to the end; every
+                    winning row jumps at once                          (16r, VO 5)
 
-  t chart_in      — the game shifts up off frame, the empty chart up into
+  u chart_in      — the game shifts up off frame, the empty chart up into
                     it: "Average Misses in Multi-Wordle"                  (16s, VO 6)
-  u plot_three    — the 3-word line; CLAMP SINGE TURBO flips in, stacked   (16t, VO 6)
-  v plot_two      — the 2-word line; flips to CLAMP TRIBE (TURBO away)    (16u, VO 6)
-  w plot_one      — the 1-word line; flips to ROTAN (RANGE away), then
-                    its definition                                        (16u, VO 6)
-  x opener_plant  — ROTAN flips to PLANT; definition flips out by line   (--,  VO 6)
-  y plot_improved — the improved strategy; PLANT flips out               (16v, VO 6)
+  v plot_three    — the 3-word line; CLAMP SINGE TURBO flips in, stacked   (16t, VO 6)
+  w plot_one_two  — the 1- and 2-word lines, drawn together; CLAMP SINGE
+                    TURBO flips out                                       (16u, VO 6)
+  x opener_pair   — CLAMP TRIBE flips in                                  (--,  VO 6)
+  y opener_rotan  — flips to ROTAN (TRIBE away), its definition fading in (--,  VO 6)
+  z opener_plant  — ROTAN flips to PLANT; definition flips out by line   (--,  VO 6)
+  za plant_out    — PLANT flips out                                       (--,  VO 6)
+  zb plot_improved — the improved strategy's line                        (16v, VO 6)
 
-16u (2- and 1-word lines) is split into v and w, and x (ROTAN to PLANT) is new
-(user's calls, 2026-10-03) -- neither is in the script yet.
+16u (2- and 1-word lines) is w, and the openers under the chart get their own
+beats, x-za (user's calls, 2026-10-03 and 10-07) --
+none of that is in the script yet.
 
 THE CHART'S DATA IS THE USER'S PLAN (2026-10-01): the best single / pair / triple
 opener at each power of two, raced, then each winner run at every k up to the next
@@ -97,11 +103,12 @@ THE ROW COUNTS ARE THE REAL GAMES': 7 (Dordle), 9 (Quordle), 13 (Octordle).
 
 REUSE MAP — every element and the one source it comes from:
   boards, tiles, letters    assets/board.py `get_board`, as scene 02
-  typing / scoring          board.type_anim / reveal_anim, every unsolved board
+  typing / scoring          board.type_anim / reveal_anim, every unsolved board;
+                            from h on scored with every tile at once (user, 2026-10-07)
                             in ONE play (one guess, all boards)
   the closing wave          board.bounce_tiles (bounce's per-tile jumps, added
                             for this), all 40 winning tiles in ONE LaggedStart
-  keystroke sfx             assets/keys.py `key_cues` (scene 02), first board only
+  keystroke sfx             none in 16 (user, 2026-10-07)
   browser windows           bpkfigures/browser.py `browser_window` (new, modelled
                             on youtube_card.py)
   page screenshots          assets/web_media/*.png, made by assets/web_shots.py
@@ -148,7 +155,6 @@ from config import *
 from assets.board import get_board, get_typed_row, ROWS, TILE, GAP, STROKE
 from assets.gloss import gloss
 from assets import game_data
-from assets.keys import key_cues
 from assets.board import TileFlip
 from assets import multi_data
 from assets.groups import dot_grid, ranked_word_layout
@@ -332,17 +338,17 @@ class Scene16(WordleBoardScene):
     # b : two boards side by side, each a row longer (Dordle's 7)
     @subscene
     def split_two(self):
-        self._split(L2, 1.4)
+        self._split(L2, 0.7)
 
     # c : four boards in a 2x2 grid, two rows longer (Quordle's 9)
     @subscene
     def split_four(self):
-        self._split(L4, 1.4)
+        self._split(L4, 0.7)
 
     # d : eight boards in a 2x4 grid, four rows longer (Octordle's 13)
     @subscene
     def split_eight(self):
-        self._split(L8, 1.4)
+        self._split(L8, 0.7)
 
     def _setup_browser(self):
         win = _window(OCT, WIN_W)
@@ -392,16 +398,17 @@ class Scene16(WordleBoardScene):
         """Guess j typed into every unsolved board, then scored. A board is unsolved
         at guess j while it has a row j. NO jump when a board is solved (user's
         call): the whole game's winning rows jump together at the end (`_wave`).
-        `extra` animations (the footnote in and out) join the typing play."""
+        `extra` animations (the footnote in and out) join the typing play. Typed
+        silently and scored with every tile at once (user's call, 2026-10-07)."""
         live = [k for k, b in enumerate(BOARDS) if len(b["guesses"]) > j]
         word = GUESSES[j]
         types = []
-        for n, k in enumerate(live):
-            anim, total = self.boards[k].type_anim(
-                self, j, word, type_rt, per_letter=key_cues(self) if n == 0 else None)
+        for k in live:
+            anim, total = self.boards[k].type_anim(self, j, word, type_rt)
             types.append(anim)
         self.play(*types, *extra, run_time=total)
-        self.play(*[self.boards[k].reveal_anim(j, BOARDS[k]["guesses"][j]["code"])
+        self.play(*[self.boards[k].reveal_anim(j, BOARDS[k]["guesses"][j]["code"],
+                                               lag_ratio=0)
                     for k in live], run_time=score_rt)
 
     def _wave(self, run_time, boards=BOARDS, height=0.15):
@@ -412,6 +419,25 @@ class Scene16(WordleBoardScene):
         for k, b in enumerate(self.boards):
             ups += b.bounce_tiles(len(boards[k]["guesses"]) - 1, height)
         self.play(LaggedStart(*ups, lag_ratio=0.08), run_time=run_time)
+
+    def _bounce_all(self, run_time, boards=BOARDS, height=0.15):
+        """Every board's winning row jumps at the same moment, each row with the
+        board's usual tile-by-tile stagger (16m: user's call, 2026-10-07; 16h keeps
+        the left-to-right `_wave`)."""
+        self._bounce_rows([len(b["guesses"]) - 1 for b in boards], run_time, height)
+
+    def _bounce_rows(self, rows, run_time, height=0.15):
+        """Board k's row `rows[k]` jumps, every board at the same moment."""
+        self.play(*[b.bounce_anim(rows[k], height) for k, b in enumerate(self.boards)],
+                  run_time=run_time)
+
+    @staticmethod
+    def _win_rows(game):
+        """Each board's winning row in a multi_data game: the guess it went all
+        green on."""
+        return [next(j for j, step in enumerate(game["steps"])
+                     if step["boards"][k]["code"] == ALL_GREEN)
+                for k in range(len(game["steps"][0]["boards"]))]
 
     def _setup_footnote(self):
         b = self.boards[FORTH_BOARD]
@@ -480,7 +506,7 @@ class Scene16(WordleBoardScene):
         sets given, plus what to do when it ends. Dots while a set is over WORD_MAX,
         words from there down; eliminated ones fade, survivors regrid, a set
         crossing to words grows its words out of their dots (07). A board that is
-        DIMMED (16s) gets its new candidates dimmed too; `refade[k]`, if given,
+        DIMMED (16s-t) gets its new candidates dimmed too; `refade[k]`, if given,
         refades board k's survivors as they move (the end-of-16s lift)."""
         pitch, word_max = self._sizes()
         dimmed = getattr(self, "dimmed", None) or [False] * len(members_by_board)
@@ -541,28 +567,151 @@ class Scene16(WordleBoardScene):
         self.play(*anims, *extra, run_time=run_time)
         self.remove(*gone)
 
-    def _play(self, game, j, type_rt, score_rt, update_rt, extra=(), refade=None):
-        """Guess j of `game` (multi_data's): typed into every board it reaches,
-        scored, then every board's candidates updated."""
+    # ── one guess, one call per step (the bundling rule: the subscene body is the
+    #    timeline, each step's run time inline, a wait possible between any two) ──
+    def _type_anims(self, game, j, run_time):
+        """Guess j of `game` (multi_data's) typed into every board it reaches: (the
+        animations, unplayed, and their total run time). No key sounds anywhere in
+        16 (user's call, 2026-10-07)."""
         step = game["steps"][j]
-        live = [k for k, b in enumerate(step["boards"]) if b["code"] is not None]
-        types = []
-        for n, k in enumerate(live):
-            anim, total = self.boards[k].type_anim(
-                self, j, step["word"], type_rt,
-                per_letter=key_cues(self) if n == 0 else None)
-            types.append(anim)
+        types, total = [], run_time
+        for k, b in enumerate(step["boards"]):
+            if b["code"] is not None:
+                anim, total = self.boards[k].type_anim(self, j, step["word"], run_time)
+                types.append(anim)
+        return types, total
+
+    def _type_guess(self, game, j, run_time):
+        types, total = self._type_anims(game, j, run_time)
         self.play(*types, run_time=total)
+
+    def _emphasize_and_type(self, j, *, emphasize_run_time, type_run_time):
+        """16t: guess j's board emphasised WHILE the guess is typed, each with its
+        own run time (user's call, 2026-10-07). When the board is already the
+        emphasised one there is nothing to change, and the typing plays alone."""
+        emph = self._emphasis_anims(GREEDY["steps"][j]["target"])
+        types, total = self._type_anims(GREEDY, j, type_run_time)
+        group = [AnimationGroup(*types, run_time=total)]
+        if emph:
+            group.append(AnimationGroup(*emph, run_time=emphasize_run_time))
+        self.play(*group, run_time=max(total, emphasize_run_time) if emph else total)
+
+    def _score_anims(self, game, j):
+        step = game["steps"][j]
+        return [self.boards[k].reveal_anim(j, b["code"], lag_ratio=0)
+                for k, b in enumerate(step["boards"]) if b["code"] is not None]
+
+    def _members(self, game, j):
+        """Every board's candidates after guess j. A SOLVED board shows nothing
+        beneath it (user's call): its word goes on the update of the guess that
+        solves it."""
+        return [[] if b["code"] in (None, ALL_GREEN) else b["members"]
+                for b in game["steps"][j]["boards"]]
+
+    def _score_guess(self, game, j, run_time):
+        """Guess j scored on every board it reaches, every tile at once (a quick
+        flip: user's call, 2026-10-07)."""
         if self.masks:
             self._follow_tiles(True)
-        self.play(*[self.boards[k].reveal_anim(j, step["boards"][k]["code"])
-                    for k in live], run_time=score_rt)
+        self.play(*self._score_anims(game, j), run_time=run_time)
         if self.masks:
             self._follow_tiles(False)
-        # a SOLVED board shows nothing beneath it (user's call): its word goes on
-        # the update of the guess that solves it
-        self._update_cands([[] if b["code"] in (None, ALL_GREEN) else b["members"]
-                            for b in step["boards"]], update_rt, extra, refade)
+
+    def _update_guess(self, game, j, run_time, lift=False):
+        """Every board's candidates updated after guess j. `lift` (16t's last guess)
+        undims every board WITH the update: the masks and borders as extra
+        animations, the candidates inside the update itself (a survivor's move and
+        its undim are ONE `.animate`, or one target overwrites the other).
+
+        THE LIFT IS BUILT HERE, AT UPDATE TIME, AFTER the guess's `_emphasize`:
+        `.animate` keeps its target on the mobject itself (`.target`), so a lift
+        built before `_emphasize` had its target overwritten by the emphasis's own --
+        it then animated nothing, and the masks vanished in one frame when removed."""
+        extra, refade = self._lift() if lift else ([], None)
+        self._update_cands(self._members(game, j), run_time, extra, refade)
+
+    def _lift(self):
+        """Every dimmed board back to full, to ride on a candidate update: (the masks'
+        and borders' animations, the candidates' `refade`). See `_update_guess`."""
+        refade = [self._refade(False) if d else None for d in self.dimmed]
+        extra = []
+        for i, d in enumerate(self.dimmed):
+            if d:
+                extra += self._dim_anims(i, False, cands=False)
+        self.dimmed = [False] * len(self.boards)
+        return extra, refade
+
+    def _span_anim(self, holder, update, run_time, total):
+        """`update(mob, t)` driven over the first `run_time` of a play `total` long,
+        held at t = 1 after. It runs the WHOLE play on purpose: an animation that
+        finishes early inside a group resumes nothing until the play ends, so a mask
+        driven this way would stop following its flipping tiles part-way through."""
+        frac = run_time / total if total else 1.0
+        return UpdateFromAlphaFunc(holder, lambda m, a: update(m, min(1.0, a / frac)),
+                                   run_time=total)
+
+    def _score_update_and_next(self, j, *, flip_run_time, update_run_time,
+                               emphasize_run_time, type_run_time):
+        """16t: guess j's flip and candidate update, and guess j+1's emphasis change
+        and typing, all starting together, each with its own run time (user's call,
+        2026-10-07).
+
+        Merged PROPERLY, not by bundling the two steps: the update and the emphasis
+        both touch the candidates, and two animations on one mobject in one play
+        overwrite each other. So the candidates take the new dim state INSIDE the
+        update (`refade` on survivors, new ones built at it -- the lift's own
+        mechanism), and each changing board's mask fades while still following its
+        flipping tiles (`_span_anim`)."""
+        k = GREEDY["steps"][j + 1]["target"]
+        want = [i != k for i in range(len(self.boards))]
+        changed = [i for i in range(len(self.boards)) if self.dimmed[i] != want[i]]
+        refade = [self._refade(want[i]) if i in changed else None
+                  for i in range(len(self.boards))]
+        self.dimmed = want                   # new candidates are built at the new state
+        cand, new, gone = self._cand_anims(self._members(GREEDY, j), refade)
+        types, type_total = self._type_anims(GREEDY, j + 1, type_run_time)
+        total = max(flip_run_time, update_run_time, emphasize_run_time, type_total)
+        dims = []
+        for i in changed:
+            b, mask = self.boards[i], self.masks[i]
+            f0, f1 = mask.get_fill_opacity(), (DIM if want[i] else 0.0)
+            tiles = [t for row in b.tiles for t in row]
+            s0 = [t.stroke_rgbas[:, 3].copy() for t in tiles]
+            s1 = 1 - DIM if want[i] else 1.0
+
+            def upd_mask(m, t, b=b, f0=f0, f1=f1):
+                m.set_fill(opacity=f0 + (f1 - f0) * t)
+                m.set_points(self._tile_mask_points(b))
+
+            def upd_stroke(m, t, tiles=tiles, s0=s0, s1=s1):
+                for tile, a0 in zip(tiles, s0):
+                    tile.stroke_rgbas[:, 3] = a0 + (s1 - a0) * t
+            dims += [self._span_anim(mask, upd_mask, emphasize_run_time, total),
+                     self._span_anim(b, upd_stroke, emphasize_run_time, total)]
+        self.add(*new)
+        self._follow_tiles(True)
+        self.play(AnimationGroup(*self._score_anims(GREEDY, j), run_time=flip_run_time),
+                  AnimationGroup(*cand, run_time=update_run_time),
+                  AnimationGroup(*types, run_time=type_total),
+                  *dims, run_time=total)
+        self._follow_tiles(False)
+        self.remove(*gone)
+
+    def _score_and_update(self, game, j, *, flip_run_time, update_run_time,
+                          lift=False):
+        """The flip and the candidate update start together, each with its own run
+        time (16m, 16s-t: user's calls, 2026-10-07). `lift` as `_update_guess`."""
+        extra, refade = self._lift() if lift else ([], None)
+        anims, new, gone = self._cand_anims(self._members(game, j), refade)
+        self.add(*new)
+        if self.masks:
+            self._follow_tiles(True)
+        self.play(AnimationGroup(*self._score_anims(game, j), run_time=flip_run_time),
+                  AnimationGroup(*anims, *extra, run_time=update_run_time),
+                  run_time=max(flip_run_time, update_run_time))
+        if self.masks:
+            self._follow_tiles(False)
+        self.remove(*gone)
 
     def _blank_flips(self, rows, row_lag=0.35):
         """Every tile of `rows` (per board) flipped to the blank face, letters gone,
@@ -631,34 +780,50 @@ class Scene16(WordleBoardScene):
         self._drop_letters(dead)
         self.play(*[b.animate.shift(UP * RAISE) for b in self.boards], run_time=0.8)
         self.cands = [{} for _ in self.boards]
-        self._play(REPLAY, 0, 0.65, 0.9, 1.0)       # TRIAL
+        self._type_guess(REPLAY, 0, 0.65)  # TRIAL
+        self._score_guess(REPLAY, 0, 0.9)
+        self._update_guess(REPLAY, 0, 1.0)
 
     # j : GUESS
     @subscene
     def replay_guess(self):
-        self._play(REPLAY, 1, 0.65, 0.9, 1.0)
+        self._type_guess(REPLAY, 1, 0.65)
+        self._score_guess(REPLAY, 1, 0.9)
+        self._update_guess(REPLAY, 1, 1.0)
 
     # k : COMBO
     @subscene
     def replay_combo(self):
-        self._play(REPLAY, 2, 0.65, 0.9, 1.0)
+        self._type_guess(REPLAY, 2, 0.65)
+        self._score_guess(REPLAY, 2, 0.9)
+        self._update_guess(REPLAY, 2, 1.0)
 
     # l : THIRD -- the first answer, out of order
     @subscene
     def replay_third(self):
-        self._play(REPLAY, 3, 0.65, 0.9, 1.0)
+        self._type_guess(REPLAY, 3, 0.65)
+        self._score_guess(REPLAY, 3, 0.9)
+        self._update_guess(REPLAY, 3, 1.0)
 
-    # m : the rest of the game, faster, then the win wave
+    # m : the rest of the game, faster, each flip and its candidate update at once,
+    #     then every board's winning row jumps at once
     @subscene
     def replay_rest(self):
-        self._play(REPLAY, 4, 0.45, 0.6, 0.4)       # SIXTH
-        self._play(REPLAY, 5, 0.45, 0.6, 0.4)       # SEVEN
-        self._play(REPLAY, 6, 0.45, 0.6, 0.4)       # FIFTH
-        self._play(REPLAY, 7, 0.45, 0.6, 0.4)       # OCTET
-        self._play(REPLAY, 8, 0.45, 0.6, 0.4)       # FIRST
-        self._play(REPLAY, 9, 0.45, 0.6, 0.4)       # HALVE
-        self._play(REPLAY, 10, 0.45, 0.6, 0.4)      # FORTH
-        self._wave(2.0, WEIRD)
+        self._type_guess(REPLAY, 4, 0.3)  # SIXTH
+        self._score_and_update(REPLAY, 4, flip_run_time=0.3, update_run_time=0.4)
+        self._type_guess(REPLAY, 5, 0.3)  # SEVEN
+        self._score_and_update(REPLAY, 5, flip_run_time=0.3, update_run_time=0.4)
+        self._type_guess(REPLAY, 6, 0.3)  # FIFTH
+        self._score_and_update(REPLAY, 6, flip_run_time=0.3, update_run_time=0.4)
+        self._type_guess(REPLAY, 7, 0.3)  # OCTET
+        self._score_and_update(REPLAY, 7, flip_run_time=0.3, update_run_time=0.4)
+        self._type_guess(REPLAY, 8, 0.3)  # FIRST
+        self._score_and_update(REPLAY, 8, flip_run_time=0.3, update_run_time=0.4)
+        self._type_guess(REPLAY, 9, 0.3)  # HALVE
+        self._score_and_update(REPLAY, 9, flip_run_time=0.3, update_run_time=0.4)
+        self._type_guess(REPLAY, 10, 0.3)  # FORTH
+        self._score_and_update(REPLAY, 10, flip_run_time=0.3, update_run_time=0.4)
+        self._bounce_all(1.0, WEIRD)
 
     # n : every row back to black; the candidates go
     @subscene
@@ -670,18 +835,12 @@ class Scene16(WordleBoardScene):
         self._drop_letters(dead)
         self.cands = [{} for _ in self.boards]
 
-    # o : SOLVE typed and scored on every board -- the opener the rest of section 5
-    #     is about (p-s are written for SOLVE EIGHT WORDS)
+    # o : row 1 back to the coloured SOLVE, in one flip (no typing: user's call,
+    #     2026-10-07) -- the opener the rest of section 5 is about (p-s are
+    #     written for SOLVE EIGHT WORDS)
     @subscene
     def solve_again(self):
-        types = []
-        for k, b in enumerate(self.boards):
-            anim, total = b.type_anim(self, 0, GUESSES[0], 0.65,
-                                      per_letter=key_cues(self) if k == 0 else None)
-            types.append(anim)
-        self.play(*types, run_time=total)
-        self.play(*[b.reveal_anim(0, BOARDS[k]["guesses"][0]["code"])
-                    for k, b in enumerate(self.boards)], run_time=0.9)
+        self._flip_word_in(0, 0.6)
 
     # p : row 2 back to the coloured EIGHT, in one flip
     @subscene
@@ -726,21 +885,31 @@ class Scene16(WordleBoardScene):
         back OUT of it (not dim) -- the two multiply to 1."""
         return DIM if dim else 1 - 1 / (1 - DIM)
 
-    def _scale_opacity(self, holder, mobs, ratio):
-        """ONE animation multiplying every fill/stroke opacity in `mobs` by `ratio`
-        over its run (multiplicative, so a word keeps its own look). Driven through
-        `holder`, a mobject ALREADY ON SCREEN: animating a fresh VGroup of the tiles
-        made manim ADD that group, pulling the tiles out of their boards and drawing
-        them over their letters -- every dimmed letter vanished."""
-        data = [(m, m.fill_rgbas[:, 3].copy(), m.stroke_rgbas[:, 3].copy())
-                for mob in mobs for m in mob.family_members_with_points()]
+    def _scale_opacity(self, mobs, ratio):
+        """Animations multiplying every fill/stroke opacity in `mobs` by `ratio` over
+        their run (multiplicative, so a word keeps its own look) -- ONE PER MOBJECT,
+        each driven through that mobject itself.
 
-        def update(_, alpha):
-            k = 1 + (ratio - 1) * alpha
-            for m, f, st in data:
-                m.fill_rgbas[:, 3] = np.minimum(f * k, 1.0)
-                m.stroke_rgbas[:, 3] = np.minimum(st * k, 1.0)
-        return UpdateFromAlphaFunc(holder, update)
+        THE HOLDER MUST BE THE MOBJECT BEING CHANGED. manim draws every mobject no
+        animation names ONCE, into a frozen background, at the start of a play; one
+        driven through some other holder (it used to be the board) is changed every
+        frame but never redrawn, so the candidates sat at full strength while their
+        board dimmed and then jumped dim when the play ended (user, 2026-10-07).
+        Each `mob` is already on screen at the top level, so naming it adds nothing.
+        (Animating a fresh VGroup of the TILES made manim add that group, pulling the
+        tiles out of their boards -- which is why tiles are never grouped here.)"""
+        anims = []
+        for mob in mobs:
+            data = [(m, m.fill_rgbas[:, 3].copy(), m.stroke_rgbas[:, 3].copy())
+                    for m in mob.family_members_with_points()]
+
+            def update(_, alpha, data=data):
+                k = 1 + (ratio - 1) * alpha
+                for m, f, st in data:
+                    m.fill_rgbas[:, 3] = np.minimum(f * k, 1.0)
+                    m.stroke_rgbas[:, 3] = np.minimum(st * k, 1.0)
+            anims.append(UpdateFromAlphaFunc(mob, update))
+        return anims
 
     def _dim_anims(self, i, dim, cands=True):
         """Board i into (or out of) its dimmed state: its mask, and ONE opacity
@@ -750,8 +919,7 @@ class Scene16(WordleBoardScene):
         anims = [self.masks[i].animate.set_fill(opacity=DIM if dim else 0.0)]
         anims.append(self._stroke_anim(i, tiles, dim))
         if cands and self.cands[i]:
-            anims.append(self._scale_opacity(self.boards[i], list(self.cands[i].values()),
-                                             ratio))
+            anims += self._scale_opacity(list(self.cands[i].values()), ratio)
         return anims
 
     def _stroke_anim(self, i, tiles, dim):
@@ -790,59 +958,69 @@ class Scene16(WordleBoardScene):
             else:
                 mask.clear_updaters()
 
-    def _emphasize(self, k, run_time):
-        """Board k (and its candidates) at full strength, every other board dimmed."""
+    def _emphasis_anims(self, k):
+        """Board k (and its candidates) at full strength, every other board dimmed:
+        the animations, unplayed (none when k is already the one emphasised)."""
         anims = []
         for i in range(len(self.boards)):
             if self.dimmed[i] != (i != k):
                 anims += self._dim_anims(i, i != k)
                 self.dimmed[i] = i != k
+        return anims
+
+    def _emphasize(self, k, run_time):
+        """Board k (and its candidates) at full strength, every other board dimmed."""
+        anims = self._emphasis_anims(k)
         if anims:
             self.play(*anims, run_time=run_time)
         else:                        # the same board again: keep the beat's pace
             self.wait(run_time)
 
-    def _greedy(self, j, lift=False):
-        """16s's guess j: its board emphasised, then the guess played everywhere.
-        `lift` undims every board with this guess's candidate update: the masks and
-        borders as extra animations, the candidates inside the update itself (a
-        survivor's move and its undim are ONE `.animate`, or one target overwrites
-        the other).
+    def _emphasize_target(self, j, run_time):
+        """16s: the board guess j is aimed at (the fewest candidates) emphasised."""
+        self._emphasize(GREEDY["steps"][j]["target"], run_time)
 
-        THE LIFT IS BUILT HERE, AFTER `_emphasize`, NEVER BY THE CALLER: `.animate`
-        keeps its target on the mobject itself (`.target`), so a lift built before
-        `_emphasize` had its target overwritten by the emphasis's own -- it then
-        animated nothing, and the masks vanished in one frame when removed."""
-        self._emphasize(GREEDY["steps"][j]["target"], 0.5)
-        extra, refade = [], None
-        if lift:
-            refade = [self._refade(False) if d else None for d in self.dimmed]
-            for i, d in enumerate(self.dimmed):
-                if d:
-                    extra += self._dim_anims(i, False, cands=False)
-            self.dimmed = [False] * len(self.boards)
-        self._play(GREEDY, j, 0.65, 0.9, 0.8, extra, refade)
+    # s : the first greedy guess on its own (split from the rest: user's call,
+    #     2026-10-07) -- the board with the fewest candidates emphasised, a random
+    #     one of its candidates guessed, every board's candidates updated
+    @subscene
+    def greedy_first(self):
+        self._setup_masks()
+        self._emphasize_target(1, 0.5)  # SEVER  (for board 7)
+        self.wait(2.0)
+        self._type_guess(GREEDY, 1, 0.5)
+        self._score_and_update(GREEDY, 1, flip_run_time=0.5, update_run_time=0.5)
 
-    # s : the board with the fewest candidates emphasised, a random one of its
-    #     candidates guessed, every board's candidates updated -- to the end
+    # t : the same for every guess after it, to the end; then every board's winning
+    #     row jumps at once (user, 2026-10-07)
     @subscene
     def greedy(self):
-        self._setup_masks()
-        self._greedy(1)              # SEVER  (for board 7)
-        self._greedy(2)              # SEVEN  (board 7)
-        self._greedy(3)              # VALVE  (board 2)
-        self._greedy(4)              # HALVE  (board 2)
-        self._greedy(5)              # OCTET  (board 8)
-        self._greedy(6)              # WORTH  (board 4)
-        self._greedy(7)              # THIRD  (board 3)
-        self._greedy(8)              # FIRST  (board 1)
-        self._greedy(9)              # FORTH  (board 4)
-        self._greedy(10)             # FIFTH  (board 5)
+        self._emphasize_and_type(2, emphasize_run_time=0.7, type_run_time=0.7)  # SEVEN  (board 7)
+        self._score_update_and_next(2, flip_run_time=0.7, update_run_time=0.7,
+                                    emphasize_run_time=0.7, type_run_time=0.7)  # VALVE  (board 2)
+        self._score_update_and_next(3, flip_run_time=0.7, update_run_time=0.7,
+                                    emphasize_run_time=0.7, type_run_time=0.7)  # HALVE  (board 2)
+        self._score_update_and_next(4, flip_run_time=0.7, update_run_time=0.7,
+                                    emphasize_run_time=0.7, type_run_time=0.7)  # OCTET  (board 8)
+        self._score_update_and_next(5, flip_run_time=0.7, update_run_time=0.7,
+                                    emphasize_run_time=0.7, type_run_time=0.7)  # WORTH  (board 4)
+        self._score_update_and_next(6, flip_run_time=0.7, update_run_time=0.7,
+                                    emphasize_run_time=0.7, type_run_time=0.7)  # THIRD  (board 3)
+        self._score_update_and_next(7, flip_run_time=0.7, update_run_time=0.7,
+                                    emphasize_run_time=0.7, type_run_time=0.7)  # FIRST  (board 1)
+        self._score_update_and_next(8, flip_run_time=0.7, update_run_time=0.7,
+                                    emphasize_run_time=0.7, type_run_time=0.7)  # FORTH  (board 4)
+        self._score_update_and_next(9, flip_run_time=0.7, update_run_time=0.7,
+                                    emphasize_run_time=0.7, type_run_time=0.7)  # FIFTH  (board 5)
+        self._score_update_and_next(10, flip_run_time=0.7, update_run_time=0.7,
+                                    emphasize_run_time=0.7, type_run_time=0.7)  # SIXTH  (board 6)
         # the masks lift WITH the last update, not as a quick fade of their own
         # after it -- seven columns brightening at once read as a flash
-        self._greedy(11, lift=True)  # SIXTH  (board 6)
+        self._score_and_update(GREEDY, 11, flip_run_time=0.7, update_run_time=0.7,
+                               lift=True)
         self.remove(*self.masks)
         self.masks = self.dimmed = None
+        self._bounce_rows(self._win_rows(GREEDY), 1.0)   # every win at once, as 16m
 
     # ── the chart (16s-v of the script) ───────────────────────────────────────
     def _setup_chart(self):
@@ -899,7 +1077,7 @@ class Scene16(WordleBoardScene):
                               for n in right], LABEL_GAP)
         return dict(zip(right, ys))
 
-    # t : the game moves up off the frame, the empty chart comes up into it
+    # u : the game moves up off the frame, the empty chart comes up into it
     @subscene
     def chart_in(self):
         self._setup_chart()
@@ -925,11 +1103,14 @@ class Scene16(WordleBoardScene):
         return self._tile_flips(row, vanish=True)
 
     def _flip_in(self, row):
-        """`row` flips IN -- the reverse of `_flip_out`. Puts the row on screen
-        (hidden until each tile turns) and returns the animation."""
-        row.set_opacity(0)          # hidden until it turns, which may be mid-play
+        """`row` flips IN -- the reverse of `_flip_out`. Puts the row on screen and
+        returns the animation. A flip-in is hidden until the tile turns edge-on at
+        its midpoint, so only its second half is ever seen; the rate function runs
+        just that half (edge-on to flat, eased), so the WHOLE run time is the part
+        you see (user, 2026-10-07: v's flip read at half its length)."""
+        row.set_opacity(0)          # hidden until it turns
         self.add(row)
-        return self._tile_flips(row, appear=True)
+        return self._tile_flips(row, appear=True, rate_func=lambda t: 0.5 + 0.5 * smooth(t))
 
     def _flip_callout(self, words):
         """The opener under the chart flips to `words`, in place: each row that carries
@@ -989,35 +1170,48 @@ class Scene16(WordleBoardScene):
                   run_time=run_time)
         self.chart_shown += list(keys)
 
-    # u : the 3-word opener's line, CLAMP SINGE TURBO flipping in under the chart
+    # v : the 3-word opener's line, CLAMP SINGE TURBO flipping in under the chart
     @subscene
     def plot_three(self):
         flips = [self._flip_in(r) for r in self.callout_rows]
-        self._draw([3], 2.0, [self._timed(flips, 1.0, 2.0)])
+        self._draw([3], 2.0, [self._timed(flips, 1.6, 2.0)])
 
-    def _draw_and_flip(self, n, words, run_time, flip):
-        anims, dead, gone = self._flip_callout(words)
-        self._draw([n], run_time, [self._timed(anims, flip, run_time)])
-        self._finish_flip(dead, gone)
-
-    # v : the 2-word opener's line; the opener flips to CLAMP TRIBE (TURBO away)
+    # w : the 1- and 2-word openers' lines, drawn together (user's order, 2026-10-07:
+    #     the lines first, then the openers under the chart)
+    #     CLAMP SINGE TURBO flips out as they draw (user, 2026-10-07)
     @subscene
-    def plot_two(self):
-        self._draw_and_flip(2, CALLOUT_OPENERS[2], 2.0, flip=1.0)
+    def plot_one_two(self):
+        rows = self.callout_rows
+        self.callout_slots = [r.get_center() for r in rows]   # x's rows land here
+        self._draw([1, 2], 2.0, [self._timed([self._flip_out(r) for r in rows], 1.0, 2.0)])
+        self.remove(*rows)
+        self.callout_rows = []
+
+    # x : the pair CLAMP TRIBE flips in under the chart, where CLAMP and SINGE were
+    def _setup_opener_pair(self):
+        self.callout_rows = [get_typed_row(w).scale_to_fit_width(CALLOUT_W).move_to(c)
+                             for w, c in zip(CALLOUT_OPENERS[2], self.callout_slots)]
+        self.callout_slots = None
+
+    @subscene
+    def opener_pair(self):
+        self._setup_opener_pair()
+        self.play(*[self._flip_in(r) for r in self.callout_rows], run_time=1.0)
 
     def _setup_gloss(self):
         self.gloss = gloss(ROTAN_GLOSS, GLOSS_FS).next_to(
             self.callout_rows[0], DOWN, buff=GLOSS_BUFF, aligned_edge=LEFT)
 
-    # w : the 1-word opener's line; the opener flips to ROTAN (RANGE away), then its
-    #     definition
+    # y : the opener flips to ROTAN (TRIBE away), its definition fading in as it
+    #     flips (user, 2026-10-07)
     @subscene
-    def plot_one(self):
-        self._draw_and_flip(1, CALLOUT_OPENERS[1], 2.0, flip=1.0)
+    def opener_rotan(self):
         self._setup_gloss()
-        self.play(FadeIn(self.gloss), run_time=0.6)
+        anims, dead, gone = self._flip_callout(CALLOUT_OPENERS[1])
+        self.play(*anims, FadeIn(self.gloss), run_time=1.0)
+        self._finish_flip(dead, gone)
 
-    # x : ROTAN flips to PLANT; the definition flips out, line by line
+    # z : ROTAN flips to PLANT; the definition flips out, line by line
     @subscene
     def opener_plant(self):
         anims, dead, gone = self._flip_callout(CALLOUT_OPENERS["alt"])
@@ -1028,10 +1222,15 @@ class Scene16(WordleBoardScene):
         self.remove(self.gloss)
         self.gloss = None
 
-    # y : the improved strategy; PLANT flips out as it draws
+    # za : PLANT flips out, a beat of its own (user, 2026-10-07)
     @subscene
-    def plot_improved(self):
+    def plant_out(self):
         rows = self.callout_rows
-        self._draw(["imp"], 2.0, [self._timed([self._flip_out(r) for r in rows], 1.0, 2.0)])
+        self.play(*[self._flip_out(r) for r in rows], run_time=1.0)
         self.remove(*rows)
         self.callout_rows = []
+
+    # zb : the improved strategy's line
+    @subscene
+    def plot_improved(self):
+        self._draw(["imp"], 2.0)

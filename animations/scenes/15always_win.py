@@ -740,6 +740,7 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
     def climb(self):
         c, cx = self.counter, self.count_x
         moves = AW["climb"]["moves"]
+        self.wait(1.0)
         for k, mv in enumerate(moves):
             v0, v1 = c.tracker.get_value(), mv["unsolved"] - UNCOUNTED
             count = c.count_anim(v1, flash="none")
@@ -753,7 +754,7 @@ class Scene15(StrategyLine, MovingCameraScene, WordleBoardScene):
                             extra=[count])
             c.end_count()
             if k < len(moves) - 1:
-                self.wait(1.1)                 # each number holds before the next move
+                self.wait(1.0)                 # each number holds before the next move
 
     # zd : the counter fades and the two empty rows drop off the bottom; the four
     #      words grow, centred

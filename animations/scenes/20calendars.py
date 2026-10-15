@@ -1,7 +1,11 @@
 """Scene 20 — a career in calendars, for the 80,000 Hours sponsor read (the script's
 unlabelled row 34, VO: "40 years ... 50 weeks a year ... 40 hours a week"). Light
-blue background. Promoted from test scene 96; scenes 21-22 are the read's browser
-pages.
+blue background. Promoted from test scene 96.
+
+SCENES 21 AND 22 ARE MERGED INTO THIS ONE (user's calls, 2026-10-08): after the
+hour dots, the 80,000 Hours homepage rises in a browser window and swipes page to
+page (the research pages, the podcast homepage, three episodes). The 21 and 22 slots
+are simply empty, so 23 and 24 keep their numbers. Ends with the window on screen.
 
 40 years -> 2000 working weeks -> 80,000 hours, in yahtzee 03dice's "grow" style:
 every parent is split into copies of itself, and each copy flies out and becomes
@@ -13,6 +17,15 @@ BEAT MAP
              cell); a week is a header strip + 5 day rows
   c hours  — each day row splits into 8 hour dots; a week's 40 dots sit 8 rows x
              5 cols, one COLUMN per day
+  d to_browser — the dots fade out while the browser, on the 80,000 Hours
+             homepage, comes up from the bottom of the frame (user's added beat)
+  e doctor   — the homepage slides left inside the window, the doctor article in
+               from the right; address and tab title cross-fade (was 21a)
+  f problems — the same to the world-problems page (was 21b)
+  g podcast  — to the podcast homepage (was 21c)
+  h elie     — to Elie Hassenfeld's episode (was 21d)
+  i oster    — to Emily Oster's (was 21e)
+  j silver   — to Nate Silver's (was 21f)
 
 LEDGER — both splits are yahtzee 03dice `_grow` (run 0.8); the ORDER differs:
   ORDER: a 45-degree sweep from the top-left in all three subscenes, by SCREEN
@@ -31,6 +44,10 @@ REUSE MAP
                       subdivides; here with absolute gaps, since each level's
                       split shape differs)
   colours          -> style.py CARD_FILL (paper), ACCENT_FILL (header / ink)
+  browser window   -> bpkfigures/browser.py `browser_window` via assets/sponsor_pages.py
+                      (screenshots from assets/web_shots.py), as scene 16
+  window up (d)    -> 16e: the window shifts UP one frame height from below, 1.2s
+  page-to-page     -> sponsor_pages `swipe` (scene 09's swipe, inside the window)
 """
 from pathlib import Path
 import sys
@@ -39,10 +56,12 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 
 from config import *
+from assets import sponsor_pages
 
 
 # ── layout ─────────────────────────────────────────────────────────────────────
 _BOX_W, _BOX_H = 15.6, 8.6
+FH = config.frame_height        # one frame, as 16's
 # (rows, cols, gap) per level, outermost first: years, weeks-in-a-year,
 # hours-in-a-week (8 rows x 5 cols: one column of 8 hours per day).
 _YEAR_SPLIT = (5, 8, 0.22)
@@ -168,13 +187,12 @@ class Scene20(WordleScene):
     @subscene
     def years(self):
         self._setup_years()
-        # 45-degree sweep; item_frac 0.39 keeps each year's fade as long as under
-        # the old 40-item stagger (1 / (1 + 39 x 0.04))
-        (_, yw, yh), _ = _layout()
-        self.play(_diagonal([(FadeIn(y, scale=0.9), *y.get_center()[:2])
-                             for y in self.years],
-                            step=_pitch(_YEAR_SPLIT, yw, yh), item_frac=0.39),
-                  run_time=2.0)
+        # left to right, top to bottom, each year growing from nothing (06's
+        # GrowFromCenter; user, 2026-10-08 -- was a diagonal fade). Lag 0.04 is the
+        # original 40-item stagger.
+        order = sorted(self.years, key=lambda y: (round(-y.get_y(), 3), y.get_x()))
+        self.play(LaggedStart(*[GrowFromCenter(y) for y in order], lag_ratio=0.04),
+                  run_time=3.0)
 
     # b : each year splits into 50 weekly calendars
     @subscene
@@ -247,3 +265,50 @@ class Scene20(WordleScene):
                   run_time=0.8)
         self._only(*[d for hr in self.hours for d in hr])
         self.weeks = None                       # consumed
+
+    # d : the dots fade out as the browser comes up from the bottom, on the homepage
+    def _setup_to_browser(self):
+        self.win = sponsor_pages.window("80k_home").shift(DOWN * FH)   # a frame below
+
+    @subscene
+    def to_browser(self):
+        self._setup_to_browser()
+        self.add(self.win)
+        # the leaving dots go BELOW the window: FadeOut(VGroup(*dots)) re-adds that
+        # group on top of everything, so add order cannot hold. Lowered rather than
+        # the window raised -- each swipe adds fresh address/title text to the window
+        # at z 0, which a raised window's bar would then cover (user, 2026-10-08)
+        dots = VGroup(*[d for hr in self.hours for d in hr]).set_z_index(-1)
+        self.play(FadeOut(dots), self.win.animate.shift(UP * FH), run_time=1.2)
+        self.remove(*dots, dots)
+        # (self.hours is NOT cleared: the name is also subscene c's method)
+
+    # e : the homepage swipes to the doctor article
+    @subscene
+    def doctor(self):
+        self.play(sponsor_pages.swipe(self.win, "80k_doctor"), run_time=1.0)
+
+    # f : the doctor article swipes to the world-problems page
+    @subscene
+    def problems(self):
+        self.play(sponsor_pages.swipe(self.win, "80k_problems"), run_time=1.0)
+
+    # g : the world-problems page swipes to the podcast homepage
+    @subscene
+    def podcast(self):
+        self.play(sponsor_pages.swipe(self.win, "80k_podcast"), run_time=1.0)
+
+    # h : the podcast homepage -> Elie Hassenfeld
+    @subscene
+    def elie(self):
+        self.play(sponsor_pages.swipe(self.win, "80k_elie"), run_time=1.0)
+
+    # i : Elie Hassenfeld -> Emily Oster
+    @subscene
+    def oster(self):
+        self.play(sponsor_pages.swipe(self.win, "80k_oster"), run_time=1.0)
+
+    # j : Emily Oster -> Nate Silver
+    @subscene
+    def silver(self):
+        self.play(sponsor_pages.swipe(self.win, "80k_silver"), run_time=1.0)

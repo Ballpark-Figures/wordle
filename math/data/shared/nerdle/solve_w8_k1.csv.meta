@@ -7,11 +7,12 @@ ranking=ascending-sum-of-squared-bins
 win=commutative-class
 optimum=0
 rank_only=0
+opening_fixed=0
 guesses=374246
 answers=17723
 classes=11765
 total=52700
 expected=2.973537
 opener=48-32=16
-rank_seconds=111.4
-solve_seconds=229.0
+rank_seconds=0.2
+solve_seconds=96.9
