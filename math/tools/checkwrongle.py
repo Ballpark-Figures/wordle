@@ -20,6 +20,10 @@ check diffs the C against something that shares none of its machinery:
      --out.
   H. The real square matrix the binary loads by default, spot-checked against
      `wordle.pattern` from the strings.
+  T. --trace: every traced losing line replayed FROM THE STRINGS -- legal and
+     consistent at every step, the recorded tiles the real feedback, the lost
+     answers never played and exactly the answers consistent with the line, and
+     the traced openers/values the ones the run reported.
 
 COVERAGE is asserted at the end: it FAILS unless the beam fell below the exact
 value somewhere, an opener lost everything AND one lost nothing, the sweep cut
@@ -44,7 +48,8 @@ import wrongle                                        # noqa: E402
 SOLVER = os.path.join(MATH, "solver", "wrongle")
 FAILS = []
 COVER = {"beam below exact": 0, "opener lost nothing": 0, "opener lost some": 0,
-         "sweep cut": 0, "tied openers": 0, "non-answer opener solved": 0}
+         "sweep cut": 0, "tied openers": 0, "non-answer opener solved": 0,
+         "traced lines": 0, "traced line losing several": 0}
 
 
 def fail(msg):
@@ -90,7 +95,7 @@ _BEST = re.compile(r"^BEST \w+ = (\d+).*attained by:(.*)$")
 
 
 def run(case, objective, depth=None, topk=0, openers=(), prune=True, out=None,
-        expect_rc=0):
+        expect_rc=0, extra=()):
     gpath, apath, ppath = case
     cmd = [SOLVER, "--guess-list", gpath, "--answer-list", apath,
            "--patterns", ppath, "--objective", objective,
@@ -104,6 +109,7 @@ def run(case, objective, depth=None, topk=0, openers=(), prune=True, out=None,
     if not prune:
         cmd += ["--no-prune"]
     cmd += ["--out", out] if out else ["--no-out"]
+    cmd += list(extra)
     p = subprocess.run(cmd, capture_output=True, text=True, cwd=MATH)
     if p.returncode != expect_rc:
         fail("wrongle exited %d (wanted %d): %s" % (p.returncode, expect_rc,
@@ -213,13 +219,81 @@ def check_sweep(case, game, depths, exact, tmp):
             run(case, obj, d + 1, out=out, expect_rc=2)       # foreign stamp: refused
 
 
+def tiles_of(code):
+    """The G/Y/- string of a pattern code, position 0 first (the C's format)."""
+    s = []
+    for _ in range(5):
+        s.append("-YG"[code % 3])
+        code //= 3
+    return "".join(reversed(s))
+
+
+def check_trace(case, game, depths, ks, tmp):
+    """T: every --trace line, replayed FROM THE STRINGS.  For each opener that
+    loses answers: the line starts with it and has exactly D guesses; every guess
+    is in the guess list and consistent with every earlier clue (the legality
+    rule); every recorded tile string is the real feedback against each lost
+    answer; no lost answer is ever played; and the lost set is EXACTLY the
+    answers consistent with the whole line.  The traced openers and their values
+    must be the ones the run itself reported."""
+    gset, aset = set(game.guesses), set(game.answers)
+    for d in depths:
+        for k in [0] + list(ks):
+            tag = "lose d=%d K=%d" % (d, k)
+            tpath = os.path.join(tmp, "trace_%d_%d.csv" % (d, k))
+            if os.path.exists(tpath):
+                os.remove(tpath)
+            vals, _, _ = run(case, "lose", d, topk=k, openers=game.guesses,
+                             extra=["--trace", tpath])
+            want = {g: v for g, v in vals.items() if v > 0}
+            rows = open(tpath).read().splitlines()[1:] if os.path.exists(tpath) else []
+            got = {}
+            bad = []
+            for r in rows:
+                opener, lost, line, lost_ans = r.split(",")
+                got[opener] = int(lost)
+                steps = [s.split(":") for s in line.split()]
+                words = [w for w, _ in steps]
+                lost_set = set(lost_ans.split())
+                if words[0] != opener or len(words) != d:
+                    bad.append("%s: line %s" % (opener, line)); continue
+                for i, (w, t) in enumerate(steps):
+                    if w not in gset:
+                        bad.append("%s: %s not a guess" % (opener, w))
+                    for j in range(i):
+                        if tiles_of(wordle.pattern(steps[j][0], w)) != steps[j][1]:
+                            bad.append("%s: guess %d %s breaks clue %d" % (opener, i + 1, w, j + 1))
+                    for a in lost_set:
+                        if tiles_of(wordle.pattern(w, a)) != t:
+                            bad.append("%s: %s against lost %s is not %s" % (opener, w, a, t))
+                if lost_set & set(words):
+                    bad.append("%s: a lost answer was played" % opener)
+                consistent = {a for a in aset
+                              if all(tiles_of(wordle.pattern(w, a)) == t for w, t in steps)}
+                if consistent != lost_set or not lost_set:
+                    bad.append("%s: lost %s, consistent %s" % (opener, sorted(lost_set), sorted(consistent)))
+                COVER["traced lines"] += 1
+                if len(lost_set) > 1:
+                    COVER["traced line losing several"] += 1
+            if got != want:
+                fail("T %s: traced %s, run reported %s" % (tag, got, want))
+            elif bad:
+                fail("T %s: %d bad, e.g. %s" % (tag, len(bad), bad[0]))
+            else:
+                print("ok T %s: %d losing lines replayed from the strings" % (tag, len(rows)))
+
+
 def check_refusals(case):
     gpath, apath, ppath = case
     base = [SOLVER, "--guess-list", gpath, "--answer-list", apath, "--patterns", ppath]
     for extra, why in [(["--no-out"], "no objective"),
                        (["--objective", "lose", "--no-out"], "lose without --depth"),
                        (["--objective", "expect", "--depth", "3", "--no-out"], "expect with --depth"),
-                       (["--objective", "lose", "--depth", "3"], "no --out")]:
+                       (["--objective", "lose", "--depth", "3"], "no --out"),
+                       (["--objective", "expect", "--opener", "aahed", "--no-out",
+                         "--trace", "/dev/null"], "--trace under expect"),
+                       (["--objective", "lose", "--depth", "3", "--no-out",
+                         "--trace", "/dev/null"], "--trace without --opener")]:
         p = subprocess.run(base + extra, capture_output=True, text=True, cwd=MATH)
         if p.returncode != 2:
             fail("G %s: exited %d, wanted 2" % (why, p.returncode))
@@ -270,6 +344,7 @@ def main():
         exact = check_exact(case, game, args.depth)
         check_beam(case, game, args.depth, exact, args.k)
         check_sweep(case, game, args.depth, exact, tmp)
+        check_trace(case, game, args.depth, args.k, tmp)
         if ci == 0:
             check_refusals(case)
     check_real_matrix(rng)

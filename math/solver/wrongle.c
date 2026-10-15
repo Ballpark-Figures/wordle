@@ -460,6 +460,130 @@ static long long solve(Ctx *c, int depth, int nL, int nA, int drem, uint64_t h0,
     return val;
 }
 
+/* ------------------------------------------------------------------- trace
+ *
+ * --trace FILE (lose, named openers only): after an opener is solved, follow THE
+ * STRATEGY THE SEARCH CHOSE down one line on which answers are lost, and write
+ * it out.  At every node the guess is the one solve() would keep -- the first in
+ * the walk order (same beam, same bound order) whose value is the maximum, the
+ * same strict `v > best` tie-break -- and the branch is the first feedback bucket
+ * (ascending code) whose value is positive.  At the cap the answers left in that
+ * bucket are the ones lost on this line.
+ *
+ * It RE-DERIVES values rather than trusting the table (a TT entry can be evicted
+ * and carries no move), and it CHECKS ITSELF: each node's best must equal the
+ * value its parent computed for it, or the trace aborts -- a line that disagreed
+ * with the search would be a fabrication.  tools/checkwrongle.py replays every
+ * traced line from the strings. */
+
+static int trace_node(Ctx *c, int depth, int nL, int nA, int drem, long long want,
+                      int *gl, int *pl, FILE *tf);
+
+/* Play g from `mem` (drem guesses left, g included) and descend into the first
+ * child that still loses an answer.  Returns the line length, or -1. */
+static int trace_move(Ctx *c, int depth, const uint16_t *mem, int n, int g, int drem,
+                      int *gl, int *pl, FILE *tf) {
+    split_by(c, depth, mem, n, g);
+    int *st = c->start[depth], *ca = c->cntA[depth];
+    for (int p = 0; p < NPAT; p++) {
+        if (p == ALL_GREEN) continue;
+        int lo = st[p], hi = st[p + 1], nAp = ca[p];
+        if (nAp == 0) continue;
+        int nLp = hi - lo;
+        long long v;
+        if (drem - 1 == 0)            v = nAp;
+        else if (nLp <= drem - 1)     v = 0;
+        else {
+            uint64_t ch0, ch1;
+            build_child(c->sortb[depth] + lo, nLp, c->arena[depth + 1],
+                        c->widx[depth + 1], &c->nwid[depth + 1], &ch0, &ch1);
+            v = solve(c, depth + 1, nLp, nAp, drem - 1, ch0, ch1);
+        }
+        if (v <= 0) continue;
+        gl[depth] = g; pl[depth] = p;
+        if (drem - 1 == 0) {
+            /* the cap: these answers were never played */
+            fprintf(tf, ",");
+            int first = 1;
+            for (int k = lo; k < hi; k++) {
+                int w = c->sortb[depth][k];
+                if (!ISA[w]) continue;
+                fprintf(tf, "%s%s", first ? "" : " ", GWORD[w]);
+                first = 0;
+            }
+            return depth + 1;
+        }
+        /* solve() above may have reused arena[depth+1] below it; rebuild */
+        uint64_t ch0, ch1;
+        build_child(c->sortb[depth] + lo, nLp, c->arena[depth + 1],
+                    c->widx[depth + 1], &c->nwid[depth + 1], &ch0, &ch1);
+        return trace_node(c, depth + 1, nLp, nAp, drem - 1, v, gl, pl, tf);
+    }
+    return -1;
+}
+
+/* At the legal set in arena[depth], pick the guess solve() keeps and follow it. */
+static int trace_node(Ctx *c, int depth, int nL, int nA, int drem, long long want,
+                      int *gl, int *pl, FILE *tf) {
+    uint16_t *mem = c->memb[depth];
+    int n = 0;
+    for (int kk = 0; kk < c->nwid[depth]; kk++) {
+        int w = c->widx[depth][kk];
+        uint64_t bits = c->arena[depth][w];
+        while (bits) { mem[n++] = (uint16_t)((w << 6) + __builtin_ctzll(bits)); bits &= bits - 1; }
+    }
+    if (n != nL) { fprintf(stderr, "trace: set size %d != %d\n", n, nL); exit(1); }
+    Cand *cand = c->cpool + c->ctop;
+    score_all(c, mem, n, drem, cand);
+    int m = order_moves(cand, n);
+    c->ctop += n;
+    long long best = -1;
+    int bestg = -1;
+    for (int i = 0; i < m; i++) {
+        if (best >= 0 && cand[i].bound <= best) break;   /* cannot beat it strictly */
+        long long v = eval_move(c, depth, mem, n, cand[i].g, drem, -1, cand[i].bound);
+        if (v > best) { best = v; bestg = cand[i].g; }
+    }
+    c->ctop -= n;
+    if (best != want) {
+        fprintf(stderr, "trace: node at depth %d re-derives %lld, its parent said %lld\n",
+                depth, best, want);
+        exit(1);
+    }
+    (void)nA;
+    return trace_move(c, depth, mem, n, bestg, drem, gl, pl, tf);
+}
+
+/* One CSV row per traced opener: opener,value,line,lost.  `line` is the guesses
+ * with their feedback, `word:TILES` space-separated (G green, Y yellow, - grey,
+ * position 0 first); `lost` the answers left unplayed at the cap on that line. */
+static void trace_opener(Ctx *c, const uint16_t *rootmem, int g, long long value, FILE *tf) {
+    int gl[MAXD], pl[MAXD];
+    fprintf(tf, "%s,%lld", GWORD[g], value);
+    /* the line goes before `lost`, so build it into a buffer first */
+    FILE *tmp = tmpfile();
+    if (!tmp) { fprintf(stderr, "trace: no temp file\n"); exit(1); }
+    int len = trace_move(c, 0, rootmem, NG, g, DEPTH, gl, pl, tmp);
+    if (len != DEPTH) {
+        fprintf(stderr, "trace: %s gave a line of %d guesses, expected %d\n", GWORD[g], len, DEPTH);
+        exit(1);
+    }
+    fprintf(tf, ",");
+    for (int i = 0; i < len; i++) {
+        char s[WORDLEN + 1];
+        int p = pl[i];
+        for (int j = WORDLEN - 1; j >= 0; j--) { int t = p % 3; p /= 3; s[j] = t == 2 ? 'G' : t == 1 ? 'Y' : '-'; }
+        s[WORDLEN] = 0;
+        fprintf(tf, "%s%s:%s", i ? " " : "", GWORD[gl[i]], s);
+    }
+    rewind(tmp);
+    int ch;
+    while ((ch = fgetc(tmp)) != EOF) fputc(ch, tf);   /* ",lost answers" */
+    fclose(tmp);
+    fprintf(tf, "\n");
+    fflush(tf);
+}
+
 /* ------------------------------------------------------------------ output */
 
 typedef struct { int status; long long value, bound; double secs; } Res;  /* 0 none, 1 solved, 2 cut */
@@ -515,6 +639,7 @@ static void usage(void) {
         "  --topk K         beam: K best guesses per node, ROOT INCLUDED (0 = exact)\n"
         "  --opener W       price only these openers (repeatable)\n"
         "  --out FILE       CSV, resumable; --no-out saves NOTHING and must be explicit\n"
+        "  --trace FILE     lose + --opener only: write one losing line per opener\n"
         "  --tt-bits B      table size 2^B (default 26)\n"
         "  --threads N      threads over openers (default: all cores)\n"
         "  --report S       heartbeat seconds (default 30)\n"
@@ -528,7 +653,7 @@ static void usage(void) {
 int main(int argc, char **argv) {
     setvbuf(stdout, NULL, _IOLBF, 0);
 
-    const char *outpath = NULL, *datadir = "data";
+    const char *outpath = NULL, *datadir = "data", *tracepath = NULL;
     const char *guesslist = NULL, *answerlist = NULL, *patpath = NULL;
     const char *openers[256];
     int nopen = 0, no_out = 0, ttbits = 26, depth_given = 0;
@@ -548,6 +673,7 @@ int main(int argc, char **argv) {
         }
         else if (!strcmp(argv[i], "--out") && i + 1 < argc)       outpath = argv[++i];
         else if (!strcmp(argv[i], "--no-out"))                    no_out = 1;
+        else if (!strcmp(argv[i], "--trace") && i + 1 < argc)     tracepath = argv[++i];
         else if (!strcmp(argv[i], "--tt-bits") && i + 1 < argc)   ttbits = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--report") && i + 1 < argc)    REPORT = atof(argv[++i]);
         else if (!strcmp(argv[i], "--no-prune"))                  PRUNE = 0;
@@ -581,6 +707,10 @@ int main(int argc, char **argv) {
         return 2;
     }
     if (TOPK < 0) { fprintf(stderr, "--topk must be >= 0\n"); return 2; }
+    if (tracepath && OBJ != OBJ_LOSE) {
+        fprintf(stderr, "wrongle: --trace follows a line on which answers are LOST; it needs --objective lose\n");
+        return 2;
+    }
     if (!outpath && !no_out) {
         fprintf(stderr, "wrongle: give --out FILE, or --no-out to save NOTHING.\n"
                         "  Prefer the wrapper: bash solver/run-wrongle.sh\n");
@@ -666,6 +796,10 @@ int main(int argc, char **argv) {
     Cand *walk = malloc(sizeof(Cand) * NG);
     int nwalk = 0;
     const char *rootmode;
+    if (tracepath && !nopen) {
+        fprintf(stderr, "wrongle: --trace needs --opener: it traces the openers you name\n");
+        return 2;
+    }
     if (nopen) {
         rootmode = "named";
         for (int i = 0; i < nopen; i++) {
@@ -788,6 +922,20 @@ int main(int argc, char **argv) {
         for (int i = 0; i < nwalk; i++)
             if (res[walk[i].g].status == 1 && res[walk[i].g].value == best) printf(" %s", GWORD[walk[i].g]);
         printf("\n");
+    }
+
+    if (tracepath) {
+        FILE *tf = fopen(tracepath, "w");
+        if (!tf) { fprintf(stderr, "cannot write %s\n", tracepath); return 1; }
+        fprintf(tf, "opener,lost,line,lost_answers\n");
+        for (int i = 0; i < nwalk; i++) {
+            int g = walk[i].g;
+            if (res[g].status != 1 || res[g].value <= 0) continue;
+            double t0 = wall_time();
+            trace_opener(ctxs[0], rootmem, g, res[g].value, tf);
+            printf("traced %s (%.1fs) -> %s\n", GWORD[g], wall_time() - t0, tracepath);
+        }
+        fclose(tf);
     }
     for (int t = 0; t < nthreads; t++) ctx_free(ctxs[t]);
     return 0;

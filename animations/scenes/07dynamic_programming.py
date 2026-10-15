@@ -143,7 +143,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 
 from config import *
 from manim import MovingCameraScene
-from assets.board import (LETTER_FRAC, get_board, get_typed_row, get_scored_row, WordleBoard, STROKE,
+from assets.board import (get_board, get_typed_row, get_scored_row, WordleBoard, STROKE,
                           TILE, GAP)
 from assets.pigpen import PigpenWord, WORD_W
 from assets.keys import key_cues
@@ -152,6 +152,7 @@ from assets.branch import branch_line as _line, mid_tile as _r
 from assets.groups import (ranked_layout, ranked_word_layout, scored_row, HEADER_W,
                            GUESS_SCALE, GUESS_Y, HEAD_ROW_GAP, row_aspect, enter_from_beyond,
                            edge_out, grid_cells)
+from assets.full_tree import spread, full_start, full_tree
 from assets import lists_data, tree_data
 
 DATA = lists_data.load()
@@ -220,21 +221,6 @@ AVG_NUM_BUFF = 0.3                 # between "Guesses" and the number
 AVG_BUFF = 0.35                    # from the frame's top-right corner
 AVG_GREEN = TILE_CORRECT           # an optimal tree's number (the others' are white):
                                    #   the tiles' green, as the winning rows
-FULL_SCALE_W = 6.0                 # zc: the size rule -- a node of n answers is
-                                   #   FULL_SCALE_W * sqrt(n / N) wide, N all of them
-FULL_ROOT_W = 3.0                  # zc: SALET's own width, OFF the rule (user's call)
-FULL_R = 4.25                      # zc: (vertical) distance of a one-answer node from the
-                                   #   centre; a node of n answers sits at
-                                   #   FULL_R * log(N / n) / log(N) -- the bigger the group,
-                                   #   the nearer the middle (user's call), not level rings
-FULL_X_STRETCH = 1.75              # zc: the ellipses' width / height (the frame's shape)
-FULL_START = math.pi / 2           # zc: where the first branch sits (straight up)
-FULL_LINE_W, FULL_LINE_OPACITY = 0.4, 0.2    # zc: the branch lines
-FULL_CLEAR = 0.15                  # zc: least gap between SALET and any node
-FULL_LETTER_W = 0.35               # zc: rows at least this wide are full board rows
-FULL_GLYPH_W = 0.08                # zc: narrower rows get copied letters down to this
-                                   #   width (user's call: letters that cannot be read
-                                   #   still read as letters); below it, bare tiles
 FULL_BELOW = 0.4                   # zc: zb's frame starts this far below FIRST's tree
 THUMB_CASE = 0.3                   # y: the group waiting in a corner
 THUMB_TREE = 0.2                   # z: the finished tree waiting in a corner, small
@@ -262,34 +248,6 @@ def _avg_block():
 def _avg_number(value, color, slot):
     """`value` to 2 decimals, centred in the corner text's number slot."""
     return crisp_text(f"{value:.2f}", font_size=AVG_FS, color=color).move_to(slot)
-
-
-def _vdc(k):
-    """The k-th term of the base-2 van der Corput sequence: 0, 1/2, 1/4, 3/4, 1/8 ..."""
-    f, d = 0.0, 0.5
-    while k:
-        f += d * (k & 1)
-        k >>= 1
-        d /= 2
-    return f
-
-
-def _spread(kids, around):
-    """The order zc lays a node's children out in (user's call: not pattern-code
-    order, which put every big group on one side). `around` (SALET's children, a
-    full circle): largest first, then each next-largest into the middle of the
-    biggest gap left -- van der Corput positions -- so the big groups are dealt
-    evenly round SALET. Otherwise (a slice of a parent's angle): largest in the
-    MIDDLE, sizes falling off to both sides, so a node's big children sit on its
-    own line out from the centre."""
-    by_size = sorted(kids, key=lambda k: (-len(k["answers"]), k["code"]))
-    if around:
-        slot = {id(k): _vdc(i) for i, k in enumerate(by_size)}
-        return sorted(by_size, key=lambda k: slot[id(k)])
-    left, right = [], []
-    for i, k in enumerate(by_size):
-        (right if i % 2 else left).append(k)
-    return left[::-1] + right
 
 
 def _jump(row):
@@ -1240,8 +1198,8 @@ class Scene07(MovingCameraScene, WordleBoardScene):
 
         def place(node, path):
             # left to right in the order the branches take in the full radial tree
-            # (`_spread`), so the zoom-out in za rearranges them without crossing
-            for kid in _spread(node["kids"], False):
+            # (`full_tree.spread`), so the zoom-out in za rearranges them without crossing
+            for kid in spread(node["kids"], False):
                 key = path + (kid["code"],)
                 if kid["node"] is None:
                     xs[key] = -X + pitch * (next(it) + 0.5)
@@ -1388,107 +1346,7 @@ class Scene07(MovingCameraScene, WordleBoardScene):
     # distance from the centre falls with its group's size (log scale), so big groups
     # sit near the middle and the wins at the edge, on ellipses (the frame is wider
     # than tall); each node at the middle of an angle proportional to its answers,
-    # siblings ordered by `_spread` (big groups dealt evenly round SALET).
-    def _full_row(self, word, code, width, centre):
-        """A row `width` wide at `centre`: `word` scored as `code`, or typed (black)
-        when `code` is None. Real letters only when wide enough to read; below
-        FULL_LETTER_W just the tiles, flat (thousands of rows)."""
-        if width >= FULL_LETTER_W:
-            row = get_typed_row(word) if code is None else get_scored_row(word, code)
-            return row.scale(width / row.width).move_to(centre)
-        trits = [None] * 5 if code is None else [(code // 3 ** (4 - i)) % 3 for i in range(5)]
-        tile = width / (5 + 4 * GAP / TILE)
-        sq = [Square(side_length=tile, stroke_width=0, fill_opacity=1.0,
-                     fill_color=TILE_EMPTY_FILL if t is None else TILE_STATE[t])
-              for t in trits]
-        row = VGroup(*sq).arrange(RIGHT, buff=tile * GAP / TILE).move_to(centre)
-        if width < FULL_GLYPH_W:
-            return row
-        # letters too: unreadable this small, but a box with a letter still reads
-        # differently from an empty one (user's call). One glyph per letter, built
-        # once and copied -- thousands of rows
-        return VGroup(row, *[self._glyph(ch).copy().scale(tile * LETTER_FRAC).move_to(t)
-                             for ch, t in zip(word, sq)])
-
-    def _glyph(self, ch):
-        """The board's letter for `ch`, 1 unit tall, built once per letter."""
-        cache = self.__dict__.setdefault("glyphs", {})
-        if ch not in cache:
-            g = crisp_text(ch.upper(), color=TILE_TEXT, weight=BOLD)
-            cache[ch] = g.scale(1 / g.height)
-        return cache[ch]
-
-    def _full_layout(self, tree, start):
-        """Where every branch of `tree` goes, relative to its root: {path: (centre,
-        width, open)}, a path being the tuple of pattern codes from the root (as
-        `_big_build`'s keys); the first branch at angle `start` (see above)."""
-        def count(n):
-            return sum(len(k["answers"]) if not k["node"] else count(k["node"])
-                       for k in n["kids"])
-        total = count(tree)
-        k_w = FULL_SCALE_W / math.sqrt(total)
-        root_h = FULL_ROOT_W * row_aspect()
-        pitch = lambda w: w * row_aspect() * (1 + GAP / TILE)
-        out = {}
-
-        def place(node, a0, a1, depth, path):
-            a = a0
-            for kid in _spread(node["kids"], depth == 1):
-                key = path + (kid["code"],)
-                n = len(kid["answers"])
-                span = (a1 - a0) * n / sum(len(k["answers"]) for k in node["kids"])
-                mid = a + span / 2
-                r = FULL_R * math.log(total / n) / math.log(total)
-                w = k_w * math.sqrt(n)
-                h = (2 if kid["node"] is not None else 1) * pitch(w)
-                off = lambda r: np.array([r * FULL_X_STRETCH * math.cos(mid), r * math.sin(mid), 0.0])
-                # a node that would overlap the root is pushed out along its angle
-                # until it clears it by FULL_CLEAR (nothing else moves)
-                while (abs(off(r)[0]) < (FULL_ROOT_W + w) / 2 + FULL_CLEAR
-                       and abs(off(r)[1]) < (root_h + h) / 2 + FULL_CLEAR):
-                    r *= 1.03
-                out[key] = (off(r), w, kid["node"] is not None, mid)
-                if kid["node"] is not None:
-                    place(kid["node"], a, a + span, depth + 1, key)
-                a += span
-        place(tree, start, start + 2 * math.pi, 1, ())
-        return out
-
-    def _full_start(self, tree, key, angle):
-        """The start angle that puts branch `key` of `tree` at `angle` -- turning the
-        whole tree (spans do not depend on where it starts)."""
-        mid = self._full_layout(tree, FULL_START)[key][3]
-        return FULL_START + angle - mid
-
-    def _full_tree(self, tree, origin=ORIGIN, start=FULL_START):
-        """Every node and line of `tree`, placed radially round `origin`. Returns
-        (root row, {path: [colouring row, next-guess row (open branches only)]},
-        {path: line in from its parent}, {path: node centre})."""
-        layout = self._full_layout(tree, start)
-        root = self._full_row(tree["guess"], None, FULL_ROOT_W, origin)
-        nodes, lines, cents = {}, {}, {}
-        guesses = {(): tree}
-
-        def walk(node, path):
-            for kid in node["kids"]:
-                key = path + (kid["code"],)
-                off, w, open_, _ = layout[key]
-                c = origin + off
-                cents[key] = c
-                if not open_:                                  # a win: the green row
-                    nodes[key] = [self._full_row(node["guess"], kid["code"], w, c)]
-                else:                                          # colouring + next guess
-                    p = w * row_aspect() * (1 + GAP / TILE)
-                    nodes[key] = [self._full_row(node["guess"], kid["code"], w, c + UP * p / 2),
-                                  self._full_row(kid["node"]["guess"], None, w, c + DOWN * p / 2)]
-                parent = origin if not path else cents[path]
-                lines[key] = Line(parent, c, color=WHITE, stroke_width=FULL_LINE_W,
-                                  stroke_opacity=FULL_LINE_OPACITY).set_z_index(-1)
-                if open_:
-                    walk(kid["node"], key)
-        walk(tree, ())
-        return root, nodes, lines, cents
-
+    # siblings ordered by `full_tree.spread` (big groups dealt evenly round SALET).
     def _avg_at(self, origin, value, color):
         """A tree's own "Average Guesses" block, already showing `value`: where the
         corner text sits in the default frame, shifted to the tree at `origin`."""
@@ -1506,8 +1364,8 @@ class Scene07(MovingCameraScene, WordleBoardScene):
         into their radial places."""
         tree = TREES_FULL[FIRST]
         base = (BIG_CODE,)
-        start = self._full_start(tree, base, -math.pi / 2)
-        root, nodes, lines, cents = self._full_tree(tree, ORIGIN, start)
+        start = full_start(tree, base, -math.pi / 2)
+        root, nodes, lines, cents = full_tree(tree, ORIGIN, start)
         # zoom: zb's FIRST row is this many times the branch's colouring row
         M = self.big.width / nodes[base][0].width
         # the branch starts this far down: zb's frame then lies wholly below the tree
