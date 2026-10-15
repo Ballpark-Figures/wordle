@@ -8,6 +8,9 @@
 #     bash solver/run-wrongle.sh --objective expect -k 10      # max expected guesses
 #     bash solver/run-wrongle.sh --opener salet --opener crane # price named openers
 #     bash solver/run-wrongle.sh --dry-run                     # resolve and stop
+#     bash solver/run-wrongle.sh --depth 18 -k 100 --opener ayaya --trace
+#                                  # also write one losing line per opener
+#                                  # to <stem>_trace.csv (lose + --opener only)
 #
 # math/wrongle.py states the rule and IS the source of truth. In short: a guess
 # must be one of the 12972 legal words AND consistent with every clue so far; the
@@ -67,6 +70,7 @@ DEPTH=""
 K=0
 NAMED=0
 DRY=0
+TRACE=0
 PASS=()
 i=0
 while [ $i -lt ${#ARGS[@]} ]; do
@@ -76,6 +80,7 @@ while [ $i -lt ${#ARGS[@]} ]; do
         -k|--topk)   K="${ARGS[$((i + 1))]}"; i=$((i + 1)) ;;
         --opener)    NAMED=1; PASS+=("${ARGS[$i]}" "${ARGS[$((i + 1))]}"); i=$((i + 1)) ;;
         --dry-run)   DRY=1 ;;
+        --trace)     TRACE=1 ;;
         --out|--no-out)
                      echo "the wrapper sets the output file itself" >&2; exit 2 ;;
         *)           PASS+=("${ARGS[$i]}") ;;
@@ -102,12 +107,21 @@ LOC=data/local/wrongle
 OUT="$OUTDIR/$STEM.csv"
 LOG="$LOC/$STEM.log"
 CMD=(./solver/wrongle "${OBJARGS[@]}" --topk "$K" --out "$OUT" ${PASS[@]+"${PASS[@]}"})
+TOUT=""
+if [ "$TRACE" = 1 ]; then
+    if [ "$OBJ" != lose ] || [ "$NAMED" != 1 ]; then
+        echo "--trace needs --objective lose and at least one --opener" >&2; exit 2
+    fi
+    TOUT="$OUTDIR/${STEM}_trace.csv"
+    CMD+=(--trace "$TOUT")
+fi
 
 if [ "$DRY" = 1 ]; then
     echo "dry run -- nothing started, nothing written"
     echo "  objective: $OBJ${DEPTH:+, depth $DEPTH}, K=$K ($([ "$K" = 0 ] && echo exact || echo 'beam: LOWER bounds'))"
     echo "  out:       $MATH/$OUT"
     echo "  log:       $MATH/$LOG"
+    [ -n "$TOUT" ] && echo "  trace:     $MATH/$TOUT"
     echo "  binary:    ${CMD[*]}"
     exit 0
 fi

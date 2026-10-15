@@ -4712,7 +4712,20 @@ attached, tee'd log, `--dry-run`. Built 2026-10-14 (user's spec).
   best of the K examined. K in the filename and the stamp.
 - Data `data/shared/wrongle/{lose_d<D>,expect}_k<K>[_openers].csv`, resumable,
   first line a stamp; a run asking a different question REFUSES to append. Log
-  under `data/local/wrongle/`. **No trees yet** -- open gap.
+  under `data/local/wrongle/`. **No trees** -- but **`--trace`** (lose + `--opener`
+  only; `run-wrongle.sh ... --opener W --trace`) writes ONE losing line per
+  opener to `<stem>_trace.csv`: the guesses with their tiles and the answers
+  left unplayed at the cap. It follows the strategy the search chose (same beam,
+  same walk order, same strict tie-break), RE-DERIVES every value rather than
+  trusting the table, and aborts if any node disagrees with its parent's value.
+  Gated as check T (each line replayed from the strings: legal, consistent, real
+  tiles, lost set exactly the consistent answers), mutation-tested (reversed
+  tiles, non-answers listed as lost).
+- **A loss at depth D implies a consistent run of at least D+1 words ending on an
+  answer** (the D unplayed-answer guesses, then the answer) -- `eldrowmax --plays
+  guess`'s quantity. So wrongle's beam can witness a longer run than that ladder
+  has reached: `ayaya` loses 1 at d18 K=100, i.e. a 19-word run, while the ladder
+  had reached 17.
 - **`python3 tools/checkwrongle.py` is the GATE** (~3 s): per-opener values, both
   objectives, several caps, against the reference (which recomputes legal sets
   from the STRINGS); `--no-prune`; the beam at K=1..3 per opener and at the root;
