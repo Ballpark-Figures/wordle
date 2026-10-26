@@ -1,5 +1,8 @@
 from bpkfigures.scene import *
 
+# This video predates the navy default (2026-10-25): it keeps the light blue.
+BG_COLOR = LIGHT_BLUE
+
 # ── The Wordle palette ────────────────────────────────────────────────────────
 # Wordle's dark-mode colours, with the three SCORED tiles brightened toward the
 # channel palette (user's call, 2026-09-28, option B of scenes/95palette_test):
