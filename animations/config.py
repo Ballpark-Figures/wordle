@@ -1,7 +1,7 @@
 from bpkfigures.scene import *
 
-# This video predates the navy default (2026-10-25): it keeps the light blue.
-BG_COLOR = LIGHT_BLUE
+# This video predates the navy default (2026-10-25): it keeps the cyan.
+BG_COLOR = CYAN_BG
 
 # ── The Wordle palette ────────────────────────────────────────────────────────
 # Wordle's dark-mode colours, with the three SCORED tiles brightened toward the
