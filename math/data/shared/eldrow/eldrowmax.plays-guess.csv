@@ -1,0 +1,17 @@
+pool,words,mode,status,length,greedy,nodes,threads,secs,line
+data/shared/words/guess.txt|answers=data/shared/words/mystery.txt,12972,ladder,greedy,13,13,0,18,11.742,gyppy cocco hudud immix flaff qajaq zazen rarer baker saser eater tater water
+data/shared/words/guess.txt|answers=data/shared/words/mystery.txt,12972,ladder,greedy,13,13,0,18,0.459,gyppy cocco hudud immix flaff qajaq zazen rarer baker saser eater tater water
+data/shared/words/guess.txt|answers=data/shared/words/mystery.txt,12972,ladder,reached,14,13,1899743,18,11.986,
+data/shared/words/guess.txt|answers=data/shared/words/mystery.txt,12972,ladder,greedy,13,13,0,18,0.435,gyppy cocco hudud immix flaff qajaq zazen rarer baker saser eater tater water
+data/shared/words/guess.txt|answers=data/shared/words/mystery.txt,12972,ladder,reached,14,13,1521110,18,11.483,
+data/shared/words/guess.txt|answers=data/shared/words/mystery.txt,12972,ladder,improved,14,13,1521110,18,11.484,gyppy cocco hudud immix flaff qajaq zazen rarer saser eater taber taver tawer taker
+data/shared/words/guess.txt|answers=data/shared/words/mystery.txt,12972,ladder,reached,15,13,6713913,18,50.189,
+data/shared/words/guess.txt|answers=data/shared/words/mystery.txt,12972,ladder,improved,15,13,6713915,18,50.191,aight bight dight eight fight hight kight light might night pight right sight tight wight
+data/shared/words/guess.txt|answers=data/shared/words/mystery.txt,12972,ladder,reached,16,13,15399274,18,90.911,
+data/shared/words/guess.txt|answers=data/shared/words/mystery.txt,12972,ladder,improved,16,13,15399276,18,90.914,guilt digit jigot aight bight eight fight hight kight might night pight right sight tight wight
+data/shared/words/guess.txt|answers=data/shared/words/mystery.txt,12972,ladder,reached,17,13,80367284,18,1042.420,
+data/shared/words/guess.txt|answers=data/shared/words/mystery.txt,12972,ladder,improved,17,13,80367285,18,1042.423,gyppy cocco susus frizz eerie iller titer biker niner mimer aiver diver hiver jiver viver wiver river
+data/shared/words/guess.txt|answers=data/shared/words/mystery.txt,12972,ladder,reached,18,13,8527331106,18,177005.196,
+data/shared/words/guess.txt|answers=data/shared/words/mystery.txt,12972,ladder,improved,18,13,8530298956,18,177038.751,aurae beery koker icier piper fifer titer mimer niner sixer diver giver hiver jiver liver viver wiver river
+data/shared/words/guess.txt|answers=data/shared/words/mystery.txt,12972,ladder,reached,19,13,71098263067,18,400177.193,
+data/shared/words/guess.txt|answers=data/shared/words/mystery.txt,12972,ladder,improved,19,13,71101741098,18,400222.058,orzos query eerie icier piper fifer mimer titer niner biker aiver diver giver hiver jiver liver viver wiver river

@@ -1,0 +1,5 @@
+# guarantee sweep (see math/guarantee.py): the WORST case over every answer and
+# every draw the random follow-up could make -- exact, no sampling, no seed
+# settings pool=mystery adapt=0 cap=6 openings=1 source=data/local/guarantee/syrup_block_fight_named.txt
+word,worst_case,guaranteed,losing_answers,losing_groups,losing_share,worst_answer,worst_line,losing_words
+syrup block fight named,7,0,15,6,0.00647948,catch,syrup block fight named hatch watch catch,catch fever fewer hatch jaunt odder order piper rider riper taunt vaunt viper watch wider
